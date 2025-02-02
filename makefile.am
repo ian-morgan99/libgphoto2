@@ -1,0 +1,5 @@
+libpentaxchatgpt_la_SOURCES = pentax.c ptp-pentax.c
+libpentaxchatgpt_la_LDFLAGS = -module -avoid-version
+libpentaxchatgpt_la_LIBADD  = ../../libgphoto2_port/libgphoto2_port.la
+
+EXTRA_DIST = pentax.h ptp-pentax.h
