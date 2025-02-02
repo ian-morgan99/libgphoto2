@@ -1,0 +1,5 @@
+libpentax_la_SOURCES = pentax.c
+libpentax_la_LDFLAGS = -module -avoid-version
+libpentax_la_LIBADD  = ../../libgphoto2_port/libgphoto2_port.la
+
+EXTRA_DIST = pentax.h
