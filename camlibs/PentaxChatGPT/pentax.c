@@ -80,6 +80,14 @@ int camera_init(Camera *camera, GPContext *context) {
 
     camera->functions->trigger_autofocus = trigger_autofocus;
 
+    camera->operations.capture = pentax_capture_image;
+    camera->operations.liveview = pentax_get_liveview;
+    camera->operations.movie_mode = pentax_set_movie_mode;
+    camera->operations.focus_control = pentax_focus_control;
+    camera->operations.white_balance = pentax_measure_wb;
+    camera->operations.clean_sensor = pentax_clean_sensor;
+
+
     // Initialization completed successfully
     return GP_OK;
 }
@@ -581,6 +589,97 @@ static int trigger_autofocus(Camera *camera, GPContext *context) {
         }
     } else {
         gp_log(GP_LOG_ERROR, "Pentax Driver", "Failed to send autofocus trigger command.");
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+int pentax_clean_sensor(PTPParams* params) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_ExecuteDustReduction; // 36898
+    ptp.Nparam = 0;
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax Sensor Cleaning failed: %d", ret);
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+int pentax_measure_wb(PTPParams* params) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_MeasuringWhiteBalanceGain; // 36897
+    ptp.Nparam = 0;
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax White Balance measurement failed: %d", ret);
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+
+int pentax_focus_control(PTPParams* params, int direction) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_FocusControl; // 36886
+    ptp.Nparam = 1;
+    ptp.Param1 = direction; // Forward/Backward focus adjustment
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax Focus Control failed: %d", ret);
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+
+int pentax_set_movie_mode(PTPParams* params, int enable) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_MovieMode; // 53305
+    ptp.Nparam = 1;
+    ptp.Param1 = enable ? 1 : 0;
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax Movie Mode failed: %d", ret);
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+
+int pentax_capture_image(PTPParams* params) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_InitiatePentaxCapture; // 36881
+    ptp.Nparam = 0;
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax Capture failed: %d", ret);
+        return ret;
+    }
+
+    return GP_OK;
+}
+
+
+
+int pentax_get_liveview(PTPParams* params, uint8_t* buffer, int bufsize) {
+    PTPContainer ptp;
+    ptp.Code = PENTAX_OC_GetLiveViewFrameData; // 36870
+    ptp.Nparam = 0;
+
+    int ret = ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, buffer, &bufsize);
+    if (ret != PTP_RC_OK) {
+        GP_LOG_ERROR("Pentax Live View failed: %d", ret);
         return ret;
     }
 
