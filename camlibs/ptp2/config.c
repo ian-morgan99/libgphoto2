@@ -4122,6 +4122,8 @@ static struct deviceproptableu16 exposure_program_modes[] = {
 	{ N_("Movie (M)"),				0x8053, PTP_VENDOR_SONY},
 	{ N_("Movie (Scene)"),			0x8054, PTP_VENDOR_SONY},
 	{ N_("Tele-zoom Cont. Priority AE"),	0x8031, PTP_VENDOR_SONY},
+	{ N_("Tele-Zoom Cont. Priority AE 10"),	0x8032, PTP_VENDOR_SONY},
+	{ N_("3D Sweep Panorama Shooting"),	0x8040, PTP_VENDOR_SONY},
 	{ N_("Sweep Panorama"),			0x8041, PTP_VENDOR_SONY},
 	{ N_("Intelligent Auto Flash Off"),	0x8060, PTP_VENDOR_SONY},
 	{ N_("Sports Action"),			0x8011, PTP_VENDOR_SONY},
@@ -4133,7 +4135,14 @@ static struct deviceproptableu16 exposure_program_modes[] = {
 	{ N_("Night Portrait"),			0x8017, PTP_VENDOR_SONY},
 	{ N_("Anti Motion Blur"),		0x8018, PTP_VENDOR_SONY},
 	{ N_("Picture Effect"),			0x8070, PTP_VENDOR_SONY},
-	{ N_("S&Q"),				0x8084, PTP_VENDOR_SONY}, /* on A7III */
+	{ N_("High Frame Rate (P)"),		0x8080, PTP_VENDOR_SONY},
+	{ N_("High Frame Rate (A)"),		0x8081, PTP_VENDOR_SONY},
+	{ N_("High Frame Rate (S)"),		0x8082, PTP_VENDOR_SONY},
+	{ N_("High Frame Rate (M)"),		0x8083, PTP_VENDOR_SONY},
+	{ N_("S&Q Motion (P)"),			0x8084, PTP_VENDOR_SONY}, /* on A7III */
+	{ N_("S&Q Motion (A)"),			0x8085, PTP_VENDOR_SONY},
+	{ N_("S&Q Motion (S)"),			0x8086, PTP_VENDOR_SONY},
+	{ N_("S&Q Motion (M)"),			0x8087, PTP_VENDOR_SONY},
 };
 GENERIC16TABLE(ExposureProgram,exposure_program_modes)
 
@@ -4157,7 +4166,7 @@ static struct deviceproptableu8 nikon_scenemode[] = {
 	{ N_("Night Portrait"),		18, 0 },
 
 };
-GENERIC8TABLE(NIKON_SceneMode,nikon_scenemode);
+GENERIC8TABLE(NIKON_SceneMode,nikon_scenemode)
 
 /* Nikon 1 S1 specials in here */
 static struct deviceproptableu8 nikon_1_j3_iso[] = {
@@ -4202,7 +4211,7 @@ static struct deviceproptableu8 nikon_1_j3_iso[] = {
 	{ "6400",	0x2e, 0 },
 	/* more unknown values */
 };
-GENERIC8TABLE(Nikon_1_J3_ISO,nikon_1_j3_iso);
+GENERIC8TABLE(Nikon_1_J3_ISO,nikon_1_j3_iso)
 
 /* Nikon 1 S1 specials in here */
 static struct deviceproptableu8 nikon_1_s1_iso[] = {
@@ -4239,7 +4248,7 @@ static struct deviceproptableu8 nikon_1_s1_iso[] = {
 	{ "3200",	0x28, 0 },
 	{ "6400",	0x2e, 0 },
 };
-GENERIC8TABLE(Nikon_1_S1_ISO,nikon_1_s1_iso);
+GENERIC8TABLE(Nikon_1_S1_ISO,nikon_1_s1_iso)
 
 /* Generic Nikon 1 ISO */
 static struct deviceproptableu8 nikon_1_iso[] = {
@@ -4278,7 +4287,7 @@ static struct deviceproptableu8 nikon_1_iso[] = {
 	{ "3200",	0x28, 0 },
 	{ "6400",	0x2e, 0 },
 };
-GENERIC8TABLE(Nikon_1_ISO,nikon_1_iso);
+GENERIC8TABLE(Nikon_1_ISO,nikon_1_iso)
 
 static struct deviceproptableu8 nikon_1_whitebalance[] = {
 	/* values from a J3 */
@@ -4294,7 +4303,7 @@ static struct deviceproptableu8 nikon_1_whitebalance[] = {
 	{ N_("Water"),			0x0a, 0 },
 	{ N_("Preset"),			0x08, 0 },
 };
-GENERIC8TABLE(Nikon_1_WhiteBalance,nikon_1_whitebalance);
+GENERIC8TABLE(Nikon_1_WhiteBalance,nikon_1_whitebalance)
 
 static struct deviceproptableu8 nikon_hdrhighdynamic[] = {
 	{ N_("Auto"),	0, 0 },
@@ -4302,7 +4311,7 @@ static struct deviceproptableu8 nikon_hdrhighdynamic[] = {
 	{ N_("2 EV"),	2, 0 },
 	{ N_("3 EV"),	3, 0 },
 };
-GENERIC8TABLE(Nikon_HDRHighDynamic,nikon_hdrhighdynamic);
+GENERIC8TABLE(Nikon_HDRHighDynamic,nikon_hdrhighdynamic)
 
 static struct deviceproptableu8 nikon_aebracketstep[] = {
 	{ N_("1/3 EV"),	0, 0 },
@@ -4312,14 +4321,14 @@ static struct deviceproptableu8 nikon_aebracketstep[] = {
 	{ N_("2 EV"),	4, 0 },
 	{ N_("3 EV"),	5, 0 },
 };
-GENERIC8TABLE(Nikon_AEBracketStep,nikon_aebracketstep);
+GENERIC8TABLE(Nikon_AEBracketStep,nikon_aebracketstep)
 
 static struct deviceproptableu8 nikon_wbbracketstep[] = {
 	{ N_("1 EV"),	0, 0 },
 	{ N_("2 EV"),	1, 0 },
 	{ N_("3 EV"),	2, 0 },
 };
-GENERIC8TABLE(Nikon_WBBracketStep,nikon_wbbracketstep);
+GENERIC8TABLE(Nikon_WBBracketStep,nikon_wbbracketstep)
 
 static struct deviceproptableu8 nikon_adlbracketstep[] = {
 	{ N_("Auto"),		0, 0 },
@@ -4328,7 +4337,7 @@ static struct deviceproptableu8 nikon_adlbracketstep[] = {
 	{ N_("High"),		3, 0 },
 	{ N_("Extra high"),	4, 0 },
 };
-GENERIC8TABLE(Nikon_ADLBracketStep,nikon_adlbracketstep);
+GENERIC8TABLE(Nikon_ADLBracketStep,nikon_adlbracketstep)
 
 static struct deviceproptableu8 nikon_bracketpattern[] = {
 	{ N_("2 images (normal and under)"),			0, 0 },
@@ -4341,7 +4350,7 @@ static struct deviceproptableu8 nikon_bracketpattern[] = {
 	{ N_("9 images (normal, 4 unders and 4 overs)"),	7, 0 },
 	{ N_("0 image"),					8, 0 },
 };
-GENERIC8TABLE(Nikon_BracketPattern,nikon_bracketpattern);
+GENERIC8TABLE(Nikon_BracketPattern,nikon_bracketpattern)
 
 static struct deviceproptableu8 nikon_adlbracketpattern[] = {
 	{ N_("2 shots (Off -> User setting)"),				0, 0 },
@@ -4350,7 +4359,7 @@ static struct deviceproptableu8 nikon_adlbracketpattern[] = {
 	{ N_("5 shots (Off -> Low -> Normal -> High -> Extra High)"),	3, 0 },
 	{ N_("0 image"),						4, 0 },
 };
-GENERIC8TABLE(Nikon_ADLBracketPattern,nikon_adlbracketpattern);
+GENERIC8TABLE(Nikon_ADLBracketPattern,nikon_adlbracketpattern)
 
 static struct deviceproptableu8 nikon_hdrsmoothing[] = {
 	{ N_("Auto"),		3, 0 },
@@ -4359,7 +4368,7 @@ static struct deviceproptableu8 nikon_hdrsmoothing[] = {
 	{ N_("High"),		0, 0 },
 	{ N_("Extra high"),	4, 0 },
 };
-GENERIC8TABLE(Nikon_HDRSmoothing,nikon_hdrsmoothing);
+GENERIC8TABLE(Nikon_HDRSmoothing,nikon_hdrsmoothing)
 
 static struct deviceproptableu16 nikon_d7100_exposure_program_modes[] = {
 	{ "M",			0x0001, 0 },
@@ -4773,6 +4782,25 @@ _put_FocalLength(CONFIG_PUT_ARGS) {
 		}
 	}
 	propval->u32 = newval;
+	return GP_OK;
+}
+
+static int
+_get_Sony_FocalPosition(CONFIG_GET_ARGS) {
+	float float_value;
+
+	// Sony focus distance adjust between 0 and 100
+	// Camera must be set to manual focus (and if there is a MF/AF toggle on the lens - it may need be set to 'AF')
+	// 0   - focus near as possible
+	// 100 - focus at infinity
+	// Adjust via /actions/manualfocus
+
+	gp_widget_new (GP_WIDGET_RANGE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_range (*widget, 0, 100, 1);
+	float_value = dpd->CurrentValue.u8;
+	gp_widget_set_value (*widget, &float_value);
+
 	return GP_OK;
 }
 
@@ -6265,10 +6293,12 @@ static struct deviceproptableu16 focusmodes[] = {
 	{ N_("C-AF"),		0x8002, PTP_VENDOR_GP_OLYMPUS_OMD },
 	{ N_("S-AF+MF"),	0x8001, PTP_VENDOR_GP_OLYMPUS_OMD },
 
-	{ N_("AF-A"),		0x8005, PTP_VENDOR_SONY },
 	{ N_("AF-C"),		0x8004, PTP_VENDOR_SONY },
+	{ N_("AF-A"),		0x8005, PTP_VENDOR_SONY },
 	{ N_("DMF"),		0x8006, PTP_VENDOR_SONY },
-
+	{ N_("Manual Reverse"),	0x8007, PTP_VENDOR_SONY },
+	{ N_("AF-D"),		0x8008, PTP_VENDOR_SONY },
+	{ N_("Preset Focus"),	0x8009, PTP_VENDOR_SONY },
 };
 GENERIC16TABLE(FocusMode,focusmodes)
 
@@ -6775,14 +6805,14 @@ static struct deviceproptableu8 nikon_microphone[] = {
 	{N_("Low sensitivity"),		3, 0},
 	{N_("Microphone off"),		4, 0},
 };
-GENERIC8TABLE(Nikon_Microphone, nikon_microphone);
+GENERIC8TABLE(Nikon_Microphone, nikon_microphone)
 
 static struct deviceproptableu8 nikon_moviequality[] = {
 	{"320x216",	0, 0},
 	{"640x424",	1, 0},
 	{"1280x720",	2, 0},
 };
-GENERIC8TABLE(Nikon_MovieQuality, nikon_moviequality);
+GENERIC8TABLE(Nikon_MovieQuality, nikon_moviequality)
 
 static struct deviceproptableu8 nikon_d850_moviequality[] = {
 	{"3840x2160; 30p",	0, 0},
@@ -6802,7 +6832,7 @@ static struct deviceproptableu8 nikon_d850_moviequality[] = {
 	{"1920x1080; 25p x4 (slow-mo)",	11, 0},
 	{"1920x1080; 24p x5 (slow-mo)",	12, 0},
 };
-GENERIC8TABLE(Nikon_D850_MovieQuality, nikon_d850_moviequality);
+GENERIC8TABLE(Nikon_D850_MovieQuality, nikon_d850_moviequality)
 
 static struct deviceproptableu8 nikon_d5100_moviequality[] = {
 	{"640x424; 25fps; normal",		0, 0},
@@ -6816,7 +6846,7 @@ static struct deviceproptableu8 nikon_d5100_moviequality[] = {
 	{"1920x1080; 25fps; normal",		8, 0},
 	{"1920x1080; 25fps; high quality",	9, 0},
 };
-GENERIC8TABLE(Nikon_D5100_MovieQuality, nikon_d5100_moviequality);
+GENERIC8TABLE(Nikon_D5100_MovieQuality, nikon_d5100_moviequality)
 
 static struct deviceproptableu8 nikon_d7100_moviequality[] = {
 	{"1920x1080; 60i",	0, 0},
@@ -6827,13 +6857,13 @@ static struct deviceproptableu8 nikon_d7100_moviequality[] = {
 	{"1280x720; 60p",	5, 0},
 	{"1280x720; 50p",	6, 0},
 };
-GENERIC8TABLE(Nikon_D7100_MovieQuality, nikon_d7100_moviequality);
+GENERIC8TABLE(Nikon_D7100_MovieQuality, nikon_d7100_moviequality)
 
 static struct deviceproptableu8 nikon_d7100_moviequality2[] = {
 	{"Norm",	0, 0},
 	{"High",	1, 0},
 };
-GENERIC8TABLE(Nikon_D7100_MovieQuality2, nikon_d7100_moviequality2);
+GENERIC8TABLE(Nikon_D7100_MovieQuality2, nikon_d7100_moviequality2)
 
 static struct deviceproptableu8 nikon_1_moviequality[] = {
 	{"1080/60i",	0, 0},
@@ -6841,7 +6871,7 @@ static struct deviceproptableu8 nikon_1_moviequality[] = {
 	{"720/60p",	3, 0},
 	{"720/30p",	4, 0},
 };
-GENERIC8TABLE(Nikon_1_MovieQuality, nikon_1_moviequality);
+GENERIC8TABLE(Nikon_1_MovieQuality, nikon_1_moviequality)
 
 static struct deviceproptableu8 nikon_d90_isoautohilimit[] = {
 	{"400",		0, 0},
@@ -6851,7 +6881,7 @@ static struct deviceproptableu8 nikon_d90_isoautohilimit[] = {
 	{N_("Hi 1"),	4, 0},
 	{N_("Hi 2"),	5, 0},
 };
-GENERIC8TABLE(Nikon_D90_ISOAutoHiLimit, nikon_d90_isoautohilimit);
+GENERIC8TABLE(Nikon_D90_ISOAutoHiLimit, nikon_d90_isoautohilimit)
 
 static struct deviceproptableu8 nikon_d7100_isoautohilimit[] = {
 	{ "200",    0,  0 },
@@ -6881,7 +6911,7 @@ static struct deviceproptableu8 nikon_d7100_isoautohilimit[] = {
 	{ "Hi 1",   24, 0 },
 	{ "Hi 2",   25, 0 },
 };
-GENERIC8TABLE(Nikon_D7100_ISOAutoHiLimit, nikon_d7100_isoautohilimit);
+GENERIC8TABLE(Nikon_D7100_ISOAutoHiLimit, nikon_d7100_isoautohilimit)
 
 static struct deviceproptableu8 nikon_manualbracketmode[] = {
 	{N_("Flash/speed"),	0, 0},
@@ -6889,7 +6919,7 @@ static struct deviceproptableu8 nikon_manualbracketmode[] = {
 	{N_("Flash/aperture"),	2, 0},
 	{N_("Flash only"),	3, 0},
 };
-GENERIC8TABLE(Nikon_ManualBracketMode, nikon_manualbracketmode);
+GENERIC8TABLE(Nikon_ManualBracketMode, nikon_manualbracketmode)
 
 static struct deviceproptableu8 nikon_d3s_isoautohilimit[] = {
 	{"400",	   0, 0},
@@ -6914,7 +6944,7 @@ static struct deviceproptableu8 nikon_d3s_isoautohilimit[] = {
 	{"51200", 25, 0},
 	{"102400",26, 0},
 };
-GENERIC8TABLE(Nikon_D3s_ISOAutoHiLimit, nikon_d3s_isoautohilimit);
+GENERIC8TABLE(Nikon_D3s_ISOAutoHiLimit, nikon_d3s_isoautohilimit)
 
 #if 0
 static struct deviceproptableu8 nikon_d70s_padvpvalue[] = {
@@ -8356,7 +8386,7 @@ static int
 _get_STR_as_time(CONFIG_GET_ARGS) {
 	time_t		camtime;
 	struct tm	tm;
-	char		capture_date[64],tmp[5];
+	char		capture_date[65],tmp[5];
 
 	/* strptime() is not widely accepted enough to use yet */
 	memset(&tm,0,sizeof(tm));
@@ -8364,7 +8394,8 @@ _get_STR_as_time(CONFIG_GET_ARGS) {
 		return (GP_ERROR);
 	gp_widget_new (GP_WIDGET_DATE, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
-	strncpy(capture_date,dpd->CurrentValue.str,sizeof(capture_date));
+	strncpy(capture_date,dpd->CurrentValue.str,sizeof(capture_date) - 1);
+	capture_date[64] = 0;
 	strncpy (tmp, capture_date, 4);
 	tmp[4] = 0;
 	tm.tm_year=atoi (tmp) - 1900;
@@ -9201,7 +9232,7 @@ _put_Sony_ManualFocus(CONFIG_PUT_ARGS)
 		else if(val <= 6.0) xpropval.i16 = 6;
 		else if(val <= 7.0) xpropval.i16 = 7;
 		else xpropval.i16 = 0;
-		C_PTP (ptp_sony_setdevicecontrolvalueb (params, PTP_DPC_SONY_NearFar, &xpropval, PTP_DTC_INT16));
+		C_PTP (ptp_sony_setdevicecontrolvalueb (params, PTP_DPC_SONY_ManualFocusAdjust, &xpropval, PTP_DTC_INT16));
 	} else {
 		xpropval.i16 = 1;
 		C_PTP (ptp_sony_setdevicecontrolvalueb (params, PTP_DPC_SONY_AFMFHold, &xpropval, PTP_DTC_INT16));
@@ -9310,12 +9341,16 @@ _get_Sony_FocusMagnifySetting(CONFIG_GET_ARGS) {
 	gp_widget_set_name (*widget, menu->name);
 
 	currentVal = dpd->CurrentValue.u64;
-	x = (int)(currentVal >> 16 & 0xffff);
+	x = (int)((currentVal >> 16) & 0xffff);
 	y = (int)(currentVal & 0xffff);
+
+	// Current magnification level
 	currentMag = (int)(currentVal >> 32);
 
+	// Enum the focus magnifications
 	for (i = 0; i < dpd->FORM.Enum.NumberOfValues; i++) {
 		PTPPropValue *value = dpd->FORM.Enum.SupportedValue + i;
+		// Magnification value e.g. Off, 1.0, 4.0, 8.0
 		mag = (uint32_t) (value->u64 >> 32);
 		magInteger = mag / 10;
 		magDecimal = mag % 10;
@@ -9333,6 +9368,7 @@ _get_Sony_FocusMagnifySetting(CONFIG_GET_ARGS) {
 			if (len < 0) {
 				len = 0;
 			}
+			// Append the current x and y position to the focus magnified string
 			sprintf (buffer + len, ",%d,%d", x, y);
 			gp_widget_set_value(*widget, buffer);
 		}
@@ -9340,6 +9376,9 @@ _get_Sony_FocusMagnifySetting(CONFIG_GET_ARGS) {
 
 	return GP_OK;
 }
+
+#define SONY_TOUCH_MAX_X (640-1)
+#define SONY_TOUCH_MAX_Y (480-1)
 
 static int
 _put_Sony_FocusMagnifySetting(CONFIG_PUT_ARGS)
@@ -9351,12 +9390,13 @@ _put_Sony_FocusMagnifySetting(CONFIG_PUT_ARGS)
 	uint64_t currentVal;
 
 	currentVal = dpd->CurrentValue.u64;
-	x = (int)(currentVal >> 16 & 0xffff);
+	x = (int)((currentVal >> 16) & 0xffff);
 	y = (int)(currentVal & 0xffff);
 
 	CR (gp_widget_get_value(widget, &xval));
-#define SONY_TOUCH_MAX_X (640-1)
-#define SONY_TOUCH_MAX_Y (480-1)
+
+	// Magnification string sets the magnification level and current magnification position
+
 	if (sscanf (xval, "%d.%1d,%d,%d", &magInteger, &magDecimal, &x, &y) == 4) {
 		GP_LOG_D ("mag: %d.%d x: %d y: %d", magInteger, magDecimal, x, y);
 	} else if (sscanf (xval, "%d,%d,%d", &magInteger, &x, &y) == 3) {
@@ -9372,14 +9412,62 @@ _put_Sony_FocusMagnifySetting(CONFIG_PUT_ARGS)
 	if (y > SONY_TOUCH_MAX_Y) {
 		y = SONY_TOUCH_MAX_Y;
 	}
-#undef SONY_TOUCH_MAX_X
-#undef SONY_TOUCH_MAX_Y
+
 	xpropval.u64 = ((uint64_t)(magInteger*10 + magDecimal) << 32) + (x << 16) + y;
 
 	C_PTP (ptp_sony_setdevicecontrolvaluea (params, dpd->DevicePropCode, &xpropval, PTP_DTC_UINT64));
 	*alreadyset = 1;
 	return GP_OK;
 }
+
+static int
+_get_Sony_SpotFocusArea(CONFIG_GET_ARGS) {
+	gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+
+	// Current value not available via Sony API
+	uint32_t value = 0;
+	gp_widget_set_value  (*widget, &value);
+
+	return GP_OK;
+}
+
+static int
+_put_Sony_SpotFocusArea(CONFIG_PUT_ARGS) {
+	PTPParams* params = &(camera->pl->params);
+	PTPPropValue xpropval;
+	char* xval;
+	uint32_t x=0,y=0;
+	uint64_t currentVal;
+
+	// Camera must be set to an autofocus mode and focusarea has to be set to one of the Spot Focus modes
+
+	currentVal = dpd->CurrentValue.u32;
+	x = (int)((currentVal >> 16) & 0xffff);
+	y = (int)(currentVal & 0xffff);
+
+	CR (gp_widget_get_value(widget, &xval));
+
+	if (sscanf (xval, "%d,%d", &x, &y) == 2) {
+		GP_LOG_D ("spotfocusarea: x: %d y: %d", x, y);
+	}
+	if (x > SONY_TOUCH_MAX_X) {
+		x = SONY_TOUCH_MAX_X;
+	}
+	if (y > SONY_TOUCH_MAX_Y) {
+		y = SONY_TOUCH_MAX_Y;
+	}
+
+	xpropval.u32 = (x << 16) + y;
+
+	C_PTP (ptp_sony_setdevicecontrolvalueb (params, PTP_DPC_SONY_AFAreaPosition, &xpropval, PTP_DTC_UINT32));
+
+	*alreadyset = 1;
+	return GP_OK;
+}
+
+#undef SONY_TOUCH_MAX_X
+#undef SONY_TOUCH_MAX_Y
 
 
 static int
@@ -11112,7 +11200,7 @@ static struct submenu camera_actions_menu[] = {
 	{ N_("Synchronize camera date and time with PC"),"syncdatetime", PTP_DPC_CANON_EOS_CameraTime, PTP_VENDOR_CANON, PTP_DTC_UINT32, _get_Canon_SyncTime, _put_Canon_SyncTime },
 
 	{ N_("Auto-Focus"),                     "autofocus",        PTP_DPC_SONY_ShutterHalfRelease, PTP_VENDOR_SONY, PTP_DTC_UINT16, _get_Sony_Autofocus,      _put_Sony_Autofocus },
-	{ N_("Manual-Focus"),                   "manualfocus",      PTP_DPC_SONY_NearFar,   PTP_VENDOR_SONY, PTP_DTC_INT16,     _get_Sony_ManualFocus,          _put_Sony_ManualFocus },
+	{ N_("Manual-Focus"),                   "manualfocus",      PTP_DPC_SONY_ManualFocusAdjust,  PTP_VENDOR_SONY, PTP_DTC_INT16,  _get_Sony_ManualFocus,    _put_Sony_ManualFocus },
 	{ N_("Capture"),                        "capture",          PTP_DPC_SONY_ShutterRelease,PTP_VENDOR_SONY,PTP_DTC_UINT16, _get_Sony_Capture,              _put_Sony_Capture },
 	{ N_("Power Down"),                     "powerdown",        0,  0,                  PTP_OC_PowerDown,                   _get_PowerDown,                 _put_PowerDown },
 	{ N_("Focus Lock"),                     "focuslock",        0,  PTP_VENDOR_CANON,   PTP_OC_CANON_FocusLock,             _get_Canon_FocusLock,           _put_Canon_FocusLock },
@@ -11152,12 +11240,13 @@ static struct submenu camera_actions_menu[] = {
 	{ N_("Movie Capture"),                  "movie",            0,  PTP_VENDOR_PANASONIC,PTP_OC_PANASONIC_MovieRecControl,  _get_Panasonic_Movie,           _put_Panasonic_Movie },
 	{ N_("Movie Mode"),                     "eosmoviemode",     0,  PTP_VENDOR_CANON,   0,                                  _get_Canon_EOS_MovieModeSw,     _put_Canon_EOS_MovieModeSw },
 	{ N_("Focus Magnifier"),                "focusmagnifier",   PTP_DPC_SONY_FocusMagnifier,PTP_VENDOR_SONY, PTP_DTC_UINT16,_get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
-	{ N_("Focus Magnifier Cancel"),         "focusmagnifierexit", PTP_DPC_SONY_FocusMagnifierCancel, PTP_VENDOR_SONY, PTP_DTC_UINT16, _get_Sony_FocusMagnifyProp, _put_Sony_FocusMagnifyProp },
-	{ N_("Remote Key Up"),                  "remotekeyup",   PTP_DPC_SONY_RemoteKeyUp,   PTP_VENDOR_SONY, PTP_DTC_UINT16,   _get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
-	{ N_("Remote Key Down"),                "remotekeydown", PTP_DPC_SONY_RemoteKeyDown, PTP_VENDOR_SONY, PTP_DTC_UINT16,   _get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
-	{ N_("Remote Key Left"),                "remotekeyleft", PTP_DPC_SONY_RemoteKeyLeft, PTP_VENDOR_SONY, PTP_DTC_UINT16,   _get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
-	{ N_("Remote Key Right"),               "remotekeyright",PTP_DPC_SONY_RemoteKeyRight,PTP_VENDOR_SONY, PTP_DTC_UINT16,   _get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
-	{ N_("Focus Magnifier"),                "focusmagnifier",PTP_DPC_SONY_FocusMagnifierSetting,PTP_VENDOR_SONY, PTP_DTC_UINT64,_get_Sony_FocusMagnifySetting,     _put_Sony_FocusMagnifySetting },
+	{ N_("Focus Magnifier Cancel"),         "focusmagnifierexit",PTP_DPC_SONY_FocusMagnifierCancel, PTP_VENDOR_SONY, PTP_DTC_UINT16, _get_Sony_FocusMagnifyProp, _put_Sony_FocusMagnifyProp },
+	{ N_("Remote Key Up"),                  "remotekeyup",      PTP_DPC_SONY_RemoteKeyUp,   PTP_VENDOR_SONY, PTP_DTC_UINT16,_get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
+	{ N_("Remote Key Down"),                "remotekeydown",    PTP_DPC_SONY_RemoteKeyDown, PTP_VENDOR_SONY, PTP_DTC_UINT16,_get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
+	{ N_("Remote Key Left"),                "remotekeyleft",    PTP_DPC_SONY_RemoteKeyLeft, PTP_VENDOR_SONY, PTP_DTC_UINT16,_get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
+	{ N_("Remote Key Right"),               "remotekeyright",   PTP_DPC_SONY_RemoteKeyRight,PTP_VENDOR_SONY, PTP_DTC_UINT16,_get_Sony_FocusMagnifyProp,     _put_Sony_FocusMagnifyProp },
+	{ N_("Focus Magnifier"),                "focusmagnifier",   PTP_DPC_SONY_FocusMagnifierSetting,PTP_VENDOR_SONY, PTP_DTC_UINT64,_get_Sony_FocusMagnifySetting, _put_Sony_FocusMagnifySetting },
+	{ N_("Spot Focus Area"),                "spotfocusarea",    PTP_DPC_SONY_AFAreaPosition,PTP_VENDOR_SONY,PTP_DTC_UINT32, _get_Sony_SpotFocusArea,        _put_Sony_SpotFocusArea },
 	{ N_("Canon Disable Mode Dial"),        "disablemodedial",  0,  PTP_VENDOR_CANON,   PTP_OC_CANON_SetModeDialDisable,    _get_Canon_SetModeDialDisable,  _put_Canon_SetModeDialDisable },
 	{ N_("PTP Opcode"),                     "opcode",           0,  0,                  PTP_OC_GetDeviceInfo,               _get_Generic_OPCode,            _put_Generic_OPCode },
 	{ 0,0,0,0,0,0,0 },
@@ -11408,6 +11497,7 @@ static struct submenu capture_settings_menu[] = {
 	{ N_("RAW+J PC Save Image"),            "pcsaveimgformat",          PTP_DPC_SONY_PcSaveImageFormat,         PTP_VENDOR_SONY,    PTP_DTC_UINT8,  _get_Sony_PcSaveImageFormat,        _put_Sony_PcSaveImageFormat },
 	{ N_("Focus Distance"),                 "focusdistance",            PTP_DPC_FocusDistance,                  0,                  PTP_DTC_UINT16, _get_FocusDistance,                 _put_FocusDistance },
 	{ N_("Focal Length"),                   "focallength",              PTP_DPC_FocalLength,                    0,                  PTP_DTC_UINT32, _get_FocalLength,                   _put_FocalLength },
+	{ N_("Focal Position"),                 "focalposition",            PTP_DPC_SONY_FocalPosition,             PTP_VENDOR_SONY,    PTP_DTC_UINT8,  _get_Sony_FocalPosition,            _put_None },
 	{ N_("Focus Mode"),                     "focusmode",                PTP_DPC_FocusMode,                      PTP_VENDOR_SONY,    PTP_DTC_UINT16, _get_FocusMode,                     _put_Sony_FocusMode },
 	{ N_("Focus Mode"),                     "focusmode",                PTP_DPC_FocusMode,                      0,                  PTP_DTC_UINT16, _get_FocusMode,                     _put_FocusMode },
 	{ N_("Focus Mode"),                     "focusmode",                PTP_DPC_OLYMPUS_FocusMode,              PTP_VENDOR_GP_OLYMPUS_OMD,  PTP_DTC_UINT16, _get_FocusMode,             _put_FocusMode },
