@@ -2,8 +2,59 @@
 #define _PENTAX_CAMERA_H_
 
 #include <gphoto2/gphoto2-camera.h>
-#include <gphoto2/gphoto2-context.h>
+#include <gphoto2/gphoto2-ptp.h>
 #include <stdint.h>
+
+/* Define Pentax Vendor and Model IDs */
+#define PENTAX_VENDOR_ID 0x0A17
+
+/* Model Numbers */
+#define MODELNO_645D   77320
+#define MODELNO_K_3    77760
+#define MODELNO_K_3III 78420
+#define MODELNO_645Z   77840
+#define MODELNO_FF     77970
+#define MODELNO_FFII   78400
+#define MODELNO_K70    78370
+#define MODELNO_KP     78380
+#define MODELNO_G900SE 78460
+#define MODELNO_GRIII  78350
+
+/* Model Names */
+#define MODEL_645D   "645D"
+#define MODEL_K_3    "PENTAX K-3"
+#define MODEL_K_3III "PENTAX K-3 Mark III"
+#define MODEL_645Z   "PENTAX 645Z"
+#define MODEL_FF     "PENTAX K-1"
+#define MODEL_FFII   "PENTAX K-1 Mark II"
+#define MODEL_K70    "PENTAX K-70"
+#define MODEL_KP     "Pentax KP"
+#define MODEL_G900SE "RICOH G900SE"
+#define MODEL_GRIII  "RICOH GR III"
+
+/* PTP Vendor Codes for Pentax-specific operations.
+   (These should match the values defined in your ImageTransmitter2 code.) */
+#define PTP_VENDOR_PENTAX_GET_LIVE_VIEW_FRAME_DATA    0x1001
+#define PTP_VENDOR_PENTAX_ENABLE_ASTROTRACER          0x1002
+#define PTP_VENDOR_PENTAX_SET_ASTROTRACER_MODE          0x1003
+#define PTP_VENDOR_PENTAX_SET_ASTROTRACER_TIME_LIMIT    0x1004
+#define PTP_VENDOR_PENTAX_BULB_START                    0x1005
+#define PTP_VENDOR_PENTAX_BULB_STOP                     0x1006
+#define PTP_VENDOR_PENTAX_SET_BULB_TIMER                0x1007
+#define PTP_VENDOR_PENTAX_SET_EXPOSURE_MODE             0x1008
+#define PTP_VENDOR_PENTAX_AF_TRIGGER                    0x1009
+#define PTP_VENDOR_PENTAX_GET_AF_STATUS                 0x100A
+#define PTP_VENDOR_PENTAX_FOCUS_STEP                    0x100B
+#define PTP_VENDOR_PENTAX_SET_FOCUS_POSITION            0x100C
+#define PTP_VENDOR_PENTAX_SET_CAPTURE_MODE              0x100D
+#define PTP_VENDOR_PENTAX_SET_INTERVAL_MODE             0x100E
+#define PTP_VENDOR_PENTAX_GET_STORAGE_INFO              0x100F
+#define PTP_VENDOR_PENTAX_GET_OBJECT                    0x1010
+#define PTP_VENDOR_PENTAX_OC_ExecuteDustReduction       0x2412  /* Example: 36898 */
+#define PTP_VENDOR_PENTAX_OC_MeasuringWhiteBalanceGain  0x2411  /* Example: 36897 */
+#define PTP_VENDOR_PENTAX_OC_FocusControl               0x2416  /* Example: 36886 */
+#define PTP_VENDOR_PENTAX_OC_MovieMode                  0xD005  /* Example: 53305 */
+#define PTP_VENDOR_PENTAX_OC_InitiatePentaxCapture      0x2415  /* Example: 36881 */
 
 // Vendor-Specific PTP Commands
 #define PTP_VENDOR_PENTAX_SET_LIVE_VIEW        0x9064
