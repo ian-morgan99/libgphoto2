@@ -1,5 +1,25 @@
-libpentax_la_SOURCES = pentax.c
-libpentax_la_LDFLAGS = -module -avoid-version
-libpentax_la_LIBADD  = ../../libgphoto2_port/libgphoto2_port.la
+# Makefile-file for PentaxChatGPT
+#
+# This Makefile builds the PentaxChatGPT camera driver for libgphoto2.
+# It has been updated to include both pentax.c and pentax.h,
+# and to use the standard libgphoto2 build infrastructure.
+#
 
+# Compiler flags: ensure the top-level include directory and current directory are in the search path.
+AM_CFLAGS = -I$(top_srcdir)/include -I$(srcdir)
+
+# Linker flags (if needed)
+AM_LDFLAGS = 
+
+# Specify the source file(s) for the driver.
+libPentaxChatGPT_la_SOURCES = pentax.c
+
+# Link against the libgphoto2 library built in the top directory.
+libPentaxChatGPT_la_LIBADD = $(top_builddir)/libgphoto2.la
+
+# Extra files to distribute (e.g. header files)
 EXTRA_DIST = pentax.h
+
+# Include the common build rules provided by the libgphoto2 project.
+include $(top_srcdir)/build/rules.mk
+
