@@ -1,0 +1,43 @@
+
+Filename	Function	Method / Description	Implemented in Part	Implemented in Full
+pentax.c	_camera_id	Sets the camera identification string via strncpy	No	Yes
+pentax.c	_camera_abilities	Registers camera abilities via libgphoto2 API	No	Yes
+pentax.c	pentax_init (and/or camera_init)	Sets up function pointers (driver registration via libgphoto2)	No	Yes
+pentax.c	pentax_exit	Cleanup/exit function (no extra resources to free – stub)	No	Yes
+pentax.c	pentax_get_config	Creates a configuration widget for the camera	No	Yes
+pentax.c	pentax_set_config	Applies configuration via gp_camera_set_config	No	Yes
+pentax.c	pentax_capture_image	Handles image capture; checks shutter speed for Bulb mode; falls back to standard capture	No	Yes
+pentax.c	get_high_res_live_view	Issues a PTP request to obtain live view frame data	No	Yes
+pentax.c	stop_live_view	Issues a PTP command to stop live view	No	Yes
+pentax.c	enable_astrotracer	Sends a vendor-specific PTP command (with parameter 1) to enable Astrotracer	No	Yes
+pentax.c	disable_astrotracer	Sends a vendor-specific PTP command (with parameter 0) to disable Astrotracer	No	Yes
+pentax.c	set_astrotracer_mode	Sends a PTP command with a mode parameter to set Astrotracer mode	No	Yes
+pentax.c	set_astrotracer_time_limit	Sends a PTP command with a time parameter to set Astrotracer time limit	No	Yes
+pentax.c	start_bulb_exposure	Issues a PTP command to start a Bulb exposure	No	Yes
+pentax.c	stop_bulb_exposure	Issues a PTP command to stop a Bulb exposure	No	Yes
+pentax.c	set_bulb_timer	Sends a PTP command with timer value to set the Bulb timer	No	Yes
+pentax.c	set_exposure_mode	Sends a PTP command with a mode parameter to set the exposure mode	No	Yes
+pentax.c	adjust_focus	Issues a PTP command for focus adjustment (with step value)	No	Yes
+pentax.c	set_focus_position	Sends a PTP command with a focus position parameter	No	Yes
+pentax.c	trigger_autofocus	Triggers autofocus via a PTP command then checks status (via get_af_status)	No	Yes
+pentax.c	transfer_file	Transfers file data using a PTP request (with object handle)	No	Yes
+pentax.c	get_storage_info	Retrieves storage information via a PTP command	No	Yes
+pentax.c	set_multi_exposure_mode	Sets multi-exposure capture mode via a PTP command	No	Yes
+pentax.c	set_bracketing_mode	Alias for setting capture mode (used for bracketing mode)	No	Yes
+pentax.c	set_interval_shooting_mode	Sets interval shooting mode via a PTP command (with interval value)	No	Yes
+pentax.c	pentax_clean_sensor	Executes dust reduction via a low-level PTP transaction (stub)	Yes (stub)	No
+pentax.c	pentax_measure_wb	Measures white balance via a low-level PTP transaction (stub)	Yes (stub)	No
+pentax.c	pentax_focus_control	Adjusts focus at a low level via a PTP transaction (stub)	Yes (stub)	No
+pentax.c	pentax_set_movie_mode	Sets movie mode via a low-level PTP transaction (stub)	Yes (stub)	No
+pentax.c	pentax_capture_ptp	Initiates capture via a low-level PTP transaction (stub)	Yes (stub)	No
+pentax.c	pentax_get_liveview	Retrieves live view data via a low-level PTP transaction (stub)	Yes (stub)	No
+pentax.h	All function declarations	Provides prototypes for the above functions	—	Yes
+Explanation
+Implemented in Full (Yes):
+Most of the high‐level driver functions (e.g. initialization, capture, configuration, live view, Astrotracer support, Bulb exposure, exposure mode, focus, file transfer, extended capture modes) are incorporated fully as per the original imagetransmitter code and further refined for proper PTP response handling.
+
+Implemented in Part (Yes, stub):
+The low‐level PTP functions (such as pentax_clean_sensor, pentax_measure_wb, pentax_focus_control, pentax_set_movie_mode, pentax_capture_ptp, pentax_get_liveview) are provided as stub implementations. They call a generic ptp_transaction with error logging but may require further detailed coding to match full vendor-specific behavior.
+
+Method:
+The “Method” column briefly explains how the function works (for example, by issuing a PTP request with parameters or setting up libgphoto2 driver pointers).
