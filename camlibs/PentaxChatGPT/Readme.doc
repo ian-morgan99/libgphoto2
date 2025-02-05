@@ -41,3 +41,25 @@ The low‐level PTP functions (such as pentax_clean_sensor, pentax_measure_wb, p
 
 Method:
 The “Method” column briefly explains how the function works (for example, by issuing a PTP request with parameters or setting up libgphoto2 driver pointers).
+
+
+
+
+Feature	Supported in MtpDevice (Windows App)	Supported in libgphoto2 Driver	Integration Plan / Next Steps	Notes
+Device Connection & Initialization	Yes	Yes	No action needed – MtpDevice uses PortableDevice API to open/close the device and set vendor mode.	MtpDevice’s Connect, OpenDevice, and CloseDevice methods manage the connection.
+Device Property Management & Conversion (PropVariant ↔ Data)	Yes	Yes (via PTP commands)	No additional integration needed; both layers perform conversions and property retrieval/set using appropriate APIs.	MtpDevice includes methods to convert between PropVariant and strings/UInt32/UInt64.
+Live View Refresh & Timer-Based Polling	Yes	Yes (basic live view in driver)	The Windows app (MtpDevice) already implements polling via Timer callbacks (LiveViewRefreshTask) and raises events when live view frames are refreshed.	The driver’s live view retrieval (e.g. get_high_res_live_view) is wrapped by the Windows app’s timer mechanism.
+File Transfer (Full & Partial Transfer)	Yes	Yes	MtpDevice implements ExecuteGetObject and ExecuteFileTransfer with partial block support.	Both layers work together: the driver provides low-level transfer commands, and MtpDevice handles the file stream management, naming, and error handling.
+Capture Functions (Standard & Bulb Mode Capture)	Yes	Yes	MtpDevice’s methods (MtpInitiatePentaxCapture, MtpTerminatePentaxCapture) manage capture events.	Bulb mode capture is handled by checking the shutter speed in MtpDevice.CamRelease.
+Extended Capture Modes (Multi-exposure, Bracketing, Interval)	Yes (via dedicated commands and property refreshes)	Yes (driver supports extended modes)	The Windows app calls driver commands (set_multi_exposure_mode, set_bracketing_mode, set_interval_shooting_mode) as needed.	MtpDevice refreshes lists (e.g. RefreshExpBracketStepList) and uses property values to update UI elements; extended modes are available if supported by hardware.
+Advanced Focus Control & Autofocus	Yes	Yes	MtpDevice wraps calls to MtpFocusControl and MtpFocusControlNew and provides methods for TouchAF and manual fine-tune adjustments.	Focus-related commands are invoked directly based on UI interactions.
+Composition Adjustment	Yes	Yes	MtpDevice implements MtpSetCompositionAdjustmentOffset to adjust composition; UI updates are triggered via property-changed events.	This feature is fully implemented; it returns adjusted direction and step values.
+Aperture Reset Mode	Not explicitly implemented	Not implemented	Plan:
+1. Define aperture reset constants (e.g. Reset = 0, NoReset = 1) in the shared header.
+2. Add a new method (e.g. MtpSetFlagToKeepAperturePosition) that accepts an aperture reset mode parameter.
+3. Integrate this call in capture or configuration routines if required.	The MtpDevice class refers to an _apertureReset field when invoking capture commands, but it does not expose UI or a dedicated method to change the reset mode.
+Exposure Compensation & Sensitivity Settings	Yes	Yes	The MtpDevice class refreshes sensitivity lists (RefreshSensitivityList) and sets sensitivity via property changes.	Exposure compensation (often reflected in the Xv list) is supported; further UI tuning might be needed if additional granularity is required.
+Vendor-Specific Commands (Astrotracer, Movie Mode, etc.)	Yes	Yes	MtpDevice calls vendor-specific commands such as MtpSetPentaxVendorMode, MtpGetPentaxSubImage, MtpGetPentaxMainImage, MtpSetFlagToKeepAperturePosition, etc.	Astrotracer functions (including time-limit via _camAstroTracerLimitTime) are supported; these commands depend on firmware version and camera model.
+Remote IPC / Single-Instance Operation (Application-level)	Yes	Not applicable	MtpDevice is part of the Windows application layer and works with the RemoteAssistant IPC mechanism.	This functionality belongs to the application (IMAGE Transmitter 2) and is not part of the libgphoto2 driver.
+Advanced User Interface Updates & Property Change Notifications	Yes	Not applicable	MtpDevice raises PropertyChanged events for live view, file transfer, parameter list updates, etc.	These UI integrations are essential for the Windows app but are outside the scope of the low-level camera driver.
+Error Handling & MTP Response Mapping	Yes	Yes	Both MtpDevice and the driver share centralized error-handling routines (e.g., handle_mtp_response).	This ensures that errors are logged consistently and can be handled at both the driver and application levels.
