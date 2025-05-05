@@ -130,6 +130,8 @@ include panasonic/Makefile-files
 include pccam300/Makefile-files
 include pccam600/Makefile-files
 include pentax/Makefile-files
+/* Added by Ian Morgan github@morgan-multinational.co.uk
+include pentaxmodern/Makefile-files
 include polaroid/Makefile-files
 include ptp2/Makefile-files
 include quicktake1x0/Makefile-files
