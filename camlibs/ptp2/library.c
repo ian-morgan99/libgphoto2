@@ -63,6 +63,9 @@ static int capture_timeout = USB_TIMEOUT_CAPTURE;
 
 #define STORAGE_FOLDER_PREFIX		"store_"
 
+/* Added by Ian Morgan github@morgan-multinational.co.uk
+#define FLAG_FORCE_CAMLIB_PENTAXMODERN (1 << 12)
+
 typedef int (*getfunc_t)(CameraFilesystem*, const char*, const char *, CameraFileType, CameraFile *, void *, GPContext *);
 typedef int (*putfunc_t)(CameraFilesystem*, const char*, CameraFile*, void*, GPContext*);
 
@@ -2762,6 +2765,10 @@ static struct {
 
 	/* via email to gphoto-devel */
 	{"Pentax:KP (PTP Mode)",		0x25fb, 0x017f, 0},
+
+	/* Implemented by Ian Morgan github@morgan-multinational.co.uk
+	{ "Pentax:K-1 Mark II (PTP mode)", 0x25fb, 0x0183, FLAG_FORCE_CAMLIB_PENTAXMODERN },
+	{ "Pentax:K-3 Mark III (PTP mode)", 0x25fb, 0x018c, FLAG_FORCE_CAMLIB_PENTAXMODERN },
 
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
