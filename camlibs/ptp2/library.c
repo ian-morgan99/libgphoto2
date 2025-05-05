@@ -63,9 +63,6 @@ static int capture_timeout = USB_TIMEOUT_CAPTURE;
 
 #define STORAGE_FOLDER_PREFIX		"store_"
 
-/* Added by Ian Morgan github@morgan-multinational.co.uk
-#define FLAG_FORCE_CAMLIB_PENTAXMODERN (1 << 12)
-
 typedef int (*getfunc_t)(CameraFilesystem*, const char*, const char *, CameraFileType, CameraFile *, void *, GPContext *);
 typedef int (*putfunc_t)(CameraFilesystem*, const char*, CameraFile*, void*, GPContext*);
 
