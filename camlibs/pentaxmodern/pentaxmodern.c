@@ -12,6 +12,11 @@
 /* Added after review Ian Morgan github@morgan-multinational.co.uk
 #include <gphoto2-gpl.h>
 #include "pentaxmodern.h"
+CameraLibrary pentaxmodern_library = {
+  .id = GP_DRIVER_PENTAX_MODERN,
+  .name = "Pentax Modern",
+  … callbacks …
+};
 
 #define PENTAX_VENDOR_ID 0x0A17
 #define PENTAX_PRODUCT_K1II 0x503A
