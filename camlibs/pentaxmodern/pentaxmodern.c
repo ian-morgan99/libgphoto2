@@ -68,6 +68,12 @@
 #define PENTAX_OC_GET_WRITE_MODE 0x9532
 #define PENTAX_OC_SET_WRITE_MODE 0x9533
 
+/* Added Ian Morgan github@morgan-multinational.co.uk
+#ifndef GP_PENTAX_MODERN_H
+#define GP_PENTAX_MODERN_H
+… 
+#endif
+	
 typedef struct {
     GPPort *port;
     int model;
