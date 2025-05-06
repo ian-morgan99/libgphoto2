@@ -9,6 +9,10 @@
 #include <glib.h>
 #include <gphoto2/gphoto2-log.h>
 
+/* Added after review Ian Morgan github@morgan-multinational.co.uk
+#include <gphoto2-gpl.h>
+#include "pentaxmodern.h"
+
 #define PENTAX_VENDOR_ID 0x0A17
 #define PENTAX_PRODUCT_K1II 0x503A
 #define PENTAX_PRODUCT_K3III 0x5049
