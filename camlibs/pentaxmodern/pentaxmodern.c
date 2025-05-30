@@ -118,6 +118,14 @@
 #define PENTAX_CUSTOM_VENDOR_EXT_VER_K3III 1       
 #define PENTAX_CUSTOM_MODEL_ID_K1II        0x13210 
 #define PENTAX_CUSTOM_VENDOR_EXT_VER_K1II  1       
+#define PENTAX_CUSTOM_MODEL_ID_645D        0x12E08
+#define PENTAX_CUSTOM_MODEL_ID_K3          0x13F80
+#define PENTAX_CUSTOM_MODEL_ID_645Z        0x13010
+#define PENTAX_CUSTOM_MODEL_ID_K1          0x13092
+#define PENTAX_CUSTOM_MODEL_ID_KP          0x1322C
+#define PENTAX_CUSTOM_MODEL_ID_G900SE      0x1327C
+#define PENTAX_CUSTOM_MODEL_ID_GRIII       0x1320E
+#define PENTAX_CUSTOM_MODEL_ID_K70         0x13222
 
 typedef struct {
     GPPort *port; 
@@ -488,6 +496,30 @@ static void populate_pentax_model_ids(CameraPrivateLibrary *priv) { /* ... uncha
     } else if (g_str_has_prefix(model_string, "PENTAX K-1 Mark II")) {
         priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K1II; 
         priv->ptp_custom_vendor_ext_ver = PENTAX_CUSTOM_VENDOR_EXT_VER_K1II;
+    } else if (strstr(model_string, "645D")) { // Using strstr for broader match
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_645D;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "PENTAX K-3")) { // Exact match for K-3 to distinguish from K-3 Mark III
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K3;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "PENTAX 645Z")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_645Z;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "PENTAX K-1")) { // Exact match for K-1 to distinguish from K-1 Mark II
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K1;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "PENTAX KP")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_KP;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "RICOH G900SE")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_G900SE;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "RICOH GR III")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_GRIII;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
+    } else if (strstr(model_string, "PENTAX K-70")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K70;
+        priv->ptp_custom_vendor_ext_ver = 1; // Assuming default vendor ext ver
     } else {
         GP_LOG_W("pentaxmodern", "Unknown Pentax model for 0x9520 specific params: '%s'. Using generic values.", model_string);
         priv->ptp_custom_model_id = 0; 
