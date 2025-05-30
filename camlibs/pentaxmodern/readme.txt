@@ -69,12 +69,6 @@ Live View, Dual Card Storage, and Advanced Scene Modes are fully interactive.
 Focus modes match capabilities documented in the reverse-engineered Image Transmitter 2 codebase.
 
 🧰 Future Enhancements (Optional)
-Add custom color profiles or film simulation modes
-Integrate video recording (if supported by firmware)
-Auto-import captured images into host gallery
-Live View focus point adjustment
-Bulb timer/long exposure automation
-Focus assist (e.g. live view magnification)
-Dual-card control
-Exposure bracketing/drive mode selection
-On-host playback image browsing
+More comprehensive video recording controls (e.g., full parameter query, start/stop if not fully implemented).
+Implement retrieval of the currently active SD card slot (to complement the existing set functionality).
+Verify and ensure all distinct USB Product IDs for the newly added Pentax/Ricoh models are covered for robust initial detection, supplementing the current custom ID mapping.
