@@ -118,6 +118,21 @@
 #define PENTAX_CUSTOM_VENDOR_EXT_VER_K3III 1       
 #define PENTAX_CUSTOM_MODEL_ID_K1II        0x13210 
 #define PENTAX_CUSTOM_VENDOR_EXT_VER_K1II  1       
+#define PENTAX_CUSTOM_MODEL_ID_645D        0x12E08
+#define PENTAX_CUSTOM_MODEL_ID_K3          0x13F80
+#define PENTAX_CUSTOM_MODEL_ID_645Z        0x13010
+#define PENTAX_CUSTOM_MODEL_ID_K1          0x13092
+#define PENTAX_CUSTOM_MODEL_ID_KP          0x1322C
+#define PENTAX_CUSTOM_MODEL_ID_G900SE      0x1327C
+#define PENTAX_CUSTOM_MODEL_ID_GRIII       0x1320E
+#define PENTAX_CUSTOM_MODEL_ID_K70         0x13222
+
+/* Live View Zoom Capabilities */
+#define LV_ZOOM_DEFAULT 0
+#define LV_ZOOM_645Z    1
+#define LV_ZOOM_K3III   2
+#define LV_ZOOM_K3      3
+#define LV_ZOOM_K1      4
 
 typedef struct {
     GPPort *port; 
@@ -132,6 +147,13 @@ typedef struct {
     unsigned char *conditions_data_cache; 
     unsigned int conditions_data_len;     
     uint8_t keep_aperture_mode; // 0 for Reset, 1 for Keep
+    int is_ls_model;                // Boolean flag for LS models like G900SE, initialized to 0 by calloc
+    int supports_tiff_format;       // Boolean flag for TIFF support, initialized to 0 by calloc
+    int supports_independent_mirror_up; // Boolean flag for specific mirror-up behavior, initialized to 0 by calloc
+    int lv_zoom_caps;               // For model-specific LV zoom options, initialized to 0 (LV_ZOOM_DEFAULT)
+    int hide_cont_m_drive_mode;     // Boolean flag for 645Z, initialized to 0
+    int hide_kp_specific_drive_modes; // Boolean flag for KP, initialized to 0
+    int hide_flash_wb;              // Boolean flag, initialized to 0 (meaning show by default unless set to 1)
 } CameraPrivateLibrary; 
 
 // Forward declarations
@@ -482,12 +504,52 @@ static void populate_pentax_model_ids(CameraPrivateLibrary *priv) { /* ... uncha
     }
     const char *model_string = priv->ptp_params.deviceinfo.Model;
     GP_DEBUG("pentaxmodern", "Device model string: '%s'", model_string);
+
+    priv->hide_flash_wb = 1; // Default to hiding Flash WB, will be overridden by specific models
+    priv->lv_zoom_caps = LV_ZOOM_DEFAULT; // Default LV zoom capabilities
+
     if (g_str_has_prefix(model_string, "PENTAX K-3 Mark III")) { 
         priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K3III;
         priv->ptp_custom_vendor_ext_ver = PENTAX_CUSTOM_VENDOR_EXT_VER_K3III;
+        priv->lv_zoom_caps = LV_ZOOM_K3III;
     } else if (g_str_has_prefix(model_string, "PENTAX K-1 Mark II")) {
         priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K1II; 
         priv->ptp_custom_vendor_ext_ver = PENTAX_CUSTOM_VENDOR_EXT_VER_K1II;
+        // K1 Mark II might share K1 zoom capabilities or default. Assuming default for now.
+    } else if (strstr(model_string, "645D")) { 
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_645D;
+        priv->ptp_custom_vendor_ext_ver = 0; // Specific for 645D
+    } else if (g_str_has_prefix(model_string, "PENTAX K-3")) { 
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K3;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+        priv->lv_zoom_caps = LV_ZOOM_K3;
+        priv->hide_flash_wb = 0;
+    } else if (strstr(model_string, "PENTAX 645Z")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_645Z;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+        priv->supports_tiff_format = 1;
+        priv->supports_independent_mirror_up = 1;
+        priv->hide_cont_m_drive_mode = 1;
+        priv->lv_zoom_caps = LV_ZOOM_645Z;
+        priv->hide_flash_wb = 0;
+    } else if (g_str_has_prefix(model_string, "PENTAX K-1")) { 
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K1;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+        priv->lv_zoom_caps = LV_ZOOM_K1;
+    } else if (strstr(model_string, "PENTAX KP")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_KP;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+        priv->hide_kp_specific_drive_modes = 1;
+    } else if (strstr(model_string, "RICOH G900SE")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_G900SE;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+        priv->is_ls_model = 1;
+    } else if (strstr(model_string, "RICOH GR III")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_GRIII;
+        priv->ptp_custom_vendor_ext_ver = 1; 
+    } else if (strstr(model_string, "PENTAX K-70")) {
+        priv->ptp_custom_model_id = PENTAX_CUSTOM_MODEL_ID_K70;
+        priv->ptp_custom_vendor_ext_ver = 1; 
     } else {
         GP_LOG_W("pentaxmodern", "Unknown Pentax model for 0x9520 specific params: '%s'. Using generic values.", model_string);
         priv->ptp_custom_model_id = 0; 
@@ -669,10 +731,50 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
     gp_widget_set_value(widget, lookup_label(KeepAperture_table, priv->keep_aperture_mode)); 
     gp_widget_append(section, widget);
 
-    gp_widget_new(GP_WIDGET_SECTION, "Live View", &section); gp_widget_append(*window, section);
-    gp_widget_new(GP_WIDGET_TOGGLE, "Live View Active", &widget); gp_widget_set_value(widget, &priv->live_view_active); gp_widget_append(section, widget);
-    gp_widget_new(GP_WIDGET_RANGE, "Live View Interval (ms)", &widget); gp_widget_set_range(widget, 30, 1000, 10); gp_widget_set_value(widget, &priv->live_view_interval); gp_widget_append(section, widget);
-    gp_widget_new(GP_WIDGET_RADIO, "Live View Zoom", &widget); const char *zoom_choices[] = {"1x", "2x", "4x", "6x", "8x", NULL}; for (int i = 0; zoom_choices[i]; i++) gp_widget_add_choice(widget, zoom_choices[i]); gp_widget_set_value(widget, "1x"); gp_widget_append(section, widget);
+    if (!priv->is_ls_model) {
+        gp_widget_new(GP_WIDGET_SECTION, "Live View", &section); gp_widget_append(*window, section);
+        gp_widget_new(GP_WIDGET_TOGGLE, "Live View Active", &widget); gp_widget_set_value(widget, &priv->live_view_active); gp_widget_append(section, widget);
+        gp_widget_new(GP_WIDGET_RANGE, "Live View Interval (ms)", &widget); gp_widget_set_range(widget, 30, 1000, 10); gp_widget_set_value(widget, &priv->live_view_interval); gp_widget_append(section, widget);
+        
+        gp_widget_new(GP_WIDGET_RADIO, "Live View Zoom", &widget);
+        gp_widget_add_choice(widget, "1x"); // No Zoom is always an option
+        switch (priv->lv_zoom_caps) {
+            case LV_ZOOM_645Z: 
+                gp_widget_add_choice(widget, "2x");
+                gp_widget_add_choice(widget, "4x"); 
+                gp_widget_add_choice(widget, "8x");
+                // gp_widget_add_choice(widget, "12x"); // PTP value for 12x unknown
+                // gp_widget_add_choice(widget, "16x"); // PTP value for 16x unknown
+                break;
+            case LV_ZOOM_K3III: 
+                gp_widget_add_choice(widget, "4x");
+                gp_widget_add_choice(widget, "8x");
+                // gp_widget_add_choice(widget, "10x"); // PTP value for 10x unknown
+                // gp_widget_add_choice(widget, "16x");
+                break;
+            case LV_ZOOM_K3: 
+                gp_widget_add_choice(widget, "2x");
+                gp_widget_add_choice(widget, "4x");
+                gp_widget_add_choice(widget, "8x");
+                // gp_widget_add_choice(widget, "10x");
+                break;
+            case LV_ZOOM_K1: 
+                gp_widget_add_choice(widget, "2x");
+                gp_widget_add_choice(widget, "4x");
+                gp_widget_add_choice(widget, "8x");
+                // gp_widget_add_choice(widget, "10x");
+                // gp_widget_add_choice(widget, "16x");
+                break;
+            case LV_ZOOM_DEFAULT: 
+            default: // Default for K70 and others not specified
+                gp_widget_add_choice(widget, "2x");
+                gp_widget_add_choice(widget, "4x");
+                gp_widget_add_choice(widget, "6x"); // Original default had 6x
+                gp_widget_add_choice(widget, "8x");
+                break;
+        }
+        gp_widget_set_value(widget, "1x"); gp_widget_append(section, widget);
+    }
     
     gp_widget_new(GP_WIDGET_SECTION, "Exposure Settings", &section); gp_widget_append(*window, section);
     // ISO, WB, ExpMode with 0x920F fallback
@@ -688,7 +790,14 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
     } else if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_WHITE_BALANCE, &raw_val_u32) == PTP_RC_OK) { 
         current_label = lookup_label(wb_table, raw_val_u32);
     } else { current_label = "Unknown"; }
-    gp_widget_new(GP_WIDGET_RADIO, "White Balance", &widget); for (int i = 0; wb_table[i].label; i++) gp_widget_add_choice(widget, wb_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
+    gp_widget_new(GP_WIDGET_RADIO, "White Balance", &widget); 
+    for (int i = 0; wb_table[i].label; i++) {
+        if (priv->hide_flash_wb && strcmp(wb_table[i].label, "Flash") == 0) { // "Flash" is a common label
+            continue;
+        }
+        gp_widget_add_choice(widget, wb_table[i].label); 
+    }
+    gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
     
     if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache) {
         raw_val_u16 = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_CAPTURE_MODE_INFO); current_label = lookup_label(exposure_mode_table, raw_val_u16);
@@ -792,6 +901,32 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
         gp_widget_set_value(widget, current_label); gp_widget_append(ci_section, widget);
     }
     // TODO: PENTAX_DPC_CI_USER_FILTER_EFFECT (0xD02D) - array of 3 shorts. Omitted for now.
+
+    // Image Quality widget
+    // Note: This section for Image Quality is added here assuming it's logically part of "Exposure Settings" or a similar config group.
+    // The original code might have it elsewhere; this attempts to place it reasonably.
+    CameraWidget *quality_section_for_widget = section; // Use current 'section' which is "Exposure Settings"
+    if (gp_widget_get_child_by_name(window, "Custom Image Details", &quality_section_for_widget) == GP_OK) {
+      // If CI section exists, maybe it's better there? For now, use Exposure Settings section.
+    }
+
+    if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_IMAGE_QUALITY, &raw_val_u32) == PTP_RC_OK) { 
+        current_label = lookup_label(quality_table, raw_val_u32); 
+    } else { 
+        current_label = "Unknown"; 
+    }
+    gp_widget_new(GP_WIDGET_RADIO, "Image Quality", &widget); 
+    for (int i = 0; quality_table[i].label; i++) {
+        gp_widget_add_choice(widget, quality_table[i].label);
+    }
+    if (priv->supports_tiff_format) {
+        // Adding TIFF as a choice. The corresponding PTP value (e.g. 0x04 if it were a new enum) 
+        // and set_config logic would be needed for full functionality.
+        gp_widget_add_choice(widget, "TIFF"); 
+    }
+    gp_widget_set_value(widget, current_label); 
+    gp_widget_append(quality_section_for_widget, widget);
+
 
     // ... (rest of get_config, e.g., Focus, Storage, Hardware controls, as before) ...
     GP_DEBUG("pentaxmodern_get_config finished.");
