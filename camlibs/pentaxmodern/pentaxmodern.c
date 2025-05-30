@@ -87,6 +87,7 @@
 #define PENTAX_OC_FOCUS_FINE_TUNE 0x9524   
 #define PENTAX_OC_BULB_START 0x9205
 #define PENTAX_OC_BULB_END   0x9206
+#define PENTAX_OC_GET_ACTIVE_STORAGE 0x9546 // Hinted opcode for getting active storage
 
 /* Pentax Specific PTP Device Property Codes (DPCs) */
 #define PENTAX_DPC_CI_SATURATION           0xD021 
@@ -792,6 +793,48 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
         gp_widget_set_value(widget, current_label); gp_widget_append(ci_section, widget);
     }
     // TODO: PENTAX_DPC_CI_USER_FILTER_EFFECT (0xD02D) - array of 3 shorts. Omitted for now.
+
+    // Storage Settings Section
+    CameraWidget *storage_section;
+    gp_widget_new(GP_WIDGET_SECTION, "Storage Settings", &storage_section); 
+    gp_widget_append(*window, storage_section); 
+
+    uint32_t active_storage_id_raw = 0;
+    const char *active_card_label = "Card 1"; // Default value
+
+    if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_ACTIVE_STORAGE, &active_storage_id_raw) == PTP_RC_OK) {
+        GP_DEBUG("pentaxmodern_get_config: Successfully read PENTAX_OC_GET_ACTIVE_STORAGE: 0x%X", active_storage_id_raw);
+        if (active_storage_id_raw == 0x00020001) { // Standard PTP StorageID for second physical store
+            active_card_label = "Card 2";
+        } else if (active_storage_id_raw == 0x00010001) { // Standard PTP StorageID for first physical store
+             active_card_label = "Card 1";
+        } else {
+             GP_LOG_W("pentaxmodern_get_config", "Unknown or non-standard active storage ID: 0x%X via PENTAX_OC_GET_ACTIVE_STORAGE. Defaulting to Card 1.", active_storage_id_raw);
+             active_card_label = "Card 1"; // Default if unknown ID
+        }
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get active storage ID via PENTAX_OC_GET_ACTIVE_STORAGE (0x%X). Trying PTP_DPC_StorageID as fallback.", PENTAX_OC_GET_ACTIVE_STORAGE);
+        PTPPropValue propval;
+        if (ptp_getdevicepropvalue(&priv->ptp_params, PTP_DPC_StorageID, &propval, PTP_DTC_UINT32) == PTP_RC_OK) {
+            GP_DEBUG("pentaxmodern_get_config", "Successfully read PTP_DPC_StorageID: 0x%X", propval.u32);
+            if (propval.u32 == 0x00020001) active_card_label = "Card 2";
+            else if (propval.u32 == 0x00010001) active_card_label = "Card 1";
+            else { 
+                GP_LOG_W("pentaxmodern_get_config", "Unknown PTP_DPC_StorageID: 0x%X. Defaulting to Card 1.", propval.u32);
+                active_card_label = "Card 1";
+            }
+        } else {
+             GP_LOG_W("pentaxmodern_get_config", "Failed to get PTP_DPC_StorageID. Defaulting to Card 1.");
+             active_card_label = "Card 1"; // Final fallback
+        }
+    }
+    
+    CameraWidget *active_sd_widget; 
+    gp_widget_new(GP_WIDGET_RADIO, "Active SD Card", &active_sd_widget); 
+    gp_widget_add_choice(active_sd_widget, "Card 1");
+    gp_widget_add_choice(active_sd_widget, "Card 2");
+    gp_widget_set_value(active_sd_widget, active_card_label);
+    gp_widget_append(storage_section, active_sd_widget);
 
     // ... (rest of get_config, e.g., Focus, Storage, Hardware controls, as before) ...
     GP_DEBUG("pentaxmodern_get_config finished.");
