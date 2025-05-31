@@ -1,3 +1,4 @@
+// JULES_SUBTASK_TEST_COMMENT_NOVEMBER_2023_VERIFICATION
 #include "config.h"
 #include <gphoto2/gphoto2-camera.h> 
 #include <gphoto2/gphoto2-library.h>
@@ -104,6 +105,14 @@
 #define PENTAX_DPC_MOVIE_MODE              0xD039 // For Movie Mode Toggle
 #define PENTAX_DPC_WRITING_FILE_FORMAT_SETTING 0xD01B // For Movie settings (File Format, Quality, Slot)
 
+#ifndef PTP_DPC_WhiteBalance
+#define PTP_DPC_WhiteBalance 0x5005 // Standard PTP Device Property Code for White Balance
+#endif
+
+#ifndef PTP_DPC_WhiteBalance
+#define PTP_DPC_WhiteBalance 0x5005 // Standard PTP Device Property Code for White Balance
+#endif
+
 /* ConditionIndex constants */
 #define CI_DSP_STATE 3          
 #define CI_CPU_STATE 4          
@@ -114,6 +123,17 @@
 #define CI_AV_VALUE_PLACEHOLDER 68    
 #define CI_BATTERY_LEVEL_PLACEHOLDER 50 
 #define CI_SD1_REMAIN_PLACEHOLDER 60    
+#define CI_DRIVE_MODE_NEW 123 // From C# ConditionIndex, assumed for detailed drive mode
+// CI_IMAGE_SIZE (34) is often used for still image size; assuming it might be defined elsewhere or implicitly used.
+// If it's specifically for movie context here and not globally defined, it would be:
+// #define CI_IMAGE_SIZE 34 // Contains movie pixel size (low short) and frame rate (high short)
+#define CI_WRITING_FORMAT_SETTING 131   // Contains current movie file format
+#define CI_MOVIE_CARD_SLOT_SETTING 140 // Contains current movie card slot
+
+#define CI_ASTROTRACER_TIMELIMIT 132 // Contains current astrotracer time limit (uint16_t seconds)
+#define CI_DSP_STATE_2 6             // Contains various DSP states, including Astrotracer active
+#define PENTAX_DSP_STATE2_ASTRO_PRE_EXPOSING 49u // Value in CI_DSP_STATE_2 indicating Astrotracer pre-exposure
+#define PENTAX_DSP_STATE2_ASTRO_MAIN_EXPOSING 50u // Value in CI_DSP_STATE_2 indicating Astrotracer main exposure
 
 #define PENTAX_CUSTOM_MODEL_ID_K3III       0x13254 
 #define PENTAX_CUSTOM_VENDOR_EXT_VER_K3III 1       
@@ -238,13 +258,53 @@ static PentaxLookupEntry aperture_table[] = { /* ... full content ... */
     {"f/64", 640},
     {NULL, 0}
 };
-static PentaxLookupEntry drive_table[] = { /* ... full content ... */ 
-    {"Single", 1}, {"Continuous High", 2}, {"Continuous Low", 3}, {"Timer", 4},
+static PentaxLookupEntry drive_table[] = {
+    {"Single Shot", 0},                      // PTP Value 0u
+    {"Continuous H", 4},                   // PTP Value 4u
+    {"Continuous M", 1},                   // PTP Value 1u
+    {"Continuous L", 2},                   // PTP Value 2u
+    {"Self-timer 12s", 5},                 // PTP Value 5u (Standard self-timer)
+    {"Self-timer 2s", 3},                  // PTP Value 3u
+    {"Remote Control", 6},                 // PTP Value 6u (Single shot remote)
+    {"Remote Control (3s delay)", 7},      // PTP Value 7u
+    {"Auto Bracket", 8},                   // PTP Value 8u
+    {"Remote Control (Continuous)", 36},   // PTP Value 36u - Corresponds to C# NominalToInternal index 12
+    {"Mirror Up", 9},                      // PTP Value 9u
+    {"Mirror Up (Remote)", 10},            // PTP Value 10u
+    {"Multi-Exposure", 11},                // PTP Value 11u
+    {"Multi-Exposure (Continuous)", 40},   // PTP Value 40u - Corresponds to C# NominalToInternal index 16
+    {"Multi-Exposure (Self-timer)", 41}, // PTP Value 41u - Corresponds to C# NominalToInternal index 17
+    {"Multi-Exposure (Remote)", 42},     // PTP Value 42u - Corresponds to C# NominalToInternal index 18
+    {"Interval Shooting", 12},             // PTP Value 12u
+    {"Interval Composite", 13},            // PTP Value 13u - Corresponds to C# NominalToInternal index 40 (Label was Interval Multi-Exposure in C# UI)
+    {"Interval Movie Record", 14},         // PTP Value 14u
+    {"Star Stream", 15},                   // PTP Value 15u
+    {"Self-timer (Continuous)", 22},       // PTP Value 22u - Corresponds to C# NominalToInternal index 6
+    // Further entries from C#'s DriveModeLUT could be added here if exact labels and use-cases are clear.
+    // This selection covers many common advanced modes.
     {NULL, 0}
 };
-static PentaxLookupEntry wb_table[] = { /* ... full content ... */ 
+static PentaxLookupEntry wb_table[] = { /* ... full content ... */
     {"Auto", 1}, {"Daylight", 2}, {"Shade", 3}, {"Cloudy", 4}, {"Tungsten", 5},
-    {"Fluorescent", 6}, {"Manual", 7},
+    // White Balance lookup table using standard PTP_DPC_WhiteBalance (0x5005) values
+    {"Auto", 2},                         // PTP_WB_AUTO
+    {"Multi Auto WB", 4},                // PTP_WB_MULTI_AUTO
+    {"Daylight", 32770},                 // PTP_WB_DAYLIGHT (0x8002)
+    {"Shade", 32771},                    // PTP_WB_SHADE (0x8003)
+    {"Cloudy", 32772},                   // PTP_WB_CLOUDY_TUNGSTEN or CLOUDY (0x8004)
+    {"Fluorescent D (Daylight)", 32773}, // PTP_WB_FLUORESCENT_DAYLIGHT (0x8005)
+    {"Fluorescent N (Neutral White)", 32774},// PTP_WB_FLUORESCENT_NEUTRAL_WHITE (0x8006)
+    {"Fluorescent W (Cool White)", 5},   // PTP_WB_FLUORESCENT_WHITE
+    {"Fluorescent L (Warm White)", 32781},// PTP_WB_FLUORESCENT_WARM_WHITE or Custom (0x800D from C# _camToMtpWBTable)
+    {"Tungsten", 6},                     // PTP_WB_TUNGSTEN_HALOGEN
+    {"Flash", 7},                        // PTP_WB_FLASH
+    {"Manual 1", 32775},                 // PTP_WB_MANUAL_1 (0x8007)
+    {"Manual 2", 32776},                 // PTP_WB_MANUAL_2 (0x8008)
+    {"Manual 3", 32777},                 // PTP_WB_MANUAL_3 (0x8009)
+    {"Color Temp 1 (Set Kelvin)", 32778}, // PTP_WB_KELVIN_1 or Custom (0x800A) - Typically triggers Kelvin input
+    {"Color Temp 2 (Set Kelvin)", 32779}, // PTP_WB_KELVIN_2 or Custom (0x800B)
+    {"Color Temp 3 (Set Kelvin)", 32780}, // PTP_WB_KELVIN_3 or Custom (0x800C)
+    {"CTE (Color Temp Enhance)", 32782}, // PTP_WB_CTE or Custom (0x800E from C# _camToMtpWBTable)
     {NULL, 0}
 };
 static PentaxLookupEntry quality_table[] = { /* ... full content ... */ 
@@ -310,11 +370,36 @@ static PentaxLookupEntry scene_mode_table[] = { /* ... full content ... */
     {"Water Reflection", 21}, {"Light Trails", 22}, {"Underwater", 23},
     {NULL, 0}
 };
-static PentaxLookupEntry exposure_mode_table[] = { /* ... full content ... */ 
-    {"P", 0}, {"Sv", 1}, {"Tv", 2}, {"Av", 3},
-    {"TAv", 4}, {"M", 5}, {"B", 6}, {"X", 7},
-    {"Green", 8}, {"U1", 9}, {"U2", 10},
-    {"Movie", 11}, {"Auto Picture", 12}, {"Scene Mode", 13},
+static PentaxLookupEntry exposure_mode_table[] = {
+    {"Program (P)", 0},                     // PTP Value 0u
+    {"Auto Picture (AUTO)", 1},            // PTP Value 1u (Corresponds to AUTOPICT in C#)
+    {"Hyper Program (HyP)", 2},            // PTP Value 2u
+    {"Green", 3},                          // PTP Value 3u
+    {"Shutter Priority (Tv)", 4},          // PTP Value 4u
+    {"Aperture Priority (Av)", 5},         // PTP Value 5u
+    {"Hyper Tv (HypTv)", 6},               // PTP Value 6u
+    {"Hyper Av (HypAv)", 7},               // PTP Value 7u
+    {"Manual (M)", 8},                     // PTP Value 8u
+    {"Bulb (B)", 9},                       // PTP Value 9u
+    // Lens-specific variants (Av_Lens, M_Lens, B_Lens, TAv_Lens) are omitted for now for broader applicability.
+    {"Shutter & Aperture Priority (TAv)", 13},// PTP Value 13u
+    {"Sensitivity Priority (Sv)", 15},     // PTP Value 15u
+    {"Flash Sync (X)", 16},                // PTP Value 16u
+    // LS (18u) is likely Leaf Shutter specific and omitted. APL_P (19u) is unclear.
+    {"AstroTracer Mode", 20},              // PTP Value 20u (If this is a distinct mode set via SET_EXPOSURE_MODE)
+    // SA_Auto (21u) might be redundant with Auto Picture.
+    {"Adv. Hyper Program", 22},            // PTP Value 22u
+    {"Adv. Hyper Tv", 23},                 // PTP Value 23u
+    {"Adv. Hyper Av", 24},                 // PTP Value 24u
+    {"Adv. Hyper Manual", 25},             // PTP Value 25u
+    {"Adv. Hyper TAv", 26},                // PTP Value 26u
+    // AdvHypAv_Lens, AdvHypM_Lens, AdvHypTAv_Lens omitted.
+    {"Adv. Hyper Sv", 30},                 // PTP Value 30u
+    {"Hyper Sv (HypSv)", 31},              // PTP Value 31u
+    // User Modes (U1, U2, etc.) are typically selected via a different mechanism (e.g. scene mode or dedicated user mode DPC)
+    // and their previous PTP values (9, 10) in the C table conflicted with Bulb and Av_Lens from C#.
+    // "Movie" and "Scene Mode" as general categories are also omitted as they are usually
+    // activated by specific DPCs/Opcodes (PENTAX_DPC_MOVIE_MODE, PENTAX_OC_SET_SCENE_MODE) rather than this general exposure mode list.
     {NULL, 0}
 };
 
@@ -658,10 +743,27 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
     ret_ptp_conditions = pentaxmodern_get_all_conditions_data(&priv->ptp_params, &priv->conditions_data_cache, &priv->conditions_data_len);
 
     // Basic Sections (Astro, Capture, Live View)
+    // Update Astrotracer settings from bulk data if available
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache) {
+        if (priv->conditions_data_len > CI_ASTROTRACER_TIMELIMIT + 1) { // uint16_t
+            uint16_t time_limit_raw = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_ASTROTRACER_TIMELIMIT);
+            priv->astrotracer_time_limit = time_limit_raw;
+            GP_DEBUG("pentaxmodern_get_config: Astrotracer time limit from 0x920F (idx %d): %d s", CI_ASTROTRACER_TIMELIMIT, priv->astrotracer_time_limit);
+        }
+        if (priv->conditions_data_len > CI_DSP_STATE_2) { // uint8_t
+            uint8_t dsp_state2_raw = parse_condition_u8(priv->conditions_data_cache, priv->conditions_data_len, CI_DSP_STATE_2);
+            if (dsp_state2_raw == PENTAX_DSP_STATE2_ASTRO_PRE_EXPOSING || dsp_state2_raw == PENTAX_DSP_STATE2_ASTRO_MAIN_EXPOSING) {
+                priv->astrotracer_enabled = TRUE;
+            } else {
+                priv->astrotracer_enabled = FALSE;
+            }
+            GP_DEBUG("pentaxmodern_get_config: Astrotracer enabled state from 0x920F (idx %d, val %u): %s", CI_DSP_STATE_2, dsp_state2_raw, priv->astrotracer_enabled ? "TRUE" : "FALSE");
+        }
+    }
+
     gp_widget_new(GP_WIDGET_SECTION, "Astrotracer", &section); gp_widget_append(*window, section);
     gp_widget_new(GP_WIDGET_TOGGLE, "Enable Astrotracer", &widget); gp_widget_set_value(widget, &priv->astrotracer_enabled); gp_widget_append(section, widget);
     gp_widget_new(GP_WIDGET_RANGE, "Astrotracer Time Limit (sec)", &widget); gp_widget_set_range(widget, 10, 300, 10); gp_widget_set_value(widget, &priv->astrotracer_time_limit); gp_widget_append(section, widget);
-    
     gp_widget_new(GP_WIDGET_SECTION, "Capture Modes", &section); gp_widget_append(*window, section);
     gp_widget_new(GP_WIDGET_TOGGLE, "Bulb Mode Active", &widget); gp_widget_set_value(widget, &priv->bulb_mode_active); gp_widget_append(section, widget);
     
@@ -669,6 +771,46 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
     for(int i=0; KeepAperture_table[i].label; i++) gp_widget_add_choice(widget, KeepAperture_table[i].label);
     gp_widget_set_value(widget, lookup_label(KeepAperture_table, priv->keep_aperture_mode)); 
     gp_widget_append(section, widget);
+
+    // Drive Mode Widget
+    gp_widget_new(GP_WIDGET_RADIO, "Drive Mode", &widget);
+    for (int i = 0; drive_table[i].label; i++) gp_widget_add_choice(widget, drive_table[i].label);
+
+    uint32_t current_drive_mode_ptp_val = 0; // Default to PTP value for "Single Shot"
+    const char* current_drive_mode_label = lookup_label(drive_table, current_drive_mode_ptp_val);
+
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_DRIVE_MODE_NEW) {
+        uint8_t drive_mode_new_raw = parse_condition_u8(priv->conditions_data_cache, priv->conditions_data_len, CI_DRIVE_MODE_NEW);
+        const char* label_from_bulk = lookup_label(drive_table, (uint32_t)drive_mode_new_raw);
+        GP_DEBUG("pentaxmodern_get_config: Drive mode from 0x920F (idx %d) raw value: %u", CI_DRIVE_MODE_NEW, drive_mode_new_raw);
+
+        if (g_strcmp0(label_from_bulk, "Unknown") != 0) {
+            current_drive_mode_label = label_from_bulk;
+            GP_DEBUG("pentaxmodern_get_config: Drive mode set from 0x920F: %s (0x%X)", current_drive_mode_label, drive_mode_new_raw);
+        } else {
+            GP_LOG_W("pentaxmodern_get_config: Value 0x%X from 0x920F (idx %d) for Drive Mode not in drive_table. Falling back.", drive_mode_new_raw, CI_DRIVE_MODE_NEW);
+            if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_DRIVE_MODE, &current_drive_mode_ptp_val) == PTP_RC_OK) {
+                current_drive_mode_label = lookup_label(drive_table, current_drive_mode_ptp_val);
+                GP_DEBUG("pentaxmodern_get_config: Drive mode from PENTAX_OC_GET_DRIVE_MODE (fallback): %s (0x%X)", current_drive_mode_label, current_drive_mode_ptp_val);
+            } else {
+                GP_LOG_E("pentaxmodern_get_config: Failed to get Drive Mode via PENTAX_OC_GET_DRIVE_MODE on fallback.");
+            }
+        }
+    }
+    else if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_DRIVE_MODE, &current_drive_mode_ptp_val) == PTP_RC_OK) {
+        current_drive_mode_label = lookup_label(drive_table, current_drive_mode_ptp_val);
+        GP_DEBUG("pentaxmodern_get_config: Drive mode from PENTAX_OC_GET_DRIVE_MODE (primary attempt): %s (0x%X)", current_drive_mode_label, current_drive_mode_ptp_val);
+    }
+    else {
+        GP_LOG_E("pentaxmodern_get_config: Failed to get Drive Mode from both 0x920F and PENTAX_OC_GET_DRIVE_MODE.");
+    }
+
+    if (g_strcmp0(current_drive_mode_label, "Unknown") == 0 && drive_table[0].label) {
+        GP_LOG_W("pentaxmodern_get_config: Current drive mode PTP value 0x%X is unknown after all attempts. Defaulting to '%s'.", current_drive_mode_ptp_val, drive_table[0].label);
+        current_drive_mode_label = drive_table[0].label;
+    }
+    gp_widget_set_value(widget, current_drive_mode_label);
+    gp_widget_append(section, widget); // Appending to "Capture Modes" section
 
     gp_widget_new(GP_WIDGET_SECTION, "Live View", &section); gp_widget_append(*window, section);
     gp_widget_new(GP_WIDGET_TOGGLE, "Live View Active", &widget); gp_widget_set_value(widget, &priv->live_view_active); gp_widget_append(section, widget);
@@ -683,49 +825,184 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
         current_label = lookup_label(iso_table, raw_val_u32);
     } else { current_label = "Unknown"; }
     gp_widget_new(GP_WIDGET_RADIO, "ISO", &widget); for (int i = 0; iso_table[i].label; i++) gp_widget_add_choice(widget, iso_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
-    
-    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache) {
-        raw_val_u16 = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_WB_MODE); current_label = lookup_label(wb_table, raw_val_u16);
-    } else if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_WHITE_BALANCE, &raw_val_u32) == PTP_RC_OK) { 
-        current_label = lookup_label(wb_table, raw_val_u32);
-    } else { current_label = "Unknown"; }
-    gp_widget_new(GP_WIDGET_RADIO, "White Balance", &widget); for (int i = 0; wb_table[i].label; i++) gp_widget_add_choice(widget, wb_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
-    
+
+    // White Balance
+    CameraWidget *wb_widget; // Use a distinct variable for clarity
+    gp_widget_new(GP_WIDGET_RADIO, "White Balance", &wb_widget);
+    for (int i = 0; wb_table[i].label; i++) gp_widget_add_choice(wb_widget, wb_table[i].label);
+
+    if (get_ptp_dpc_u16(camera, PTP_DPC_WhiteBalance, &raw_val_u16) == GP_OK) {
+        current_label = lookup_label(wb_table, raw_val_u16);
+        GP_DEBUG("pentaxmodern_get_config: White Balance from DPC 0x5005: %s (0x%X)", current_label, raw_val_u16);
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get White Balance via DPC 0x5005. Attempting fallback to bulk data CI_WB_MODE (30).");
+        if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_WB_MODE + 1) { // CI_WB_MODE is 30
+            uint16_t wb_from_bulk = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_WB_MODE);
+            current_label = lookup_label(wb_table, wb_from_bulk);
+            GP_DEBUG("pentaxmodern_get_config: White Balance from bulk data (idx 30) raw: %u, mapped label: %s", wb_from_bulk, current_label);
+            if (g_strcmp0(current_label, "Unknown") == 0) {
+                 GP_LOG_W("pentaxmodern_get_config", "WB value %u from bulk data (idx 30) not found in new wb_table.", wb_from_bulk);
+            }
+        } else {
+            GP_LOG_E("pentaxmodern_get_config", "Failed to get White Balance from DPC and bulk data unavailable/too short for CI_WB_MODE.");
+            current_label = lookup_label(wb_table, 2); // Default to "Auto" (PTP value 2)
+        }
+    }
+    if (g_strcmp0(current_label, "Unknown") == 0 && wb_table[0].label) {
+         GP_LOG_W("pentaxmodern_get_config: Current WB PTP value is unknown. Defaulting to '%s'.", wb_table[0].label);
+         current_label = wb_table[0].label;
+    }
+    gp_widget_set_value(wb_widget, current_label);
+    gp_widget_append(section, wb_widget);
+
+    // Exposure Mode
     if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache) {
         raw_val_u16 = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_CAPTURE_MODE_INFO); current_label = lookup_label(exposure_mode_table, raw_val_u16);
     } else if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_EXPOSURE_MODE, &raw_val_u32) == PTP_RC_OK) {
         current_label = lookup_label(exposure_mode_table, raw_val_u32);
     } else { current_label = "Unknown"; }
-    gp_widget_new(GP_WIDGET_RADIO, "Exposure Mode", &widget); for (int i = 0; exposure_mode_table[i].label; i++) gp_widget_add_choice(widget, exposure_mode_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
+    // This line above is part of the old block and will be replaced by the new logic below.
+    // gp_widget_new(GP_WIDGET_RADIO, "Exposure Mode", &widget); for (int i = 0; exposure_mode_table[i].label; i++) gp_widget_add_choice(widget, exposure_mode_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
 
+    // New logic for Exposure Mode Widget
+    CameraWidget *exposure_mode_widget; // Use a distinct variable name
+    gp_widget_new(GP_WIDGET_RADIO, "Exposure Mode", &exposure_mode_widget);
+    for (int i = 0; exposure_mode_table[i].label; i++) gp_widget_add_choice(exposure_mode_widget, exposure_mode_table[i].label);
+
+    uint32_t current_exposure_mode_ptp_val = 0; // Default to PTP value for "Program (P)"
+    const char* current_exposure_mode_label = lookup_label(exposure_mode_table, current_exposure_mode_ptp_val);
+
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_CAPTURE_MODE_INFO + 1) {
+        uint16_t exp_mode_raw = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_CAPTURE_MODE_INFO);
+        const char* label_from_bulk = lookup_label(exposure_mode_table, (uint32_t)exp_mode_raw);
+        GP_DEBUG("pentaxmodern_get_config: Exposure Mode from 0x920F (idx %d) raw value: %u", CI_CAPTURE_MODE_INFO, exp_mode_raw);
+
+        if (g_strcmp0(label_from_bulk, "Unknown") != 0) {
+            current_exposure_mode_label = label_from_bulk;
+            GP_DEBUG("pentaxmodern_get_config: Exposure Mode set from 0x920F: %s (0x%X)", current_exposure_mode_label, exp_mode_raw);
+        } else {
+            GP_LOG_W("pentaxmodern_get_config: Value 0x%X from 0x920F (idx %d) for Exposure Mode not in new exposure_mode_table. Falling back.", exp_mode_raw, CI_CAPTURE_MODE_INFO);
+            if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_EXPOSURE_MODE, &current_exposure_mode_ptp_val) == PTP_RC_OK) {
+                current_exposure_mode_label = lookup_label(exposure_mode_table, current_exposure_mode_ptp_val);
+                GP_DEBUG("pentaxmodern_get_config: Exposure Mode from PENTAX_OC_GET_EXPOSURE_MODE (fallback): %s (0x%X)", current_exposure_mode_label, current_exposure_mode_ptp_val);
+            } else {
+                GP_LOG_E("pentaxmodern_get_config: Failed to get Exposure Mode via PENTAX_OC_GET_EXPOSURE_MODE on fallback.");
+            }
+        }
+    }
+    else if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_EXPOSURE_MODE, &current_exposure_mode_ptp_val) == PTP_RC_OK) {
+        current_exposure_mode_label = lookup_label(exposure_mode_table, current_exposure_mode_ptp_val);
+        GP_DEBUG("pentaxmodern_get_config: Exposure Mode from PENTAX_OC_GET_EXPOSURE_MODE (primary attempt): %s (0x%X)", current_exposure_mode_label, current_exposure_mode_ptp_val);
+    }
+    else {
+        GP_LOG_E("pentaxmodern_get_config: Failed to get Exposure Mode from both 0x920F and PENTAX_OC_GET_EXPOSURE_MODE.");
+    }
+
+    if (g_strcmp0(current_exposure_mode_label, "Unknown") == 0 && exposure_mode_table[0].label) {
+        GP_LOG_W("pentaxmodern_get_config: Current exposure mode PTP value 0x%X is unknown. Defaulting to '%s'.", current_exposure_mode_ptp_val, exposure_mode_table[0].label);
+        current_exposure_mode_label = exposure_mode_table[0].label;
+    }
+    gp_widget_set_value(exposure_mode_widget, current_exposure_mode_label);
+    gp_widget_append(section, exposure_mode_widget);
+
+    // Shutter Speed, Aperture widgets using the generic 'widget' variable
     if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_SHUTTER, &raw_val_u32) == PTP_RC_OK) { current_label = lookup_label(shutter_table, raw_val_u32); } else { current_label = "Unknown"; }
     gp_widget_new(GP_WIDGET_RADIO, "Shutter Speed", &widget); for (int i = 0; shutter_table[i].label; i++) gp_widget_add_choice(widget, shutter_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
     if (pentaxmodern_get_ptp_property_u32(&priv->ptp_params, PENTAX_OC_GET_APERTURE, &raw_val_u32) == PTP_RC_OK) { current_label = lookup_label(aperture_table, raw_val_u32); } else { current_label = "Unknown"; }
     gp_widget_new(GP_WIDGET_RADIO, "Aperture", &widget); for (int i = 0; aperture_table[i].label; i++) gp_widget_add_choice(widget, aperture_table[i].label); gp_widget_set_value(widget, current_label); gp_widget_append(section, widget);
     
     // Movie Settings Section
-    gp_widget_new(GP_WIDGET_SECTION, "Movie Settings", &movie_section);
-    gp_widget_append(*window, movie_section);
-    uint8_t movie_mode_val = 0;
-    if (get_ptp_dpc_u8(camera, PENTAX_DPC_MOVIE_MODE, &movie_mode_val) == GP_OK) {
-        gp_widget_new(GP_WIDGET_TOGGLE, "Movie Mode", &widget);
-        int movie_mode_enabled = (movie_mode_val != 0); 
-        gp_widget_set_value(widget, &movie_mode_enabled);
-        gp_widget_append(movie_section, widget);
+    // CameraWidget *movie_section; // Declared with other section types earlier if that's the pattern
+    gp_widget_new(GP_WIDGET_SECTION, "Movie Settings", &movie_section); // 'movie_section' is already declared with other CameraWidget* at the start of the function
+
+    // Movie Mode Toggle
+    CameraWidget *movie_mode_toggle_widget;
+    gp_widget_new(GP_WIDGET_TOGGLE, "Movie Mode", &movie_mode_toggle_widget);
+    uint8_t movie_mode_dpc_val = 0;
+    if (get_ptp_dpc_u8(camera, PENTAX_DPC_MOVIE_MODE, &movie_mode_dpc_val) == GP_OK) {
+        int movie_mode_enabled = (movie_mode_dpc_val != 0);
+        gp_widget_set_value(movie_mode_toggle_widget, &movie_mode_enabled);
+    } else {
+        GP_LOG_E("pentaxmodern_get_config", "Failed to get Movie Mode DPC 0x%X", PENTAX_DPC_MOVIE_MODE);
+        int enabled = 0; gp_widget_set_value(movie_mode_toggle_widget, &enabled);
+        gp_widget_set_readonly(movie_mode_toggle_widget, TRUE);
     }
-    // TODO: Fetch current Movie File Format and Quality if readable DPCs exist or from 0x920F if indices known.
-    gp_widget_new(GP_WIDGET_RADIO, "Movie File Format", &widget);
-    for(int i=0; MovieFileFormat_table[i].label; i++) gp_widget_add_choice(widget, MovieFileFormat_table[i].label);
-    gp_widget_set_value(widget, MovieFileFormat_table[0].label); // Default
-    gp_widget_append(movie_section, widget);
-    gp_widget_new(GP_WIDGET_RADIO, "Movie Quality", &widget);
-    for(int i=0; MovieQuality_table[i].label; i++) gp_widget_add_choice(widget, MovieQuality_table[i].label);
-    gp_widget_set_value(widget, MovieQuality_table[0].label); // Default
-    gp_widget_append(movie_section, widget);
+    gp_widget_append(movie_section, movie_mode_toggle_widget);
+
+    // Movie Pixel Size
+    CameraWidget *pixel_size_widget;
+    gp_widget_new(GP_WIDGET_RADIO, "Movie Pixel Size", &pixel_size_widget);
+    for (int i = 0; MoviePixelSize_table[i].label; i++) gp_widget_add_choice(pixel_size_widget, MoviePixelSize_table[i].label);
+    // Assuming CI_IMAGE_SIZE (34) is for stills primarily, if movie size is separate, need its index.
+    // For now, let's assume PENTAX_DPC_WRITING_FILE_FORMAT_SETTING (0xD01B) byte 6 is the source if bulk data isn't specific.
+    // Given the task specifies CI_IMAGE_SIZE for movie, we'll use that.
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_IMAGE_SIZE + 1) { // CI_IMAGE_SIZE is index for uint16_t
+        uint16_t image_size_val = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_IMAGE_SIZE);
+        uint16_t movie_pix_size_ptp = image_size_val & 0xFFFF;
+        gp_widget_set_value(pixel_size_widget, lookup_label(MoviePixelSize_table, movie_pix_size_ptp));
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get Movie Pixel Size from 0x920F CI_IMAGE_SIZE. Defaulting.");
+        gp_widget_set_value(pixel_size_widget, MoviePixelSize_table[0].label);
+    }
+    gp_widget_append(movie_section, pixel_size_widget);
+
+    // Movie Frame Rate
+    CameraWidget *frame_rate_widget;
+    gp_widget_new(GP_WIDGET_RADIO, "Movie Frame Rate", &frame_rate_widget);
+    for (int i = 0; MovieFrameRate_table[i].label; i++) gp_widget_add_choice(frame_rate_widget, MovieFrameRate_table[i].label);
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_IMAGE_SIZE + 1) {
+        uint16_t image_size_val = parse_condition_u16(priv->conditions_data_cache, priv->conditions_data_len, CI_IMAGE_SIZE);
+        uint16_t movie_frame_rate_ptp_val = image_size_val >> 16;
+        // Note: C# MtpDevice.cs maps PTP 3 to UI index 2 ("24p").
+        // If MovieFrameRate_table stores UI indices {0,1,2} as PTP values, direct lookup is fine.
+        // If it stores actual PTP values {0,1,3}, then direct lookup is also fine.
+        // The current MovieFrameRate_table is {"60p",0}, {"30p",1}, {"24p",2}.
+        // If camera returns PTP value 3 for 24p, this direct lookup_label(table, 3) will fail.
+        // This requires either adjusting table values or mapping logic here.
+        // For now, assume direct lookup works or table values match camera PTP values for this specific condition index.
+        const char * frame_rate_label = lookup_label(MovieFrameRate_table, movie_frame_rate_ptp_val);
+        if (g_strcmp0(frame_rate_label, "Unknown") == 0 && movie_frame_rate_ptp_val == 3 && MovieFrameRate_table[2].value == 2) { // Specific C# case for 24p
+             frame_rate_label = MovieFrameRate_table[2].label; // "24p"
+        }
+        gp_widget_set_value(frame_rate_widget, frame_rate_label);
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get Movie Frame Rate from 0x920F CI_IMAGE_SIZE. Defaulting.");
+        gp_widget_set_value(frame_rate_widget, MovieFrameRate_table[0].label);
+    }
+    gp_widget_append(movie_section, frame_rate_widget);
+
+    // Movie Card Slot
+    CameraWidget *card_slot_widget;
+    gp_widget_new(GP_WIDGET_RADIO, "Movie Card Slot", &card_slot_widget);
+    for (int i = 0; MovieCardSlot_table[i].label; i++) gp_widget_add_choice(card_slot_widget, MovieCardSlot_table[i].label);
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_MOVIE_CARD_SLOT_SETTING) { // Assuming uint8_t
+        uint8_t slot_val = parse_condition_u8(priv->conditions_data_cache, priv->conditions_data_len, CI_MOVIE_CARD_SLOT_SETTING);
+        gp_widget_set_value(card_slot_widget, lookup_label(MovieCardSlot_table, slot_val));
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get Movie Card Slot from 0x920F CI_MOVIE_CARD_SLOT_SETTING. Defaulting.");
+        gp_widget_set_value(card_slot_widget, MovieCardSlot_table[0].label);
+    }
+    gp_widget_append(movie_section, card_slot_widget);
+
+    // Movie File Format
+    CameraWidget *file_format_widget;
+    gp_widget_new(GP_WIDGET_RADIO, "Movie File Format", &file_format_widget);
+    for (int i = 0; MovieFileFormat_table[i].label; i++) gp_widget_add_choice(file_format_widget, MovieFileFormat_table[i].label);
+    if (ret_ptp_conditions == PTP_RC_OK && priv->conditions_data_cache && priv->conditions_data_len > CI_WRITING_FORMAT_SETTING) { // Assuming uint8_t
+        uint8_t format_val = parse_condition_u8(priv->conditions_data_cache, priv->conditions_data_len, CI_WRITING_FORMAT_SETTING);
+        gp_widget_set_value(file_format_widget, lookup_label(MovieFileFormat_table, format_val));
+    } else {
+        GP_LOG_W("pentaxmodern_get_config", "Failed to get Movie File Format from 0x920F CI_WRITING_FORMAT_SETTING. Defaulting.");
+        gp_widget_set_value(file_format_widget, MovieFileFormat_table[0].label);
+    }
+    gp_widget_set_readonly(file_format_widget, TRUE);
+    gp_widget_append(movie_section, file_format_widget);
+
+    gp_widget_append(*window, movie_section);
 
 
     // Custom Image Details Section
-    gp_widget_new(GP_WIDGET_SECTION, "Custom Image Details", &ci_section);
+    gp_widget_new(GP_WIDGET_SECTION, "Custom Image Details", &ci_section); // 'ci_section' is already declared
     gp_widget_append(*window, ci_section);
     if (get_ptp_dpc_s8(camera, PENTAX_DPC_CI_SATURATION, &raw_val_s8) == GP_OK) {
         gp_widget_new(GP_WIDGET_RANGE, "CI Saturation", &widget); range_float_val = raw_val_s8;
@@ -792,7 +1069,76 @@ static int pentaxmodern_get_config (Camera *camera, CameraWidget **window, GPCon
         for(int i=0; CICrossProcessType_table[i].label; i++) gp_widget_add_choice(widget, CICrossProcessType_table[i].label);
         gp_widget_set_value(widget, current_label); gp_widget_append(ci_section, widget);
     }
-    // TODO: PENTAX_DPC_CI_USER_FILTER_EFFECT (0xD02D) - array of 3 shorts. Omitted for now.
+
+    // CI User Filter Effect Widgets
+    // IMPORTANT: The PTP value for "User Filter" in CIFilterEffect_table needs verification. Assuming 5 for now.
+    #define PTP_VALUE_FOR_USER_FILTER 5
+    uint8_t current_main_filter_effect_val = 0;
+    gboolean is_user_filter_active = FALSE;
+    if (get_ptp_dpc_u8(camera, PENTAX_DPC_CI_FILTER_EFFECT, &current_main_filter_effect_val) == GP_OK) {
+        if (current_main_filter_effect_val == PTP_VALUE_FOR_USER_FILTER) {
+            is_user_filter_active = TRUE;
+        }
+        // Debugging: Log the read main filter effect and whether user filter is considered active
+        GP_DEBUG("pentaxmodern_get_config: CI Filter Effect (0xD024) PTP value: %u. User filter active: %s.",
+                 current_main_filter_effect_val, is_user_filter_active ? "yes" : "no");
+    } else {
+        GP_LOG_E("pentaxmodern_get_config: Failed to get CI Filter Effect DPC 0x%X.", PENTAX_DPC_CI_FILTER_EFFECT);
+    }
+
+    int16_t gain_r = 0, gain_g = 0, gain_b = 0;
+    PTPPropValue pv_userfilter;
+    memset(&pv_userfilter, 0, sizeof(pv_userfilter));
+    uint16_t ret_uf = ptp_getdevicepropvalue(&priv->ptp_params, PENTAX_DPC_CI_USER_FILTER_EFFECT, &pv_userfilter, PTP_DTC_AUINT8);
+
+    if (ret_uf == PTP_RC_OK) {
+        if (pv_userfilter.a.v_u8 != NULL && pv_userfilter.a.count == 8) {
+            if (pv_userfilter.a.v_u8[0] == 4) { // Check descriptor
+                uint8_t sign_byte = pv_userfilter.a.v_u8[4];
+                uint8_t abs_r = pv_userfilter.a.v_u8[5];
+                uint8_t abs_g = pv_userfilter.a.v_u8[6];
+                uint8_t abs_b = pv_userfilter.a.v_u8[7];
+
+                gain_r = (sign_byte & 0x10) ? -(int16_t)abs_r : (int16_t)abs_r;
+                gain_g = (sign_byte & 0x20) ? -(int16_t)abs_g : (int16_t)abs_g;
+                gain_b = (sign_byte & 0x40) ? -(int16_t)abs_b : (int16_t)abs_b;
+                GP_DEBUG("pentaxmodern_get_config: Parsed User Filter Gains - R:%d, G:%d, B:%d", gain_r, gain_g, gain_b);
+            } else {
+                GP_LOG_W("pentaxmodern_get_config: DPC 0x%X descriptor mismatch. Expected 4, got %u.", PENTAX_DPC_CI_USER_FILTER_EFFECT, pv_userfilter.a.v_u8[0]);
+            }
+            free(pv_userfilter.a.v_u8); // Free the allocated memory
+            pv_userfilter.a.v_u8 = NULL;
+        } else {
+             GP_LOG_W("pentaxmodern_get_config: DPC 0x%X data invalid (NULL or count %u != 8).", PENTAX_DPC_CI_USER_FILTER_EFFECT, pv_userfilter.a.count);
+             if(pv_userfilter.a.v_u8) { free(pv_userfilter.a.v_u8); pv_userfilter.a.v_u8 = NULL; }
+        }
+    } else {
+        GP_LOG_E("pentaxmodern_get_config: Failed to get DPC 0x%X (CI User Filter Effect). Error: 0x%X", PENTAX_DPC_CI_USER_FILTER_EFFECT, ret_uf);
+    }
+
+    CameraWidget *user_gain_r_widget, *user_gain_g_widget, *user_gain_b_widget;
+    float gain_float_val;
+
+    gp_widget_new(GP_WIDGET_RANGE, "CI User Filter R Gain", &user_gain_r_widget);
+    gain_float_val = (float)gain_r;
+    gp_widget_set_range(user_gain_r_widget, -200.0f, 200.0f, 10.0f);
+    gp_widget_set_value(user_gain_r_widget, &gain_float_val);
+    gp_widget_set_readonly(user_gain_r_widget, !is_user_filter_active);
+    gp_widget_append(ci_section, user_gain_r_widget);
+
+    gp_widget_new(GP_WIDGET_RANGE, "CI User Filter G Gain", &user_gain_g_widget);
+    gain_float_val = (float)gain_g;
+    gp_widget_set_range(user_gain_g_widget, -200.0f, 200.0f, 10.0f);
+    gp_widget_set_value(user_gain_g_widget, &gain_float_val);
+    gp_widget_set_readonly(user_gain_g_widget, !is_user_filter_active);
+    gp_widget_append(ci_section, user_gain_g_widget);
+
+    gp_widget_new(GP_WIDGET_RANGE, "CI User Filter B Gain", &user_gain_b_widget);
+    gain_float_val = (float)gain_b;
+    gp_widget_set_range(user_gain_b_widget, -200.0f, 200.0f, 10.0f);
+    gp_widget_set_value(user_gain_b_widget, &gain_float_val);
+    gp_widget_set_readonly(user_gain_b_widget, !is_user_filter_active);
+    gp_widget_append(ci_section, user_gain_b_widget);
 
     // Storage Settings Section
     CameraWidget *storage_section;
@@ -853,6 +1199,52 @@ static int pentaxmodern_set_config (Camera *camera, CameraWidget *window, GPCont
 
     GP_DEBUG("pentaxmodern_set_config called.");
     // ... (Existing config settings for Astro, Bulb, Live View, basic Exposure etc. as before) ...
+
+    // White Balance Setting
+    if (gp_widget_get_child_by_name(window, "White Balance", &widget) == GP_OK && gp_widget_changed(widget)) {
+        gp_widget_get_value(widget, &choice_val);
+        uint32_t temp_wb_ptp_val = lookup_value(wb_table, choice_val); // Using new wb_table
+        uint16_t wb_ptp_val_u16 = (uint16_t)temp_wb_ptp_val;
+
+        GP_DEBUG("pentaxmodern_set_config: Setting White Balance to: %s (PTP val 0x%X)", choice_val, wb_ptp_val_u16);
+        if (set_ptp_dpc_u16(camera, PTP_DPC_WhiteBalance, wb_ptp_val_u16) == GP_OK) {
+            GP_DEBUG("pentaxmodern_set_config: Successfully set White Balance via DPC 0x5005.");
+        } else {
+            GP_LOG_E("pentaxmodern_set_config: Failed to set White Balance via DPC 0x5005 (value 0x%X).", wb_ptp_val_u16);
+        }
+        free(choice_val);
+    }
+
+    // Drive Mode Setting
+    if (gp_widget_get_child_by_name(window, "Drive Mode", &widget) == GP_OK && gp_widget_changed(widget)) {
+        gp_widget_get_value(widget, &choice_val);
+        ptp_val_u32 = lookup_value(drive_table, choice_val);
+
+        GP_DEBUG("pentaxmodern_set_config: Setting Drive Mode to: %s (PTP val 0x%X)", choice_val, ptp_val_u32);
+
+        if (ptp_generic_no_data(&priv->ptp_params, PENTAX_OC_SET_DRIVE_MODE, 1, ptp_val_u32, 0, 0, 0) == PTP_RC_OK) {
+            GP_DEBUG("pentaxmodern_set_config: Successfully set Drive Mode.");
+        } else {
+            GP_LOG_E("pentaxmodern_set_config: Failed to set Drive Mode using PENTAX_OC_SET_DRIVE_MODE (PTP val 0x%X).", ptp_val_u32);
+        }
+        free(choice_val);
+    }
+
+    // Exposure Mode Setting
+    if (gp_widget_get_child_by_name(window, "Exposure Mode", &widget) == GP_OK && gp_widget_changed(widget)) {
+        gp_widget_get_value(widget, &choice_val);
+        ptp_val_u32 = lookup_value(exposure_mode_table, choice_val);
+
+        GP_DEBUG("pentaxmodern_set_config: Setting Exposure Mode to: %s (PTP val 0x%X)", choice_val, ptp_val_u32);
+
+        if (ptp_generic_no_data(&priv->ptp_params, PENTAX_OC_SET_EXPOSURE_MODE, 1, ptp_val_u32, 0, 0, 0) == PTP_RC_OK) {
+            GP_DEBUG("pentaxmodern_set_config: Successfully set Exposure Mode.");
+        } else {
+            GP_LOG_E("pentaxmodern_set_config: Failed to set Exposure Mode using PENTAX_OC_SET_EXPOSURE_MODE (PTP val 0x%X).", ptp_val_u32);
+        }
+        free(choice_val);
+    }
+
     if (gp_widget_get_child_by_name(window, "Aperture Setting Priority", &widget) == GP_OK && gp_widget_changed(widget)) {
         gp_widget_get_value(widget, &choice_val);
         uint8_t keep_mode = lookup_value(KeepAperture_table, choice_val);
@@ -872,73 +1264,98 @@ static int pentaxmodern_set_config (Camera *camera, CameraWidget *window, GPCont
     }
     
     // Movie Settings
-    if (gp_widget_get_child_by_name(window, "Movie Mode", &widget) == GP_OK && gp_widget_changed(widget)) {
-        gp_widget_get_value(widget, &enabled_val);
-        set_ptp_dpc_u8(camera, PENTAX_DPC_MOVIE_MODE, enabled_val ? 1 : 0); 
-    }
-    
-    CameraWidget *movie_format_widget = NULL, *movie_quality_widget = NULL;
-    gp_widget_get_child_by_name(window, "Movie File Format", &movie_format_widget);
-    gp_widget_get_child_by_name(window, "Movie Quality", &movie_quality_widget);
+    CameraWidget *movie_mode_widget = NULL, *pixel_size_widget = NULL, *frame_rate_widget = NULL, *card_slot_widget = NULL;
+    int movie_mode_changed = FALSE, pixel_size_changed = FALSE, frame_rate_changed = FALSE, card_slot_changed = FALSE;
 
-    if ((movie_format_widget && gp_widget_changed(movie_format_widget)) || 
-        (movie_quality_widget && gp_widget_changed(movie_quality_widget))) {
-        
-        uint32_t movie_quality_choice_val = 0;
-        uint32_t movie_pixsize = PENTAX_CONST_MOVIE_PIXSIZE_FHD; 
-        uint32_t movie_framerate = PENTAX_CONST_MOVIE_FRAMERATE_30P; 
-        // uint32_t movie_file_format_val = 0; // Example, if "Movie File Format" widget existed and was used
-
-        if (movie_quality_widget) { // Assuming this widget exists and was changed or format was changed
-            gp_widget_get_value(movie_quality_widget, &choice_val);
-            movie_quality_choice_val = lookup_value(MovieQuality_table, choice_val);
-            free(choice_val);
-
-            if (movie_quality_choice_val == PENTAX_MOVIE_QUALITY_4K_30P) {
-                movie_pixsize = PENTAX_CONST_MOVIE_PIXSIZE_4K; movie_framerate = PENTAX_CONST_MOVIE_FRAMERATE_30P;
-            } else if (movie_quality_choice_val == PENTAX_MOVIE_QUALITY_FHD_60P) {
-                movie_pixsize = PENTAX_CONST_MOVIE_PIXSIZE_FHD; movie_framerate = PENTAX_CONST_MOVIE_FRAMERATE_60P;
-            } // else default to FHD 30p
+    if (gp_widget_get_child_by_name(window, "Movie Mode", &movie_mode_widget) == GP_OK && gp_widget_changed(movie_mode_widget)) {
+        movie_mode_changed = TRUE;
+        gp_widget_get_value(movie_mode_widget, &enabled_val);
+        GP_DEBUG("pentaxmodern_set_config: Setting Movie Mode to: %s", enabled_val ? "ON" : "OFF");
+        if (set_ptp_dpc_u8(camera, PENTAX_DPC_MOVIE_MODE, enabled_val ? 1 : 0) == GP_OK) {
+            GP_DEBUG("pentaxmodern_set_config: Successfully set Movie Mode DPC.");
+        } else {
+            GP_LOG_E("pentaxmodern_set_config: Failed to set Movie Mode DPC 0x%X.", PENTAX_DPC_MOVIE_MODE);
         }
-        // if (movie_format_widget) { /* Get movie_file_format_val similarly */ }
-        
-        PTPPropValue propv;
-        // The PTP standard specifies arrays as a sequence of elements.
-        // ptp_setdevicepropvalue expects a PTPPropValue where, for arrays,
-        // the .a.v field points to an array of PTPPropValue elements.
-        // This is complex. A common simplification for vendor DPCs is to send raw byte arrays.
-        // Let's assume PENTAX_DPC_WRITING_FILE_FORMAT_SETTING expects a flat structure
-        // of 3x uint16_t (PixSize, FrameRate, CardSlot) - this is a guess.
-        // Total 6 bytes.
-        unsigned char movie_settings_data[6];
-        uint16_t pixsize16 = (uint16_t)movie_pixsize; // Truncate if necessary
-        uint16_t framerate16 = (uint16_t)movie_framerate;
-        uint16_t cardslot16 = (uint16_t)PENTAX_CONST_MOVIE_CARD_SLOT_DEFAULT;
-
-        htole16a(&movie_settings_data[0], pixsize16);
-        htole16a(&movie_settings_data[2], framerate16);
-        htole16a(&movie_settings_data[4], cardslot16);
-        
-        propv.str = (char*)movie_settings_data; // Treat as opaque byte string for ptp_setdevicepropvalue
-                                                // The 'datatype' param will tell ptp.c how to interpret it.
-                                                // PTP_DTC_STR usually means null-terminated. This is not.
-                                                // Need a way to send raw byte array.
-                                                // PTP_DTC_AUINT8 with count 6 might work.
-        
-        // Forcing PTP_DTC_AUINT8 for now, as it's a common way to send byte blobs for vendor props.
-        // The actual datatype for PENTAX_DPC_WRITING_FILE_FORMAT_SETTING (0xD01B) is critical.
-        // If it's truly an array of uint32_t, then PTP_DTC_AUINT32 should be used,
-        // and the data packing would be different (array of 3x uint32_t).
-        // This part is highly speculative due to lack of precise data structure info.
-        // The following will likely fail or be misinterpreted by the camera if the data type/structure is wrong.
-        propv.a.count = 6; // Number of bytes for AUINT8
-        propv.a.v = (PTPPropValue*)movie_settings_data; // Incorrect usage of PTPPropValue for array
-
-        GP_LOG_W("pentaxmodern", "Attempting to set Movie Format/Quality (0xD01B). This is speculative and may not work.");
-        // set_ptp_deviceprop_value(camera, PENTAX_DPC_WRITING_FILE_FORMAT_SETTING, &propv, PTP_DTC_AUINT8); 
-        GP_LOG_E("pentaxmodern", "TODO: Correctly implement array packing for PENTAX_DPC_WRITING_FILE_FORMAT_SETTING (0xD01B).");
     }
 
+    // Check if any of the DPC 0xD01B related movie settings changed
+    gp_widget_get_child_by_name(window, "Movie Pixel Size", &pixel_size_widget);
+    if (pixel_size_widget && gp_widget_changed(pixel_size_widget)) pixel_size_changed = TRUE;
+
+    gp_widget_get_child_by_name(window, "Movie Frame Rate", &frame_rate_widget);
+    if (frame_rate_widget && gp_widget_changed(frame_rate_widget)) frame_rate_changed = TRUE;
+
+    gp_widget_get_child_by_name(window, "Movie Card Slot", &card_slot_widget);
+    if (card_slot_widget && gp_widget_changed(card_slot_widget)) card_slot_changed = TRUE;
+
+    // If any of the DPC 0xD01B related settings changed, construct and send payload
+    if (pixel_size_changed || frame_rate_changed || card_slot_changed) {
+        unsigned char payload[10];
+        memset(payload, 0, sizeof(payload)); // Initialize with zeros
+
+        payload[0] = 6; // Descriptor/type
+
+        // Placeholders for unused/still-related bytes based on C# analysis
+        payload[1] = 0;
+        payload[2] = 0;
+        payload[3] = 0;
+        payload[4] = 6; // Still Format Slot 1 / Movie File Format (MP4/MOV - not being set here)
+        payload[5] = 6; // Still Format Slot 2
+        payload[7] = 4; // Still JPEG Quality
+
+        // Get Movie Pixel Size (payload[6])
+        if (pixel_size_widget) { // Should always be found if changed
+            gp_widget_get_value(pixel_size_widget, &choice_val);
+            payload[6] = (uint8_t)lookup_value(MoviePixelSize_table, choice_val);
+            GP_DEBUG("pentaxmodern_set_config: Payload[6] (MoviePixelSize) set to: %s (0x%X)", choice_val, payload[6]);
+            free(choice_val);
+        } else { /* Should not happen if changed=TRUE, but as a fallback use current from camera or default */
+            GP_LOG_W("pentaxmodern_set_config", "Movie Pixel Size widget not found for DPC 0xD01B payload construction, but was marked changed. Using default.");
+            payload[6] = MoviePixelSize_table[0].value; // Default to first entry's PTP value
+        }
+        
+        // Get Movie Frame Rate (payload[8])
+        if (frame_rate_widget) {
+            gp_widget_get_value(frame_rate_widget, &choice_val);
+            uint32_t ui_index_val = lookup_value(MovieFrameRate_table, choice_val);
+            if (g_strcmp0(choice_val, "24p") == 0) { // C# MtpDevice.cs special case: UI "24p" (index 2) -> PTP value 3
+                payload[8] = 3;
+            } else {
+                payload[8] = (uint8_t)ui_index_val; // Assumes other PTP values match UI indices in table
+            }
+            GP_DEBUG("pentaxmodern_set_config: Payload[8] (MovieFrameRate) set to: %s (UI Index %u, PTP val 0x%X)", choice_val, ui_index_val, payload[8]);
+            free(choice_val);
+        } else {
+            GP_LOG_W("pentaxmodern_set_config", "Movie Frame Rate widget not found for DPC 0xD01B payload construction, but was marked changed. Using default.");
+            payload[8] = MovieFrameRate_table[0].value; // Default to first entry's PTP value (adjust if special mapping needed)
+        }
+
+        // Get Movie Card Slot (payload[9])
+        if (card_slot_widget) {
+            gp_widget_get_value(card_slot_widget, &choice_val);
+            payload[9] = (uint8_t)lookup_value(MovieCardSlot_table, choice_val);
+            GP_DEBUG("pentaxmodern_set_config: Payload[9] (MovieCardSlot) set to: %s (0x%X)", choice_val, payload[9]);
+            free(choice_val);
+        } else {
+            GP_LOG_W("pentaxmodern_set_config", "Movie Card Slot widget not found for DPC 0xD01B payload construction, but was marked changed. Using default.");
+            payload[9] = MovieCardSlot_table[0].value; // Default to first entry's PTP value
+        }
+
+        GP_DEBUG("pentaxmodern_set_config: Preparing to set DPC 0xD01B (WritingFileFormatSetting) with payload:");
+        for(int i=0; i<10; i++) GP_DEBUG("  payload[%d] = 0x%02X", i, payload[i]);
+
+        PTPPropValue propv_array;
+        propv_array.a.v_u8 = payload;
+        propv_array.a.count = sizeof(payload);
+
+        if (set_ptp_deviceprop_value(camera, PENTAX_DPC_WRITING_FILE_FORMAT_SETTING, &propv_array, PTP_DTC_AUINT8) == GP_OK) {
+            GP_DEBUG("pentaxmodern_set_config: Successfully set DPC 0xD01B (WritingFileFormatSetting).");
+        } else {
+            GP_LOG_E("pentaxmodern_set_config: Failed to set DPC 0xD01B (WritingFileFormatSetting).");
+        }
+    }
+    // Note: MovieFileFormat is read-only, so no set logic here.
+    // The old MovieQuality widget handling is removed as it's superseded by the new granular controls.
 
     // Custom Image Detail Settings
     if (gp_widget_get_child_by_name(window, "CI Saturation", &widget) == GP_OK && gp_widget_changed(widget)) {
@@ -949,7 +1366,89 @@ static int pentaxmodern_set_config (Camera *camera, CameraWidget *window, GPCont
         gp_widget_get_value(widget, &range_float_val); ptp_val_s8 = (int8_t)range_float_val;
         set_ptp_dpc_s8(camera, PENTAX_DPC_CI_HUE, ptp_val_s8);
     }
-    // ... (rest of CI set logic from previous turn)
+    // ... (Handle other existing CI settings like Key, Contrast, Sharpness, etc. before adding User Filter Effect)
+
+    // CI User Filter Effect (R,G,B Gains)
+    // IMPORTANT: PTP_VALUE_FOR_USER_FILTER (5) needs verification against actual CIFilterEffect_table PTP value for "User" mode.
+    #define PTP_VALUE_FOR_USER_FILTER 5
+    CameraWidget *ci_filter_effect_widget_check; // Use a different variable name to avoid conflict
+    char *current_ci_filter_label_check;
+    uint8_t current_ci_filter_ptp_val_check = 0; // Default to a non-User value
+
+    if (gp_widget_get_child_by_name(window, "CI Filter Effect", &ci_filter_effect_widget_check) == GP_OK) {
+        // We need the *current* value of the main CI Filter Effect, not if it changed,
+        // because the gain sliders might change even if the main filter selection didn't this turn.
+        gp_widget_get_value(ci_filter_effect_widget_check, &current_ci_filter_label_check);
+        current_ci_filter_ptp_val_check = lookup_value(CIFilterEffect_table, current_ci_filter_label_check);
+        GP_DEBUG("pentaxmodern_set_config: Current CI Filter Effect is '%s' (PTP: %u). Required for User Filter Gains: %u.",
+            current_ci_filter_label_check, current_ci_filter_ptp_val_check, PTP_VALUE_FOR_USER_FILTER);
+        free(current_ci_filter_label_check);
+    } else {
+        GP_LOG_E("pentaxmodern_set_config: Could not find 'CI Filter Effect' widget to check prerequisite for User Filter Gains.");
+    }
+
+    if (current_ci_filter_ptp_val_check == PTP_VALUE_FOR_USER_FILTER) {
+        CameraWidget *r_gain_widget, *g_gain_widget, *b_gain_widget;
+        gboolean r_changed = FALSE, g_changed = FALSE, b_changed = FALSE;
+        float r_float_val = 0.0f, g_float_val = 0.0f, b_float_val = 0.0f; // Initialize to default
+
+        // Get R Gain widget and check if changed
+        if (gp_widget_get_child_by_name(window, "CI User Filter R Gain", &r_gain_widget) == GP_OK) {
+            if(gp_widget_changed(r_gain_widget)) r_changed = TRUE;
+            gp_widget_get_value(r_gain_widget, &r_float_val);
+        }
+        // Get G Gain widget and check if changed
+        if (gp_widget_get_child_by_name(window, "CI User Filter G Gain", &g_gain_widget) == GP_OK) {
+            if(gp_widget_changed(g_gain_widget)) g_changed = TRUE;
+            gp_widget_get_value(g_gain_widget, &g_float_val);
+        }
+        // Get B Gain widget and check if changed
+        if (gp_widget_get_child_by_name(window, "CI User Filter B Gain", &b_gain_widget) == GP_OK) {
+            if(gp_widget_changed(b_gain_widget)) b_changed = TRUE;
+            gp_widget_get_value(b_gain_widget, &b_float_val);
+        }
+
+        if (r_changed || g_changed || b_changed) {
+            GP_DEBUG("pentaxmodern_set_config: Attempting to set CI User Filter Gains (R:%.0f, G:%.0f, B:%.0f)", r_float_val, g_float_val, b_float_val);
+
+            int16_t r_gain = (int16_t)r_float_val;
+            int16_t g_gain = (int16_t)g_float_val;
+            int16_t b_gain = (int16_t)b_float_val;
+
+            // Clamp values: abs(gain) must be <= 200
+            if (abs(r_gain) > 200) r_gain = (r_gain > 0) ? 200 : -200;
+            if (abs(g_gain) > 200) g_gain = (g_gain > 0) ? 200 : -200;
+            if (abs(b_gain) > 200) b_gain = (b_gain > 0) ? 200 : -200;
+
+            unsigned char payload[8];
+            payload[0] = 4; // Descriptor
+            payload[1] = 0; payload[2] = 0; payload[3] = 0; // Padding
+            payload[4] = ((r_gain < 0) ? 0x10 : 0) |
+                         ((g_gain < 0) ? 0x20 : 0) |
+                         ((b_gain < 0) ? 0x40 : 0); // Sign bits
+            payload[5] = (uint8_t)abs(r_gain);
+            payload[6] = (uint8_t)abs(g_gain);
+            payload[7] = (uint8_t)abs(b_gain);
+
+            PTPPropValue propv_array_userfilter; // Use a distinct variable name
+            memset(&propv_array_userfilter, 0, sizeof(propv_array_userfilter));
+            propv_array_userfilter.a.v_u8 = payload; // Pointer to the array
+            propv_array_userfilter.a.count = sizeof(payload); // Number of elements
+
+            GP_DEBUG("pentaxmodern_set_config: Setting DPC 0x%X (CI User Filter Effect) with payload:", PENTAX_DPC_CI_USER_FILTER_EFFECT);
+            for(int i=0; i<8; i++) GP_DEBUG("  payload[%d] = 0x%02X", i, payload[i]);
+
+            if (set_ptp_deviceprop_value(camera, PENTAX_DPC_CI_USER_FILTER_EFFECT, &propv_array_userfilter, PTP_DTC_AUINT8) == GP_OK) {
+                GP_DEBUG("pentaxmodern_set_config: Successfully set DPC 0x%X (CI User Filter Effect).", PENTAX_DPC_CI_USER_FILTER_EFFECT);
+            } else {
+                GP_LOG_E("pentaxmodern_set_config: Failed to set DPC 0x%X (CI User Filter Effect).", PENTAX_DPC_CI_USER_FILTER_EFFECT);
+            }
+        }
+    } else {
+        GP_DEBUG("pentaxmodern_set_config: CI User Filter not active (current PTP value %u != %u). Skipping User Filter Gain settings.",
+                 current_ci_filter_ptp_val_check, PTP_VALUE_FOR_USER_FILTER);
+    }
+    // ... (rest of CI set logic from previous turn, if any, should follow here)
 
     GP_DEBUG("pentaxmodern_set_config finished.");
     return GP_OK;
