@@ -24,6 +24,7 @@ shared_module(
   c_args: [
     '-DLIBGPHOTO2',
     '-DPKTDATADIR="/"',
+    '-D_POSIX_C_SOURCE=200809L',  # ✅ Added to enable usleep
   ],
   name_prefix: '',
   install: true,
