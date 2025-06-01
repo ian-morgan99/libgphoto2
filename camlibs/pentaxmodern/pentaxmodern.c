@@ -1,5 +1,3 @@
-// JULES_SUBTASK_TEST_COMMENT_NOVEMBER_2023_VERIFICATION
-#include "config.h"
 #include <gphoto2/gphoto2-camera.h> 
 #include <gphoto2/gphoto2-library.h>
 #include <gphoto2/gphoto2-port.h>   
@@ -14,6 +12,7 @@
 #include <glib.h> 
 #include <gphoto2/gphoto2-log.h>
 #include <unistd.h> 
+#include <config.h>
 
 #include "pentaxmodern.h" 
 
