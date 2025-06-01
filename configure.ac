@@ -552,6 +552,7 @@ GP_CAMLIB([panasonic_dc1580],[outdated])dnl
 GP_CAMLIB([pccam300],[outdated])dnl
 GP_CAMLIB([pccam600],[outdated])dnl
 GP_CAMLIB([pentax])dnl
+GP_CAMLIB([libgphoto2_cam_pentaxmodern])dnl
 GP_CAMLIB([polaroid_pdc320],[outdated])dnl
 GP_CAMLIB([polaroid_pdc640],[outdated])dnl
 GP_CAMLIB([polaroid_pdc700],[outdated])dnl
