@@ -9,6 +9,10 @@ camlibdoc_DATA         += %reldir%/README.pentax
 
 EXTRA_LTLIBRARIES      += pentax.la
 
+if ENABLE_COMPUTED_GOTOS
+if HAVE_LIBCURL
+if HAVE_LIBXML2
+
 pentax_la_SOURCES       =
 pentax_la_SOURCES      += %reldir%/library.c
 pentax_la_SOURCES      += %reldir%/pslr.c
@@ -32,9 +36,30 @@ pentax_la_CFLAGS        = $(camlib_cflags)
 pentax_la_CPPFLAGS      = $(camlib_cppflags)
 pentax_la_DEPENDENCIES  = $(camlib_dependencies)
 pentax_la_LDFLAGS       = $(camlib_ldflags)
-pentax_la_LIBADD        = $(camlib_libadd)
+# pentax_la_LIBADD is handled below
+# pentax_la_CFLAGS is handled below
+
+PENTAX_CADD_CFLAGS =
+PENTAX_CADD_LIBS =
+
+if HAVE_LIBXML2
+PENTAX_CADD_CFLAGS += $(LIBXML2_CFLAGS)
+PENTAX_CADD_LIBS += $(LIBXML2_LIBS)
+endif
+
+if HAVE_LIBCURL
+PENTAX_CADD_CFLAGS += $(LIBCURL_CFLAGS)
+PENTAX_CADD_LIBS += $(LIBCURL_LIBS)
+endif
 
 pentax_la_CFLAGS       += $(NO_UNUSED_CFLAGS)
+pentax_la_CFLAGS       += $(PENTAX_CADD_CFLAGS)
+
+pentax_la_LIBADD        = $(camlib_libadd) $(PENTAX_CADD_LIBS)
 
 pentax_la_CFLAGS       += -DLIBGPHOTO2
 pentax_la_CFLAGS       += -DPKTDATADIR='"/"'
+
+endif
+endif
+endif

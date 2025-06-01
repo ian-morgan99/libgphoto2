@@ -1,13 +1,15 @@
-# --- usual header ---
-lib_LTLIBRARIES = libgphoto2_cam_pentaxmodern.la
+AM_CPPFLAGS = $(INCLUDES)
+AM_CFLAGS = -Wall -Wmissing-prototypes
 
-libgphoto2_cam_pentaxmodern_la_SOURCES = \
-    pentaxmodern.c \
-    pentaxmodern.h
+EXTRA_LTLIBRARIES =
+CAMLIBS =
 
-# (if you have any extra CPPFLAGS or LIBADD, list them here)
-# e.g.
-# AM_CPPFLAGS = -I$(top_srcdir)/include
-# libgphoto2_cam_pentaxmodern_la_LIBADD = …  
-
-# --- optional install hooks, tests, etc. ---
+if ENABLE_PENTAXMODERN_GLIB
+CAMLIBS += libgphoto2_cam_pentaxmodern.la
+libgphoto2_cam_pentaxmodern_la_SOURCES = pentaxmodern.c pentaxmodern.h
+libgphoto2_cam_pentaxmodern_la_LDFLAGS = -module -avoid-version $(NO_UNDEFINED)
+libgphoto2_cam_pentaxmodern_la_CFLAGS = $(AM_CFLAGS) $(PENTAXMODERN_GLIB_CFLAGS)
+libgphoto2_cam_pentaxmodern_la_LIBADD = $(PENTAXMODERN_GLIB_LIBS) $(LIBGPHOTO2_LIBS) $(LIBGPHOTO2_LDFLAGS)
+else
+EXTRA_LTLIBRARIES += libgphoto2_cam_pentaxmodern.la
+endif

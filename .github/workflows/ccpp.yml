@@ -58,11 +58,11 @@ jobs:
 
       - name: 'Install build requirements (Linux)'
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y autopoint gettext libusb-1.0-0-dev libcurl4-openssl-dev libgd-dev libltdl-dev
+        run: sudo apt-get install -y autopoint gettext libusb-1.0-0-dev libcurl4-openssl-dev libgd-dev libltdl-dev libglib2.0-dev libxml2-dev
 
       - name: 'Install build requirements (macOS)'
         if: runner.os == 'macOS'
-        run: brew install automake gd gettext libexif libtool libusb
+        run: brew install automake gd gettext libexif libtool libusb glib libxml2
 
       - name: 'OS specific build flags (Linux)'
         if: runner.os == 'Linux'

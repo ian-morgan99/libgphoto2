@@ -486,6 +486,20 @@ AC_SUBST([utilsdir])
 GP_UDEV([true])
 
 
+dnl Check for computed goto support (for js0n.c in pentax camlib)
+AC_CACHE_CHECK([whether C compiler supports computed gotos], [ax_cv_cc_computed_gotos], [
+  AC_LANG_PUSH([C])
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    int main() { void *p = &&label; label: return 0; }
+  ]])],[ax_cv_cc_computed_gotos=yes],[ax_cv_cc_computed_gotos=no])
+  AC_LANG_POP([C])
+])
+if test "x$ax_cv_cc_computed_gotos" = xyes; then
+  AC_DEFINE([HAVE_COMPUTED_GOTOS], [1], [Define if C compiler supports computed gotos])
+fi
+AM_CONDITIONAL([ENABLE_COMPUTED_GOTOS], [test "x$ax_cv_cc_computed_gotos" = xyes])
+
+
 dnl ---------------------------------------------------------------------------
 dnl camlib installation directory
 dnl ---------------------------------------------------------------------------
@@ -551,8 +565,39 @@ GP_CAMLIB([panasonic_dc1000],[outdated])dnl
 GP_CAMLIB([panasonic_dc1580],[outdated])dnl
 GP_CAMLIB([pccam300],[outdated])dnl
 GP_CAMLIB([pccam600],[outdated])dnl
-GP_CAMLIB([pentax])dnl
-GP_CAMLIB([libgphoto2_cam_pentaxmodern])dnl
+
+AM_COND_IF([ENABLE_COMPUTED_GOTOS], [
+  AM_COND_IF([HAVE_LIBCURL], [
+    AM_COND_IF([HAVE_LIBXML2], [
+      GP_CAMLIB([pentax])
+    ],[
+      AC_MSG_WARN([pentax camlib disabled due to missing libxml2])
+    ])
+  ],[
+    AC_MSG_WARN([pentax camlib disabled due to missing libcurl])
+  ])
+],[
+  AC_MSG_WARN([pentax camlib disabled due to C compiler not supporting computed gotos (needed for js0n.c)])
+])
+
+PENTAXMODERN_GLIB_CFLAGS=""
+PENTAXMODERN_GLIB_LIBS=""
+HAVE_PENTAXMODERN_GLIB="no"
+PKG_CHECK_MODULES([PENTAXMODERN_GLIB], [glib-2.0 >= 2.32], [
+  HAVE_PENTAXMODERN_GLIB="yes"
+],[
+  HAVE_PENTAXMODERN_GLIB="no"
+])
+AC_SUBST(PENTAXMODERN_GLIB_CFLAGS)
+AC_SUBST(PENTAXMODERN_GLIB_LIBS)
+AM_CONDITIONAL([ENABLE_PENTAXMODERN_GLIB], [test "x$HAVE_PENTAXMODERN_GLIB" = "xyes"])
+
+AM_COND_IF([ENABLE_PENTAXMODERN_GLIB], [
+  GP_CAMLIB([libgphoto2_cam_pentaxmodern])
+],[
+  AC_MSG_WARN([pentaxmodern camlib disabled due to missing glib-2.0 >= 2.32])
+])
+
 GP_CAMLIB([polaroid_pdc320],[outdated])dnl
 GP_CAMLIB([polaroid_pdc640],[outdated])dnl
 GP_CAMLIB([polaroid_pdc700],[outdated])dnl
