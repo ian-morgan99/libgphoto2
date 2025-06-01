@@ -6290,6 +6290,7 @@ static struct deviceproptableu16 focusmodes[] = {
 	{ N_("Single-Servo AF"),0x8001, PTP_VENDOR_FUJI },
 	{ N_("Continuous-Servo AF"),0x8002, PTP_VENDOR_FUJI },
 
+	{ N_("Preset MF"),	0x8004, PTP_VENDOR_GP_OLYMPUS_OMD },
 	{ N_("C-AF"),		0x8002, PTP_VENDOR_GP_OLYMPUS_OMD },
 	{ N_("S-AF+MF"),	0x8001, PTP_VENDOR_GP_OLYMPUS_OMD },
 
@@ -7591,6 +7592,25 @@ static struct deviceproptableu32 canon_eos_movieservoaf[] = {
 	{ N_("On"),	0x1, 0 },
 };
 GENERIC32TABLE(Canon_EOS_MovieServoAF,canon_eos_movieservoaf)
+
+static struct deviceproptableu16 olympus_whitebalanceadjust[] = {
+	{"-7",	65529, 0},
+	{"-6",	65530, 0},
+	{"-5",	65531, 0},
+	{"-4",	65532, 0},
+	{"-3",	65533, 0},
+	{"-2",	65534, 0},
+	{"-1",	65535, 0},
+	{"0",	0, 0},
+	{"1",	1, 0},
+	{"2",	2, 0},
+	{"3",	3, 0},
+	{"4",	4, 0},
+	{"5",	5, 0},
+	{"6",	6, 0},
+	{"7",	7, 0},
+};
+GENERIC16TABLE(Olympus_WhiteBalanceAdjust, olympus_whitebalanceadjust)
 
 static int
 _get_BatteryLevel(CONFIG_GET_ARGS) {
@@ -11412,10 +11432,13 @@ static struct submenu image_settings_menu[] = {
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_CANON_EOS_ColorTemperature,     PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_INT },
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_FUJI_ColorTemperature,          PTP_VENDOR_FUJI,    PTP_DTC_UINT16, _get_INT,                       _put_INT },
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_SONY_ColorTemp,                 PTP_VENDOR_SONY,    PTP_DTC_UINT16, _get_INT,                       _put_INT },
+	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_OLYMPUS_ColorTemperature,       PTP_VENDOR_GP_OLYMPUS_OMD,    PTP_DTC_UINT16, _get_INT,             _put_INT },
 	{ N_("WhiteBalance"),           "whitebalance",         PTP_DPC_WhiteBalance,                   0,                  PTP_DTC_UINT16, _get_WhiteBalance,              _put_WhiteBalance },
 	{ N_("WhiteBalance"),           "whitebalance",         PTP_DPC_NIKON_1_WhiteBalance,           PTP_VENDOR_NIKON,   PTP_DTC_UINT8,  _get_Nikon_1_WhiteBalance,      _put_Nikon_1_WhiteBalance },
 	{ N_("WhiteBalance Adjust A"),  "whitebalanceadjusta",  PTP_DPC_CANON_EOS_WhiteBalanceAdjustA,  PTP_VENDOR_CANON,   PTP_DTC_INT32,  _get_Canon_EOS_WBAdjust,        _put_Canon_EOS_WBAdjust },
 	{ N_("WhiteBalance Adjust B"),  "whitebalanceadjustb",  PTP_DPC_CANON_EOS_WhiteBalanceAdjustB,  PTP_VENDOR_CANON,   PTP_DTC_INT32,  _get_Canon_EOS_WBAdjust,        _put_Canon_EOS_WBAdjust },
+	{ N_("WhiteBalance Adjust A"),  "whitebalanceadjusta",  PTP_DPC_OLYMPUS_WhiteBalanceAdjustA,    PTP_VENDOR_GP_OLYMPUS_OMD,   PTP_DTC_UINT16,  _get_Olympus_WhiteBalanceAdjust,  _put_Olympus_WhiteBalanceAdjust },
+	{ N_("WhiteBalance Adjust B"),  "whitebalanceadjustb",  PTP_DPC_OLYMPUS_WhiteBalanceAdjustB,    PTP_VENDOR_GP_OLYMPUS_OMD,   PTP_DTC_UINT16,  _get_Olympus_WhiteBalanceAdjust,  _put_Olympus_WhiteBalanceAdjust },
 	{ N_("WhiteBalance X A"),       "whitebalancexa",       PTP_DPC_CANON_EOS_WhiteBalanceXA,       PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
 	{ N_("WhiteBalance X B"),       "whitebalancexb",       PTP_DPC_CANON_EOS_WhiteBalanceXB,       PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
 	{ N_("Photo Effect"),           "photoeffect",          PTP_DPC_CANON_PhotoEffect,              PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_PhotoEffect,         _put_Canon_PhotoEffect },
