@@ -6,7 +6,8 @@ glib_dep = dependency('glib-2.0', version: '>=2.32', required: true)
 shared_module('gphoto2_pentaxmodern',
   pentaxmodern_sources,
   dependencies: [libgphoto2_dep, glib_dep],
-  name_prefix: '', // Ensure consistent naming for the .so file
+  # Ensure consistent naming for the .so file
+  name_prefix: '',
   install: true,
-  install_dir: camlibs_dir // Use the correct variable name 'camlibs_dir'
+  install_dir: camlibs_dir
 )
