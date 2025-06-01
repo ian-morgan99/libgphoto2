@@ -13,7 +13,7 @@
 #include <gphoto2/gphoto2-log.h>
 #include <unistd.h> 
 #include <config.h>
-#include "libgphoto2/ptp.h"
+#include "../../libgphoto2/ptp.h"
 
 #include "pentaxmodern.h" 
 
