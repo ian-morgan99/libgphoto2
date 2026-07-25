@@ -505,6 +505,10 @@ ptp_fujiptpip_getdata (PTPParams* params, PTPContainer* ptp, PTPDataHandler *han
 		GP_LOG_D("synthesizing Fuji DeviceInfo");
 		xret = handler->putfunc (params, handler->priv, sizeof(hardcoded_deviceinfo),hardcoded_deviceinfo);
 	} else {
+		if (dtoh32(hdr.length) < fujiptpip_getdata_payload+4) {
+			GP_LOG_E ("header size %d too small, expected at least 12.",dtoh32(hdr.length));
+			return GP_ERROR;
+		}
 		GP_LOG_DATA ((char*)(xdata+fujiptpip_getdata_payload), dtoh32(hdr.length)-fujiptpip_getdata_payload-4, "fujiptpip/getdatda data:");
 		xret = handler->putfunc (params, handler->priv,
 			dtoh32(hdr.length)-fujiptpip_getdata_payload-4, xdata+fujiptpip_getdata_payload
