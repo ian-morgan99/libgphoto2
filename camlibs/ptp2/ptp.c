@@ -5101,6 +5101,8 @@ ptp_nikon_getwifiprofilelist (PTPParams* params)
 
 	profn = 0;
 	while (profn < params->wifi_profiles_number && pos < size) {
+		unsigned int tocopy;
+
 		if (pos+6 >= size)
 			goto error;
 		params->wifi_profiles[profn].id    = dtoh8o(data, pos);
@@ -5109,8 +5111,11 @@ ptp_nikon_getwifiprofilelist (PTPParams* params)
 		n = dtoh32o(data, pos);
 		if (pos+n+4 >= size)
 			goto error;
-		strncpy(params->wifi_profiles[profn].profile_name, (char*)&data[pos], n);
-		params->wifi_profiles[profn].profile_name[16] = '\0';
+		tocopy = n;
+		if (tocopy >= sizeof(params->wifi_profiles[profn].profile_name))
+			tocopy = sizeof(params->wifi_profiles[profn].profile_name)-1;
+		strncpy(params->wifi_profiles[profn].profile_name, (char*)&data[pos], tocopy);
+		params->wifi_profiles[profn].profile_name[sizeof(params->wifi_profiles[profn].profile_name)-1] = '\0';
 		pos += n;
 
 		params->wifi_profiles[profn].display_order = dtoh8o(data, pos);
@@ -5119,7 +5124,8 @@ ptp_nikon_getwifiprofilelist (PTPParams* params)
 
 		if (!ptp_unpack_string(params, data, &pos, size, &buffer))
 			goto error;
-		strncpy(params->wifi_profiles[profn].creation_date, buffer, sizeof(params->wifi_profiles[profn].creation_date));
+		strncpy(params->wifi_profiles[profn].creation_date, buffer, sizeof(params->wifi_profiles[profn].creation_date)-1);
+		params->wifi_profiles[profn].creation_date[sizeof(params->wifi_profiles[profn].creation_date)-1] = '\0';
 		free (buffer);
 		if (pos+1 >= size)
 			goto error;
@@ -5134,8 +5140,11 @@ ptp_nikon_getwifiprofilelist (PTPParams* params)
 		n = dtoh32o(data, pos);
 		if (pos+n >= size)
 			goto error;
-		strncpy(params->wifi_profiles[profn].essid, (char*)data + pos, n);
-		params->wifi_profiles[profn].essid[32] = '\0';
+		tocopy = n;
+		if (tocopy >= sizeof(params->wifi_profiles[profn].essid))
+			tocopy = sizeof(params->wifi_profiles[profn].essid)-1;
+		strncpy(params->wifi_profiles[profn].essid, (char*)data + pos, tocopy);
+		params->wifi_profiles[profn].essid[sizeof(params->wifi_profiles[profn].essid)-1] = '\0';
 		pos += n;
 		pos += 1;
 		profn++;
