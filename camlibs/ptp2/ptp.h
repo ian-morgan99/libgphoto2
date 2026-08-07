@@ -814,42 +814,46 @@ typedef struct _PTPIPHeader PTPIPHeader;
 
 /* Olympus OMD series commands */
 #define PTP_OC_OLYMPUS_OMD_Capture			0x9481
+#define PTP_OC_OLYMPUS_GetDateTime			0x9482
+#define PTP_OC_OLYMPUS_OMD_MagnifyLiveViewPoint		0x9483	/* Capture UI 0x03; start/set magnify LV point */
 #define PTP_OC_OLYMPUS_GetLiveViewImage			0x9484	/* liveview */
 #define PTP_OC_OLYMPUS_OMD_GetImage			0x9485	/* gets an JPEG image (from the capture? SDRAM style?) */
-#define PTP_OC_OLYMPUS_OMD_ChangedProperties		0x9486
-#define PTP_OC_OLYMPUS_OMD_MFDrive			0x9487
+#define PTP_OC_OLYMPUS_OMD_ChangedProperties		0x9486	/* heavy poll (~42 propdescs) */
+#define PTP_OC_OLYMPUS_OMD_MFDrive			0x9487	/* also Capture focusAdjustWithDirection:amount: */
+#define PTP_OC_OLYMPUS_OMD_MagnifyLiveViewArea		0x9488	/* Capture UI 0x08; change magnify LV area */
 #define PTP_OC_OLYMPUS_OMD_SetProperties		0x9489 /* Sends to the device a PTP list of all 16 bit device properties , count 32bit, then 16bit vals */
+#define PTP_OC_OLYMPUS_OMD_PollProperties		0x948A	/* light poll (~15 propdescs); Workspace idle with 9486 */
+#define PTP_OC_OLYMPUS_OMD_SetProperties2		0x948B	/* second property announce list (ptp.c) */
+#define PTP_OC_OLYMPUS_OMD_OpticalZoomDrive		0x948D	/* Capture opticalZoomDriveWithAction:… (UI 0x0E) */
 /* 948C: Record Video? */
-/* 9482: Set One Touch WB Gain */
-/* 9483: Set / Start Magnifying Live View Point */
-/* 9488: Change Magnifying Live View Area */
-/* 9493: Start Driving Zoom Lens For Direction / Focal Length  / Stop Driving zoom
+/* 948F–9492: unknown (in Capture UI map) */
+/* 9493: Alternate / legacy zoom drive (still in Capture binary; primary path is 948D)
  * start direction: 		x1=1,x2=0,x3= STEPS?, x4=1 or 2 (near / far ? )
  * start to focallength:	x1=1,x2=3,x3= VALUE? ,x4=4 (potentially more)
  * stop:  			x1=2,x2=0,x3=0,x4=0
  * unclear:			x1=4,x2=0,x3=0,x4=0
  */
+/* 9494: unknown */
 /* 9495: Set / Clear Auto Focus Point? */
 /* 94a0: Set / Clear Auto Exposure Point? */
-/* 94b7 or 94bf: Set Focus Adjust Pulse */
-/* 94A1: Detect One Touch WB Gain */
+/* 94A1: Detect One Touch WB Gain (Capture UI 0x18) */
+#define PTP_OC_OLYMPUS_OMD_DetectOneTouchWB		0x94A1
 /* 94A2: AdjustLevelGauge? */
 /* 94A4: Get Direct Item Buffer */
 /* 94A5: Get Direct Item Info */
-/* 94B7: Get Recording Folder List? */
-/* 94BA / 94a1: Pixel Mapping? */
+/* 94B7: Get Recording Folder List? / Focus Adjust Pulse? */
 /* 94ba: TransferModeStartStop */
 /* 94bb: Get Un Transfer List */
 /* 94bc: GetLocalObject info? */
 /* 94bd: GetLocalObject? */
 /* 94be: delete local object? */
-/* 94c0 / 94b9 : Set Comment String */
-/* 94bf: Set Connect Pc Info? */
-/* 94c0: Get Connect Pc Info? */
-/* 94c1: Clear Connect Pc Info? */
-/* 94c4: Get Camera Af Target Frames? */
-/* 94c3: Start Station Mode */
-/* 94c3: End Station Mode */
+#define PTP_OC_OLYMPUS_OMD_SetConnectPcInfo		0x94BF	/* Capture setConnectPCInfo (UI 0x1A) */
+#define PTP_OC_OLYMPUS_OMD_GetConnectPcInfo		0x94C0	/* Capture getConnectPCInfoAtIndex (UI 0x1B) */
+#define PTP_OC_OLYMPUS_OMD_ClearConnectPcInfo		0x94C1	/* Capture clearConnectPCInfoAtIndex (UI 0x1C) */
+#define PTP_OC_OLYMPUS_OMD_GetOTWBKelvin			0x94C2	/* Capture getOTWBKelvin (UI 0x1D) */
+/* 94c4: Get Camera Af Target Frames? (Capture UI 0x1E) */
+#define PTP_OC_OLYMPUS_OMD_GetAFTargetFrames		0x94C4
+/* 94c3: Start/End Station Mode */
 /* 911c: Get Firmware Update Mode? */
 /* 9121: Firmware Check? */
 /* 9122: Get Firmware Status? */
@@ -871,7 +875,6 @@ typedef struct _PTPIPHeader PTPIPHeader;
 #define PTP_OC_OLYMPUS_GetDeviceInfo			0x9301
 #define PTP_OC_OLYMPUS_OpenSession			0x9302
 #define PTP_OC_OLYMPUS_SetDateTime			0x9402
-#define PTP_OC_OLYMPUS_GetDateTime			0x9482
 #define PTP_OC_OLYMPUS_SetCameraID			0x9501
 #define PTP_OC_OLYMPUS_GetCameraID			0x9581
 
@@ -3155,9 +3158,10 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_FLBracketingFrame		0xD118
 #define PTP_DPC_OLYMPUS_FLBracketingStep		0xD119
 #define PTP_DPC_OLYMPUS_FlashBiasCompensation		0xD11A
-#define PTP_DPC_OLYMPUS_ManualFocusMode			0xD11B
-#define PTP_DPC_OLYMPUS_RawSaveMode			0xD11D
-#define PTP_DPC_OLYMPUS_AUXLightMode			0xD11E
+#define PTP_DPC_OLYMPUS_StillRecordingMode		0xD11B	/* Capture Card Slot Settings */
+#define PTP_DPC_OLYMPUS_StillRecordingSlot		0xD11C	/* was ExtendedSetting11C / RawSaveMode */
+#define PTP_DPC_OLYMPUS_MovieRecordingSlot		0xD11D
+#define PTP_DPC_OLYMPUS_PlaySlot				0xD11E
 #define PTP_DPC_OLYMPUS_LensSinkMode			0xD11F
 #define PTP_DPC_OLYMPUS_BeepStatus			0xD120
 #define PTP_DPC_OLYMPUS_ColorSpace			0xD122
@@ -3201,7 +3205,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_BulbMFMode			0xD14E
 #define PTP_DPC_OLYMPUS_BurstFPSValue			0xD14F
 #define PTP_DPC_OLYMPUS_ISOAutoBaseValue		0xD150
-#define PTP_DPC_OLYMPUS_ISOAutoMaxValue			0xD151
+#define PTP_DPC_OLYMPUS_HighResCharge			0xD151
 #define PTP_DPC_OLYMPUS_BulbLimiterValue		0xD152
 #define PTP_DPC_OLYMPUS_DPIMode				0xD153
 #define PTP_DPC_OLYMPUS_DPICustomValue			0xD154
@@ -3219,16 +3223,16 @@ typedef struct _PTPCanonEOSDeviceInfo {
 /* Olympus/OM System OMD properties (OM-1 generation and newer bodies) */
 #define PTP_DPC_OLYMPUS_PropertyD001			0xD001
 #define PTP_DPC_OLYMPUS_FlashMode			0xD005
-#define PTP_DPC_OLYMPUS_LensType			0xD006
-#define PTP_DPC_OLYMPUS_ExposureProgramMode			0xD00C
+#define PTP_DPC_OLYMPUS_ExposureProgramMode		0xD006
+#define PTP_DPC_OLYMPUS_AFAreaSetting			0xD00C
 #define PTP_DPC_OLYMPUS_FlashExposureCompensation			0xD00F
 #define PTP_DPC_OLYMPUS_WhiteBalancePreset			0xD010
 #define PTP_DPC_OLYMPUS_NoiseFilter			0xD011
 #define PTP_DPC_OLYMPUS_AFReleasePriority			0xD013
 #define PTP_DPC_OLYMPUS_ShutterReleasePriority			0xD014
 #define PTP_DPC_OLYMPUS_ISOAutoMode			0xD018
-#define PTP_DPC_OLYMPUS_FlashSyncMode			0xD01D
-#define PTP_DPC_OLYMPUS_BracketSettingA			0xD01F
+#define PTP_DPC_OLYMPUS_ImageStabilizer			0xD01D
+#define PTP_DPC_OLYMPUS_WBKeepWarmColor			0xD01F
 #define PTP_DPC_OLYMPUS_BracketSettingB			0xD020
 #define PTP_DPC_OLYMPUS_BracketSettingC			0xD021
 #define PTP_DPC_OLYMPUS_BracketSettingD			0xD022
@@ -3271,13 +3275,13 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_MyModeExposureCompensation23			0xD047
 #define PTP_DPC_OLYMPUS_MyModeExposureCompensation24			0xD048
 #define PTP_DPC_OLYMPUS_FlashWirelessChannel			0xD049
-#define PTP_DPC_OLYMPUS_FirmwareVersionMinor			0xD04A
-#define PTP_DPC_OLYMPUS_ImageStabilizerMode			0xD04B
+#define PTP_DPC_OLYMPUS_CurrentFocalLength			0xD04A
+#define PTP_DPC_OLYMPUS_LVCloseUpMode			0xD04B
 #define PTP_DPC_OLYMPUS_AutoMinimumShutterSpeed			0xD04C
 #define PTP_DPC_OLYMPUS_FlashRemoteRatio			0xD04D
 #define PTP_DPC_OLYMPUS_FlashRemoteGroup			0xD04E
 #define PTP_DPC_OLYMPUS_FlashRemoteMode			0xD04F
-#define PTP_DPC_OLYMPUS_OrientationSensor			0xD050
+#define PTP_DPC_OLYMPUS_ReleasePrioritySAF			0xD050
 #define PTP_DPC_OLYMPUS_CameraControlMode			0xD052
 #define PTP_DPC_OLYMPUS_LensFocalLengthMinimum			0xD053
 #define PTP_DPC_OLYMPUS_LensApertureFormat			0xD054
@@ -3301,7 +3305,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_LensAttachedStatus			0xD066
 #define PTP_DPC_OLYMPUS_LensDataValid			0xD067
 #define PTP_DPC_OLYMPUS_LensErrorStatus			0xD068
-#define PTP_DPC_OLYMPUS_LiveViewStreamEnable			0xD069
+#define PTP_DPC_OLYMPUS_ReleasePriorityCAF			0xD069
 #define PTP_DPC_OLYMPUS_LiveViewStreamFormat			0xD06A
 #define PTP_DPC_OLYMPUS_PropertyD06B			0xD06B
 #define PTP_DPC_OLYMPUS_PropertyD06C			0xD06C
@@ -3344,7 +3348,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_PictureModeParameter9			0xD0AA
 #define PTP_DPC_OLYMPUS_PropertyD0AB			0xD0AB
 #define PTP_DPC_OLYMPUS_PictureModeToggle			0xD0AC
-#define PTP_DPC_OLYMPUS_PictureModeColorProfile			0xD0AD
+#define PTP_DPC_OLYMPUS_HDRMode			0xD0AD
 #define PTP_DPC_OLYMPUS_PictureModeToggle2			0xD0AE
 #define PTP_DPC_OLYMPUS_PropertyD0AF			0xD0AF
 #define PTP_DPC_OLYMPUS_PropertyD0B0			0xD0B0
@@ -3366,14 +3370,14 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_FocusBracketingEnable			0xD0C4
 #define PTP_DPC_OLYMPUS_MovieFocusMode			0xD0C5
 #define PTP_DPC_OLYMPUS_FocusBracketingStatus			0xD0C6
-#define PTP_DPC_OLYMPUS_VideoResolution			0xD0C7
+#define PTP_DPC_OLYMPUS_HighResResolution			0xD0C7
 #define PTP_DPC_OLYMPUS_PropertyD0C8			0xD0C8
-#define PTP_DPC_OLYMPUS_ProCapturePreBufferShutter			0xD0C9
+#define PTP_DPC_OLYMPUS_HighResWait			0xD0C9
 #define PTP_DPC_OLYMPUS_KeystoneCompensation			0xD0CB
 #define PTP_DPC_OLYMPUS_KeystoneAdjustment			0xD0CC
 #define PTP_DPC_OLYMPUS_CustomModeDial			0xD0CD
 #define PTP_DPC_OLYMPUS_PropertyD0CE			0xD0CE
-#define PTP_DPC_OLYMPUS_CustomModeParameter			0xD0CF
+#define PTP_DPC_OLYMPUS_LiveViewZoomRatio			0xD0CF
 #define PTP_DPC_OLYMPUS_LiveViewOverlay1			0xD0D0
 #define PTP_DPC_OLYMPUS_LiveViewOverlay2			0xD0D1
 #define PTP_DPC_OLYMPUS_LiveViewOverlay3			0xD0D2
@@ -3393,7 +3397,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_RemoteReleaseMode			0xD0E3
 #define PTP_DPC_OLYMPUS_RemoteReleaseMode2			0xD0E4
 #define PTP_DPC_OLYMPUS_PropertyD0E5			0xD0E5
-#define PTP_DPC_OLYMPUS_IntervalShootingCount			0xD0E6
+#define PTP_DPC_OLYMPUS_ImageReview			0xD0E6
 #define PTP_DPC_OLYMPUS_PropertyD0E7			0xD0E7
 #define PTP_DPC_OLYMPUS_PropertyD0E8			0xD0E8
 #define PTP_DPC_OLYMPUS_PropertyD0E9			0xD0E9
@@ -3413,7 +3417,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_ColorProfileMode			0xD0F8
 #define PTP_DPC_OLYMPUS_ColorProfileToggle			0xD0F9
 #define PTP_DPC_OLYMPUS_SilentMode			0xD0FA
-#define PTP_DPC_OLYMPUS_SubjectDetectionMode			0xD0FB
+#define PTP_DPC_OLYMPUS_ConnectPCMRecorderCamera		0xD0FB
 #define PTP_DPC_OLYMPUS_PropertyD0FC			0xD0FC
 #define PTP_DPC_OLYMPUS_PropertyD0FD			0xD0FD
 #define PTP_DPC_OLYMPUS_USBPortPriority			0xD0FE
@@ -3422,7 +3426,6 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_CompositePropertyB			0xD101
 #define PTP_DPC_OLYMPUS_ExtendedSetting116			0xD116
 #define PTP_DPC_OLYMPUS_ExtendedSetting117			0xD117
-#define PTP_DPC_OLYMPUS_ExtendedSetting11C			0xD11C
 #define PTP_DPC_OLYMPUS_ExtendedSetting121			0xD121
 #define PTP_DPC_OLYMPUS_ExtendedSetting125			0xD125
 #define PTP_DPC_OLYMPUS_ExtendedSetting128			0xD128
@@ -3448,7 +3451,7 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_PropertyD171			0xD171
 #define PTP_DPC_OLYMPUS_PropertyD172			0xD172
 #define PTP_DPC_OLYMPUS_PropertyD173			0xD173
-#define PTP_DPC_OLYMPUS_PropertyD174			0xD174
+#define PTP_DPC_OLYMPUS_CustomMode			0xD174
 #define PTP_DPC_OLYMPUS_PropertyD175			0xD175
 #define PTP_DPC_OLYMPUS_PropertyD177			0xD177
 #define PTP_DPC_OLYMPUS_PropertyD178			0xD178
@@ -3458,38 +3461,38 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_ExtendedSetting19E			0xD19E
 #define PTP_DPC_OLYMPUS_ExtendedSetting19F			0xD19F
 #define PTP_DPC_OLYMPUS_PropertyD1A0			0xD1A0
-#define PTP_DPC_OLYMPUS_PropertyD1A1			0xD1A1
-#define PTP_DPC_OLYMPUS_PropertyD1A2			0xD1A2
-#define PTP_DPC_OLYMPUS_PropertyD1A3			0xD1A3
-#define PTP_DPC_OLYMPUS_PropertyD1A4			0xD1A4
-#define PTP_DPC_OLYMPUS_PropertyD1A5			0xD1A5
-#define PTP_DPC_OLYMPUS_PropertyD1A6			0xD1A6
-#define PTP_DPC_OLYMPUS_PropertyD1A7			0xD1A7
-#define PTP_DPC_OLYMPUS_PropertyD1A8			0xD1A8
-#define PTP_DPC_OLYMPUS_PropertyD1A9			0xD1A9
-#define PTP_DPC_OLYMPUS_PropertyD1AA			0xD1AA
-#define PTP_DPC_OLYMPUS_PropertyD1AB			0xD1AB
-#define PTP_DPC_OLYMPUS_PropertyD1AC			0xD1AC
-#define PTP_DPC_OLYMPUS_PropertyD1AD			0xD1AD
-#define PTP_DPC_OLYMPUS_PropertyD1AE			0xD1AE
-#define PTP_DPC_OLYMPUS_PropertyD1AF			0xD1AF
-#define PTP_DPC_OLYMPUS_PropertyD1B0			0xD1B0
-#define PTP_DPC_OLYMPUS_PropertyD1B1			0xD1B1
-#define PTP_DPC_OLYMPUS_PropertyD1B2			0xD1B2
-#define PTP_DPC_OLYMPUS_PropertyD1B3			0xD1B3
-#define PTP_DPC_OLYMPUS_PropertyD1B4			0xD1B4
-#define PTP_DPC_OLYMPUS_PropertyD1B5			0xD1B5
-#define PTP_DPC_OLYMPUS_PropertyD1B6			0xD1B6
-#define PTP_DPC_OLYMPUS_PropertyD1B7			0xD1B7
-#define PTP_DPC_OLYMPUS_PropertyD1B8			0xD1B8
-#define PTP_DPC_OLYMPUS_PropertyD1B9			0xD1B9
+#define PTP_DPC_OLYMPUS_SequentialMaxFPS			0xD1A1
+#define PTP_DPC_OLYMPUS_SequentialFrameCountLimiter	0xD1A2
+#define PTP_DPC_OLYMPUS_SequentialFrameCountLimit	0xD1A3
+#define PTP_DPC_OLYMPUS_SilentSequentialMaxFPS		0xD1A4
+#define PTP_DPC_OLYMPUS_SilentSequentialFrameCountLimiter	0xD1A5
+#define PTP_DPC_OLYMPUS_SilentSequentialFrameCountLimit	0xD1A6
+#define PTP_DPC_OLYMPUS_SH1MaxFPS			0xD1A7
+#define PTP_DPC_OLYMPUS_SH1FrameCountLimiter		0xD1A8
+#define PTP_DPC_OLYMPUS_SH1FrameCountLimit		0xD1A9
+#define PTP_DPC_OLYMPUS_SH2MaxFPS			0xD1AA
+#define PTP_DPC_OLYMPUS_SH2FrameCountLimiter		0xD1AB
+#define PTP_DPC_OLYMPUS_SH2FrameCountLimit		0xD1AC
+#define PTP_DPC_OLYMPUS_ProCaptureMaxFPS			0xD1AD
+#define PTP_DPC_OLYMPUS_ProCaptureFrameCountLimiter	0xD1AE
+#define PTP_DPC_OLYMPUS_ProCaptureFrameCountLimit	0xD1AF
+#define PTP_DPC_OLYMPUS_ProCapturePreShutterFrames	0xD1B0
+#define PTP_DPC_OLYMPUS_ProCaptureSH1MaxFPS		0xD1B1
+#define PTP_DPC_OLYMPUS_ProCaptureSH1FrameCountLimiter	0xD1B2
+#define PTP_DPC_OLYMPUS_ProCaptureSH1FrameCountLimit	0xD1B3
+#define PTP_DPC_OLYMPUS_ProCaptureSH1PreShutterFrames	0xD1B4
+#define PTP_DPC_OLYMPUS_ProCaptureSH2MaxFPS		0xD1B5
+#define PTP_DPC_OLYMPUS_ProCaptureSH2FrameCountLimiter	0xD1B6
+#define PTP_DPC_OLYMPUS_ProCaptureSH2FrameCountLimit	0xD1B7
+#define PTP_DPC_OLYMPUS_ProCaptureSH2PreShutterFrames	0xD1B8
+#define PTP_DPC_OLYMPUS_HighResShot			0xD1B9
 #define PTP_DPC_OLYMPUS_PropertyD1BA			0xD1BA
 #define PTP_DPC_OLYMPUS_PropertyD1BB			0xD1BB
 #define PTP_DPC_OLYMPUS_PropertyD1BC			0xD1BC
 #define PTP_DPC_OLYMPUS_PropertyD1BD			0xD1BD
 #define PTP_DPC_OLYMPUS_PropertyD1BE			0xD1BE
 #define PTP_DPC_OLYMPUS_PropertyD1BF			0xD1BF
-#define PTP_DPC_OLYMPUS_PropertyD1C0			0xD1C0
+#define PTP_DPC_OLYMPUS_ISO2				0xD1C0	/* OM-1 and later; replaces 0xD007 */
 #define PTP_DPC_OLYMPUS_PropertyD1C1			0xD1C1
 #define PTP_DPC_OLYMPUS_PropertyD1C2			0xD1C2
 #define PTP_DPC_OLYMPUS_PropertyD1C3			0xD1C3
@@ -3497,7 +3500,9 @@ typedef struct _PTPCanonEOSDeviceInfo {
 #define PTP_DPC_OLYMPUS_PropertyD1C5			0xD1C5
 #define PTP_DPC_OLYMPUS_PropertyD1C6			0xD1C6
 #define PTP_DPC_OLYMPUS_PropertyD1C7			0xD1C7
-/* Sony A900 */
+#define PTP_DPC_OLYMPUS_PropertyD1C8			0xD1C8
+#define PTP_DPC_OLYMPUS_SubjectDetectionMode		0xD1D0
+#define PTP_DPC_OLYMPUS_HighResShotRawBit		0xD1D1
 #define PTP_DPC_SONY_IrisModeSetting			0xD001
 #define PTP_DPC_SONY_FocalDistanceInMeter		0xD004
 #define PTP_DPC_SONY_FocalDistanceInFeet		0xD005
