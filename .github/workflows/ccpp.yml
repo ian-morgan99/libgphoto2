@@ -33,7 +33,7 @@ jobs:
              iolibs: 'disk,vusb,ptpip,serial,libusb1,usb'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6.0.0
 
       - name: 'Update software database (Linux)'
         if: runner.os == 'Linux'

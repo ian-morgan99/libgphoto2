@@ -598,6 +598,7 @@ static const char *mime_table[] = {
 	"txt",  GP_MIME_TXT,
 	"qtk",  GP_MIME_QTKT,
 	"qtk",  GP_MIME_QTKN,
+	"dng",  GP_MIME_DNG,
 	NULL
 };
 /**
@@ -610,7 +611,7 @@ int
 gp_file_open (CameraFile *file, const char *filename)
 {
 	FILE *fp;
-	char *name, *dot;
+	const char *name, *dot;
 	long size, size_read;
 	int  i;
 	struct stat s;
@@ -906,8 +907,8 @@ gp_file_get_name (CameraFile *file, const char **name)
 int
 gp_file_get_name_by_type (CameraFile *file, const char *basename, CameraFileType type, char **newname)
 {
-	char *prefix = NULL, *s, *new, *slash = NULL;
-	const char *suffix = NULL;
+	char *prefix = NULL, *new;
+	const char *suffix = NULL, *s, *slash = NULL;
 	int i;
 
 	C_PARAMS (file && basename && newname);
@@ -1112,6 +1113,7 @@ gp_file_adjust_name_for_mime_type (CameraFile *file)
 		GP_MIME_TXT,  "txt",
 		GP_MIME_QTKT, "qtk",
 		GP_MIME_QTKN, "qtk",
+		GP_MIME_DNG,  "dng",
 		NULL};
 
 	C_PARAMS (file);

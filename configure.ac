@@ -4,9 +4,10 @@ AC_PREREQ([2.69])
 dnl NOTE: Be version style _higher_ than the last release.
 dnl       So lastversion.X.trunk for instance. Bump X if necessary.
 
-dnl ******* THE NEXT RELEASE VERSION MUST BE 2.5.31 at least or higher!
+dnl ******* THE NEXT RELEASE VERSION MUST BE 2.5.34.1 at least or higher!
+dnl ******* also update meson.build!
 AC_INIT([libgphoto2 photo camera library],
-        [2.5.31.1],
+        [2.5.34.1],
         [gphoto-devel@lists.sourceforge.net],
         [libgphoto2])
 
@@ -384,6 +385,16 @@ GP_CHECK_LIBRARY([LIBGD],[gdlib],[>= 2.0],[gd.h],[gdImageCreateTrueColor],[
 
 ],[],[default-on],[http://www.libgd.org/])
 GP_CONFIG_MSG([libGD conversion support],[${have_LIBGD}])
+
+dnl ---------------------------------------------------------------------------
+dnl libtiff
+dnl ---------------------------------------------------------------------------
+GP_CHECK_LIBRARY([LIBTIFF],[libtiff-4],[>= 4.0],
+         [tiffio.h],[TIFFOpen],[],[],
+         [default-on],
+         [https://gitlab.com/libtiff/libtiff]
+)
+GP_CONFIG_MSG([TIFF support],[${have_LIBTIFF}])
 
 dnl ---------------------------------------------------------------------------
 dnl Checks for header files.

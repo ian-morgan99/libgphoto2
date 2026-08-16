@@ -505,6 +505,10 @@ ptp_fujiptpip_getdata (PTPParams* params, PTPContainer* ptp, PTPDataHandler *han
 		GP_LOG_D("synthesizing Fuji DeviceInfo");
 		xret = handler->putfunc (params, handler->priv, sizeof(hardcoded_deviceinfo),hardcoded_deviceinfo);
 	} else {
+		if (dtoh32(hdr.length) < fujiptpip_getdata_payload+4) {
+			GP_LOG_E ("header size %d too small, expected at least 12.",dtoh32(hdr.length));
+			return GP_ERROR;
+		}
 		GP_LOG_DATA ((char*)(xdata+fujiptpip_getdata_payload), dtoh32(hdr.length)-fujiptpip_getdata_payload-4, "fujiptpip/getdatda data:");
 		xret = handler->putfunc (params, handler->priv,
 			dtoh32(hdr.length)-fujiptpip_getdata_payload-4, xdata+fujiptpip_getdata_payload
@@ -641,7 +645,7 @@ ptp_fujiptpip_init_command_ack (PTPParams* params)
 	PTPIPHeader	hdr;
 	unsigned char	*data = NULL;
 	uint16_t 	ret;
-	int		i;
+	unsigned int	i;
 	unsigned short	*name;
 
 	ret = ptp_fujiptpip_generic_read (params, params->cmdfd, &hdr, &data, 1);
@@ -657,8 +661,9 @@ ptp_fujiptpip_init_command_ack (PTPParams* params)
 	params->eventpipeid = dtoh32a(&data[ptpip_cmdack_idx]);
 	memcpy (params->cameraguid, &data[ptpip_cmdack_guid], 16);
 	name = (unsigned short*)&data[ptpip_cmdack_name];
-	for (i=0;name[i];i++) /* EMPTY */;
+	for (i=0;name[i] && (i + ptpip_cmdack_name <= dtoh32(hdr.length));i++) /* EMPTY */
 	params->cameraname = calloc((i+1),sizeof(uint16_t));
+	for (i=0;name[i] && (i + ptpip_cmdack_name <= dtoh32(hdr.length));i++)
 	for (i=0;name[i];i++)
 		params->cameraname[i] = name[i];
 	free (data);

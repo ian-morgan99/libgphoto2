@@ -173,7 +173,7 @@ sony_read_byte(Camera * camera, unsigned char *b)
 static unsigned char
 sony_packet_checksum(Packet * p)
 {
-	unsigned short int o = 0;
+	unsigned int o = 0;
 	unsigned long int sum = 0;
 
 	sum = 0;
@@ -302,7 +302,7 @@ static int sony_packet_read(Camera * camera, Packet * pack)
 static int
 sony_packet_write(Camera * camera, Packet * p)
 {
-	unsigned short int count;
+	unsigned int count;
 	int rc;
 
 	GP_DEBUG(

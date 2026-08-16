@@ -59,13 +59,13 @@
 
 ## update NEWS
 
-    git diff libgphoto2-2\_5\_21-release.. | less
+    git diff v2.5.32.. | less
 
    summarize changes
 
 ## tag release
 
-   bump version in `configure.ac`, `NEWS`, commit and push.
+   bump version in `configure.ac`, `NEWS`, `meson.build`, commit and push.
 
     make clean
     make

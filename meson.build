@@ -1,5 +1,5 @@
 project('libgphoto2', 'c',
-  version : '2.5.31.1',
+  version : '2.5.34.1',
   meson_version : '>= 1.4.0',
   default_options : [
     'buildtype=debugoptimized',
@@ -11,6 +11,8 @@ project('libgphoto2', 'c',
 
 i18n = import('i18n')
 pkg = import('pkgconfig')
+py = import('python')
+python = py.find_installation()
 
 libxml_req         = '>= 2.0'
 libcurl_req        = '>= 7.1'
@@ -66,6 +68,7 @@ libcurl_dep = dependency('libcurl', version: libcurl_req, required: ['lumix', 'p
 libgd_dep   = dependency('gdlib', version: libgd_req, required: 'docupen' in get_option('camlibs'))
 libexif_dep = dependency('libexif', version: libexif_req, required: false)
 libjpeg_dep = dependency('libjpeg', required: false)
+libtiff_dep = dependency('libtiff-4', required: false)
 intl_dep    = dependency('intl', required: false)
 
 add_project_arguments('-DMAIL_GPHOTO_DEVEL="<gphoto-devel@lists.sourceforge.net>"', language: 'c')
@@ -81,12 +84,44 @@ if cc.has_function('strncpy', prefix: '#include <string.h>')
   add_project_arguments('-DHAVE_STRNCPY=1', language: 'c')
 endif
 
+if cc.has_function('snprintf', prefix: '#include <stdio.h>')
+  add_project_arguments('-DHAVE_SNPRINTF=1', language: 'c')
+endif
+
+if cc.has_function('statvfs', prefix: '#include <sys/statvfs.h>')
+  add_project_arguments('-DHAVE_STATVFS=1', language: 'c')
+endif
+
+if cc.has_function('localtime_r', prefix: '#include <time.h>')
+  add_project_arguments('-DHAVE_LOCALTIME_R=1', language: 'c')
+endif
+
+if cc.has_function('lstat', prefix: '#include <sys/stat.h>')
+  add_project_arguments('-DHAVE_LSTAT=1', language: 'c')
+endif
+
+if cc.has_function('inet_aton', prefix: '#include <sys/socket.h>\n#include <netinet/in.h>\n#include <arpa/inet.h>')
+  add_project_arguments('-DHAVE_INET_ATON=1', language: 'c')
+endif
+
+if cc.has_function('setenv', prefix: '#include <stdlib.h>')
+  add_project_arguments('-DHAVE_SETENV=1', language: 'c')
+endif
+
+if cc.has_member('struct tm', 'tm_gmtoff', prefix : '#include <time.h>')
+  add_project_arguments('-DHAVE_RM_GMTOFF=1', language: 'c')
+endif
+
 if (libcurl_dep.found())
   add_project_arguments('-DHAVE_LIBCURL=1', language: 'c')
 endif
 
 if (libgd_dep.found())
   add_project_arguments('-DHAVE_LIBGD=1', language: 'c')
+endif
+
+if (libtiff_dep.found())
+  add_project_arguments('-DHAVE_LIBTIFF=1', language: 'c')
 endif
 
 if (libexif_dep.found())
@@ -130,13 +165,21 @@ int main(int argc, char **argv)
     libjpeg_dep = disabler()
   else
     add_project_arguments('-DHAVE_LIBJPEG=1', language: 'c')
+
+    add_project_arguments('-DJPEG_SIZE=unsigned long', language: 'c')
   endif
+endif
+
+# The iconv detection from autoconf does more than checking
+# the header.
+if cc.has_header('iconv.h')
+  add_project_arguments('-DHAVE_ICONV=1', language: 'c')
 endif
 
 headers = [
   'sys/param.h', 'sys/mman.h', 'sys/select.h', 'locale.h', 'memory.h',
   'getopt.h', 'unistd.h', 'mcheck.h', 'limits.h', 'sys/time.h', 'langinfo.h',
-  'stdio.h', 'stdlib.h', 'string.h',
+  'stdio.h', 'stdlib.h', 'string.h', 'sys/statvfs.h',
 ]
 
 foreach header : headers
@@ -145,6 +188,13 @@ foreach header : headers
   endif
 endforeach
 
+# If sys/mman.h is present, check whether mmap requires the mman
+mman_dep = []
+if not cc.has_function('mmap', prefix: '#include <sys/mman.h>')
+  mman_dep = cc.find_library('mman')
+  cc.has_function('mmap', prefix: '#include <sys/mman.h>', dependencies: mman_dep, required: true)
+endif
+
 add_project_arguments(common_cflags, language: 'c')
 add_project_arguments('-D_GPHOTO2_INTERNAL_CODE', language: 'c')
 add_project_arguments('-DLOCALEDIR="@0@"'.format (get_option('prefix') / get_option('localedir')), language: 'c')
@@ -152,13 +202,21 @@ if intl_dep.found()
   add_project_arguments('-DENABLE_NLS=1', language: 'c')
 endif
 
+has_version_script = cc.has_link_argument('-Wl,--version-script=@0@'.format(
+  meson.current_source_dir() / 'libgphoto2_port' / 'libgphoto2_port' / 'libgphoto2_port.ver'
+))
+
 libgphoto2_root_inc = include_directories('.')
+
+doc_dir = get_option('prefix') / get_option('datadir') / 'doc' / '@0@-@1@'.format(meson.project_name(), libgphoto2_current_min)
+camlibdoc_dir = doc_dir / 'camlibs'
 
 iolibs_dir_suffix = libgphoto2_port_name / libgphoto2_port_version
 iolibs_dir = get_option('prefix') / get_option('libdir') / iolibs_dir_suffix
 
 camlibs_dir_suffix = meson.project_name() / meson.project_version()
 camlibs_dir = get_option('prefix') / get_option('libdir') / camlibs_dir_suffix
+camlibs_datadir = get_option('prefix') / get_option('datadir') / camlibs_dir_suffix
 
 config_data = configuration_data()
 config_data.set_quoted('PACKAGE_VERSION', meson.project_version())

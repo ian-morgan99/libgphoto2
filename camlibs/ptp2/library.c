@@ -1,7 +1,7 @@
 /* library.c
  *
  * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
- * Copyright (C) 2003-2024 Marcus Meissner <marcus@jet.franken.de>
+ * Copyright (C) 2003-2026 Marcus Meissner <marcus@jet.franken.de>
  * Copyright (C) 2005 Hubert Figuiere <hfiguiere@teaser.fr>
  * Copyright (C) 2009-2024 Axel Waggershauser <awagger@web.de>
  *
@@ -234,14 +234,6 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 		return GP_OK;
 	}
 
-	/* LEICA */
-	if (    ((!di->VendorExtensionID) || (di->VendorExtensionID == PTP_VENDOR_MICROSOFT)) &&
-		(camera->port->type == GP_PORT_USB) &&
-		(a.usb_vendor == 0x1a98)
-	) {
-		di->VendorExtensionID = PTP_VENDOR_GP_LEICA;
-	}
-
 	/* XML style Olympus E series control. internal deviceInfos is encoded in XML. */
 	if (	di->Manufacturer && !strcmp(di->Manufacturer,"OLYMPUS") &&
 		(params->device_flags & DEVICE_FLAG_OLYMPUS_XML_WRAPPED)
@@ -299,6 +291,8 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 			a.usb_vendor = 0x4b0;
 		if (strstr (di->Manufacturer,"FUJIFILM"))
 			a.usb_vendor = 0x4cb;
+		if (strstr (di->Manufacturer,"LEICA"))
+			a.usb_vendor = 0x1a98;
 	}
 	/* Switch the PTP vendor, so that the vendor specific sets become available. */
 	if (	(di->VendorExtensionID == PTP_VENDOR_MICROSOFT) &&
@@ -334,6 +328,14 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 	) {
 		/*camera->pl->bugs |= PTP_MTP;*/
 		di->VendorExtensionID = PTP_VENDOR_NIKON;
+	}
+
+	/* LEICA */
+	if (    ((!di->VendorExtensionID) || (di->VendorExtensionID == PTP_VENDOR_MICROSOFT)) &&
+		(camera->port->type == GP_PORT_USB) &&
+		(a.usb_vendor == 0x1a98)
+	) {
+		di->VendorExtensionID = PTP_VENDOR_GP_LEICA;
 	}
 
 	/* Fuji S5 Pro mostly, make its vendor set available. */
@@ -649,6 +651,24 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 				free (xprops);
 			}
 		}
+
+		if (ptp_operation_issupported(&camera->pl->params, PTP_OC_NIKON_GetVendorCodes)) {
+			uint32_t  	*xprops;
+			unsigned int	xsize;
+
+			if (PTP_RC_OK == LOG_ON_PTP_E (ptp_nikon_get_vendorcodes (&camera->pl->params, &xprops, &xsize))) {
+				di->DeviceProps = realloc(di->DeviceProps,sizeof(di->DeviceProps[0])*(di->DeviceProps_len + xsize));
+				if (!di->DeviceProps) {
+					free (xprops);
+					C_MEM (di->DeviceProps);
+				}
+				for (i=0;i<xsize;i++)
+					di->DeviceProps[i+di->DeviceProps_len] = xprops[i];
+				di->DeviceProps_len += xsize;
+				free (xprops);
+			}
+		}
+
 
 		/* For nikon 1 j5, they have blanked this space */
 		if (camera->pl->params.device_flags & PTP_NIKON_1) {
@@ -1371,6 +1391,10 @@ static struct {
 	/* The A7-RV */
 	{"Sony:ILCE-7RM5 (PC Control)",		0x054c, 0x0e0c, PTP_CAP|PTP_CAP_PREVIEW},
 
+	/* The A7 V */
+	{"Sony:ILCE-7M5 (MTP mode)",		0x054c, 0x0f50, 0},
+	{"Sony:ILCE-7M5 (PC Control)",		0x054c, 0x0f56, PTP_CAP|PTP_CAP_PREVIEW},
+
 	/* via email */
 	{"Sony:A6700 (PC Control)",		0x054c, 0x0e78, PTP_CAP|PTP_CAP_PREVIEW},
 
@@ -1379,6 +1403,11 @@ static struct {
 
 	/* Mark Watson <watsonmw@gmail.com> */
 	{"Sony:ILX-LR1 (PC Control)",		0x054c, 0x0e90, PTP_CAP|PTP_CAP_PREVIEW},
+
+	{"Sony:ZV-E10M2 (MTP mode)",		0x054c, 0x0ee7, 0},
+
+	/* Mark Watson <watsonmw@gmail.com> */
+	{"Sony:ILCE-1M2 (PC Control)",		0x054c, 0x0eed, PTP_CAP|PTP_CAP_PREVIEW},
 
 	/* Nikon Coolpix 2500: M. Meissner, 05 Oct 2003 */
 	{"Nikon:Coolpix 2500 (PTP mode)", 0x04b0, 0x0109, 0},
@@ -1566,6 +1595,9 @@ static struct {
 	/* https://github.com/gphoto/libgphoto2/issues/477 */
 	{"Nikon:Coolpix P1000 (PTP mode)",0x04b0, 0x0232, PTP_CAP/*|PTP_CAP_PREVIEW*/},
 
+	/* https://github.com/gphoto/libgphoto2/issues/1201 */
+	{"Nikon:Coolpix P1100 (PTP mode)",0x04b0, 0x0234, PTP_CAP/*|PTP_CAP_PREVIEW*/},
+
 	/* Nikon Coolpix 2000 */
 	{"Nikon:Coolpix 2000 (PTP mode)", 0x04b0, 0x0302, 0},
 	/* From IRC reporter. */
@@ -1608,6 +1640,9 @@ static struct {
 
 	/* t.ludewig@gmail.com */
 	{"Nikon:Coolpix S01",  		  0x04b0, 0x0337, PTP_CAP},
+
+	/* via email */
+	{"Nikon:Coolpix S3500",		  0x04b0, 0x033b, PTP_CAP},
 
 	/* https://sourceforge.net/p/gphoto/bugs/971/ */
 	{"Nikon:Coolpix S2700", 	  0x04b0, 0x033f, PTP_CAP},
@@ -1777,6 +1812,9 @@ static struct {
 	/* Daniel Baertschi <daniel@avisec.ch> */
 	{"Nikon:Z50",                	  0x04b0, 0x0444, PTP_CAP|PTP_CAP_PREVIEW},
 
+    /* ArvinSpace <yanhui-180@163.com> */
+	{"Nikon:Z50_2",                	  0x04b0, 0x0455, PTP_CAP|PTP_CAP_PREVIEW},
+
 	/* Schreiber, Steve via Gphoto-devel */
 	{"Nikon:DSC D3500",		  0x04b0, 0x0445, PTP_CAP|PTP_CAP_PREVIEW},
 
@@ -1866,7 +1904,7 @@ static struct {
 	{"Panasonic:DMC-LX7",		  0x04da, 0x2374, 0},
 	/* Constantin B <klochto@gmail.com> */
 	{"Panasonic:DMC-GF1",             0x04da, 0x2374, 0},
-
+	/* Matthias <mattjowil@hotmail.com>: The Panasonic Lumix DC-G9 reports the same vendor and product ID (04da:2382) */
 	{"Panasonic:DC-GH5",		  0x04da, 0x2382, PTP_CAP|PTP_CAP_PREVIEW},
 
 
@@ -2535,7 +2573,9 @@ static struct {
 	{"Canon:EOS R10",			0x04a9, 0x32f8, PTP_CAP|PTP_CAP_PREVIEW},
 	/* https://github.com/gphoto/libgphoto2/issues/642 */
 	{"Canon:EOS M50m2",			0x04a9, 0x32f9, PTP_CAP|PTP_CAP_PREVIEW},
-	/* E-mail */
+	/* Andreas Jäger */
+	{"Canon:EOS R1",            0x04a9, 0x3313, PTP_CAP|PTP_CAP_PREVIEW},
+    /* E-mail */
 	{"Canon:EOS R3",			0x04a9, 0x32fc, PTP_CAP|PTP_CAP_PREVIEW},
 	/* Ingmar Rieger via email */
 	{"Canon:EOS R5 C",			0x04a9, 0x3303, PTP_CAP|PTP_CAP_PREVIEW},
@@ -2548,6 +2588,10 @@ static struct {
 	{"Canon:EOS R100",			0x04a9, 0x3312, PTP_CAP|PTP_CAP_PREVIEW},
 	/* https://github.com/gphoto/libgphoto2/issues/1028 */
 	{"Canon:EOS 5Rm2",			0x04a9, 0x3314, PTP_CAP|PTP_CAP_PREVIEW},
+	/* https://github.com/gphoto/libgphoto2/issues/1131 */
+	{"Canon:EOS R50 V",			0x04a9, 0x3320, PTP_CAP|PTP_CAP_PREVIEW},
+	/* https://github.com/gphoto/libgphoto2/issues/1200 */
+	{"Canon:EOS R6 Mark III",		0x04a9, 0x3323, PTP_CAP|PTP_CAP_PREVIEW},
 
 	/* Konica-Minolta PTP cameras */
 	{"Konica-Minolta:DiMAGE A2 (PTP mode)",        0x132b, 0x0001, 0},
@@ -2628,6 +2672,8 @@ static struct {
 	{"Fuji:FinePix JX370",			0x04cb, 0x0250, 0},
 	/* Luis Arias <kaaloo@gmail.com> */
 	{"Fuji:FinePix X10",			0x04cb, 0x0263, 0},
+	/* https://github.com/gphoto/libgphoto2/issues/1199 */
+	{"Fuji:FinePix S4200",			0x04cb, 0x0264, 0},
 	/* t.ludewig@gmail.com */
 	{"Fuji:FinePix S4300",			0x04cb, 0x0265, 0},
 	/* t.ludewig@gmail.com */
@@ -2710,6 +2756,10 @@ static struct {
 	{"Fuji:Fujifilm GFX100 II",		0x04cb, 0x02fe, PTP_CAP|PTP_CAP_PREVIEW},
 	/* https://github.com/gphoto/libgphoto2/issues/964 */
 	{"Fuji:Fujifilm X100VI",		0x04cb, 0x0305, 0},
+	/* Capture when camera set in Tether. */
+	{"Fuji:Fujifilm X-M5",			0x04cb, 0x030c, PTP_CAP|PTP_CAP_PREVIEW},
+	/* No capture support. */
+	{"Fuji:Fujifilm X-E5",			0x04cb, 0x0313, 0},
 
 	{"Ricoh:Caplio R5 (PTP mode)",          0x05ca, 0x0110, 0},
 	{"Ricoh:Caplio GX (PTP mode)",          0x05ca, 0x0325, 0},
@@ -2744,7 +2794,9 @@ static struct {
 	/* https://github.com/gphoto/libgphoto2/issues/1099 */
 	{"Ricoh:GR III (PTP mode)",        	0x25fb, 0x210f, 0},
 	/* https://github.com/libmtp/libmtp/issues/148 */
-	{"Ricoh:GR IIIx (PTP mode)",        	0x25fb, 0x25fb, 0},
+	{"Ricoh:GR IIIx (PTP mode)",        	0x25fb, 0x2115, 0},
+	/* https://github.com/libmtp/libmtp/issues/392 */
+	{ "Ricoh:GR IV (PTP mode)", 		0x25fb, 0x2123, 0},
 
 	/* Pentax cameras */
 	{"Pentax:Optio 43WR",                   0x0a17, 0x000d, 0},
@@ -2762,6 +2814,8 @@ static struct {
 
 	/* via email to gphoto-devel */
 	{"Pentax:KP (PTP Mode)",		0x25fb, 0x017f, 0},
+	/* Pentax K-3 Mark III Monochrome, USB setting: MTP */
+	{"Pentax:K-3 Mark III Monochrome (PTP Mode)", 0x25fb, 0x018f, 0},
 
 	/* Implemented by Ian Morgan github@morgan-multinational.co.uk
 	{ "Pentax:K-1 Mark II (PTP mode)", 0x25fb, 0x0183, "pentaxmodern" },
@@ -2814,6 +2868,10 @@ static struct {
 	/* This is a camera ... reported by TAN JIAN QI <JQTAN1@e.ntu.edu.sg */
 	{"Samsung:EK-GC100",			0x04e8,	0x6866, 0},
 
+	
+	/* https://sourceforge.net/p/libmtp/bugs/1950/ */
+	{"TOPDON:TC004 Mini",			0x3474,	0x0020, 0},
+
 	/* 522903503@qq.com */
 	{"Sigma:fp",				0x1003,	0xc432, PTP_CAP|PTP_CAP_PREVIEW},
 	/* https://github.com/gphoto/libgphoto2/issues/882 */
@@ -2821,14 +2879,14 @@ static struct {
 
 	/* Bernhard Wagner <me@bernhardwagner.net> */
 	{"Leica:M9",				0x1a98,	0x0002, PTP_CAP},
-	/* https://github.com/gphoto/libgphoto2/issues/1098 */
-	{"Leica:M11 Monochrom",			0x1a98,	0x2083, PTP_CAP},
-
-	/* https://github.com/gphoto/gphoto2/issues/601 */
-	{"Leica:Q3",				0x1a98,	0x2376, PTP_CAP|PTP_CAP_PREVIEW|PTP_NO_CAPTURE_COMPLETE},
-
 	/* Christopher Kao <christopherkao@icloud.com> */
 	{"Leica:SL (Typ 601)",			0x1a98,	0x2041, PTP_CAP|PTP_CAP_PREVIEW},
+	/* https://github.com/gphoto/libgphoto2/issues/1098 */
+	{"Leica:M11 Monochrom",			0x1a98,	0x2083, PTP_CAP},
+	/* https://github.com/gphoto/gphoto2/issues/601 */
+	{"Leica:Q3",				0x1a98,	0x2376, PTP_CAP|PTP_CAP_PREVIEW|PTP_NO_CAPTURE_COMPLETE},
+	/* https://github.com/gphoto/libgphoto2/issues/1203 */
+	{"Leica:SL3",				0x1a98,	0x2382, PTP_CAP|PTP_CAP_PREVIEW|PTP_NO_CAPTURE_COMPLETE},
 
 	/* https://github.com/gphoto/libgphoto2/issues/105 */
 	{"Parrot:Sequoia",			0x19cf,	0x5039, PTP_CAP},
@@ -3254,23 +3312,22 @@ camera_exit (Camera *camera, GPContext *context)
 			}
 			break;
 		case PTP_VENDOR_SONY:
-#if 0
-			/* if we call this, the camera shuts down on close in MTP mode */
-			if (ptp_operation_issupported(params, 0x9280)) {
-				C_PTP (ptp_sony_9280(params, 0x4,0,5,0,0,0,0));
+			/* Sony cameras expect to be issued this shutdown command after any
+			 * operation in PTPIP mode. */
+			if (camera->port->type == GP_PORT_PTPIP) {
+				if (ptp_operation_issupported(params, 0x9280)
+					&& ptp_operation_issupported(params, 0x9281)) {
+					C_PTP (ptp_sony_9280(params, 0x4,0,5,0,0,0,0));
+					C_PTP (ptp_sony_9281(params, 0x4));
+				}
 			}
-#endif
 			break;
 		case PTP_VENDOR_FUJI:
 			CR (camera_unprepare_capture (camera, context));
 			break;
-		case PTP_VENDOR_GP_OLYMPUS_OMD: {
-			PTPPropValue propval;
-
-			propval.u16 = 0;
-			CR (ptp_setdevicepropvalue (params, 0xD052, &propval, PTP_DTC_UINT16));
+		case PTP_VENDOR_GP_OLYMPUS_OMD:
+			ptp_olympus_exit_pc_mode (params);
 			break;
-		}
 		case PTP_VENDOR_GP_LEICA:
 			if (ptp_operation_issupported(params, PTP_OC_LEICA_LECloseSession)) {
 				if ((exit_result = ptp_leica_leclosesession (params)) != PTP_RC_OK)
@@ -3357,7 +3414,7 @@ append_folder_from_handle (Camera *camera, uint32_t storage, uint32_t handle, ch
 	if (handle == PTP_HANDLER_ROOT)
 		return GP_OK;
 
-	C_PTP (ptp_object_want (params, handle, PTPOBJECT_PARENTOBJECT_LOADED, &ob)); // refresh
+	C_PTP (ptp_object_want (params, handle, PTPOBJECT_PARENTOBJECT_LOADED|PTPOBJECT_OBJECTINFO_LOADED, &ob)); // refresh
 	CR (append_folder_from_handle (camera, storage, ob->oi.ParentObject, folder));
 	/* re-fetch invalidated ob cache pointer */
 	ptp_find_object_in_cache(params, handle, &ob);
@@ -3372,7 +3429,7 @@ find_object_path (Camera *camera, PTPObject **ob, CameraFilePath *path)
 	GP_LOG_D ("(storage=0x%08x, handle=0x%08x)", (*ob)->oi.StorageID, (*ob)->oi.Handle);
 
 	uint32_t handle = (*ob)->oi.Handle;
-	strcpy  (path->name,  (*ob)->oi.Filename);
+	strncpy  (path->name,  (*ob)->oi.Filename, sizeof(path->name));
 	sprintf (path->folder,"/"STORAGE_FOLDER_PREFIX"%08lx",(unsigned long)(*ob)->oi.StorageID);
 	CR (append_folder_from_handle (camera, (*ob)->oi.StorageID, (*ob)->oi.ParentObject, path->folder));
 	/* re-fetch invalidated ob cache pointer */
@@ -4470,11 +4527,17 @@ camera_canon_eos_capture (Camera *camera, CameraCaptureType type, CameraFilePath
 			case PTP_EOSEvent_Unknown:
 				GP_LOG_D ("event unknown: %s", event.u.info);
 				continue; /* in loop ... do not poll while draining the queue */
-			case PTP_EOSEvent_ObjectTransfer:
+			case PTP_EOSEvent_ObjectTransfer: {
+				char buf[20];
 				GP_LOG_D ("object transfer requested: handle 0x%x, name %s, size %lu",
 							event.u.object.Handle, event.u.object.Filename, event.u.object.ObjectSize);
+				if (!event.u.object.Filename)  {
+					sprintf (buf, "capt%04d.", params->capcnt++);
+					event.u.object.Filename = strdup(buf);
+				}
 				move(oi, event.u.object);
 				break;
+			}
 			case PTP_EOSEvent_ObjectRemoved:
 				GP_LOG_D ("object removed: handle 0x%x", event.u.object.Handle);
 				ptp_remove_object_from_cache(params, event.u.object.Handle);
@@ -4900,6 +4963,7 @@ camera_sony_capture (Camera *camera, CameraCaptureType type, CameraFilePath *pat
 		!strcmp(params->deviceinfo.Model, "ILCE-7M3")		||
 		!strcmp(params->deviceinfo.Model, "ILCE-7SM3")		||
 		!strcmp(params->deviceinfo.Model, "ILCE-7M4")		||
+		!strcmp(params->deviceinfo.Model, "ILCE-7M5")		||
 		!strcmp(params->deviceinfo.Model, "ILCE-9M2")		||
 		!strcmp(params->deviceinfo.Model, "ILCE-1")		||
 		!strcmp(params->deviceinfo.Model, "ILCE-7C")
@@ -5085,7 +5149,7 @@ camera_sony_capture (Camera *camera, CameraCaptureType type, CameraFilePath *pat
 	log_objectinfo(params, &oi);
 	sprintf (path->folder,"/");
 	if (oi.Filename && strlen(oi.Filename) > 4) {
-		sprintf (path->name, "capt_%s", oi.Filename);  // capt prefix is mandatory when deleting file
+		snprintf (path->name, sizeof(path->name), "capt_%s", oi.Filename);  // capt prefix is mandatory when deleting file
 	} else {
 		if (oi.ObjectFormat == PTP_OFC_SONY_RAW)
 			sprintf (path->name, "capt%04d.arw", params->capcnt++);
@@ -7671,8 +7735,20 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 
 	txt = summary->text;
 
-#define SPACE_LEFT ptp_max(0, summary->text + sizeof (summary->text) - txt)
-#define APPEND_TXT( ... ) txt += snprintf (txt, SPACE_LEFT, __VA_ARGS__)
+#define SUMMARY_END (summary->text + sizeof (summary->text))
+#define SPACE_LEFT ((int)ptp_max(0, SUMMARY_END - txt))
+#define APPEND_N(n) do { \
+	int _sn = (n); \
+	if (_sn > 0) { \
+		if ((size_t)_sn >= (size_t)SPACE_LEFT) \
+			txt = SUMMARY_END; \
+		else \
+			txt += _sn; \
+	} \
+} while (0)
+#define APPEND_TXT(...) APPEND_N(snprintf (txt, SPACE_LEFT, __VA_ARGS__))
+#define APPEND_PTP(data, dt) APPEND_N(snprintf_ptp_property (txt, SPACE_LEFT, (data), (dt)))
+#define APPEND_PROPVAL(dpc, dpd) APPEND_N(ptp_render_property_value (params, (dpc), (dpd), SPACE_LEFT, txt))
 
 	APPEND_TXT (_("Manufacturer: %s\n"),params->deviceinfo.Manufacturer);
 	APPEND_TXT (_("Model: %s\n"),params->deviceinfo.Model);
@@ -7700,7 +7776,7 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 	APPEND_TXT (_("\nCapture Formats: "));
 
 	for (i=0;i<params->deviceinfo.CaptureFormats_len;i++) {
-		txt += ptp_render_ofc (params, params->deviceinfo.CaptureFormats[i], SPACE_LEFT, txt);
+		APPEND_N(ptp_render_ofc (params, params->deviceinfo.CaptureFormats[i], SPACE_LEFT, txt));
 		if (i<params->deviceinfo.CaptureFormats_len-1)
 			APPEND_TXT (" ");
 	}
@@ -7708,7 +7784,7 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 
 	APPEND_TXT (_("Display Formats: "));
 	for (i=0;i<params->deviceinfo.ImageFormats_len;i++) {
-		txt += ptp_render_ofc (params, params->deviceinfo.ImageFormats[i], SPACE_LEFT, txt);
+		APPEND_N(ptp_render_ofc (params, params->deviceinfo.ImageFormats[i], SPACE_LEFT, txt));
 		if (i<params->deviceinfo.ImageFormats_len-1)
 			APPEND_TXT (", ");
 	}
@@ -7761,7 +7837,7 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 			uint32_t propcnt = 0;
 
 			APPEND_TXT ("\t");
-			txt += ptp_render_ofc (params, params->deviceinfo.ImageFormats[i], SPACE_LEFT, txt);
+			APPEND_N(ptp_render_ofc (params, params->deviceinfo.ImageFormats[i], SPACE_LEFT, txt));
 			APPEND_TXT ("/%04x:", params->deviceinfo.ImageFormats[i]);
 
 			ret = ptp_mtp_getobjectpropssupported (params, params->deviceinfo.ImageFormats[i], &propcnt, &props);
@@ -7770,7 +7846,7 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 			} else {
 				for (j=0;j<propcnt;j++) {
 					APPEND_TXT (" %04x/",props[j]);
-					txt += ptp_render_mtp_propname(props[j],SPACE_LEFT,txt);
+					APPEND_N(ptp_render_mtp_propname(props[j],SPACE_LEFT,txt));
 				}
 				free(props);
 			}
@@ -7925,10 +8001,15 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 	 */
 	C_PTP_REP (ptp_getdeviceinfo (params, &pdi));
 	CR (fixup_cached_deviceinfo (camera, &pdi));
+	/* Property name lookup uses params->deviceinfo.VendorExtensionID. */
+	params->deviceinfo.VendorExtensionID = pdi.VendorExtensionID;
 	for (i=0;i<pdi.DeviceProps_len;i++) {
 		PTPDevicePropDesc dpd;
 		unsigned int dpc = pdi.DeviceProps[i];
 		const char *propname = ptp_get_property_description (params, dpc);
+
+		if (SPACE_LEFT <= 1)
+			break;
 
 		/* drop the "EOS_" prefix */
 		if (propname && strncmp(propname, "EOS_", 4) == 0)
@@ -7955,39 +8036,47 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 			case PTP_DPFF_None:	break;
 			case PTP_DPFF_Range: {
 				APPEND_TXT ("Range [");
-				txt += snprintf_ptp_property (txt, SPACE_LEFT, &dpd.FORM.Range.MinValue, dpd.DataType);
+				APPEND_PTP (&dpd.FORM.Range.MinValue, dpd.DataType);
 				APPEND_TXT (" - ");
-				txt += snprintf_ptp_property (txt, SPACE_LEFT, &dpd.FORM.Range.MaxValue, dpd.DataType);
+				APPEND_PTP (&dpd.FORM.Range.MaxValue, dpd.DataType);
 				APPEND_TXT (", step ");
-				txt += snprintf_ptp_property (txt, SPACE_LEFT, &dpd.FORM.Range.StepSize, dpd.DataType);
+				APPEND_PTP (&dpd.FORM.Range.StepSize, dpd.DataType);
 				APPEND_TXT ("] value: ");
 				break;
 			}
-			case PTP_DPFF_Enumeration:
+			case PTP_DPFF_Enumeration: {
+				unsigned int n_enum = dpd.FORM.Enum.NumberOfValues;
+				unsigned int n_print = n_enum;
+
+				if (n_print > 64)
+					n_print = 64;
 				APPEND_TXT ("Enumeration [");
 				if ((dpd.DataType & PTP_DTC_ARRAY_MASK) == PTP_DTC_ARRAY_MASK)
 					APPEND_TXT ("\n\t");
-				for (j = 0; j<dpd.FORM.Enum.NumberOfValues; j++) {
-					txt += snprintf_ptp_property (txt, SPACE_LEFT, dpd.FORM.Enum.SupportedValue+j, dpd.DataType);
-					if (j+1 != dpd.FORM.Enum.NumberOfValues) {
+				for (j = 0; j < n_print; j++) {
+					APPEND_PTP (dpd.FORM.Enum.SupportedValue + j, dpd.DataType);
+					if (j + 1 != n_print) {
 						APPEND_TXT (",");
 						if ((dpd.DataType & PTP_DTC_ARRAY_MASK) == PTP_DTC_ARRAY_MASK)
 							APPEND_TXT ("\n\t");
 					}
 				}
+				if (n_print < n_enum)
+					APPEND_TXT (", ... (%u values)", n_enum);
 				if ((dpd.DataType & PTP_DTC_ARRAY_MASK) == PTP_DTC_ARRAY_MASK)
 					APPEND_TXT ("\n\t");
 				APPEND_TXT ("] value: ");
 				break;
 			}
+			}
 			txt_marker = txt;
-			txt += ptp_render_property_value(params, dpc, &dpd, SPACE_LEFT, txt);
+			APPEND_PROPVAL (dpc, &dpd);
 			if (txt != txt_marker) {
 				APPEND_TXT (" (");
-				txt += snprintf_ptp_property (txt, SPACE_LEFT, &dpd.CurrentValue, dpd.DataType);
+				APPEND_PTP (&dpd.CurrentValue, dpd.DataType);
 				APPEND_TXT (")");
 			} else {
-				txt += snprintf_ptp_property (txt, SPACE_LEFT, &dpd.CurrentValue, dpd.DataType);
+				APPEND_PTP (&dpd.CurrentValue, dpd.DataType);
 			}
 		} else {
 			APPEND_TXT (" -- ---): ");
@@ -7998,8 +8087,12 @@ camera_summary (Camera* camera, CameraText* summary, GPContext *context)
 	}
 	ptp_free_deviceinfo (&pdi);
 	return (GP_OK);
-#undef SPACE_LEFT
+#undef APPEND_PROPVAL
+#undef APPEND_PTP
+#undef APPEND_N
 #undef APPEND_TXT
+#undef SPACE_LEFT
+#undef SUMMARY_END
 }
 
 static uint32_t
@@ -8124,7 +8217,9 @@ generic_list_func (PTPParams *params, const char *folder, int is_directory, Came
 
 		/* GP_LOG_D ("adding 0x%08x to folder", ob->oid); */
 
-#if 0 /* TODO: Axel disabled this for its performance panalty and questionable value. */
+		/* TODO: Axel disabled this for its performance panalty and questionable value. */
+		/* Marcus: Needed for Iphones still, as they duplicate filenames. See https://github.com/gphoto/libgphoto2/issues/1238 */
+
 		/* HP Photosmart 850, the camera tends to duplicate filename in the list.
 		* Original patch by clement.rezvoy@gmail.com */
 		/* search backwards, likely gets hits faster. */
@@ -8135,7 +8230,6 @@ generic_list_func (PTPParams *params, const char *folder, int is_directory, Came
 				ob->oi.Filename, folder);
 			continue;
 		}
-#endif
 		CR(gp_list_append (list, ob->oi.Filename, NULL));
 	}
 
@@ -9127,8 +9221,7 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 	CR (find_storage_and_handle_from_path(params, folder, &storage, &handle));
 	handle = find_child(params, filename, storage, handle, NULL);
 
-	/* in some cases we return errors ... just ignore them for now */
-	LOG_ON_PTP_E (ptp_deleteobject(params, handle, 0));
+	C_PTP (ptp_deleteobject(params, handle, 0));
 
 	/* On some Canon firmwares, a DeleteObject causes a ObjectRemoved event
 	 * to be sent. At least on Digital IXUS II and PowerShot A85. But
@@ -9826,7 +9919,17 @@ camera_init (Camera *camera, GPContext *context)
 		if (ptp_operation_issupported(params, PTP_OC_NIKON_CurveDownload))
 			add_special_file("curve.ntc", nikon_curve_get, nikon_curve_put);
 		break;
-	/* case PTP_VENDOR_SONY: setup already done in fixup_cached_deviceinfo */
+	case PTP_VENDOR_SONY:
+		/* Some Sony cameras expect this before filesytem reading is available. */
+		if (camera->port->type == GP_PORT_PTPIP) {
+				if (ptp_operation_issupported(params, 0x9280)
+					&& ptp_operation_issupported(params, 0x9281)) {
+				C_PTP (ptp_sony_9280(params, 0x4,2,2,0,0,1,1));
+				C_PTP (ptp_sony_9281(params, 0x4));
+			}
+		}
+		/* Other setup already done in fixup_cached_deviceinfo */
+		break;
 	case PTP_VENDOR_FUJI:
 		CR (camera_prepare_capture (camera, context));
 		break;
@@ -9938,6 +10041,26 @@ camera_init (Camera *camera, GPContext *context)
 			}
 		}
 		gp_port_set_timeout (camera->port, timeout);
+	}
+
+	/* initial reading of the root directory of each storage, which serves 2 purposes:
+	 * a) the ptp_list_folder caching of root queries depends on this being done once
+	 * b) this is needed for some reason for Canons EOS 1500D to not hang
+	 */
+	if (params->storageids.len == 0) {
+		/* if ptp_getstorageids failed or was not available, use the catch-all storageID
+		 * (whether this code is ever called is unclear and simply added as a precaution) */
+
+		/* skip ptp_list_folder calls with storage equal to PTP_HANDLER_SPECIAL for sony cameras -
+		 * this is not supported on any sony cameras (mode 3 cameras will return a failure - mode 2 will hang) */
+		if (params->deviceinfo.VendorExtensionID != PTP_VENDOR_SONY) {
+			ptp_list_folder(params, PTP_HANDLER_SPECIAL, PTP_HANDLER_SPECIAL, NULL);
+		}
+	} else {
+		for_each (uint32_t*, psid, params->storageids) {
+			if (*psid != 0x80000001)
+				ptp_list_folder (params, *psid, PTP_HANDLER_SPECIAL, NULL);
+		}
 	}
 
 	/* moved down here in case the filesystem needs to first be initialized as the Olympus app does */

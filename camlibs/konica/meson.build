@@ -1,5 +1,5 @@
 
-konica_localization_dir = camlibs_dir_suffix / 'konica'
+konica_localization_dir = camlibs_datadir / 'konica'
 install_data(
   files(
     'localization/english',
@@ -10,6 +10,7 @@ install_data(
     'localization/spanish',
   ),
   install_dir: konica_localization_dir,
+  install_tag: 'i18n',
 )
 
 shared_module(
@@ -42,4 +43,10 @@ shared_module(
   name_prefix: '',
   install: true,
   install_dir: camlibs_dir,
+)
+
+install_data(
+  'README.konica',
+  install_dir: camlibdoc_dir,
+  install_tag: 'doc',
 )
