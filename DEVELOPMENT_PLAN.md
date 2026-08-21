@@ -1,703 +1,416 @@
-# Development Plan: Adding Pentax Support to libgphoto2 Fork
+# Pentax support: executable development plan
 
-This document specifies exactly what changes to make to the user's fork of libgphoto2 (ian-morgan99/libgphoto2) to implement full Pentax camera support based on analysis of Pentax Image Transmitter 2. The plan is broken into incremental, testable stages.
+Status: canonical plan, revision 2026-08-21
 
-## Prerequisites
-- Working libgphoto2 build environment (meson/autotools)
-- Access to Pentax K-3 III and/or K-1 II hardware for validation
-- Base fork is up-to-date with upstream (as of current date)
-- Local copy of Image Transmitter 2 source available for reference
+This is the single source of truth for adding Pentax tethering support to the
+libgphoto2 fork and delivering that build through BenroPolarisPatcher. Copies of
+this plan elsewhere are informational only.
 
-## Overview
-We will implement support in two parts:
-1. **Part 1: Basic Generic PTP Support** - Provides parity with upstream Monochrome K-3 III (PR #1273): detection, configuration, file download.
-2. **Part 2: Pentax-Specific Extensions** - Adds live view, advanced capture, extensive configuration, model-specific gating, and status feedback.
+The primary target is the PENTAX K-3 Mark III colour body (`25fb:018c`). The
+PENTAX K-1 Mark II (`25fb:0183`) is the second validation body. Adding a USB ID
+does not mean that a camera has vendor support. Unknown Pentax bodies must retain
+safe generic PTP behaviour.
 
-Each part is divided into stages with clear entrance/exit criteria and specific code changes.
+## 1. Outcome and definition of done
 
----
+The work is complete only when all applicable rows below have recorded evidence.
 
-# PART 1: BASIC GENERIC PTP SUPPORT
+| Capability | Native Linux acceptance test | Polaris acceptance test |
+|---|---|---|
+| Detection | Exact model selected by `gphoto2 --auto-detect` | `pgphoto` selects the new `ptp2` camlib |
+| Generic files | One named JPEG and one named RAW download with matching hashes | Same files arrive through the Polaris workflow |
+| Configuration | ISO, aperture, shutter, white balance, and focus mode can be read; supported writable values round-trip | Polaris changes every setting it actually exposes |
+| Live view | 500 consecutive `--capture-preview` frames, then stop/restart and reconnect | 30 minutes of preview, stop/restart, and cold reconnect |
+| Capture | Trigger, completion detection, download, and acknowledgement work for JPEG and RAW | Five consecutive captures, including reconnect and cold boot |
+| Status | Validated battery, capture state, transfer candidate, and card/slot values update | Required status reaches the UI or is documented as unused by `pgphoto` |
+| Safety | Existing tests pass; a non-Pentax PTP body still initializes | Stock restore image and on-device revert both verified before flashing |
 
-## Goal
-Enable detection, configuration (ISO, shutter, aperture, WB, focus), and file download for Pentax models that respond to standard PTP (expected: K-3 III, K-1 II, K-01, etc.). This does NOT require vendor mode.
+“Works” means a command, result, log, camera/firmware identity, and artifact hash
+are recorded under `libgphoto2/docs/pentax/evidence/<date>/`. Compilation alone is never a
+feature acceptance test.
 
-### Stage 1.1: Environment Setup and Baseline
-**Entrance Criteria**: Prerequisites met.
-**Activities**:
-- Ensure libgphoto2 builds from source.
-- Verify Pentax hardware is detected by `gphoto2 --auto-detect`.
-- Confirm basic summary obtainable.
-**Exit Criteria**:
-- libgphoto2 builds without errors.
-- Pentax hardware detected.
-- `gphoto2 --summary` returns basic info.
-**No code changes needed yet** (just verification).
+## 2. Repository map and authority
 
-### Stage 1.2: Standard PTP Property Support
-**Goal**: Make standard PTP properties (ISO, shutter, aperture, WB, focus) gettable and settable where supported.
+- Workspace and extracted reference: `/home/ian/Documents/VSCodeProjects/LibGphoto2`
+- libgphoto2 repository: `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2`
+- Polaris repository: `/home/ian/Documents/VSCodeProjects/BenroPolarisPatcher`
+- Decompiled reference: `ImageTransmitter2/IMAGETransmitter2/MtpDevice.cs`
+- Extracted notes: `CameraCapabilities.md`
 
-**Files to Modify**:
-- `ptp2/config.c` – Ensure standard PTP properties are handled (they likely already are; verify no regression).
-- No new code needed if standard PTP already works; we just need to test and confirm.
+The decompiled application is evidence about one host implementation, not a
+wire-protocol specification. USB captures and real camera responses outrank it.
+Do not copy proprietary source into shipping code. Implement independently from
+observed facts and retain provenance in research notes.
 
-**Activities**:
-- Test `gphoto2 --get-config iso`, `--get-config shutterspeed`, etc.
-- Test `gphoto2 --set-config iso=200`, etc.
-- Map any missing properties if needed (unlikely).
+Before every task:
 
-**Exit Criteria**:
-- At least ISO, aperture, shutter speed, white balance, focus mode are gettable.
-- At least ISO and aperture are settable (others may be read-only on some models).
-- Error handling for unsupported properties works.
+1. Run `git status --short` in each Git repository that will be touched.
+2. Preserve unrelated changes. `camlibs/ptp2/library.c` may already contain user
+   changes.
+3. Create one focused commit per completed task card. Do not commit captures,
+   firmware, serial numbers, or proprietary binaries.
+4. Stop at a hardware gate when its evidence is unavailable. Do not replace an
+   observation with guessed constants or a stub.
 
-### Stage 1.3: File Transfer Support
-**Goal**: Enable file listing and download.
+## 3. Corrections to the obsolete plan
 
-**Files to Modify**:
-- `ptp2/ptp.c` – Ensure standard PTP object handling works (likely already functional).
-- No new code needed if standard PTP object operations are intact.
+These are non-negotiable design constraints.
 
-**Activities**:
-- Test `gphoto2 --list-files`.
-- Test `gphoto2 --get-file all`.
-- Verify file integrity and speed.
+1. libgphoto2 initiates PTP. Pentax operations are host-side wrappers that
+   construct `PTPContainer` and call `ptp_transaction()`; they are not
+   responder-side `case` handlers. Do not invent `ptp_get_data()` or
+   `ptp_emit_data()` helpers.
+2. `SetPentaxVendorMode` is observed as a no-data command with five parameters:
+   `13, model_no, enable, vendor_ext_version, 0`. Its function flag is a response
+   parameter, not a data payload. Its exact response index is unverified until
+   Task P1 records a trace.
+3. Operation and device-property definitions belong in `camlibs/ptp2/ptp.h`,
+   beside other vendor constants—not in `mtp.h`.
+4. `params->deviceinfo.Model` is the cached model. Model is not fetched through
+   a fictional `PTP_DPC_Model` property.
+5. Configuration uses the existing `struct menu`, `struct submenu`, typed value
+   tables, and getter/setter callbacks in `config.c`. Do not invent
+   `GP_CAPTURE_*` constants or edit `gphoto2-port.h` for widget names.
+6. Vendor state is per camera/session in `PTPParams`; static global state is
+   forbidden.
+7. Property datatypes come from captured `GetDevicePropDesc` responses. A C#
+   `byte[]` does not establish the PTP datatype.
+8. Status offsets are byte offsets. Every read is little-endian and
+   bounds-checked. Conflicting documented offsets remain unresolved until traced.
+9. Capture is a state machine including completion detection, block-length
+   response handling, cancellation, and 0x9003 acknowledgement.
+10. Hardware validation occurs after each new transaction, not after all code is
+    written.
 
-**Exit Criteria**:
-- File listing works.
-- File download works for at least one format (JPEG/RAW).
-- Download speed reasonable.
-- Error handling for unsupported operations works.
+## 4. Work records required from every task
 
-### Stage 1.4: Basic Event Handling (Optional)
-**Goal**: Add basic event handling if desired (not required for core function).
+Create `libgphoto2/docs/pentax/evidence/<YYYY-MM-DD>/<task-id>/README.md`
+inside the libgphoto2 Git repository containing:
 
-**Files to Modify**:
-- `ptp2/ptp.c` – Ensure event handling is enabled and functional.
+- source commit and dirty-state summary;
+- camera model, firmware, VID:PID, USB mode, host OS, and library version;
+- exact commands and relevant environment variables;
+- expected and actual results;
+- hexadecimal response codes;
+- hashes and sizes of generated/downloaded files;
+- redacted log/capture filenames;
+- PASS, FAIL, or BLOCKED and the reason.
 
-**Activities**:
-- Test `--wait-event` or similar.
-- Verify no interference with synchronous ops.
+Large captures stay outside Git. Commit only a redacted transaction table and
+the capture’s SHA-256.
 
-**Exit Criteria**:
-- Event system functional without breaking synchronous operations.
+## 5. Milestones and task cards
 
-**Stage Gate 1 Complete**: When Pentax hardware is detectable, core properties gettable/settable, file listing/download works, and no regressions.
+Tasks are sequential unless stated otherwise. Do not start the next milestone
+until its gate passes.
 
----
+### M0 — Freeze baselines and targets
 
-# PART 2: PENTAX-SPECIFIC EXTENSIONS
+#### M0.1 Record repository baselines
 
-## Goal
-Add Pentax-specific capabilities: live view, advanced capture control, extensive configuration, model-specific gating, and status feedback.
+1. Record `git rev-parse HEAD`, branch, remotes, and `git status --short` for
+   both Git repositories.
+2. Record compiler, Meson, Autotools, gphoto2 CLI, Docker, and QEMU versions.
+3. Inventory available cameras and firmware without assuming both target bodies
+   are present.
+4. Copy no firmware into the libgphoto2 repository.
 
-### Stage 2.1: Vendor-Mode Handshake (Prerequisite)
-**Goal**: Implement `SetPentaxVendorMode` (0x9001) as required before any vendor-specific ops.
+Exit: the work record identifies exactly what can be tested. If the K-3 III
+colour body is unavailable, mark its hardware tasks BLOCKED; do not silently
+substitute the Monochrome model.
 
-**Files to Modify**:
-- `ptp2/ptp.c` – Add handling for opcode 0x9001.
-- `ptp2/config.c` – No changes needed (handshake is an operation, not a property).
-- `ptp2/mtp.h` – Add opcode definition if not present.
+#### M0.2 Build the unmodified native baseline
 
-**Exact Changes**:
-In `ptp2/ptp.c`, in the switch statement handling PTP opcodes (look for the large switch), add:
-```c
-case 0x9001: /* SetPentaxVendorMode */
-{
-    uint32_t model_no, vendor_mode, vendor_ext_version, dummy5;
-    uint16_t res_code;
-    uint32_t func_avail_flag;
+From `libgphoto2` use an out-of-tree build:
 
-    if (ptp_get_data(params, ptp, 5, &model_no, &vendor_mode, &vendor_ext_version, &dummy5, &dummy5) < 0)
-        return PTP_RC_InvalidParameter;
-
-    /* Call vendor-specific function (to be implemented) */
-    res_code = pentax_set_vendor_mode(params, model_no, vendor_mode, vendor_ext_version, &func_avail_flag);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-
-    /* Return function availability flag as uint32 data */
-    ptp_emit_uint32(params, func_avail_flag);
-    return PTP_RC_OK;
-}
-```
-Also implement the helper function `pentax_set_vendor_mode` (to be defined later, likely in a new file or in `ptp2/ptp.c`).
-
-**Exit Criteria**:
-- Opcode 0x9001 recognized and calls handler.
-- Handler returns PTP_RC_OK on success with correct data.
-- Without this handshake, vendor properties/ops should return appropriate error (e.g., PTP_RC_InvalidParameter or similar).
-
-### Stage 2.2: Pentax-Specific Property Support
-**Goal**: Add Pentax vendor property codes (0xD0xx range) to `ptp2/config.c`.
-
-**Files to Modify**:
-- `ptp2/config.c` – Add entries for each Pentax vendor property in the appropriate tables (getters/setters).
-- `ptp2/mtp.h` – Add property code definitions if missing.
-
-**Exact Changes**:
-In `ptp2/config.c`, find the arrays defining properties (look for `static const struct _CamPropDesc camprops[]` or similar). Add entries for each property code from the analysis. Example for ShutterSpeed (0xD00F):
-```c
-{ 0xD00F, "shutterspeed", GP_CAPTURE_SHUTTER_SPEED, PT_PTP_TYPE_UINT32, 0, 0, 0, 0 },
-```
-But we must map each to the appropriate libgphoto2 property (GP_CAPTURE_*). For Pentax-specific ones without direct GP_CAPTURE_* equivalent, we may need to add new GP_CAPTURE_* constants or use generic integer properties. However, libgphoto2 already has many properties; we should map to existing ones where possible.
-
-Given the extensive list, we will add all properties from the analysis. For brevity in this plan, we specify the approach:
-
-- For each property code in the 0xD0xx range from the analysis, add an entry in the property table in `ptp2/config.c` with:
-  - The property code.
-  - A descriptive name (e.g., "colortemp" for 0xD018).
-  - The corresponding libgphoto2 property constant (e.g., GP_CAPTURE_WHITE_BALANCE_TEMPERATURE if exists, else we may need to define a new one in `libgphoto2/gphoto2-port.h`).
-  - The appropriate PT_PTP_TYPE_* (UINT32, UINT16, BYTE, etc.) based on the analysis (most are UINT32 or BYTE arrays).
-  - Get/min/max/step as appropriate (many are enumerations; we may need to fetch the range via GetDevicePropDesc or use fixed ranges if known).
-
-Given the complexity, we will implement a subset first and expand. However, the plan is to add all.
-
-**Exit Criteria**:
-- All Pentax vendor property codes from the analysis have entries in `ptp2/config.c`.
-- Properties are gettable and settable where appropriate (some may be read-only).
-- Values returned are within expected ranges/enums.
-
-### Stage 2.3: Core Pentax Opcodes Implementation
-**Goal**: Implement the high-confidence opcodes with clear call sites.
-
-**Files to Modify**:
-- `ptp2/ptp.c` – Add cases for each opcode in the main switch.
-- `ptp2/mtp.h` – Add opcode definitions if missing.
-- Possibly `ptp2/ptp.h` for helper function declarations.
-- New helper functions may be added to `ptp2/ptp.c` or a new file.
-
-**Exact Changes**:
-We will add cases for each opcode. Below are the exact implementations for each.
-
-**Note**: All these operations should first check if vendor mode is enabled (via a global or per-port flag). We will add a helper `pentax_vendor_mode_enabled(PTPParams *params)` that checks a flag set by the handshake.
-
-**Example skeleton for a vendor operation**:
-```c
-if (!pentax_vendor_mode_enabled(params))
-    return PTP_RC_InvalidParameter; // or specific error
-
-/* proceed with operation */
+```sh
+meson setup build-pentax-baseline
+meson compile -C build-pentax-baseline
+meson test -C build-pentax-baseline --print-errorlogs
 ```
 
-**Implement each**:
+If Meson dependencies require the documented Autotools route, record why and
+use `autoreconf -is`, a separate build directory, `../configure`, `make -j2`,
+and `make check`.
 
-1. **0x9006 GetLiveViewFrameData** (DATA-TO-READ)
-```c
-case 0x9006: /* GetLiveViewFrameData */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    /* Call helper to get live view frame data */
-    uint8_t *frame_data;
-    uint32_t frame_size;
-    uint16_t res_code = pentax_get_live_view_frame(params, &frame_data, &frame_size);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, frame_data, frame_size);
-    /* Assuming we allocated frame_data, free it */
-    free(frame_data);
-    return PTP_RC_OK;
-}
+Exit: baseline build/test results are recorded before Pentax feature changes.
+
+### P1 — Produce a wire-protocol specification
+
+No feature code is allowed in this milestone.
+
+#### P1.1 Record generic PTP identity and descriptors
+
+For each available target body:
+
+1. Put it in the exact USB mode used for tethering.
+2. Record `lsusb -nn`, `gphoto2 --auto-detect`, `--summary`, `--list-config`,
+   and `--list-all-config` with debug logging.
+3. Record DeviceInfo vendor extension ID/version, exact model string, operations,
+   events, and properties.
+4. Save every target property descriptor: datatype, GetSet, default/current
+   value, and enum/range form.
+5. Download one selected JPEG and RAW—not `--get-file all`—and compare SHA-256
+   hashes with card-reader copies.
+
+Exit: USB IDs and baseline generic capabilities are established facts.
+
+#### P1.2 Capture Image Transmitter transactions
+
+Capture and tabulate separately:
+
+- connect, session open, DeviceInfo, vendor-mode enable;
+- vendor-mode disable and clean disconnect;
+- PC live-view start, three frames, stop;
+- autofocus and each observed focus-drive operation;
+- one JPEG capture/transfer and one RAW capture/transfer;
+- cancellation during capture or transfer;
+- each configuration property in the first slice;
+- GetAllConditions in idle, live-view, capture, transfer, and card-slot states.
+
+Record opcode, data-phase direction, every command parameter, response code,
+every response parameter, data size, and ordering. Redact identifiers.
+
+#### P1.3 Resolve protocol questions
+
+| Question | Required evidence |
+|---|---|
+| Which response parameter carries `funcAvailFlag`? | Handshake trace plus C# executor indexing |
+| When is model number selected? | Exact mapping and handshake trace |
+| What enables/stops PC live view? | Full sequence and restored values |
+| Is a frame raw JPEG or wrapped? | Hex header, JPEG bounds, decoder result |
+| How is transfer completion signalled? | Final data and response lengths, events/status |
+| When is 0x9003 sent? | Successful and cancelled transfer traces |
+| Which status layout applies per model/version? | Blob lengths and changing byte ranges |
+| Which properties are writable in which modes? | Descriptors and set attempts |
+
+Deliverable: `libgphoto2/docs/pentax/PENTAX_WIRE_PROTOCOL.md`, labeling every
+field Observed, Inferred, or Unknown and citing its trace/work-record ID.
+
+Gate P1: no Unknown may affect handshake, preview, or capture.
+
+### P2 — Add a minimal protocol layer
+
+#### P2.1 Add constants and per-camera state
+
+Files: `camlibs/ptp2/ptp.h`, plus an optional new `pentax.c` and its build lists.
+
+1. Add constants only for observed operations and properties.
+2. Define compact per-camera state in `PTPParams`: matched model, model number,
+   extension version, returned flags, vendor/live-view state, and transfer state.
+3. Use exact normalized DeviceInfo model plus VID:PID where required. Unknown
+   bodies receive no vendor commands.
+
+Tests: warning-clean compile and model-table fixture tests. Confirm two camera
+instances cannot share state.
+
+#### P2.2 Implement transaction wrappers
+
+Wrappers contain only packing, `ptp_transaction()`, response extraction, and
+bounds checking. Implement and hardware-test one at a time:
+
+1. vendor-mode enable/disable (0x9001);
+2. raw GetAllConditions (0x900F);
+3. live-view frame (0x9006);
+4. initiate/terminate capture (0x9011/0x9012);
+5. candidate info, file command, and block transfer (0x900B–0x900D);
+6. acknowledge object (0x9003);
+7. interrupt (0x9013);
+8. focus only if observed and in scope.
+
+Use the observed data phase, named constants, host-order parameters, existing
+buffer ownership, and response-parameter count checks. Propagate non-OK PTP
+responses. A local “enabled” flag never substitutes for real lifecycle handling.
+
+Gate P2: each wrapper has a successful hardware record or is removed. Stubs and
+uncalled wrappers do not pass.
+
+### P3 — Integrate the camera lifecycle
+
+Primary file: `camlibs/ptp2/library.c`.
+
+1. After session open and DeviceInfo retrieval, match an exact supported model.
+2. Enable vendor mode once, store returned flags, then refresh descriptors if P1
+   proves that necessary.
+3. On failure, retain generic PTP and suppress Pentax-only features.
+4. On exit, stop live view, cancel active transfer if required, disable vendor
+   mode, and continue cleanup even when one cleanup command fails.
+5. Verify reconnect and two simultaneous camera instances.
+
+Gate P3: 50 connect/disconnect cycles, including unplug during initialization,
+without crash, stale state, or failure of the next generic connection.
+
+### P4 — Implement live view as the first vertical slice
+
+Integrate with the Pentax branch of `camera_capture_preview()` and only the
+existing stream-preview path if required.
+
+1. Save original live-view property values.
+2. Apply the observed start sequence with bounded retries.
+3. Fetch and validate the observed frame container; never scan unbounded memory
+   for JPEG markers.
+4. Set the correct MIME type in `CameraFile`.
+5. Restore state on completion, cancellation, error, and exit.
+
+Tests: 500 decoded frames; 20 start/stop cycles; cancellation and unplug; still
+capture after preview; no Pentax branch for unsupported/non-Pentax devices.
+
+Gate P4: all tests pass on the primary body. Do not infer secondary support.
+
+### P5 — Implement capture and transfer as one state machine
+
+Document these states and all error transitions in
+`libgphoto2/docs/pentax/PENTAX_WIRE_PROTOCOL.md`:
+
+```text
+IDLE -> TRIGGERED -> WAITING -> CANDIDATE -> TRANSFERRING
+     -> ACKNOWLEDGING -> COMPLETE -> IDLE
 ```
 
-2. **0x9007 GetPentaxSubImage** (DATA-TO-READ)
-```c
-case 0x9007: /* GetPentaxSubImage */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t object_handle = 0; /* or get from params if needed */
-    uint8_t *img_data;
-    uint32_t img_size;
-    uint16_t res_code = pentax_get_subimage(params, object_handle, &img_data, &img_size);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, img_data, img_size);
-    free(img_data);
-    return PTP_RC_OK;
-}
+1. Wire trigger into the correct `camera_trigger_capture()` and/or
+   `camera_capture()` semantics.
+2. Use reliable observed events; otherwise bounded status polling with a
+   deadline and `GPContext` cancellation.
+3. Validate metadata lengths and UTF-16 conversion.
+4. Stream blocks via `PTPDataHandler` or bounded buffers. Requested length is
+   not assumed to equal returned response length.
+5. Verify total size and send 0x9003 exactly when observed.
+6. Surface the correct file path/event and invalidate relevant caches.
+
+Tests: JPEG, RAW, RAW+JPEG if supported, five sequential captures, full card,
+no card, two slots, timeout, cancel, unplug, and hash comparison.
+
+Gate P5: no successful or cancelled transfer leaves a stuck candidate unless a
+documented protocol limitation requires reconnect.
+
+### P6 — Add configuration incrementally
+
+One property per commit: ISO, aperture, shutter, white balance, exposure
+compensation, focus mode, drive mode, then file format.
+
+For each property:
+
+1. Use a real `submenu` entry and typed get/put pattern from `config.c`.
+2. Use the device descriptor. Hard-code only when the descriptor is absent and
+   P1 observed every supported value on each claimed model.
+3. Respect GetSet and camera mode; omit unsupported widgets.
+4. After set, invalidate/refetch and verify round-trip, then restore the original.
+
+Gate P6: the five required settings meet the definition of done. Record genuine
+read-only exceptions instead of forcing writes.
+
+### P7 — Parse and expose only validated status
+
+Create bounds-checked little-endian readers. Each field definition states model
+layout/version, byte offset, width, signedness, mask/enum, minimum blob length,
+and trace evidence.
+
+Initially parse transfer flag/handle, capture state required by P5, confirmed
+battery, and confirmed card/activity/current slot. Expose only through existing
+summary/config semantics with compatible units. Do not invent vendor property
+codes for cached status. Astrotracer and pixel shift are deferred.
+
+Gate P7: fixtures cover short blobs, known layouts, signed values, and state
+transitions; hardware values agree with visible camera state.
+
+### Q1 — Native quality and regression gate
+
+```sh
+meson compile -C build-pentax
+meson test -C build-pentax --print-errorlogs
 ```
 
-3. **0x9008 GetPentaxMainImage** (DATA-TO-READ) – similar to above.
+Also run documented style checks, sanitizers on fixtures, and Valgrind on CLI
+operations where practical. Test an unknown Pentax in generic mode and one
+non-Pentax PTP camera.
 
-4. **0x900B GetTransferCandidateFileInfo** (DATA-TO-READ)
-```c
-case 0x900B: /* GetTransferCandidateFileInfo */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint8_t type_of_trans_img; /* byte */
-    if (ptp_get_data(params, ptp, 1, &type_of_trans_img) < 0)
-        return PTP_RC_InvalidParameter;
-    /* Call helper */
-    uint8_t *resp_buf;
-    uint32_t resp_size;
-    uint16_t res_code = pentax_get_transfer_candidate_file_info(params, type_of_trans_img, &resp_buf, &resp_size);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, resp_buf, resp_size);
-    free(resp_buf);
-    return PTP_RC_OK;
-}
-```
-The response format per analysis: [0]=FileFormat, [1]=Quality, [2]=ImageSize, [3]=nameLen*2, then UTF-16 name.
+Review checklist:
 
-5. **0x900C GetCamFileOperationCommand** (DATA-TO-READ)
-```c
-case 0x900C: /* GetCamFileOperationCommand */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    /* Call helper */
-    uint8_t *resp_buf;
-    uint32_t resp_size;
-    uint16_t res_code = pentax_get_cam_file_operation_command(params, &resp_buf, &resp_size);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, resp_buf, resp_size);
-    free(resp_buf);
-    return PTP_RC_OK;
-}
-```
-Response: byte[0]=FileOperation, bytes[1-4]=int32 OperationInfo.
+- no globals for session state;
+- no unchecked blob/response reads or camera-sized unbounded allocation;
+- one owner per returned buffer;
+- deadlines and cancellation in every loop;
+- no model-prefix matching;
+- no logs containing serials or image contents;
+- stable public widget names once Polaris depends on them.
 
-6. **0x900D GetTranferFileDataBlock** (DATA-TO-READ)
-```c
-case 0x900D: /* GetTranferFileDataBlock */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t transRequestSize;
-    if (ptp_get_data(params, ptp, 1, &transRequestSize) < 0)
-        return PTP_RC_InvalidParameter;
-    uint8_t *readData;
-    uint32_t transferredDataSize;
-    uint16_t res_code = pentax_get_transfer_file_block(params, transRequestSize, &readData, &transferredDataSize);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, readData, transferredDataSize);
-    free(readData);
-    return PTP_RC_OK;
-}
-```
+Gate Q1: clean build/tests, review checklist, and hardware records accompany the
+candidate commit.
 
-7. **0x900F GetAllConditions** (DATA-TO-READ)
-```c
-case 0x900F: /* GetAllConditions */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint8_t *resp_buf;
-    uint32_t resp_size;
-    uint16_t res_code = pentax_get_all_conditions(params, &resp_buf, &resp_size);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    ptp_emit_data(params, resp_buf, resp_size);
-    free(resp_buf);
-    return PTP_RC_OK;
-}
-```
-We will need to parse this blob in the host side (see status blob parsing below). For now, just emit the raw data.
+### B1 — Make BenroPolarisPatcher consume the candidate source
 
-8. **0x9011 InitiatePentaxCapture** (NO-DATA)
-```c
-case 0x9011: /* InitiatePentaxCapture */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t releaseMode, focusMode, mwbMode, syncMode, apertureReset;
-    if (ptp_get_data(params, ptp, 5, &releaseMode, &focusMode, &mwbMode, &syncMode, &apertureReset) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_initiate_capture(params, releaseMode, focusMode, mwbMode, syncMode, apertureReset);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+The patcher currently downloads a released archive. It must test this exact fork.
 
-9. **0x9012 TerminatePentaxCapture** (NO-DATA)
-```c
-case 0x9012: /* TerminatePentaxCapture */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t releaseMode;
-    if (ptp_get_data(params, ptp, 1, &releaseMode) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_terminate_capture(params, releaseMode);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+1. Add `--libgphoto2-source <directory-or-archive>` to shell and PowerShell entry
+   points, mutually exclusive with release download.
+2. Copy into the Docker context or mount read-only; record Git commit and dirty
+   diff hash in output metadata.
+3. Update `container/build_ptp2.sh` and `build_fullstack.sh` to use it without
+   reapplying release-specific Pentax edits.
+4. Preserve and regression-test the release-download path.
+5. Fail closed for missing source, dirty source without explicit opt-in, or an
+   unexpected build version.
+6. Include corresponding LGPL source and diff in the output source offer; never
+   include decompiled code.
 
-10. **0x9013 InterruptFunction** (NO-DATA)
-```c
-case 0x9013: /* InterruptFunction */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_interrupt_function(params);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+Gate B1: a dry run proves `ptp2.so` contains a candidate-only marker and metadata
+names the exact commit. The ordinary 2.5.34 build still passes its baseline.
 
-11. **0x9016 FocusControl** (NO-DATA)
-```c
-case 0x9016: /* FocusControl */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t driveAmount, driveDirection;
-    if (ptp_get_data(params, ptp, 2, &driveAmount, &driveDirection) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_focus_control(params, driveAmount, driveDirection);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+### B2 — Polaris compatibility before flashing
 
-12. **0x9017 FocusControlNew** (NO-DATA)
-```c
-case 0x9017: /* FocusControlNew */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t imagePlaneDisplacement;
-    if (ptp_get_data(params, ptp, 1, &imagePlaneDisplacement) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_focus_control_new(params, imagePlaneDisplacement);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+Use full-stack mode first because it is hardware-verified. `ptp2-only` is a
+separate target, not an assumed fallback.
 
-13. **0x9018 SetCompositionAdjustmentOffset** (NO-DATA)
-```c
-case 0x9018: /* SetCompositionAdjustmentOffset */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t adjustDirection, step;
-    if (ptp_get_data(params, ptp, 2, &adjustDirection, &step) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_set_composition_adjustment_offset(params, adjustDirection, step);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+1. Run existing ELF/ABI, glibc, `DT_NEEDED`, symbol, `_Camera` size, patch-site,
+   ownership, hash, and UBIFS `space_fixup` checks.
+2. Run QEMU/self-tests and make failures fatal for candidates. QEMU proves
+   loading/registration, not USB.
+3. Trace `pgphoto` calls, widget names, capture target, paths, and events and
+   compare them to P4–P6.
+4. Decide from evidence whether Canon-specific shims must be disabled for Pentax;
+   default them off for Pentax until tested.
+5. Build stage2 and verify install/restore without modifying bootloader, kernel,
+   or unrelated appfs files.
 
-14. **0x9019 SetFlagToKeepAperturePosition** (NO-DATA)
-```c
-case 0x9019: /* SetFlagToKeepAperturePosition */
-{
-    if (!pentax_vendor_mode_enabled(params))
-        return PTP_RC_InvalidParameter;
-    uint32_t keepFlag, apertureValue;
-    if (ptp_get_data(params, ptp, 2, &keepFlag, &apertureValue) < 0)
-        return PTP_RC_InvalidParameter;
-    uint16_t res_code = pentax_set_flag_to_keep_aperture_position(params, keepFlag, apertureValue);
-    if (res_code != PTP_RC_OK)
-        return res_code;
-    return PTP_RC_OK;
-}
-```
+Gate B2: package-diff allowlist, QEMU logs, provenance, and verified on-device
+revert exist before flashing.
 
-**Helper Functions**: We need to implement the `pentax_*` helper functions. These will likely be placed in `ptp2/ptp.c` or a new file `ptp2/pentax.c`. For simplicity, we can add them to `ptp2/ptp.c` as static functions.
+### B3 — On-device and firmware validation
 
-**Vendor Mode Flag**: We need a way to track whether vendor mode is enabled per camera session. We can add a flag to the `PTPParams` or `PTPCamera` structure. Since modifying core structures may be invasive, we can use a property or a side channel. However, the simplest is to add a boolean to `PTPParams` (if we can modify `ptp.h`). Given that we are already modifying `ptp2/`, we can add a field to `PTPParams` in `ptp2/ptp.h` if it's safe.
+Mandatory order:
 
-Alternatively, we can store the state in the camera's private data (if using the camera struct). Since this is getting complex, we may opt for a simpler approach: require that vendor mode is set via a property or we check a global flag set by the handshake. For a first implementation, we can use a static/global variable per port (not thread-safe but acceptable for single camera). Better to add a flag to `PTPParams`.
+1. Keep and hash the stock `FwPkt`.
+2. Install reversible stage2 on-device.
+3. Test detection, UI settings, preview, capture, download, stop, reconnect, and
+   cold boot with logs.
+4. Revert stage2 and prove stock operation.
+5. Build the flashable image and inspect its file-level diff allowlist.
+6. Flash only the documented firmware version with recovery media ready.
+7. Repeat acceptance tests, then restore stock once as a recovery rehearsal.
 
-Given the scope, we will outline the helper functions without full implementation details, as the exact implementation depends on how we store the vendor mode state.
+Only real-device results pass B3; cross-build, QEMU, and repack do not.
 
-**Exit Criteria for Stage 2.3**:
-- All high-confidence opcodes (0x9001, 0x9006-0x900D, 0x900F, 0x9011-0x9013, 0x9016-0x9019) are implemented in `ptp2/ptp.c`.
-- Each opcode checks vendor mode enabled (via a helper).
-- Each opcode calls a helper function that performs the operation.
-- Helper functions are stubbed to return appropriate values (we will implement them in later stages).
-- The code compiles without errors.
+## 6. Scope control and failure policy
 
-### Stage 2.4: Model-Specific Capability Gating
-**Goal**: Implement `_camModelNo` approach to gate features based on model capabilities.
+Deferred: unobserved opcodes, “all D0xx” properties, movie transfer,
+composition adjustment, dust reduction, Astrotracer, pixel-shift control, and
+LS/G900SE support. Each requires a new traced vertical slice.
 
-**Files to Modify**:
-- `ptp2/ptp.c` – Add model detection and capability checking.
-- `ptp2/mtp.h` – Add model number constants and capability flag definitions if needed.
-- Possibly `ptp2/config.c` – to gate property get/set based on capabilities.
+Do not revive `pentaxmodern` unless evidence shows ptp2 cannot express the
+protocol. Do not change public APIs without upstream design review.
 
-**Exact Changes**:
-We will add a function `pentax_get_model_capabilities(PTPParams *params)` that:
-1. Reads the camera's `Model` string via standard PTP `GetDeviceInfo` (property 0xD001? Actually GetDeviceInfo is opcode 0x0101, but we can use the existing PTP device info retrieval).
-2. Maps the model string to a `_camModelNo` and capability flags (exactly as in `MtpDevice.cs` Model setter).
-3. Returns a structure with flags.
+- Unsupported feature: omit it and retain generic PTP.
+- Vendor enable failure: remain generic and issue no later vendor commands.
+- Malformed response: return an error without partial parsing.
+- Timeout/cancel: use only cleanup proven by P1 and report reconnect needs.
+- Polaris verification failure: produce no flashable output.
+- Missing hardware: mark BLOCKED; simulation never passes a hardware gate.
 
-Then, in each property get/set and opcode handler, we check if the requested feature is supported for the current model before proceeding.
+## 7. Final release evidence
 
-**Implementation Steps**:
-- Add a struct `PentaxCameraCapabilities` with boolean fields for each capability (dual slot, new transfer, etc.).
-- Add a function `pentax_get_model_capabilities` that returns this struct.
-- In property get/set, before accessing the property, check if the property is supported for the model (e.g., if trying to set movie mode on a non-movie model, return error).
-- In opcode handlers, similarly check if the opcode is supported for the model.
+Link the native and Polaris commits, redacted wire specification, build/test
+logs, camera matrices with untested cells, stress results, file hashes, patcher
+provenance/static report, install/revert/flashed recovery results, limitations,
+and an upstreamable commit series.
 
-**Exact Code Sketch**:
-In `ptp2/ptp.c`, add:
-```c
-typedef struct {
-    int dual_slot;
-    int new_transfer_mode;
-    int new_focus_fine_control;
-    int movie_supported;
-    int movie_settings_supported;
-    int movie_sub_image_supported;
-    int composition_adj_supported;
-    int aperture_keep_supported;
-    int color_temp_setting_supported;
-    int ci_detail_param_supported;
-    int self_timer_continuous_new_supported;
-    int remote_continuous_new_supported;
-    int slot_change_supported;
-    int pc_lv_high_res_supported;
-    /* add more as needed */
-} PentaxCameraCapabilities;
-
-static PentaxCameraCapabilities pentax_get_model_capabilities(PTPParams *params)
-{
-    PentaxCameraCapabilities caps = {0};
-    /* Get Model string via standard PTP GetDeviceInfo (we can reuse existing code) */
-    char model[256];
-    int ret = ptp_get_device_prop_value(params, PTP_DPC_Model, model, sizeof(model));
-    if (ret < 0) {
-        /* unable to get model, assume no capabilities */
-        return caps;
-    }
-    /* Map model to capabilities exactly as in MtpDevice.cs Model setter */
-    if (strncmp(model, "PENTAX K-3 Mark III", 19) == 0) {
-        caps.dual_slot = 1;
-        caps.new_transfer_mode = 1;
-        caps.new_focus_fine_control = 1;
-        caps.movie_supported = 1;
-        caps.movie_settings_supported = 1;
-        caps.movie_sub_image_supported = 1;
-        caps.composition_adj_supported = 1;
-        caps.aperture_keep_supported = 1;
-        caps.color_temp_setting_supported = 1;
-        caps.ci_detail_param_supported = 1;
-        caps.self_timer_continuous_new_supported = 1;
-        caps.remote_continuous_new_supported = 1;
-        caps.slot_change_supported = 1;
-        caps.pc_lv_high_res_supported = 1;
-    } else if (strncmp(model, "PENTAX K-3", 10) == 0) {
-        /* K-3 (no marks) */
-        caps.dual_slot = 1;
-        /* all others 0 */
-    } else if (strncmp(model, "PENTAX 645Z", 11) == 0) {
-        caps.dual_slot = 1;
-        /* etc. */
-    }
-    /* ... and so on for each model ... */
-    return caps;
-}
-```
-
-Then, in each property getter/setter and opcode handler, we do:
-```c
-PentaxCameraCapabilities caps = pentax_get_model_capabilities(params);
-if (!caps.some_feature) {
-    return PTP_RC_InvalidParameter; // or specific error
-}
-```
-
-**Exit Criteria for Stage 2.4**:
-- Function `pentax_get_model_capabilities` implemented.
-- Model detection via `GetDeviceInfo` works.
-- Capability flags match the analysis exactly for each model.
-- Property get/set and opcode handlers check capabilities and return appropriate errors for unsupported features on a given model.
-- Works correctly for at least two different Pentax models if available.
-
-### Stage 2.5: Status Blob Parsing (`GetAllConditions` 0x900F)
-**Goal**: Parse the `GetAllConditions` response to provide status feedback.
-
-**Files to Modify**:
-- `ptp2/ptp.c` – In the handler for 0x900F, instead of just emitting raw data, we will parse it and emit meaningful status information via libgphoto2's status reporting mechanism (or we can store the parsed data in the camera's private data and provide getters for status properties).
-- We may need to add new status properties to libgphoto2 (e.g., battery level, storage state, etc.) or use existing ones.
-
-**Approach**:
-Rather than emitting raw data, we will parse the blob and update the camera's private data (if we have a camera struct) or we can emit the parsed data as separate properties via the standard PTP property system? However, the status blob is not a standard PTP property; it's a vendor-specific opcode.
-
-Simpler: In the handler for 0x900F, we parse the blob and store the relevant status fields in the camera's private data (if we extend the camera struct). Then we can provide getters for these status fields as standard PTP properties (e.g., we could map battery level to the standard battery level property if it makes sense, or we create new vendor-specific status properties).
-
-Given the complexity, we can start by simply emitting the raw data and letting the host application parse it (if the host application is modified). But for a generic libgphoto2 improvement, we want to make the status available via standard properties.
-
-We will add new properties to `ptp2/config.c` for the status fields we want to expose, and in their getters, we will compute the value from the last cached `GetAllConditions` blob.
-
-**Exact Changes**:
-1. Add a struct to hold the last `GetAllConditions` blob (or parsed fields) in the camera's private data (if we have one) or in a global per-port variable.
-2. In the handler for 0x900F, store the blob (or parse and store fields).
-3. Add getters for status properties (e.g., battery level, storage state, etc.) that read from the cached data.
-4. Add these properties to `ptp2/config.c` with appropriate property codes (we can use standard PTP property codes where applicable, or define new vendor-specific status property codes if needed).
-
-Given the time, we will outline the approach:
-
-- In `ptp2/ptp.c`, add a static struct `LastGetAllConditions` per port (or per camera) to hold the last blob or parsed values.
-- In the handler for 0x900F, parse the blob and fill this struct.
-- Add property getters for:
-  - Battery level (if available in blob)
-  - Storage state (sd1CardState, sd2CardState)
-  - Remaining space (sd1Remain, sd2Remain)
-  - Capture mode info
-  - Mode enable info
-  - Astrotracer phase/state/time limit
-  - Pixel shift status (read-only indicator)
-  - Current writing slot
-  - etc.
-
-We will map these to existing libgphoto2 properties where possible (e.g., battery level maps to GP_CAPTURE_BATTERY_LEVEL, storage state may not have a direct equivalent, we may need to use generic integer properties).
-
-**Exit Criteria for Stage 2.5**:
-- `GetAllConditions` (0x900F) handler implemented.
-- Last blob parsed and stored.
-- At least 80% of the documented status fields are available as gettable properties (standard or vendor-specific).
-- Values update correctly when the blob changes.
-- Pixel shift status correctly reported as read-only indicator.
-- Astrotracer phase/state correctly reported.
-
-### Stage 2.6: Model-Specific Property Gating (Optional Refinement)
-**Goal**: Ensure property get/set handlers check model capabilities before allowing access.
-
-**Files to Modify**:
-- `ptp2/config.c` – In property getters/setters, call `pentax_get_model_capabilities` and check if the property is supported for the model.
-
-**Exact Changes**:
-For each property getter/setter in `ptp2/config.c`, add:
-```c
-PentaxCameraCapabilities caps = pentax_get_model_capabilities(params);
-if (!caps.some_feature_related_to_this_property) {
-    return PTP_RC_InvalidParameter; // or specific error
-}
-```
-before accessing the property.
-
-**Exit Criteria**:
-- Property get/set handlers correctly return errors for unsupported properties on a given model.
-- Works correctly for at least two models.
-
-### Stage 2.7: Integration and Polish
-**Goal**: Ensure code follows libgphoto2 standards, no memory leaks, passes existing tests.
-
-**Files to Modify**:
-- All modified files.
-- Possibly `ptp2/ptp.h` for new function declarations.
-
-**Activities**:
-- Run `make check` or equivalent test suite.
-- Check for memory leaks (if tools available).
-- Ensure code style matches surrounding code.
-- Document any limitations in the source comments.
-
-**Exit Criteria**:
-- Code compiles without warnings.
-- Existing libgphoto2 test suite passes (no regressions).
-- Code follows libgphoto2 coding style.
-- Limitations documented in source comments.
-
-**Stage Gate 2 Complete**: When all Pentax-specific features are implemented, tested, and integrated without regressions.
-
----
-
-# VALIDATION AND BENRO POLARIS INTEGRATION
-
-## Stage 3.1: Hardware Validation
-**Entrance Criteria**: Stage 2 complete.
-**Activities**:
-- Test all implemented features against real Pentax K-3 III and/or K-1 II hardware.
-- Test property get/set, live view, file download, capture control, focus control, status feedback.
-- Verify model-specific gating works.
-- Document any discrepancies.
-**Exit Criteria**:
-- Core functionality working: live view, file download, capture control.
-- Model-specific gating working.
-- Status blob parsing providing useful feedback.
-- Limitations documented.
-
-## Stage 3.2: Benro Polaris Firmware Integration
-**Entrance Criteria**: Stage 3.1 complete.
-**Activities**:
-- Build custom libgphoto2 with Pentax support for ARM target (using Benro Polaris patcher's build environment).
-- Integrate with Benro Polaris firmware patcher.
-- Build test firmware image.
-- Flash test image (if appropriate and hardware available) or test via USB host mode.
-- Test end-to-end functionality via Polaris interface.
-**Exit Criteria**:
-- Custom libgphoto2 built successfully for ARM target.
-- Integrated with Benro Polaris firmware patcher.
-- End-to-end functionality tested via Polaris interface (if possible).
-- Any issues documented.
-
-## Stage 3.3: Alternative Validation (If Hardware Flashing Not Feasible)
-**Entrance Criteria**: Stage 3.1 complete.
-**Activities**:
-- Validate via USB connection with standard gphoto2 CLI first.
-- Then test the same build via Benro Polaris in USB host mode (if supported).
-- Or validate through simulation/testing without flashing.
-**Exit Criteria**:
-- Core functionality validated via available methods.
-- Implementation readiness for Polaris integration documented.
-
----
-
-# SUMMARY OF FILES TO MODIFY
-
-Below is a consolidated list of files that will be modified, with a brief description.
-
-### `ptp2/ptp.c`
-- Add vendor-mode handshake handler (0x9001).
-- Add handlers for all high-confidence opcodes (0x9006-0x900D, 0x900F, 0x9011-0x9013, 0x9016-0x9019).
-- Add helper functions for each operation (stubs to be filled).
-- Add vendor mode enabled check (requires storing state).
-- Add model detection and capability checking functions.
-- Add status blob parsing and caching (for 0x900F).
-- Possibly add fields to `PTPParams` or camera struct for vendor mode flag and cached status.
-
-### `ptp2/config.c`
-- Add entries for all Pentax vendor property codes (0xD0xx range) from the analysis.
-- In property getters/setters, add model capability checks (optional refinement).
-- Add getters for status properties derived from cached `GetAllConditions` blob (if implementing status feedback via properties).
-
-### `ptp2/mtp.h`
-- Add definitions for any missing opcode codes (0x9xxx range).
-- Add definitions for any missing property codes (if not already present).
-
-### `ptp2/ptp.h`
-- Add declarations for new helper functions (pentax_* functions, pentax_get_model_capabilities, etc.).
-- Possibly add a field to `PTPParams` for vendor mode flag (if we modify the struct).
-
-### Optional: New file `ptp2/pentax.c`
-- Could house all the helper functions to keep `ptp2/ptp.c` clean.
-
-### Optional: `libgphoto2/gphoto2-port.h`
-- If we need to define new GP_CAPTURE_* constants for properties that don't have existing equivalents, we would add them here. However, we should first try to map to existing properties.
-
----
-
-# EXIT CRITERIA FOR THE ENTIRE PROJECT
-
-The project will be considered complete when:
-1. Pentax K-3 III and/or K-1 II cameras are detectable and identifiable.
-2. Core camera properties (ISO, shutter, aperture, WB, focus) are gettable and settable.
-3. Live view frame acquisition works.
-4. File download and transfer works.
-5. Capture triggering and control works.
-6. Model-specific capability gating works correctly.
-7. Status blob parsing provides useful feedback (at least battery, storage, capture mode, astrotracer state, pixel shift indicator).
-8. No regressions in existing libgphoto2 functionality.
-9. Implementation follows libgphoto2 coding standards.
-10. Limitations and known issues are clearly documented (e.g., pixel shift read-only only, HDR LS-series only, etc.).
-
-This development plan provides a detailed, step-by-step roadmap with specific code changes that can be evaluated for certainty by other agents. Each stage has clear entrance and exit criteria, allowing for incremental development and testing.
+Only then may documentation say “supported” or “complete.”
