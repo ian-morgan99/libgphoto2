@@ -34,3 +34,19 @@ precede labels or writes.
 Status: **READ-ONLY PASS (2/2)**. This proves stable B-mode enumeration and a
 distinct 1–600 second timer domain. It does not prove that setting a timer or
 starting/ending a Bulb exposure is safe or correct.
+
+## First reversible write
+
+After the read-only gate, raw `0xd01e` was changed from 3200 to 1600. A fresh
+property read returned 1600 and the operator confirmed ISO 1600 on the camera
+display, establishing the property identity in B mode. Before the planned
+restore, the camera disappeared from USB and its screen went black. The restore
+container never launched because the old USB node no longer existed, so no
+restore command was transmitted. After a restart attempt the operator reported
+the battery was flat.
+
+This is an **INTERRUPTED RESTORE**, not a completed reversible-write pass and
+not evidence that the driver caused the power loss. The camera is expected to
+retain ISO 1600. After charging/replacing the battery, confirm the displayed
+value, restore the recorded original 3200, and verify both PTP and display
+before any other write or exposure test.
