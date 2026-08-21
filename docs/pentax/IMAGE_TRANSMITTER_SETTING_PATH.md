@@ -95,10 +95,10 @@ that an acknowledged request was applied. libgphoto2's post-write verification
 is deliberately stricter and correctly detected the K-1 II retaining shutter
 1/500 and ISO 200.
 
-## Remaining differential and next experiment
+## Resolved differential
 
 Our bytes, property codes, model handshake, DeviceInfo refresh, storage query,
-conditions gate, and idle state match IT2. Two differences remain credible:
+conditions gate, and idle state match IT2. Two differences were considered:
 
 1. IT2 is a long-lived session. Its first 100 ms timer poll begins after initial
    conditions loading, and it stays in vendor mode after a UI write. Our CLI
@@ -107,7 +107,7 @@ conditions gate, and idle state match IT2. Two differences remain credible:
    PTP containers directly. Both represent the same PTP phases, but only an
    official-client USB capture can rule out WPD/driver-added traffic.
 
-The next hardware experiment must isolate difference 1 before blaming WPD:
+The hardware experiment isolated difference 1 before blaming WPD:
 
 1. open one exact-model session and perform the normal vendor/DeviceInfo/storage
    initialization;
@@ -121,7 +121,12 @@ The next hardware experiment must isolate difference 1 before blaming WPD:
    exposure write;
 7. independently verify ISO 200 in a fresh session before exit from the gate.
 
-This test needs a purpose-built harness so cleanup/restoration runs on every
-branch. Do not approximate it with chained CLI processes. If it still retains
-200, the next evidence should be a USB trace from IT2 on Windows, not speculative
-opcodes or additional property writes.
+Purpose-built harnesses completed ISO 200→400→200 and shutter
+1/500→1/125→1/500 in single sessions. Live conditions reflected both targets
+and both restorations; cleanup and independent fresh-session checks passed.
+Therefore WPD-specific traffic is not needed for these properties.
+
+The descriptor `CurrentValue` was the wrong immediate success oracle. Continue
+to use conditions as IT2 does, while retaining stricter bounded verification and
+restoration. Apply this pattern one property at a time; do not generalize it to
+properties absent from the parsed conditions layout.

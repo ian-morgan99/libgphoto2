@@ -39,13 +39,12 @@ property, payload, model gate, state transition, retry, or cleanup path:
 
 ## Current K-1 Mark II setting finding
 
-On firmware 1.02 in PC-P Manual mode, conditions reported raw mode 8, idle,
-capability flags `0x0000000f`, and therefore Av/Tv/Sv/Xv changeable. Exact IT2
-payloads for shutter 1/500→1/125 and ISO 200→400 were acknowledged but retained
-their original values. Further exposure-property writes are prohibited until
-the common prerequisite is resolved.
+On firmware 1.02 in PC-P Manual mode, conditions reported raw mode 8, idle, and
+capability flags `0x0000000f`. Source-faithful long-lived tests proved restored
+round trips for shutter 1/500→1/125→1/500 and ISO 200→400→200.
 
-The next permitted exposure experiment is the purpose-built, single-session
-100 ms polling/persistence ISO test specified in
-`docs/pentax/IMAGE_TRANSMITTER_SETTING_PATH.md`. If it fails, obtain an official
-IT2 USB trace on Windows; do not speculate about hidden commit opcodes.
+The crucial rule is that IT2 obtains live exposure values from periodic
+`GetAllConditions`; a descriptor's `CurrentValue` can lag and must not be the
+sole post-write oracle. Reproduce IT2's initial conditions load, second 100 ms
+poll, serialized write, and bounded later condition polls. Still require exact
+restoration and an independent fresh-session check.

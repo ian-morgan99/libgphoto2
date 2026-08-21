@@ -9947,11 +9947,11 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
 	PTPDevicePropDesc desc;
-	PTPDevicePropDesc verify;
 	PTPPropValue value;
 	PentaxConditions conditions;
 	unsigned char *condition_data = NULL;
 	unsigned int condition_size = 0;
+	unsigned int attempt;
 	uint16_t ret;
 	int result;
 
@@ -9974,8 +9974,27 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
 		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
 		return GP_ERROR_CAMERA_BUSY;
+	usleep (100000);
+	condition_data = NULL;
+	condition_size = 0;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		&conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
 	memset (&desc, 0, sizeof (desc));
-	memset (&verify, 0, sizeof (verify));
 	memset (&value, 0, sizeof (value));
 	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ShutterSpeed,
 		&desc);
@@ -9987,21 +10006,47 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 			&value, PTP_DTC_UINT64);
 		result = translate_ptp_result (ret);
 		if (result == GP_OK) {
-			ret = ptp_generic_getdevicepropdesc (params,
-				PTP_DPC_PENTAX_ShutterSpeed, &verify);
-			result = translate_ptp_result (ret);
-			if ((result == GP_OK) && (verify.CurrentValue.u64 != value.u64)) {
-				GP_LOG_E ("Pentax shutter write was acknowledged but not applied "
-					"(requested 0x%016llx, retained 0x%016llx).",
-					(unsigned long long)value.u64,
-					(unsigned long long)verify.CurrentValue.u64);
+			result = GP_ERROR;
+			for (attempt = 1; attempt <= 5; attempt++) {
+				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+				    GP_CONTEXT_FEEDBACK_CANCEL) {
+					result = GP_ERROR_CANCEL;
+					break;
+				}
+				usleep (100000);
+				condition_data = NULL;
+				condition_size = 0;
+				ret = ptp_pentax_get_all_conditions (params,
+					&condition_data, &condition_size);
+				if (ret != PTP_RC_OK) {
+					free (condition_data);
+					result = translate_ptp_result (ret);
+					break;
+				}
+				result = pentax_parse_conditions (condition_data,
+					condition_size, &conditions);
+				free (condition_data);
+				if (result < GP_OK)
+					break;
+				GP_LOG_D ("Pentax shutter verification attempt %u: "
+					"requested=%u/%u, conditions=%u/%u", attempt,
+					(unsigned int)(value.u64 & 0xffffffffU),
+					(unsigned int)(value.u64 >> 32),
+					conditions.bulb_timer_seconds,
+					conditions.bulb_timer_denominator);
+				if ((conditions.bulb_timer_seconds ==
+				     (uint32_t)(value.u64 & 0xffffffffU)) &&
+				    (conditions.bulb_timer_denominator ==
+				     (uint32_t)(value.u64 >> 32))) {
+					result = GP_OK;
+					break;
+				}
 				result = GP_ERROR;
 			}
 		}
 		if (alreadyset)
 			*alreadyset = 1;
 	}
-	ptp_free_devicepropdesc (&verify);
 	ptp_free_devicepropdesc (&desc);
 	return result;
 }
@@ -10031,11 +10076,11 @@ _put_Pentax_DirectISO (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
 	PTPDevicePropDesc desc;
-	PTPDevicePropDesc verify;
 	PTPPropValue value;
 	PentaxConditions conditions;
 	unsigned char *condition_data = NULL;
 	unsigned int condition_size = 0;
+	unsigned int attempt;
 	uint16_t ret;
 	int result;
 
@@ -10058,8 +10103,30 @@ _put_Pentax_DirectISO (CONFIG_PUT_ARGS)
 	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
 		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
 		return GP_ERROR_CAMERA_BUSY;
+	/* IT2 starts its serialized conditions timer at 100 ms after the initial
+	 * Connect-time conditions load.  Reproduce that second readiness sample
+	 * before a setting write instead of treating one snapshot as sufficient. */
+	usleep (100000);
+	condition_data = NULL;
+	condition_size = 0;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		&conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_SV))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
 	memset (&desc, 0, sizeof (desc));
-	memset (&verify, 0, sizeof (verify));
 	memset (&value, 0, sizeof (value));
 	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ExtendedISO,
 		&desc);
@@ -10071,20 +10138,44 @@ _put_Pentax_DirectISO (CONFIG_PUT_ARGS)
 			&value, PTP_DTC_UINT32);
 		result = translate_ptp_result (ret);
 		if (result == GP_OK) {
-			ret = ptp_generic_getdevicepropdesc (params,
-				PTP_DPC_PENTAX_ExtendedISO, &verify);
-			result = translate_ptp_result (ret);
-			if ((result == GP_OK) && (verify.CurrentValue.u32 != value.u32)) {
-				GP_LOG_E ("Pentax ISO write was acknowledged but not applied "
-					"(requested %u, retained %u).",
-					value.u32, verify.CurrentValue.u32);
+			result = GP_ERROR;
+			for (attempt = 1; attempt <= 5; attempt++) {
+				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+				    GP_CONTEXT_FEEDBACK_CANCEL) {
+					result = GP_ERROR_CANCEL;
+					break;
+				}
+				usleep (100000);
+				condition_data = NULL;
+				condition_size = 0;
+				ret = ptp_pentax_get_all_conditions (params,
+					&condition_data, &condition_size);
+				if (ret != PTP_RC_OK) {
+					free (condition_data);
+					result = translate_ptp_result (ret);
+					break;
+				}
+				result = pentax_parse_conditions (condition_data,
+					condition_size, &conditions);
+				free (condition_data);
+				if (result < GP_OK)
+					break;
+				GP_LOG_D ("Pentax ISO verification attempt %u: requested=%u, "
+					"conditions=%u", attempt, value.u32, conditions.iso);
+				if (conditions.iso == value.u32) {
+					result = GP_OK;
+					break;
+				}
 				result = GP_ERROR;
 			}
+			if (result == GP_ERROR)
+				GP_LOG_E ("Pentax ISO write was acknowledged but conditions "
+					"retained %u after 500 ms (requested %u).",
+					conditions.iso, value.u32);
 		}
 		if (alreadyset)
 			*alreadyset = 1;
 	}
-	ptp_free_devicepropdesc (&verify);
 	ptp_free_devicepropdesc (&desc);
 	return result;
 }

@@ -34,17 +34,15 @@ the conditions changeability word at offset 504 before another shutter write;
 GetSet and physical M are not sufficient authorization or success evidence.
 
 That conditions audit subsequently reported IT2 Manual mode (raw 8),
-Tv-changeable, idle, and not task-changing. Repeating the bounded write after a
-source-aligned conditions preflight was still acknowledged but ignored. The
-setter now requires the preflight and post-write match, but K-1 II shutter
-writes are closed pending new official-client or wire evidence.
+Tv-changeable, idle, and not task-changing. A source-faithful long-lived test
+then proved 1/500→1/125→1/500 through live conditions. The earlier immediate
+descriptor check was stale; the setter now follows bounded conditions polling.
 
 K-1 II also omits extended ISO `0xd01e` from DeviceInfo. The exact-model
 `pentaxdirectiso` widget therefore requests its UINT32 descriptor on demand,
 requires the source-defined Sv-changeable/idle conditions, and verifies the
-post-write value. Its first 200→400 hardware attempt was acknowledged but
-retained 200; the widget correctly returned failure. It is diagnostic evidence,
-not a claim of working K-1 II ISO control.
+post-write value through live conditions. A single-session 200→400→200 round
+trip and independent restoration check passed on hardware.
 
 Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
 exposure compensation, and shutter speed. Several white-balance enumeration
