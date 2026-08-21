@@ -33,8 +33,9 @@ Pentax table does not name them; no labels are guessed.
 A controlled cold-start sequence subsequently reconfirmed shutter property
 `0xd00f` through read-only `GetDevicePropDesc` (`0x1014`): UINT64 rational,
 current 1 second, with 55 choices ranging from 1/8000 through 30 seconds. No
-property value was written. The identical result passed in two power cycles;
-the lifecycle repetition gate remains open.
+property value was written. The identical result passed in three controlled
+power cycles after explicit shooting-screen readiness; the larger lifecycle
+repetition gate remains open.
 
 ## Deliberately withheld widgets
 
