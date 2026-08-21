@@ -2,6 +2,10 @@
 
 Status: canonical plan, revision 2026-08-21
 
+All physical-camera activity is also recorded chronologically in
+`docs/pentax/REAL_HARDWARE_TEST_LOG.md`. Updating that log is part of completing
+any real-hardware test; the plan status table is not a substitute for it.
+
 ## Progress ledger
 
 | Date | Work | Result | Evidence / next gate |
