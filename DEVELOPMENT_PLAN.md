@@ -16,6 +16,7 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Obsolete `pentaxmodern` prototype | ARCHIVED | Removed stale build registrations; source retained under workspace `archive/obsolete-source/` and in Git history |
 | 2026-08-21 | Pentax parser/transfer-buffer unit tests | PASS | Fresh container compile plus `test-pentax-utils` 1/1 PASS |
 | 2026-08-21 | Autotools/source-distribution path | PASS | Removed stale invalid Makefile text; `autoreconf`, configure, and `make dist-xz` PASS; archive contains Pentax utility source |
+| 2026-08-21 | Candidate-transfer finalization audit | CORRECTED | New 0x900B–0x900D path now finalizes with GETDATA 0x900E; 0x9003 retained only for legacy object path |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

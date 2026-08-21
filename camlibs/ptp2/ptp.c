@@ -2044,6 +2044,22 @@ ptp_pentax_get_transfer_block (PTPParams *params, uint32_t requested_size,
 }
 
 uint16_t
+ptp_pentax_delete_transfer_candidate (PTPParams *params)
+{
+	PTPContainer ptp;
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	uint16_t ret;
+
+	if (!params)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_DeleteTransferCandidate);
+	ret = ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, &data, &size);
+	free (data);
+	return ret;
+}
+
+uint16_t
 ptp_pentax_get_all_conditions (PTPParams *params, unsigned char **data,
 	unsigned int *size)
 {

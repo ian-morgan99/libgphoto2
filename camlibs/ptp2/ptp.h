@@ -4165,6 +4165,7 @@ uint16_t ptp_pentax_get_file_operation (PTPParams *params,
 uint16_t ptp_pentax_get_transfer_block (PTPParams *params,
 	uint32_t requested_size, unsigned char **data, unsigned int *size,
 	uint32_t *transferred_size);
+uint16_t ptp_pentax_delete_transfer_candidate (PTPParams *params);
 uint16_t ptp_pentax_get_all_conditions (PTPParams *params,
 	unsigned char **data, unsigned int *size);
 uint16_t ptp_pentax_initiate_capture (PTPParams *params, uint32_t release_mode,

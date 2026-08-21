@@ -6008,7 +6008,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		GP_FILE_TYPE_NORMAL, file, context);
 	if (ret < GP_OK)
 		goto out;
-	ptpres = ptp_pentax_received_created_object (params, candidate_handle);
+	ptpres = ptp_pentax_delete_transfer_candidate (params);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
