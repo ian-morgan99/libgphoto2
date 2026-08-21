@@ -75,6 +75,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 | 2026-08-21 | H1.10 K-1 II LV control discovery | READ-ONLY PASS | Source-derived `0xd009`, `0xd036`, and `0xd037` returned validated 720×480 geometry, centred 8-byte AF position, and zoom-off value 1; no setters, preview, focus, or capture; see H1.10 |
 | 2026-08-21 | H1.11 K-1 II direct descriptor sweep | READ-ONLY PASS 2/2 | Seven conventional properties were byte-stable across individual fresh sessions; corrected drive mode to UINT32; focus-peaking and PC-LV descriptors are stable nonstandard payloads and remain withheld; see H1.11 |
 | 2026-08-21 | H1.12 K-1 II single preview | REPRODUCIBLE FAIL-CLOSED | Cardless and inserted-card exact-model attempts both returned the same unlocalized `GP_ERROR_IO`, retained no frame, made no retry, and released USB; card absence is ruled out as sole cause; instrument every start/frame/restore/disable substage before another attempt; see H1.12 |
+| 2026-08-21 | H1.13 K-1 II instrumented preview | START/RESTORE PASS; FRAME NOT READY | Exact stages localized failure: empty `0xd035` pre-read, direct start `0x2001`, first frame `0xa008`/NoUpdateImage, explicit stop restore `0x2001`; implement bounded 33 ms polling for only `0xa008`; see H1.13 |
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
 | 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
 | 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
@@ -87,13 +88,12 @@ not guessed without real `GetDevicePropDesc` evidence.
 
 This list supersedes completed task narratives later in the document.
 
-1. Instrument the K-1 II preview path so `0xd009`, PC-LV start `0xd035=1`, frame
-   `0x9006`, PC-LV restoration `0xd035=0`, vendor disable, and session close
-   each report their raw result while preserving the first failure.
-2. Rebuild offline and add forced-failure cleanup fixtures for failure at every
-   stage. Prove restoration is attempted only when start succeeded.
-3. Run exactly one instrumented K-1 II frame once. Stop on any non-OK result.
-   Only a valid
+1. Implement bounded 33 ms polling for hardware-confirmed `0xa008`
+   (`NoUpdateImage`) only. Include cancellation, attempt and elapsed-time limits;
+   all other responses remain terminal.
+2. Add offline fixtures for immediate frame, transient-then-frame, transient
+   exhaustion, cancellation, other error, and restoration after each failure.
+3. Run exactly one K-1 II frame once. Only a valid
    bounded JPEG plus explicit successful restoration permits 10 frames.
 4. After 1/10/50/500 preview gates, perform separate single-variable AF-position
    and zoom restore tests. Focus peaking remains withheld on K-1 II.
@@ -105,10 +105,11 @@ This list supersedes completed task narratives later in the document.
 
 ## Current hard stop
 
-H1.12 failed in the composite preview path. Do not retry preview, change a
-setting, move focus, capture, delete, reset USB, or start a Polaris hardware
-test until activities 1 and 2 above pass offline. A failed vendor enable remains
-fail-closed with no in-session retry or later Pentax opcode.
+H1.13 proved K-1 II PC-LV start and restoration, while the first frame returned
+transient `0xa008`. Do not retry preview, change a setting, move focus, capture,
+delete, reset USB, or start a Polaris hardware test until bounded transient
+polling and its offline fixtures (activities 1 and 2) pass. A failed vendor
+enable remains fail-closed with no in-session retry or later Pentax opcode.
 
 The earlier `0x2002` diagnosis was partly confounded by incomplete container
 isolation. Controlled clean starts subsequently passed 3/3, but the plan's

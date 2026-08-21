@@ -3668,8 +3668,18 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			ret = ptp_getdevicepropvalue (params,
 				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
 			if (ret != PTP_RC_OK) {
-				SET_CONTEXT_P (params, NULL);
-				return translate_ptp_result (ret);
+				gp_context_status (context,
+					_("Pentax preview stage read-PC-LV returned 0x%04x."), ret);
+				if ((params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) &&
+				    (ret == PTP_ERROR_IO)) {
+					/* K-1 II returns an empty 0xd035 value and a datatype-zero
+					 * descriptor.  In a fresh non-live-view session, follow IT2's
+					 * direct start/stop path and restore explicitly to zero. */
+					value.u8 = 0;
+				} else {
+					SET_CONTEXT_P (params, NULL);
+					return translate_ptp_result (ret);
+				}
 			}
 			params->pentax.live_view_original_value = value.u8;
 			params->pentax.live_view_original_valid = 1;
@@ -3677,6 +3687,8 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 				value.u8 = 1;
 				ret = ptp_setdevicepropvalue (params,
 					PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+				gp_context_status (context,
+					_("Pentax preview stage start-PC-LV returned 0x%04x."), ret);
 				if (ret != PTP_RC_OK) {
 					params->pentax.live_view_original_valid = 0;
 					SET_CONTEXT_P (params, NULL);
@@ -3686,8 +3698,14 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			params->inliveview = 1;
 		}
 		ret = ptp_pentax_get_live_view_frame (params, &data, &size);
+		gp_context_status (context,
+			_("Pentax preview stage get-frame returned 0x%04x (%u bytes)."),
+			ret, size);
 		if (ret != PTP_RC_OK) {
 			uint16_t restore_ret = pentax_restore_live_view (params);
+			gp_context_status (context,
+				_("Pentax preview stage restore-after-frame returned 0x%04x."),
+				restore_ret);
 			if (restore_ret != PTP_RC_OK)
 				GP_LOG_E ("Pentax live view restore after frame error failed with 0x%04x",
 					restore_ret);
