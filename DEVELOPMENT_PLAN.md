@@ -33,6 +33,11 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Post-enable DeviceInfo cache audit | CORRECTED | Normal config listing initially saw only pre-vendor properties; candidate now atomically refreshes after enable and rolls vendor mode back on refresh/fixup failure |
 | 2026-08-21 | Read-only configuration widgets | PARTIAL PASS | Aperture, exposure compensation, and shutter decode correctly; Pentax white-balance vendor labels required effective-vendor routing correction; ISO/focus remain withheld |
 | 2026-08-21 | H1.3 single live-view frame | PASS | Valid 1080x720 JPEG returned; disposable host file only; `0xd035` independently verified restored to 0; see evidence record |
+| 2026-08-21 | Safe multi-preview harness | IMPLEMENTED | Fixed-model, explicit-port, 1..500-frame tool retains no images, validates complete JPEGs in memory, exposes no setters/capture/delete path, and always runs camera exit cleanup |
+| 2026-08-21 | Initial multi-preview timing probe | PARTIAL | Two valid frames followed by frame-3 preview error under an unpaced loop; cleanup ran; harness now uses conservative 250 ms pacing and reports exact failure stage |
+| 2026-08-21 | Paced multi-preview probe | PASS | 10/10 complete in-memory JPEGs with 250 ms pacing; no retained images; explicit camera exit succeeded |
+| 2026-08-21 | Paced preview soak | PASS | 50/50 complete in-memory JPEGs with 250 ms pacing; no retained images or shutter/card operations; strengthened camera exit reported cleanup success |
+| 2026-08-21 | Exit error propagation audit | CORRECTED | Pentax exit continues vendor/session cleanup but now preserves a live-view restoration failure instead of allowing successful vendor disable to mask it |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
