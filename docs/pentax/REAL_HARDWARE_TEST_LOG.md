@@ -56,13 +56,14 @@ Camera serial data seen during discovery was not committed.
 | Instrumented Far physical observation | Operator watched the 24–70 mm lens after the `-23` reversal | Focus visibly moved farther by about the same small amount; exact equality was difficult to judge | Bounded bidirectional focus gate passes qualitatively. Do not claim calibrated displacement accuracy or enable escalation/larger steps from this result |
 | Bulb-mode full parameter enumeration | Physical dial `B`; two complete public config-tree reads under corrected single-device isolation; exact transmitted-opcode audit on snapshot 2 | Both snapshots returned 700 lines. Snapshot 2 sent zero setters, focus, or capture operations. Shutter/`0xd00f` exposed 1–600 seconds, current 300; `0xd013` narrowed from M's 12 choices/current 4 to 3 choices/current 0 | Read-only B baseline passes 2/2. Treat `0xd00f` as a B timer domain; withhold `0xd013` value labels and all writes pending display correlation; see H1.6 |
 | First ISO write and interrupted restore | Read `0xd01e=3200`; set 1600; read back; request operator display confirmation; plan exact restore to 3200 | PTP and camera display both confirmed ISO 1600. Before restore, USB node vanished and the restore container did not launch. Camera screen was black; after restart attempt operator identified a flat battery | Property identity/write/read-back passes, but reversibility gate remains open. No restore command was sent; expected retained value is 1600. Charge/replace battery, confirm, then restore 3200 before any further write or exposure |
+| H0 exact ISO restoration after charging | Operator confirmed retained ISO 1600; exclusive ownership; fresh read requiring `0xd01e=1600`; one set to advertised 3200; independent fresh-session read; operator display confirmation | All three vendor enables succeeded with flags 0. Pre-read was 1600, the sole write returned success, fresh PTP read was 3200, and the camera display showed ISO 3200. USB node was unowned after exit | Interrupted reversibility gate is closed. `0xd01e` identity and exact 3200→1600→3200 round trip pass; this does not authorize arbitrary ISO values or other setting writes |
 
 ## Pending hardware tests (not executed)
 
 The condition parser and read-only status widget were implemented while the
 camera charged. Their fixture/build results are software evidence, not entries
-in the chronological hardware table. After the ISO restore, run H0.1 from the
-development plan: two B-mode reads, exactly one `0x900f` per named widget read,
+in the chronological hardware table. Now that ISO restoration passed, run H0.1
+from the development plan: two B-mode reads, exactly one `0x900f` per named widget read,
 response length recorded, no setter/focus/preview/capture/transfer/delete/reset,
 and operator correlation limited to ISO and visible Bulb-timer state/value.
 

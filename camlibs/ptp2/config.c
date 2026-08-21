@@ -9392,6 +9392,7 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 		free (data);
 		return translate_ptp_result (ret);
 	}
+	GP_LOG_D ("Pentax conditions response: %u bytes", size);
 	parse_ret = pentax_parse_conditions (data, size, &conditions);
 	free (data);
 	if (parse_ret < GP_OK)

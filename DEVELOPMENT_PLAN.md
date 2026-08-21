@@ -60,6 +60,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Bounded bidirectional focus | PASS (QUALITATIVE) | `+23` moved nearer and `-23` moved farther by approximately the same small amount; both returned `0x2001`, zero retries, clean exits; no calibrated-distance or larger-step claim |
 | 2026-08-21 | Bulb-mode full config snapshots | READ-ONLY PASS (2/2) | Both returned 700 lines; exact audit sent zero setters/focus/capture; `0xd00f` becomes a 1–600 s timer domain (current 300), while `0xd013` narrows to 3 choices/current 0; see H1.6 |
 | 2026-08-21 | B-mode ISO 3200→1600→restore | INTERRUPTED BEFORE RESTORE | PTP read-back and camera display confirmed `0xd01e` is ISO and changed to 1600; camera then lost USB/power with a flat battery before restore container launch, so no 3200 restore was sent; restore is the next mandatory action after charging |
+| 2026-08-21 | H0 interrupted ISO restoration | PASS | After charging, display and a guarded PTP read confirmed retained 1600; exactly one write restored advertised value 3200; a fresh PTP session and operator display confirmation both reported 3200; USB ownership was released cleanly |
 | 2026-08-21 | B/Astro condition parser and read-only status | OFFLINE PASS / HARDWARE PENDING | Bounded `0x900f` parser covers activity, raw modes, ISO, Bulb timer, Astro phase/errors/limit, and changeability flags; 508/532-byte boundary fixtures and ptp2 build pass; one status widget performs one read and no write |
 
 Current implementation work does not satisfy the definition of done until the
@@ -68,17 +69,15 @@ not guessed without real `GetDevicePropDesc` evidence.
 
 ## Current hard stop
 
-The camera powered down before the verified ISO change from 3200 to 1600 could
-be restored. After charging, the first and only permitted write is therefore an
-exact restore to 3200, followed by PTP read-back and operator display
-confirmation. Until that closes:
+The interrupted ISO restoration is closed: the original 3200 value was restored
+and confirmed through both a fresh PTP read and the camera display. The next
+hardware task is H0.1's read-only condition snapshot. Until that closes:
 
 - do not write another setting, drive focus, start preview, release the shutter,
   capture, transfer, delete, reset USB, or run a Polaris camera test;
 - a fresh failed `0x9001` session remains fail-closed: send no later Pentax
   opcode and do not retry in place;
-- do not claim configuration-write reversibility, reconnect stability, capture,
-  transfer, or Astro exposure support.
+- do not claim reconnect stability, capture, transfer, or Astro exposure support.
 
 The earlier `0x2002` diagnosis was partly confounded by incomplete container
 isolation. Controlled clean starts subsequently passed 3/3, but the plan's
@@ -101,8 +100,8 @@ missing exit criterion and must not begin a later card.
    vendor disable/session cleanup. On any mismatch or non-OK response, stop.
 6. Update H1.6, the real-hardware log, and this ledger in the same commit.
 
-Exit: PTP and display both show 3200 and cleanup succeeds. No later hardware
-card may start before this exit is recorded.
+Exit: **PASS 2026-08-21.** PTP and display both showed 3200 and cleanup
+succeeded. See H1.6 and the real-hardware log.
 
 #### H0.1 — Validate the condition snapshot without exposure
 

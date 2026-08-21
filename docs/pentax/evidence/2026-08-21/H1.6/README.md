@@ -45,8 +45,12 @@ container never launched because the old USB node no longer existed, so no
 restore command was transmitted. After a restart attempt the operator reported
 the battery was flat.
 
-This is an **INTERRUPTED RESTORE**, not a completed reversible-write pass and
-not evidence that the driver caused the power loss. The camera is expected to
-retain ISO 1600. After charging/replacing the battery, confirm the displayed
-value, restore the recorded original 3200, and verify both PTP and display
-before any other write or exposure test.
+This was an **INTERRUPTED RESTORE**, not evidence that the driver caused the
+power loss. After charging, the operator confirmed retained ISO 1600. Under
+exclusive ownership and corrected dual container isolation, a fresh read also
+returned `0xd01e=1600`. Exactly one property write restored advertised value
+3200. A separate fresh session read `0xd01e=3200`, the operator confirmed ISO
+3200 on the display, and the USB node was unowned after exit. All three vendor
+enables reported function flags 0. No focus, preview, capture, transfer, delete,
+reset, or other property write was issued. The restoration obligation is
+closed; this validates only the observed 3200→1600→3200 round trip.
