@@ -36,14 +36,14 @@ does not mean camera-verified.
 | Capability | K-3 III | K-1 II | Current evidence | Hardware acceptance gate |
 |---|---|---|---|---|
 | Generic PTP files | Existing | Existing | Existing ptp2 path compiles | enumerate/download/hash |
-| Vendor lifecycle | Implemented | Implemented | exact identity and response guards tested | enable, disable, reconnect |
-| Live-view JPEG | Implemented | Implemented | bounded parser and restore paths compile | 500 frames, stop, reconnect |
-| Capture/download | Implemented | Implemented | fault-injected transfer grammar passes sanitizers | JPEG and RAW hash checks |
+| Vendor lifecycle | Conditional warm-session pass; cold restart fails | Implemented, hardware blocked | exact identity and response guards tested; K-3 III cold restart returns `0x2002` | resolve ordering/state, then enable, disable, cold reconnect |
+| Live-view JPEG | 50-frame bounded warm-session pass | Implemented, hardware blocked | bounded parser and restore paths compile | first pass cold lifecycle, then 500 frames, stop, reconnect |
+| Capture/download | Research code; hardware blocked | Research code; hardware blocked | fault-injected transfer grammar passes sanitizers; opcodes unverified on camera | suppress capability until JPEG and RAW hash checks pass |
 | Cancellation/timeout | Implemented | Implemented | callback fault tests pass | cancel at each phase, reconnect |
-| ISO | Generic descriptor path | Generic descriptor path | `0x500f`, `UINT16` | read and round-trip supported value |
+| ISO | Absent in observed vendor descriptor set | Generic descriptor path | `0x500f` absent on K-3 III firmware 2.20 | identify correct property before any write |
 | Aperture | Generic descriptor path | Generic descriptor path | `0x5007`, `UINT16` | read and round-trip supported value |
 | White balance | Generic descriptor path | Generic descriptor path | `0x5005`, `UINT16` | read and round-trip supported value |
-| Focus mode | Generic descriptor path | Generic descriptor path | `0x500a`, `UINT16` | read and round-trip supported value |
+| Focus mode | Absent in observed vendor descriptor set | Generic descriptor path | `0x500a` absent on K-3 III firmware 2.20 | identify correct property before any write |
 | Exposure compensation | Generic descriptor path | Generic descriptor path | `0x5010`, `INT16` | read and round-trip supported value |
 | Shutter speed | Existing Pentax/Ricoh path | Existing Pentax/Ricoh path | `0xd00f`, `UINT64` | descriptor/type/value round-trip |
 | Polaris packaging | Source path implemented | Source path implemented | provenance, safety, ARM loader builds | FwPkt QEMU/repack/install/revert |
