@@ -18,6 +18,116 @@ pentax_get_u32le (const unsigned char *data)
 	       ((uint32_t)data[3] << 24);
 }
 
+static uint16_t
+pentax_get_u16le (const unsigned char *data)
+{
+	return (uint16_t)(data[0] | ((uint16_t)data[1] << 8));
+}
+
+int
+pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
+		PentaxLiveViewGeometry *geometry)
+{
+	PentaxLiveViewGeometry parsed;
+
+	if (!data || !geometry)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (size < 20)
+		return GP_ERROR_CORRUPTED_DATA;
+	parsed.area_width = pentax_get_u16le (data + 4);
+	parsed.area_height = pentax_get_u16le (data + 6);
+	parsed.active_width = pentax_get_u16le (data + 8);
+	parsed.active_height = pentax_get_u16le (data + 10);
+	parsed.contrast_af_active_width = pentax_get_u16le (data + 12);
+	parsed.contrast_af_active_height = pentax_get_u16le (data + 14);
+	parsed.contrast_af_spot_width = pentax_get_u16le (data + 16);
+	parsed.contrast_af_spot_height = pentax_get_u16le (data + 18);
+	if (!parsed.area_width || !parsed.area_height ||
+	    (parsed.active_width > parsed.area_width) ||
+	    (parsed.active_height > parsed.area_height) ||
+	    (parsed.contrast_af_active_width > parsed.area_width) ||
+	    (parsed.contrast_af_active_height > parsed.area_height) ||
+	    (parsed.contrast_af_spot_width > parsed.contrast_af_active_width) ||
+	    (parsed.contrast_af_spot_height > parsed.contrast_af_active_height))
+		return GP_ERROR_CORRUPTED_DATA;
+	*geometry = parsed;
+	return GP_OK;
+}
+
+int
+pentax_parse_live_view_af_position (const unsigned char *data, size_t size,
+		const PentaxLiveViewGeometry *geometry, uint16_t *x, uint16_t *y)
+{
+	uint16_t parsed_x, parsed_y;
+
+	if (!data || !geometry || !x || !y)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (size == 4) {
+		parsed_x = geometry->area_width / 2;
+		parsed_y = geometry->area_height / 2;
+	} else if (size >= 8) {
+		parsed_x = pentax_get_u16le (data + 4);
+		parsed_y = pentax_get_u16le (data + 6);
+	} else {
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	if ((parsed_x >= geometry->area_width) ||
+	    (parsed_y >= geometry->area_height))
+		return GP_ERROR_CORRUPTED_DATA;
+	*x = parsed_x;
+	*y = parsed_y;
+	return GP_OK;
+}
+
+int
+pentax_encode_live_view_af_position (uint16_t x, uint16_t y,
+		unsigned char data[8])
+{
+	if (!data)
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (data, 0, 8);
+	data[0] = 2;
+	data[4] = (unsigned char)x;
+	data[5] = (unsigned char)(x >> 8);
+	data[6] = (unsigned char)y;
+	data[7] = (unsigned char)(y >> 8);
+	return GP_OK;
+}
+
+int
+pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
+		uint8_t magnification, unsigned char data[12])
+{
+	if (!data || !magnification)
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (data, 0, 12);
+	data[0] = 4;
+	data[4] = (unsigned char)x;
+	data[5] = (unsigned char)(x >> 8);
+	data[6] = (unsigned char)y;
+	data[7] = (unsigned char)(y >> 8);
+	data[8] = magnification;
+	return GP_OK;
+}
+
+int
+pentax_live_view_stop_response_ok (uint16_t response)
+{
+	return (response == 0x2001) || (response == 0xa005);
+}
+
+int
+pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
+		uint8_t *fallback)
+{
+	if (!fallback)
+		return GP_ERROR_BAD_PARAMETERS;
+	if ((requested != 16) || (response != 0x201c))
+		return 0;
+	*fallback = 10;
+	return 1;
+}
+
 int
 pentax_parse_conditions (const unsigned char *data, size_t size,
 		PentaxConditions *conditions)
