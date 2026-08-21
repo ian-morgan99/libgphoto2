@@ -84,6 +84,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 | 2026-08-21 | H1.18 K-1 II proportional cold gate | PASS 2/2 | Operator reduced the manual target after warm 10/10 and extensive fresh sessions; both cycles proved absence, fresh enumeration, normal readiness, flags 3, stable conditions, clean exit, and USB release |
 | 2026-08-21 | H1.18 K-1 II direct ISO write | ACKNOWLEDGED BUT NOT APPLIED | `0xd01e` advertised 200→400 and raw conditions flags `0x0f` included Sv-changeable, but verified setter failed because camera retained 200; fresh read confirmed original, so no restore was required. Diagnose common exposure-write prerequisite before aperture/WB/Xv writes |
 | 2026-08-21 | IT2 exposure-setting source trace | SOURCE COMPLETE / DIFFERENTIAL ISOLATED | Exact UI→list→BitConverter→`0x1016` WPD path matches our codes, widths, byte order, and PTP phases; IT2 ignores exposure setter response codes and relies on later conditions polling. Long-lived 100 ms polling/session behavior is the next bounded differential; WPD traffic capture follows only if that fails |
+| 2026-08-21 | H1.19 source-faithful ISO and shutter | HW-W PASS / RESTORED | Long-lived 100 ms conditions verification proved ISO 200→400→200 and shutter 1/500→1/125→1/500; cleanup and independent fresh reads passed. Earlier failure was stale descriptor/immediate-exit verification, not wrong wire mapping |
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
 | 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
 | 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
@@ -103,10 +104,9 @@ This list supersedes completed task narratives later in the document.
    slices work; it is release evidence, not the next discovery action.
 3. Resume K-1 II `0x9016` minimum Near/equal Far only after preview recovery and
    lifecycle gates; never use IT2's focus escalation.
-4. Implement the one-session, source-faithful 100 ms conditions/persistence ISO
-   harness specified in `IMAGE_TRANSMITTER_SETTING_PATH.md`; compile and fault-
-   test restoration before one hardware run. Do not proceed to aperture/WB/Xv.
-   If it fails, obtain an official IT2 USB trace rather than guessing opcodes.
+4. Apply the proven live-conditions verification pattern separately to aperture
+   and exposure compensation, with exact restoration harnesses. White balance
+   remains later because its raw labels are not fully correlated.
 5. Capture/transfer, Bulb, Astro and Polaris integration remain later blocked
    tiers. Default public capture/preview abilities stay disabled.
 

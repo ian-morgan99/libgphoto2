@@ -64,6 +64,24 @@ executable(
 )
 
 executable(
+  'pentax-safe-iso-roundtrip',
+  'pentax-safe-iso-roundtrip.c',
+  'samples.h',
+  'autodetect.c',
+  'context.c',
+  dependencies: libgphoto2_dep,
+)
+
+executable(
+  'pentax-safe-shutter-roundtrip',
+  'pentax-safe-shutter-roundtrip.c',
+  'samples.h',
+  'autodetect.c',
+  'context.c',
+  dependencies: libgphoto2_dep,
+)
+
+executable(
   'pentax-safe-focus',
   'pentax-safe-focus.c',
   'samples.h',
