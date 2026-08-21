@@ -3,6 +3,7 @@
 Status: **INITIAL READ-ONLY PASS**
 
 Camera: PENTAX K-1 Mark II in PC-P USB mode. Serial data is omitted.
+Firmware: 1.02, returned by a separate read-only device-version query.
 
 ## Passive identity
 
@@ -44,6 +45,9 @@ operation was issued. After each session the USB node was unowned.
 This proves initial identity, lifecycle, response length compatibility, and one
 idle status parse only. It does not validate repeated cold/warm lifecycle,
 visible setting correlations, live view, focus, Bulb/Astro behavior, capture,
-transfer, or any writable property. Before another K-1 II probe, record the
-physical mode dial and visible ISO, then repeat this status read once for
-correlation without changing a setting.
+transfer, or any writable property. The operator reported that the K-1 II does
+not display its settings while connected in PC-P mode, so ISO 200 and the raw
+mode values above are transport observations, not visual correlations. A later
+correlation procedure must record settings before connection, reconnect without
+changing them, read once, disconnect cleanly, and verify the same settings after
+the camera returns to its normal display.

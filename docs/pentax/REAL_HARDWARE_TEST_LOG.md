@@ -8,7 +8,7 @@ Camera: PENTAX K-3 Mark III, firmware 2.20. Test date: 2026-08-21. The camera
 serial number and all image content are deliberately omitted. Unless explicitly
 stated otherwise, tests used the colour K-3 Mark III in MTP mode over USB.
 The K-1 Mark II H1.7 rows explicitly identify the second body and used its PC-P
-USB mode; its firmware version was not yet recorded.
+USB mode; its firmware version is 1.02.
 
 ## Non-destructive test policy
 
@@ -62,6 +62,7 @@ Camera serial data seen during discovery was not committed.
 | K-1 II passive PC-P identity | USB/udev descriptor reads and ownership check only | `25fb:0183`, Imaging/PTP `06/01/01`, exact USB product string; no node owner | First hardware confirmation of the K-1 II identifier; only ptp2 claims the model |
 | K-1 II guarded model read | Exact-model init, vendor enable, read-only camera-model widget, exit | Enable succeeded with function flags `0x00000003`; exact model returned; USB released | Initial K-1 II lifecycle pass; flags differ from K-3 III and remain model-specific evidence |
 | K-1 II condition snapshot | Separate exact-model session; one read-only `status/pentaxconditions` widget | 568-byte response parsed: state 0, exposure mode raw 21, drive raw 4, ISO 200, `openAvNum=14`, no active Bulb/Astro/error flags; USB released | Layout is compatible through optional offset 528; no setting semantics beyond reported/raw values are claimed; see H1.7 |
+| K-1 II version/display limitation | Separate read-only device-version query; operator observation of camera UI | Firmware 1.02; vendor flags again `0x00000003`; PC-P mode does not show settings on the camera display; USB released | ISO/mode values from PC-P cannot be called visually correlated; use a pre-connect/read/disconnect/post-check procedure later |
 
 ## Pending hardware tests (not executed)
 
