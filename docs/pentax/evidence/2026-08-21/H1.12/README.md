@@ -23,9 +23,14 @@ the `0xd009` read, `0xd035=1`, `0x9006`, `0xd035=0`, and vendor-disable results,
 this attempt does **not** prove which substage failed or independently prove the
 PC-live-view restoration response.
 
-Status: **INCONCLUSIVE / FAIL-CLOSED / INSTRUMENTATION REQUIRED**. Before another preview
+An operator-requested retest was then performed with a memory card installed.
+After gracefully releasing the desktop GVFS camera claim, the same exact-model
+one-frame harness ran directly from the already-built artifacts. Vendor enable
+again succeeded with flags `0x00000003`, and the composite preview path again
+returned `GP_ERROR_IO` before a JPEG. No retry followed. The USB node was
+released. This rules out card absence as the sole cause.
+
+Status: **REPRODUCIBLE FAIL-CLOSED / INSTRUMENTATION REQUIRED**. Before another preview
 attempt, add stage-specific raw response logging and an exit report that
 preserves the primary failure while listing every restoration/cleanup result.
 Then rerun exactly one frame; do not advance to 10 frames until it passes.
-Record the inserted card and available capacity in that retry, without writing
-to it.
