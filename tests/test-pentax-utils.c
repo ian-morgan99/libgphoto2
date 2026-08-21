@@ -140,6 +140,14 @@ main (void)
 	malformed[4] = 0xe9;
 	CHECK (pentax_candidate_filename (malformed, sizeof (malformed), name,
 		sizeof (name)) == GP_ERROR_CORRUPTED_DATA);
+	{
+		const unsigned char dot[] = {1, 2, 3, 1, '.', 0};
+		const unsigned char dotdot[] = {1, 2, 3, 2, '.', 0, '.', 0};
+		CHECK (pentax_candidate_filename (dot, sizeof (dot), name,
+			sizeof (name)) == GP_ERROR_CORRUPTED_DATA);
+		CHECK (pentax_candidate_filename (dotdot, sizeof (dotdot), name,
+			sizeof (name)) == GP_ERROR_CORRUPTED_DATA);
+	}
 
 	CHECK (pentax_capture_buffer_write (&buffer, first, sizeof (first)) == GP_OK);
 	CHECK ((buffer.size == 4) && (buffer.offset == 4));

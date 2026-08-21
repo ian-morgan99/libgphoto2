@@ -23,6 +23,7 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Transfer state machine fault injection | PASS | Callback-driven command/block machine; sequencing, seeks, multi-block, malformed, transport, cancel, timeout, and ownership paths pass ASan/UBSan |
 | 2026-08-21 | P6 configuration-path audit | DOCUMENTED | Six required settings already have descriptor-gated ptp2 handlers; vendor structures withheld pending real descriptors; see `docs/pentax/PENTAX_CONFIGURATION.md` |
 | 2026-08-21 | B2 runtime-shim policy audit | PARTIAL PASS | Polaris R5-II storage/capturetarget shims now require an exact R5 II abilities model and fail closed for Pentax/unknown cameras; native and ARM policy tests PASS; full loader/QEMU/repack remain BLOCKED without FwPkt |
+| 2026-08-21 | Candidate filename security audit | PASS | UTF-16 parser rejects separators, non-ASCII/control input, empty names, overflow, and reserved `.`/`..` path components; regression fixtures pass sanitizers |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

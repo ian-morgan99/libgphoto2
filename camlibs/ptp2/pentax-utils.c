@@ -140,6 +140,8 @@ pentax_candidate_filename (const unsigned char *data, uint32_t size,
 	if (!output)
 		return GP_ERROR_CORRUPTED_DATA;
 	filename[output] = '\0';
+	if (!strcmp (filename, ".") || !strcmp (filename, ".."))
+		return GP_ERROR_CORRUPTED_DATA;
 	return GP_OK;
 }
 

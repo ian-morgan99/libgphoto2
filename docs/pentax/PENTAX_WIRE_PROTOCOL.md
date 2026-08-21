@@ -87,7 +87,8 @@ The new candidate-transfer path uses `0x900e`; `ReceivedCreatedObject` (`0x9003`
 with an object handle belongs to the client's older standard-GetObject path.
 The command grammar and finalization ordering are Observed-client. Timeouts,
 strict length checks, a 2 GiB file cap, a command-count cap, cancellation, seek
-bounds, and filename path rejection are defensive host policy.
+bounds, and filename path rejection (separators plus reserved `.`/`..`
+components) are defensive host policy.
 
 ### Host state and error transitions
 
