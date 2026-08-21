@@ -47,6 +47,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Controlled warm reconnect shutter read | PASS (3/3) | Three independent powered-on sessions each performed one enable, one `0xd00f` descriptor read, one disable, and clean exit; current value remained 1 second; larger lifecycle gates remain open |
 | 2026-08-21 | IMAGE Transmitter wake-up audit | NO WAKE COMMAND FOUND | Client opens WPD and immediately sends `0x9001`; post-connect `0x900f` polling maintains a live session; `0x9002` is explicit shutdown only; USB trace still required to reveal WPD-managed session traffic |
 | 2026-08-21 | Manual-mode full config snapshots | READ-ONLY PASS | Three 777-line trees were byte-identical after serial/clock/battery normalization; zero setter opcodes; stable decoded and raw vendor-property baseline recorded in H1.4 |
+| 2026-08-21 | First bounded K-3 III focus drive | INCONCLUSIVE / STOPPED | Source-derived minimum Near action made no retries but returned `GP_ERROR_IO`; Far was correctly withheld; add stage-specific raw response logging and record AF/MF plus observed movement before another probe |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

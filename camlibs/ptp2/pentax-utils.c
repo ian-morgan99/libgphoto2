@@ -19,6 +19,22 @@ pentax_get_u32le (const unsigned char *data)
 }
 
 int
+pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
+		int32_t *displacement)
+{
+	uint64_t magnitude;
+
+	if (!displacement || ((direction != -1) && (direction != 1)))
+		return GP_ERROR_BAD_PARAMETERS;
+	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0). */
+	magnitude = ((uint64_t)open_av_num * 5U) / 6U;
+	if (!magnitude || (magnitude > INT32_MAX))
+		return GP_ERROR_CORRUPTED_DATA;
+	*displacement = direction > 0 ? (int32_t)magnitude : -(int32_t)magnitude;
+	return GP_OK;
+}
+
+int
 pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		const char *device_model, uint32_t *model_no, uint32_t *extension_version)
 {

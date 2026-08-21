@@ -87,6 +87,25 @@ value before changing it. It restores that exact value after a frame transport
 error, an invalid JPEG frame, or session exit. A failed restoration remains
 pending so exit can retry it before vendor mode is disabled.
 
+## Focus drive
+
+IMAGE Transmitter 2 explicitly selects its new focus-fine-control path for the
+K-3 Mark III. It reads little-endian `openAvNum` from byte offset 328 of a
+`GetAllConditions` (`0x900f`) response and calculates the first displacement as
+`(int)(-(openAvNum * 2.5 / 3.0) * requestedDirection)`. The Far UI button uses
+requested direction `+1`, producing a negative displacement; Near uses `-1`,
+producing a positive displacement. Opcode `0x9017` then carries that signed
+displacement in one UINT32 command parameter. The older two-parameter `0x9016`
+path is not the K-3 III path.
+
+The official client retries response `0xa00c` up to ten times and multiplies
+the displacement by `sqrt(2)` after each failure. Libgphoto2 deliberately does
+not reproduce that escalation: each public action makes a fresh status read,
+requires at least 332 bytes and a non-zero bounded displacement, sends exactly
+one `0x9017`, and returns the first response. The first hardware probe returned
+a translated I/O error without stage-specific logging, so neither offset 328
+nor physical focus movement is hardware-validated yet.
+
 ## Still capture and transfer
 
 Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
