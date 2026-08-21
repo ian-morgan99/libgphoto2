@@ -50,6 +50,29 @@ with fewer than two parameters. This is Inferred-client and must be verified by
 a handshake trace. Disable is sent during clean exit even if another cleanup
 step fails.
 
+### Power-on readiness and wake-up audit
+
+The decompiled IMAGE Transmitter connection path contains no explicit wake-up
+operation. `Connect()` calls the Windows portable-device `Open`, immediately
+sets vendor mode with `0x9001`, then reads DeviceInfo, storage IDs, and
+`GetAllConditions`. It has no connection delay, retry loop, standard PTP
+`PowerDown`/`ResetDevice` call, Pentax shutdown call, or other command before
+`0x9001`. Windows WPD may still perform implicit session traffic, so only a USB
+trace can establish the exact on-wire sequence.
+
+After connection, IMAGE Transmitter polls `GetAllConditions` every 100 ms. This
+can keep an already running session active, but it is not evidence of a command
+that can wake a powered-off or non-enumerated camera. Pentax opcode `0x9002` is
+named and used as camera shutdown; it is called only from the application's
+explicit camera-shutdown UI path and must not be used for recovery.
+
+Current evidence supports a host readiness policy rather than a wake command:
+wait for USB enumeration, exclusive ownership, and a settled camera shooting
+screen before one vendor-enable attempt. A powered-off camera has no USB/PTP
+transport on which a wake command could be delivered. USB remote wakeup, if the
+device implements it while suspended, is a USB power-management mechanism and
+is not established by this application code.
+
 ## Live view
 
 The client writes UINT8 value 1 to device property `0xd035`, then repeatedly
