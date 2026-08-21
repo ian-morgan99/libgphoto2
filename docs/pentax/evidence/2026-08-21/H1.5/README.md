@@ -45,11 +45,16 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
    compiled `0x900f`/`0x9017` error messages appeared. This indicates the error
    occurred before those instrumented calls, but the first harness version did
    not label camera-init versus action-widget retrieval.
+6. The operator confirmed there was no audible lens movement during the second
+   attempt.
+7. The final stage-labelled Near diagnostic returned `GP_ERROR_IO` at
+   `camera-init`. The harness therefore never retrieved the focus action and
+   never entered the instrumented `0x900f`/`0x9017` setter. No Far command was
+   sent and the focus sequence was closed.
 
-Status: **INCONCLUSIVE / STOPPED**. The initial build reported only the
-translated error and therefore cannot identify whether `0x900f` or `0x9017`
-failed. Operator observation establishes no physical movement for the first
-run; the second observation remains pending. The next build labels every host
-stage from explicit camera open through the one-command setter. Do not make a
-third attempt until the second movement observation is recorded and the newly
-labelled harness is compiled.
+Status: **BLOCKED AT SESSION INITIALIZATION / STOPPED**. The stage-labelled
+result establishes that the current failure precedes the focus action; it is
+not a hardware rejection of `0x9017` or validation of offset 328. Operator
+observation establishes no physical movement in the first two attempts. Focus
+testing must not resume until lifecycle/recovery investigation restores a
+successful fresh initialization.
