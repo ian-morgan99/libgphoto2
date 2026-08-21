@@ -4490,6 +4490,8 @@ uint16_t ptp_pentax_camera_shutdown (PTPParams *params);
 uint16_t ptp_pentax_received_created_object (PTPParams *params, uint32_t handle);
 uint16_t ptp_pentax_get_live_view_frame (PTPParams *params,
 	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_device_prop_raw (PTPParams *params, uint16_t propcode,
+	unsigned char **data, unsigned int *size);
 uint16_t ptp_pentax_get_sub_image (PTPParams *params, uint32_t handle,
 	unsigned char **data, unsigned int *size);
 uint16_t ptp_pentax_get_main_image (PTPParams *params, uint32_t handle,

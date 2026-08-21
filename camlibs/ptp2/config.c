@@ -9779,6 +9779,74 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 }
 
 static int
+_get_Pentax_LiveViewControls (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxLiveViewGeometry geometry;
+	unsigned char *data = NULL;
+	unsigned int size, position_size;
+	uint16_t x, y, ret;
+	char value[256];
+	uint8_t zoom;
+	int parse_ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAreaInfo, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	parse_ret = pentax_parse_live_view_geometry (data, size, &geometry);
+	free (data);
+	data = NULL;
+	if (parse_ret < GP_OK)
+		return parse_ret;
+
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAFPosition, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	position_size = size;
+	parse_ret = pentax_parse_live_view_af_position (data, size, &geometry,
+		&x, &y);
+	free (data);
+	data = NULL;
+	if (parse_ret < GP_OK)
+		return parse_ret;
+
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewZoom, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 9) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	zoom = data[8];
+	free (data);
+
+	snprintf (value, sizeof (value),
+		"area=%ux%u; active=%ux%u; caf-active=%ux%u; caf-spot=%ux%u; "
+		"af-position=%u,%u; af-response-bytes=%u; zoom-raw=%u",
+		geometry.area_width, geometry.area_height,
+		geometry.active_width, geometry.active_height,
+		geometry.contrast_af_active_width,
+		geometry.contrast_af_active_height,
+		geometry.contrast_af_spot_width,
+		geometry.contrast_af_spot_height, x, y, position_size, zoom);
+	gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, value);
+	return GP_OK;
+}
+
+static int
 _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
@@ -11969,6 +12037,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Device Version"),         "deviceversion",    0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_DeviceVersion_STR,     _put_None },
 	{ N_("Vendor Extension"),       "vendorextension",  0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_VendorExtension_STR,   _put_None },
 	{ N_("Pentax Conditions"),       "pentaxconditions", 0,  PTP_VENDOR_PENTAX, PTP_OC_PENTAX_GetAllConditions, _get_Pentax_Conditions, _put_None },
+	{ N_("Pentax Live View Controls"), "pentaxliveviewcontrols", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewControls, _put_None },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },

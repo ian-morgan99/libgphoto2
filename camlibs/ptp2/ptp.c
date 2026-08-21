@@ -1995,6 +1995,20 @@ ptp_pentax_get_live_view_frame (PTPParams *params, unsigned char **data,
 }
 
 uint16_t
+ptp_pentax_get_device_prop_raw (PTPParams *params, uint16_t propcode,
+		unsigned char **data, unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!data || !size)
+		return PTP_ERROR_BADPARAM;
+	*data = NULL;
+	*size = 0;
+	PTP_CNT_INIT (ptp, PTP_OC_GetDevicePropValue, propcode);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
 ptp_pentax_get_sub_image (PTPParams *params, uint32_t handle,
 	unsigned char **data, unsigned int *size)
 {
