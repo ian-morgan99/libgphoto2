@@ -14,7 +14,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | M0 repository, tool, and camera inventory | PARTIAL | Repository/tool inventory PASS; target hardware BLOCKED; see `docs/pentax/evidence/2026-08-21/M0.1/` |
 | 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Passive USB and limited warm-session observations exist; official-client handshake trace and capture/transfer traces remain BLOCKED |
 | 2026-08-21 | P2 wrappers and guarded session state | PARTIAL HARDWARE PASS | `0x9001` and `0x9006` have bounded warm-session evidence; all capture/transfer and dormant wrappers remain hardware-blocked |
-| 2026-08-21 | P3 vendor lifecycle | INTERMITTENT / BLOCKED | Warm-state and one controlled cold-start enable/refresh/disable passed, but two earlier fresh sessions after a power cycle returned `0x2002`; differing precondition and repeatability remain unknown |
+| 2026-08-21 | P3 vendor lifecycle | CONTROLLED CHECKPOINT PASS / BLOCKED | Warm-state and 3/3 explicitly ready cold starts passed; two earlier less-controlled restarts returned `0x2002`; exact readiness prerequisite and the 10+10/50-cycle gates remain open |
 | 2026-08-21 | P4 preview path | PARTIAL HARDWARE PASS | A 50-frame paced warm-session soak passed with cleanup; cold-start lifecycle and 500-frame gates remain |
 | 2026-08-21 | P5 capture and transfer state machine | COMPILE PASS | JPEG/RAW/cancel camera gate BLOCKED |
 | 2026-08-21 | Obsolete `pentaxmodern` prototype | ARCHIVED | Removed stale build registrations; source retained under workspace `archive/obsolete-source/` and in Git history |
@@ -43,7 +43,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Paced preview soak | PASS | 50/50 complete in-memory JPEGs with 250 ms pacing; no retained images or shutter/card operations; strengthened camera exit reported cleanup success |
 | 2026-08-21 | Exit error propagation audit | CORRECTED | Pentax exit continues vendor/session cleanup but now preserves a live-view restoration failure instead of allowing successful vendor disable to mask it |
 | 2026-08-21 | First cold-restart config read | FAIL-CLOSED | Camera returned `0x2002` to vendor enable after power cycle; driver sent no later Pentax opcode and exposed generic MTP only; restart-state requirement remains unknown |
-| 2026-08-21 | Controlled clean-start shutter read | PASS (2/2) | Both first enables succeeded with flags 0; read-only `0x1014` descriptor for `0xd00f` reported current 1 second and 55 choices; both disable/exits succeeded; initial 3/3 checkpoint remains open |
+| 2026-08-21 | Controlled clean-start shutter read | PASS (3/3) | All first enables succeeded with flags 0; read-only `0x1014` descriptor for `0xd00f` reported current 1 second and 55 choices; all disable/exits succeeded; exact readiness prerequisite and larger lifecycle gates remain open |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
