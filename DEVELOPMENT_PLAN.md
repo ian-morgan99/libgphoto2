@@ -50,6 +50,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | First bounded K-3 III focus drive | INCONCLUSIVE / STOPPED | Source-derived minimum Near action made no retries but returned `GP_ERROR_IO`; Far was correctly withheld; add stage-specific raw response logging and record AF/MF plus observed movement before another probe |
 | 2026-08-21 | Second bounded Near diagnostic | INCONCLUSIVE / STOPPED | Repeated `GP_ERROR_IO` before the instrumented `0x900f`/`0x9017` calls; Far withheld; harness now labels init, action retrieval, and setter stages before any third attempt |
 | 2026-08-21 | Final stage-labelled focus diagnostic | BLOCKED AT INIT | Failed at `camera-init` before action retrieval or the focus setter; no `0x900f`/`0x9017` focus-path evidence and no Far command; resume lifecycle/recovery diagnosis before focus work |
+| 2026-08-21 | Init-only check after clean power cycle | FAIL / STOPPED | Camera fully disappeared and re-enumerated at a new address after normal-screen readiness, but exact-model init-only harness still returned `GP_ERROR_IO`; instrument initialization substages/raw responses before more hardware commands |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

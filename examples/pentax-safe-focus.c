@@ -22,8 +22,9 @@ main (int argc, char **argv)
 	int initialized = 0, enabled = 1;
 	int result = GP_OK, exit_result;
 
-	if ((argc != 3) || (strcmp (argv[2], "near") && strcmp (argv[2], "far"))) {
-		fprintf (stderr, "usage: %s usb:BUS,DEVICE near|far\n", argv[0]);
+	if ((argc != 3) || (strcmp (argv[2], "init") &&
+	    strcmp (argv[2], "near") && strcmp (argv[2], "far"))) {
+		fprintf (stderr, "usage: %s usb:BUS,DEVICE init|near|far\n", argv[0]);
 		return 2;
 	}
 	action = !strcmp (argv[2], "near") ?
@@ -40,6 +41,10 @@ main (int argc, char **argv)
 	if (result < GP_OK)
 		goto out;
 	initialized = 1;
+	if (!strcmp (argv[2], "init")) {
+		stage = "init-only-complete";
+		goto out;
+	}
 	stage = "get-focus-action";
 	result = gp_camera_get_single_config (camera, action, &widget, context);
 	if (result < GP_OK)

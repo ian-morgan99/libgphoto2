@@ -51,6 +51,12 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
    `camera-init`. The harness therefore never retrieved the focus action and
    never entered the instrumented `0x900f`/`0x9017` setter. No Far command was
    sent and the focus sequence was closed.
+8. The camera was powered off until `25fb:0189` disappeared, with no remaining
+   MTP mount or test process. After a user-confirmed normal shooting-screen
+   restart it re-enumerated as `usb:001,011`. A newly compiled `init` mode then
+   performed only explicit camera open, initialization, and intended cleanup;
+   it again returned `GP_ERROR_IO` at `camera-init`. It never retrieved or
+   invoked a focus action.
 
 Status: **BLOCKED AT SESSION INITIALIZATION / STOPPED**. The stage-labelled
 result establishes that the current failure precedes the focus action; it is
