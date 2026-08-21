@@ -18,6 +18,7 @@ main (int argc, char **argv)
 	CameraWidget *widget = NULL;
 	GPContext *context = NULL;
 	const char *action;
+	const char *stage = "create-context";
 	int initialized = 0, enabled = 1;
 	int result = GP_OK, exit_result;
 
@@ -30,19 +31,23 @@ main (int argc, char **argv)
 	context = sample_create_context ();
 	if (!context)
 		return 1;
+	stage = "open-explicit-camera";
 	result = sample_open_camera (&camera, PENTAX_MODEL, argv[1], context);
 	if (result < GP_OK)
 		goto out;
+	stage = "camera-init";
 	result = gp_camera_init (camera, context);
 	if (result < GP_OK)
 		goto out;
 	initialized = 1;
+	stage = "get-focus-action";
 	result = gp_camera_get_single_config (camera, action, &widget, context);
 	if (result < GP_OK)
 		goto out;
 	result = gp_widget_set_value (widget, &enabled);
 	if (result < GP_OK)
 		goto out;
+	stage = "send-minimum-focus";
 	result = gp_camera_set_single_config (camera, action, widget, context);
 
 out:
@@ -57,8 +62,8 @@ out:
 		gp_camera_unref (camera);
 	gp_context_unref (context);
 	if (result < GP_OK) {
-		fprintf (stderr, "focus_%s=failed error=%s (%d) cleanup=attempted\n",
-			argv[2], gp_result_as_string (result), result);
+		fprintf (stderr, "focus_%s=failed stage=%s error=%s (%d) cleanup=attempted\n",
+			argv[2], stage, gp_result_as_string (result), result);
 		return 1;
 	}
 	printf ("focus_%s=command-accepted cleanup=ok retries=0\n", argv[2]);
