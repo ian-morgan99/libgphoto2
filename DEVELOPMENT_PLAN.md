@@ -19,6 +19,9 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Candidate-transfer finalization audit | CORRECTED | New 0x900B–0x900D path now finalizes with GETDATA 0x900E; 0x9003 retained only for legacy object path |
 | 2026-08-21 | Multi-block transfer audit | CORRECTED | Operation 3 now consumes repeated bounded 0x900D blocks before requesting the next file command |
 | 2026-08-21 | Live-view ownership audit | CORRECTED | Read and retain original 0xD035 value; restore on frame error, malformed frame, and exit; retry restoration during exit after a transient failure |
+| 2026-08-21 | B1 candidate-source provenance and safety | PARTIAL PASS | Polaris `6210741`; clean/dirty/archive/version/security preflights PASS; ARM/QEMU/repack BLOCKED without FwPkt |
+| 2026-08-21 | Transfer state machine fault injection | PASS | Callback-driven command/block machine; sequencing, seeks, multi-block, malformed, transport, cancel, timeout, and ownership paths pass ASan/UBSan |
+| 2026-08-21 | P6 configuration-path audit | DOCUMENTED | Six required settings already have descriptor-gated ptp2 handlers; vendor structures withheld pending real descriptors; see `docs/pentax/PENTAX_CONFIGURATION.md` |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

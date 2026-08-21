@@ -14,6 +14,8 @@ working-tree Pentax implementation described below.
 - still-capture completion polling and cancellable transfer state machine;
 - bounded filename, command, seek, allocation, block-size, and runtime handling;
 - candidate deletion/finalization only after successful local caching.
+- explicit per-session capture states and candidate handle, cleared on every
+  host exit path.
 
 ## Build command
 
@@ -41,6 +43,12 @@ The fixture covers little-endian decoding; valid, truncated, oversized,
 non-ASCII, and path-injection filenames; sequential, overwrite, and sparse
 writes; begin/current/end seeking; negative bounds; invalid commands; and null
 arguments.
+
+The callback-driven transfer fixture additionally injects valid multi-block and
+seek sequences, missing/repeated begin, empty completion, unknown operations,
+command failure, block failure with allocated data, zero and oversized blocks,
+immediate cancellation, and timeout. The test passes with ASan leak detection
+and UBSan, so ownership/error paths are executable rather than documentary.
 
 The model fixture also proves that only the two exact VID:PID plus DeviceInfo
 model combinations map to vendor model numbers. It rejects the Monochrome PID,
