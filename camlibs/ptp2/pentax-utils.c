@@ -1,0 +1,119 @@
+#include "config.h"
+
+#include <stdlib.h>
+#include <string.h>
+
+#include <gphoto2/gphoto2-result.h>
+
+#include "pentax-utils.h"
+
+#define PENTAX_CAPTURE_MAX_FILE_SIZE ((size_t)2U * 1024U * 1024U * 1024U)
+
+uint32_t
+pentax_get_u32le (const unsigned char *data)
+{
+	return ((uint32_t)data[0]) |
+	       ((uint32_t)data[1] << 8) |
+	       ((uint32_t)data[2] << 16) |
+	       ((uint32_t)data[3] << 24);
+}
+
+static int
+pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
+{
+	size_t capacity;
+	unsigned char *data;
+
+	if (required > PENTAX_CAPTURE_MAX_FILE_SIZE)
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	if (required <= buffer->capacity)
+		return GP_OK;
+	capacity = buffer->capacity ? buffer->capacity : 1024U * 1024U;
+	while (capacity < required) {
+		if (capacity > PENTAX_CAPTURE_MAX_FILE_SIZE / 2) {
+			capacity = PENTAX_CAPTURE_MAX_FILE_SIZE;
+			break;
+		}
+		capacity *= 2;
+	}
+	data = realloc (buffer->data, capacity);
+	if (!data)
+		return GP_ERROR_NO_MEMORY;
+	buffer->data = data;
+	buffer->capacity = capacity;
+	return GP_OK;
+}
+
+int
+pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
+		const unsigned char *data, size_t size)
+{
+	size_t end;
+	int ret;
+
+	if (!buffer || (!data && size))
+		return GP_ERROR_BAD_PARAMETERS;
+	if (size > PENTAX_CAPTURE_MAX_FILE_SIZE - buffer->offset)
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	end = buffer->offset + size;
+	ret = pentax_capture_buffer_reserve (buffer, end);
+	if (ret < GP_OK)
+		return ret;
+	if (buffer->offset > buffer->size)
+		memset (buffer->data + buffer->size, 0, buffer->offset - buffer->size);
+	if (size)
+		memcpy (buffer->data + buffer->offset, data, size);
+	buffer->offset = end;
+	if (end > buffer->size)
+		buffer->size = end;
+	return GP_OK;
+}
+
+int
+pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer, unsigned int operation,
+		int32_t displacement)
+{
+	int64_t base, destination;
+
+	if (!buffer)
+		return GP_ERROR_BAD_PARAMETERS;
+	switch (operation) {
+	case 4: base = 0; break;
+	case 5: base = (int64_t)buffer->offset; break;
+	case 6: base = (int64_t)buffer->size; break;
+	default: return GP_ERROR_BAD_PARAMETERS;
+	}
+	destination = base + displacement;
+	if ((destination < 0) || ((uint64_t)destination > PENTAX_CAPTURE_MAX_FILE_SIZE))
+		return GP_ERROR_BAD_PARAMETERS;
+	buffer->offset = (size_t)destination;
+	return GP_OK;
+}
+
+int
+pentax_candidate_filename (const unsigned char *data, uint32_t size,
+		char *filename, size_t filename_size)
+{
+	size_t characters, i, output = 0;
+
+	if (!data || (size < 4) || !filename || (filename_size < 2))
+		return GP_ERROR_BAD_PARAMETERS;
+	characters = data[3];
+	if ((characters > (size - 4) / 2) || !characters)
+		return GP_ERROR_CORRUPTED_DATA;
+	for (i = 0; i < characters; i++) {
+		uint16_t character = data[4 + i * 2] | ((uint16_t)data[5 + i * 2] << 8);
+		if (!character)
+			break;
+		if ((character < 0x20) || (character > 0x7e) ||
+		    (character == '/') || (character == '\\'))
+			return GP_ERROR_CORRUPTED_DATA;
+		if (output + 1 >= filename_size)
+			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+		filename[output++] = (char)character;
+	}
+	if (!output)
+		return GP_ERROR_CORRUPTED_DATA;
+	filename[output] = '\0';
+	return GP_OK;
+}
