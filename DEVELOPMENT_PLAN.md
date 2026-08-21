@@ -15,6 +15,7 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | P5 capture and transfer state machine | COMPILE PASS | JPEG/RAW/cancel camera gate BLOCKED |
 | 2026-08-21 | Obsolete `pentaxmodern` prototype | ARCHIVED | Removed stale build registrations; source retained under workspace `archive/obsolete-source/` and in Git history |
 | 2026-08-21 | Pentax parser/transfer-buffer unit tests | PASS | Fresh container compile plus `test-pentax-utils` 1/1 PASS |
+| 2026-08-21 | Autotools/source-distribution path | PASS | Removed stale invalid Makefile text; `autoreconf`, configure, and `make dist-xz` PASS; archive contains Pentax utility source |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
