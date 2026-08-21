@@ -38,9 +38,16 @@ structure with the same decoded values:
 Both public configuration snapshots contained 188 lines. After removing only
 the advancing camera clock and battery value, their SHA-256 was identically
 `aefcf1ccf4de83256f375b1942d5ea08e4bb8d0469b62a456c735d8677babdfd`.
-The body exposed only five generic device-property descriptors in this vendor
-session. It did not expose the K-3 III's richer `0xd0xx` property set, so those
-property mappings must not be assumed for the K-1 II.
+The body advertised only five generic device-property descriptors in this
+vendor session. This is not a capability boundary. Image Transmitter 2 handles
+the K-1 II explicitly as model number 78400 with vendor extension 1, dual slots,
+new transfer mode, and movie support. It directly requests descriptors that are
+not present in DeviceInfo, including shutter `0xd00f`, aperture `0x5007`, ISO
+`0xd01e`, exposure compensation `0x5010`, and focal length `0x5008`.
+
+The correct next step is therefore a complete source-derived K-1 II capability
+table followed by individually guarded direct descriptor reads. Absence from
+DeviceInfo must be recorded separately from absence of official-client support.
 
 Status: **READ-ONLY PASS (2/2)**. This correlates raw exposure mode 9 and the
 30-second Bulb-timer status with the operator-selected B mode. It does not test
