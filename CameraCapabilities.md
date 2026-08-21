@@ -35,7 +35,7 @@ does not mean camera-verified.
 
 | Capability | K-3 III | K-1 II | Current evidence | Hardware acceptance gate |
 |---|---|---|---|---|
-| Generic PTP files | Existing | Existing | Existing ptp2 path compiles | enumerate/download/hash |
+| Generic PTP files | Existing | DNG download pass | K-1 II 38,468,076-byte DNG hashed and EXIF parsed without deletion | add JPEG and repeat hashes on both bodies |
 | Vendor lifecycle | Initial 3/3 controlled cold and 3/3 warm pass; larger gates open | Initial read-only pass, flags `0x3` | exact identity/response guards; earlier poorly isolated K-3 III runs returned `0x2002` | complete per-body cold/warm gates |
 | Live-view JPEG | 50-frame bounded warm-session pass | Implemented, hardware blocked | bounded parser and restore paths compile | first pass cold lifecycle, then 500 frames, stop, reconnect |
 | Capture/download | Research code, default-disabled | Research code, default-disabled | fault-injected grammar passes sanitizers; ability and dispatch containment enforced | explicit research build only, then JPEG and RAW hash checks |
