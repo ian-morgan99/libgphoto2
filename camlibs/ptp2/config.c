@@ -9923,6 +9923,70 @@ _get_Pentax_DirectProperty (CONFIG_GET_ARGS)
 }
 
 static int
+_get_Pentax_DirectShutter (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ShutterSpeed,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _get_Ricoh_ShutterSpeed (camera, widget, menu, &desc);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPDevicePropDesc verify;
+	PTPPropValue value;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	memset (&verify, 0, sizeof (verify));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ShutterSpeed,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _put_Ricoh_ShutterSpeed (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
+			&value, PTP_DTC_UINT64);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK) {
+			ret = ptp_generic_getdevicepropdesc (params,
+				PTP_DPC_PENTAX_ShutterSpeed, &verify);
+			result = translate_ptp_result (ret);
+			if ((result == GP_OK) && (verify.CurrentValue.u64 != value.u64)) {
+				GP_LOG_E ("Pentax shutter write was acknowledged but not applied "
+					"(requested 0x%016llx, retained 0x%016llx).",
+					(unsigned long long)value.u64,
+					(unsigned long long)verify.CurrentValue.u64);
+				result = GP_ERROR;
+			}
+		}
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&verify);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
 _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
@@ -12123,6 +12187,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Drive Mode Descriptor"), "pentaxpropd013", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Focus Peaking Descriptor"), "pentaxpropd02b", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
