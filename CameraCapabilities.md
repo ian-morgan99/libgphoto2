@@ -7,9 +7,12 @@ uncertain USB IDs, and unimplemented properties; it is archived outside the
 repository in workspace
 `archive/CameraCapabilities.extracted-obsolete-20260821.md`.
 
-The canonical implementation plan is `DEVELOPMENT_PLAN.md`. Wire details are in
-`docs/pentax/PENTAX_WIRE_PROTOCOL.md`; configuration coverage is in
-`docs/pentax/PENTAX_CONFIGURATION.md`.
+The canonical implementation plan is `DEVELOPMENT_PLAN.md`. The exhaustive
+normative target is
+[`docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`](docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md).
+Wire details are in `docs/pentax/PENTAX_WIRE_PROTOCOL.md`; configuration
+coverage is in `docs/pentax/PENTAX_CONFIGURATION.md`. This summary must not
+substitute for the normative matrix.
 
 ## Guarded vendor-mode models
 

@@ -9709,6 +9709,10 @@ static int
 _get_Pentax_MinimumFocusDrive (CONFIG_GET_ARGS)
 {
 	int val = 0;
+	PTPParams *params = &camera->pl->params;
+
+	if (!pentax_model_uses_new_focus (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 
 	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
@@ -9791,6 +9795,8 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 		return GP_OK;
 	}
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_uses_new_focus (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_name (widget, &name));
 	if (!strcmp (name, "manualfocusdrivenear"))

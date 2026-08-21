@@ -6,6 +6,11 @@ All physical-camera activity is also recorded chronologically in
 `docs/pentax/REAL_HARDWARE_TEST_LOG.md`. Updating that log is part of completing
 any real-hardware test; the plan status table is not a substitute for it.
 
+The normative feature target is
+`docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`. Work closes its rows in
+tier order. DeviceInfo is evidence about advertisement only; it does not
+replace the IMAGE Transmitter model gates or direct-request matrix.
+
 ## Progress ledger
 
 | Date | Work | Result | Evidence / next gate |
@@ -67,6 +72,8 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | K-1 II manual-reference DNG download | PASS | Operator-created `K1II8664.DNG` downloaded through standard object path, 38,468,076 bytes, hashed, EXIF parsed, temporary copy deleted, card untouched; ISO 200 agrees across display/status/EXIF; raw exposure mode 21 is a provisional Program AE correlation; see H1.7 |
 | 2026-08-21 | H1.8 K-1 II B-mode read-only baseline | PASS (2/2) | Two 188-line configuration snapshots normalized identically after clock/battery removal; each 568-byte condition response reported raw exposure mode 9, ISO 200, Bulb timer 30/1, and inactive Astro/error state; exact audits found zero setters/focus/preview/capture/transfer/delete/reset; only five generic descriptors were exposed; see H1.8 |
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
+| 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
+| 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

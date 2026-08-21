@@ -22,7 +22,11 @@ typedef struct {
 	int (*is_timed_out) (void *user_data);
 } PentaxTransferOps;
 
-/* Parsed subset of the K-3 Mark III GetAllConditions response.  Mode values
+/* IMAGE Transmitter 2 vendor-model identifiers. */
+#define PENTAX_MODEL_K1_MARK_II 78400U
+#define PENTAX_MODEL_K3_MARK_III 78420U
+
+/* Parsed subset of the Pentax GetAllConditions response.  Mode values
  * deliberately remain raw until each value has been correlated on hardware. */
 typedef struct {
 	uint8_t operation_state;
@@ -75,6 +79,7 @@ int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
+int pentax_model_uses_new_focus (uint32_t model_no);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,

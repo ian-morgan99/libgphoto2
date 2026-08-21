@@ -132,6 +132,9 @@ main (void)
 	CHECK (pentax_lookup_model (0x25fb, 0x0183, "PENTAX K-1 Mark II",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78400) && (extension_version == 1));
+	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_uses_new_focus (0));
 	CHECK (!pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
 	CHECK ((model_no == 0) && (extension_version == 0));
