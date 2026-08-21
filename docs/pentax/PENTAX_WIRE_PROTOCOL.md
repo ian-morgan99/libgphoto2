@@ -73,9 +73,12 @@ The transfer sequence is:
    8 MiB safety block. `GetTransferFileDataBlock` (`0x900d`) returns its valid
    byte count in response `Param1`.
 6. Only after a non-empty local file is cached, send
-   `ReceivedCreatedObject` (`0x9003`) with the candidate handle.
+   `DeleteTransferCandidate` (`0x900e`, GETDATA with no parameters) and discard
+   its returned data.
 
-The command grammar and acknowledgement ordering are Observed-client. Timeouts,
+The new candidate-transfer path uses `0x900e`; `ReceivedCreatedObject` (`0x9003`)
+with an object handle belongs to the client's older standard-GetObject path.
+The command grammar and finalization ordering are Observed-client. Timeouts,
 strict length checks, a 2 GiB file cap, a command-count cap, cancellation, seek
 bounds, and filename path rejection are defensive host policy.
 
@@ -89,4 +92,3 @@ bounds, and filename path rejection are defensive host policy.
 - Exercise JPEG and RAW transfers, all emitted file operations, cancellation,
   short final blocks, disconnect, reconnect, and acknowledgement failures.
 - Capture descriptors before implementing model-specific configuration values.
-

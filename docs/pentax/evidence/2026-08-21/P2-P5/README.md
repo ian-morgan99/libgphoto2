@@ -13,7 +13,7 @@ working-tree Pentax implementation described below.
 - live-view start, bounded JPEG extraction, and stop during exit;
 - still-capture completion polling and cancellable transfer state machine;
 - bounded filename, command, seek, allocation, block-size, and runtime handling;
-- object acknowledgement only after successful local caching.
+- candidate deletion/finalization only after successful local caching.
 
 ## Build command
 
