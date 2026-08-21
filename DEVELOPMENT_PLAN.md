@@ -58,6 +58,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Minimum Near physical direction | PASS | Operator confirmed `0x9017(+23)` moved the 24–70 focus nearer; permits one equal source-derived Far reversal, still with no retry/escalation |
 | 2026-08-21 | Minimum Far reversal | TRANSPORT PASS / PHYSICAL PENDING | Fresh `openAvNum=28` produced `-23`; camera returned PTP OK `0x2001`, zero retries, clean exit; record visible Far movement before closing bidirectional gate |
 | 2026-08-21 | Bounded bidirectional focus | PASS (QUALITATIVE) | `+23` moved nearer and `-23` moved farther by approximately the same small amount; both returned `0x2001`, zero retries, clean exits; no calibrated-distance or larger-step claim |
+| 2026-08-21 | Bulb-mode full config snapshots | READ-ONLY PASS (2/2) | Both returned 700 lines; exact audit sent zero setters/focus/capture; `0xd00f` becomes a 1–600 s timer domain (current 300), while `0xd013` narrows to 3 choices/current 0; see H1.6 |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

@@ -52,6 +52,7 @@ Camera serial data seen during discovery was not committed.
 | Instrumented Near physical observation | Operator watched the 24–70 mm lens during the `+23` probe | Focus moved nearer | Minimum Near passes protocol and physical-direction acceptance; one equal Far reversal is now permitted |
 | Instrumented fixed minimum Far | Fresh status and one source-derived Far reversal under the same corrected isolation; no retry or follow-up | `openAvNum=28`; displacement `-23`; `0x9017` response `0x2001`; cleanup OK | Far transport passes with exact opposite displacement; physical direction/reversal observation pending |
 | Instrumented Far physical observation | Operator watched the 24–70 mm lens after the `-23` reversal | Focus visibly moved farther by about the same small amount; exact equality was difficult to judge | Bounded bidirectional focus gate passes qualitatively. Do not claim calibrated displacement accuracy or enable escalation/larger steps from this result |
+| Bulb-mode full parameter enumeration | Physical dial `B`; two complete public config-tree reads under corrected single-device isolation; exact transmitted-opcode audit on snapshot 2 | Both snapshots returned 700 lines. Snapshot 2 sent zero setters, focus, or capture operations. Shutter/`0xd00f` exposed 1–600 seconds, current 300; `0xd013` narrowed from M's 12 choices/current 4 to 3 choices/current 0 | Read-only B baseline passes 2/2. Treat `0xd00f` as a B timer domain; withhold `0xd013` value labels and all writes pending display correlation; see H1.6 |
 
 The 50-frame result is a bounded soak, not the plan's 500-frame acceptance gate.
 Still capture, transfer from camera storage, configuration writes, cancellation,
@@ -121,6 +122,7 @@ Detailed records are retained in:
 - `docs/pentax/evidence/2026-08-21/H1.2/README.md` — vendor lifecycle and descriptors;
 - `docs/pentax/evidence/2026-08-21/H1.3/README.md` — live-view probes and soak.
 - `docs/pentax/evidence/2026-08-21/H1.5/README.md` — bounded focus-drive probe.
+- `docs/pentax/evidence/2026-08-21/H1.6/README.md` — Bulb-mode read-only baseline.
 
 Implementation commits arising directly from these tests are `b72d9cbdc` and
 `abf55fbcb`.
