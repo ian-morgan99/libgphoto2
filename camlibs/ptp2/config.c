@@ -9847,6 +9847,82 @@ _get_Pentax_LiveViewControls (CONFIG_GET_ARGS)
 }
 
 static int
+_get_Pentax_DirectProperty (CONFIG_GET_ARGS)
+{
+	static const struct { const char *name; uint16_t code; } properties[] = {
+		{ "pentaxpropd00f", 0xd00f }, { "pentaxprop5007", 0x5007 },
+		{ "pentaxpropd01e", 0xd01e }, { "pentaxprop5010", 0x5010 },
+		{ "pentaxprop5008", 0x5008 }, { "pentaxprop5005", 0x5005 },
+		{ "pentaxpropd013", 0xd013 }, { "pentaxpropd02b", 0xd02b },
+		{ "pentaxpropd035", 0xd035 }
+	};
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	unsigned char *data = NULL, *raw_desc = NULL;
+	unsigned int size = 0, raw_desc_size = 0, i, used;
+	const char *name;
+	char value[512];
+	uint16_t code = 0, ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	name = menu->name;
+	for (i = 0; i < ARRAYSIZE (properties); i++)
+		if (!strcmp (name, properties[i].name)) {
+			code = properties[i].code;
+			break;
+		}
+	if (!code)
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, code, &desc);
+	if (ret != PTP_RC_OK) {
+		ret = ptp_pentax_get_device_prop_desc_raw (params, code, &raw_desc,
+			&raw_desc_size);
+		if (ret != PTP_RC_OK) {
+			free (raw_desc);
+			return translate_ptp_result (ret);
+		}
+	}
+	ret = ptp_pentax_get_device_prop_raw (params, code, &data, &size);
+	if (ret != PTP_RC_OK) {
+		if (!raw_desc)
+			ptp_free_devicepropdesc (&desc);
+		free (raw_desc);
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (raw_desc) {
+		used = (unsigned int)snprintf (value, sizeof (value),
+			"code=0x%04x; descriptor-parse=failed; descriptor-bytes=%u; "
+			"descriptor-hex=", code, raw_desc_size);
+		for (i = 0; i < raw_desc_size && i < 64 && used + 2 < sizeof (value); i++)
+			used += (unsigned int)snprintf (value + used,
+				sizeof (value) - used, "%02x", raw_desc[i]);
+		used += (unsigned int)snprintf (value + used, sizeof (value) - used,
+			"; value-bytes=%u; value-hex=", size);
+	} else {
+		used = (unsigned int)snprintf (value, sizeof (value),
+			"code=0x%04x; datatype=0x%04x; getset=%u; form=%u; "
+			"enum-count=%u; value-bytes=%u; value-hex=",
+			code, desc.DataType, desc.GetSet, desc.FormFlag,
+			desc.FormFlag == PTP_DPFF_Enumeration ?
+				desc.FORM.Enum.NumberOfValues : 0, size);
+	}
+	for (i = 0; i < size && i < 64 && used + 2 < sizeof (value); i++)
+		used += (unsigned int)snprintf (value + used, sizeof (value) - used,
+			"%02x", data[i]);
+	free (data);
+	free (raw_desc);
+	if (!raw_desc)
+		ptp_free_devicepropdesc (&desc);
+	gp_widget_set_value (*widget, value);
+	return GP_OK;
+}
+
+static int
 _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
@@ -12038,6 +12114,15 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Vendor Extension"),       "vendorextension",  0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_VendorExtension_STR,   _put_None },
 	{ N_("Pentax Conditions"),       "pentaxconditions", 0,  PTP_VENDOR_PENTAX, PTP_OC_PENTAX_GetAllConditions, _get_Pentax_Conditions, _put_None },
 	{ N_("Pentax Live View Controls"), "pentaxliveviewcontrols", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewControls, _put_None },
+	{ N_("Pentax Shutter/Bulb Descriptor"), "pentaxpropd00f", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Aperture Descriptor"), "pentaxprop5007", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax ISO Descriptor"), "pentaxpropd01e", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Exposure Compensation Descriptor"), "pentaxprop5010", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Focal Length Descriptor"), "pentaxprop5008", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax White Balance Descriptor"), "pentaxprop5005", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Drive Mode Descriptor"), "pentaxpropd013", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Focus Peaking Descriptor"), "pentaxpropd02b", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
