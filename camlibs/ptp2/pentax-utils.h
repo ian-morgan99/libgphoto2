@@ -45,6 +45,17 @@ typedef struct {
 	int has_astro_limit;
 } PentaxConditions;
 
+typedef struct {
+	uint16_t area_width;
+	uint16_t area_height;
+	uint16_t active_width;
+	uint16_t active_height;
+	uint16_t contrast_af_active_width;
+	uint16_t contrast_af_active_height;
+	uint16_t contrast_af_spot_width;
+	uint16_t contrast_af_spot_height;
+} PentaxLiveViewGeometry;
+
 #define PENTAX_CONDITION_ACTIVITY_SHOOTING       0x00000001U
 #define PENTAX_CONDITION_ACTIVITY_PROCESSING     0x00000002U
 #define PENTAX_CONDITION_ACTIVITY_MOVIE_MODE     0x00000100U
@@ -73,6 +84,17 @@ typedef struct {
 #define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
 
 uint32_t pentax_get_u32le (const unsigned char *data);
+int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
+	PentaxLiveViewGeometry *geometry);
+int pentax_parse_live_view_af_position (const unsigned char *data, size_t size,
+	const PentaxLiveViewGeometry *geometry, uint16_t *x, uint16_t *y);
+int pentax_encode_live_view_af_position (uint16_t x, uint16_t y,
+	unsigned char data[8]);
+int pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
+	uint8_t magnification, unsigned char data[12]);
+int pentax_live_view_stop_response_ok (uint16_t response);
+int pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
+	uint8_t *fallback);
 int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,

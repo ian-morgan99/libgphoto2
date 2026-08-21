@@ -109,7 +109,10 @@ main (void)
 	int32_t displacement = 0;
 	PentaxCaptureBuffer buffer = {0};
 	PentaxConditions conditions, unchanged;
+	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
+	unsigned char geometry_data[20] = {0};
+	unsigned char af_data[8] = {0}, encoded_af[8], encoded_zoom[12];
 	const unsigned char filename[] = {
 		1, 2, 3, 11,
 		'I', 0, 'M', 0, 'G', 0, '0', 0, '0', 0, '0', 0, '1', 0, '.', 0,
@@ -121,11 +124,59 @@ main (void)
 	char name[32];
 	size_t jpeg_offset = 99, jpeg_length = 99;
 	uint32_t model_no = 99, extension_version = 99;
+	uint16_t af_x = 99, af_y = 99;
+	uint8_t fallback = 99;
 	MockTransfer mock;
 	PentaxTransferOps transfer_operations;
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
+	put_u32le (geometry_data, 4, 480U << 16 | 720U);
+	put_u32le (geometry_data, 8, 400U << 16 | 640U);
+	put_u32le (geometry_data, 12, 360U << 16 | 600U);
+	put_u32le (geometry_data, 16, 40U << 16 | 60U);
+	memset (&unchanged_geometry, 0xa5, sizeof (unchanged_geometry));
+	geometry = unchanged_geometry;
+	CHECK (pentax_parse_live_view_geometry (geometry_data, 19, &geometry) ==
+		GP_ERROR_CORRUPTED_DATA);
+	CHECK (!memcmp (&geometry, &unchanged_geometry, sizeof (geometry)));
+	CHECK (pentax_parse_live_view_geometry (geometry_data,
+		sizeof (geometry_data), &geometry) == GP_OK);
+	CHECK ((geometry.area_width == 720) && (geometry.area_height == 480) &&
+		(geometry.active_width == 640) && (geometry.active_height == 400) &&
+		(geometry.contrast_af_active_width == 600) &&
+		(geometry.contrast_af_active_height == 360) &&
+		(geometry.contrast_af_spot_width == 60) &&
+		(geometry.contrast_af_spot_height == 40));
+	CHECK (pentax_parse_live_view_af_position (af_data, 4, &geometry,
+		&af_x, &af_y) == GP_OK);
+	CHECK ((af_x == 360) && (af_y == 240));
+	af_data[4] = 100; af_data[6] = 200;
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_OK);
+	CHECK ((af_x == 100) && (af_y == 200));
+	CHECK (pentax_parse_live_view_af_position (af_data, 7, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	af_data[5] = 3;
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK (pentax_encode_live_view_af_position (300, 200, encoded_af) == GP_OK);
+	CHECK ((encoded_af[0] == 2) && (encoded_af[4] == 44) &&
+		(encoded_af[5] == 1) && (encoded_af[6] == 200));
+	CHECK (pentax_encode_live_view_zoom (300, 200, 16, encoded_zoom) == GP_OK);
+	CHECK ((encoded_zoom[0] == 4) && (encoded_zoom[4] == 44) &&
+		(encoded_zoom[5] == 1) && (encoded_zoom[6] == 200) &&
+		(encoded_zoom[8] == 16));
+	CHECK (pentax_encode_live_view_zoom (0, 0, 0, encoded_zoom) ==
+		GP_ERROR_BAD_PARAMETERS);
+	CHECK (pentax_live_view_stop_response_ok (0x2001));
+	CHECK (pentax_live_view_stop_response_ok (0xa005));
+	CHECK (!pentax_live_view_stop_response_ok (0x2019));
+	CHECK (pentax_live_view_zoom_fallback (16, 0x201c, &fallback) == 1);
+	CHECK (fallback == 10);
+	fallback = 99;
+	CHECK (pentax_live_view_zoom_fallback (10, 0x201c, &fallback) == 0);
+	CHECK (fallback == 99);
 	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78420) && (extension_version == 1));

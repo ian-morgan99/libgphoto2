@@ -212,6 +212,31 @@ Exit: all stable descriptors are documented; dynamic and unexplained values are
 isolated; every unknown remains numeric. Setting writes require a separate,
 explicitly approved P6 task.
 
+#### R5 — Close undocumented recovery and live-view controls (offline first)
+
+1. Use `docs/pentax/IMAGE_TRANSMITTER_ERROR_RECOVERY.md` as the recovery
+   checklist. Preserve command/data/response phase, opcode, raw response, and
+   lifecycle state in every diagnostic.
+2. Unit-test the `0xd009` geometry parser, both `0xd036` response forms and its
+   setter encoding, the `0xd037` encoding, stop-only `0xa005` handling, and the
+   single 16x/`0x201c` to 10x fallback.
+3. Do not copy IT2's ten-attempt `0x9017` displacement escalation. Focus actions
+   remain one source-derived minimum command with zero automatic retry.
+4. After R3 lifecycle passes, read `0xd009`, `0xd036`, and `0xd037` on each body
+   without writes. Then approve separate single-variable restore tests.
+5. Graduate preview through `gp_camera_capture_preview`. Represent zoom as a
+   menu, AF X/Y as bounded range widgets derived from current geometry, and fine
+   focus as Near/Far action widgets (or a signed range only if the UI can make
+   each activation unambiguous). Keep all widgets model- and state-gated.
+6. On every live-view exit, stop frame requests, restore zoom and AF position,
+   stop PC live view, then disable vendor mode. Preserve the primary failure and
+   log cleanup failures. Never acknowledge/delete a candidate as recovery.
+
+Exit: offline malformed/truncation and response fixtures pass under normal and
+ASan/UBSan builds; then both bodies pass read-only geometry/control discovery,
+single-variable restoration, the Tier 7 frame ladder, and a forced-failure
+cleanup test before any control becomes public.
+
 This is the single source of truth for adding Pentax tethering support to the
 libgphoto2 fork and delivering that build through BenroPolarisPatcher. Copies of
 this plan elsewhere are informational only.

@@ -80,7 +80,7 @@ vendor capture/candidate workflow.
 | `0x5010` | exposure compensation | INT16 thousandths; both | K-3 III HW-R; K-1 II target |
 | `0x5014` | CI contrast | UINT8, logical value +4 | Source target |
 | `0x5015` | CI sharpness | UINT8, logical value +4 | K-3 III HW-R; writes pending |
-| `0xd009` | LV/CAF geometry | 20 bytes with UINT16 dimensions | Read before K-1 II live view |
+| `0xd009` | LV/CAF geometry | 20 bytes with UINT16 dimensions | Fail-closed parser implemented; hardware read required before each body's first live view |
 | `0xd00f` | shutter/Bulb timer | UINT64 as UINT32 numerator/denominator | K-3 III HW-R; K-1 II next direct read |
 | `0xd013` | drive mode | UINT8 enumeration | K-3 III HW-R; K-1 II target |
 | `0xd014` | bracket mode | UINT8; K-3 III gate | K-1 II withheld |
@@ -103,8 +103,8 @@ vendor capture/candidate workflow.
 | `0xd02c` | CI cross process | encoded UINT8 normal and 32+ ranges | Source target |
 | `0xd02d` | CI user filter | 8-byte signed triplet structure | Trace before write |
 | `0xd035` | PC live view | UINT8 boolean | K-3 III HW-W restore; K-1 II target |
-| `0xd036` | LV AF position | 4/8-byte structure; X/Y UINT16 | Hardware target |
-| `0xd037` | LV zoom | 12-byte X/Y/magnification structure | Hardware target; 16x fallback to 10x on `0x201c` |
+| `0xd036` | LV AF position | 4-byte response means geometry centre; >=8 bytes has X/Y UINT16 at 4/6; setter is `{2,0,0,0,Xlo,Xhi,Ylo,Yhi}` | Parser/encoder fixtures implemented; public config target after read and bounded write gate |
+| `0xd037` | LV zoom | `{4,0,0,0,Xlo,Xhi,Ylo,Yhi,mag,0,0,0}`; disable mag 1 | Encoder fixture implemented; public config target; 16x fallback once to 10x only on `0x201c` after hardware gate |
 | `0xd039` | movie mode | UINT8 boolean; movie gate | Both source target |
 
 `0xd01b` offsets are: 0 count/version (6 normally, 7 with current-slot field),
@@ -167,8 +167,8 @@ values until resource ordering and camera state jointly confirm each label.
 | 4 | aggregate status | three snapshots per representative mode; visible correlation |
 | 5 | generic files | repeat RAW hash and one JPEG hash without card deletion |
 | 6 | scalar writes | one at a time; read-back, display, exact restore |
-| 7 | live view | 1/10/50/500 frames; restore, reconnect, cold reconnect |
-| 8 | focus | K-1 II one bounded `0x9016` Near then equal Far; K-3 III repeat `0x9017` |
+| 7 | live view | Expose through `gp_camera_capture_preview`; 1/10/50/500 frames; bounded consecutive-frame failure; restore zoom/AF/PC-LV, reconnect, cold reconnect |
+| 8 | live-view controls and focus | Config widgets for zoom and AF position, action/range widgets for fine focus; K-1 II one bounded `0x9016` Near then equal Far; K-3 III repeat `0x9017`; zero automatic displacement escalation |
 | 9 | JPEG capture/transfer | research build; cache, finalize, reconnect |
 | 10 | RAW/RAW+JPEG | hash, finalize, repeat, reconnect |
 | 11 | Bulb/cancel/recovery | short supervised B exposure, terminate, reconnect |
