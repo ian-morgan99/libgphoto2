@@ -22,7 +22,7 @@ records pass.
 | USB VID:PID | Exact DeviceInfo model | Model number | Extension version | Evidence |
 |---|---|---:|---:|---|
 | `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo + Observed-client |
-| `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Observed-client |
+| `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Hardware-confirmed PC-P identity; model number/version remain Observed-client |
 
 Both USB identity and the exact DeviceInfo string must match before vendor
 commands are sent. Other Pentax devices retain generic PTP behavior.

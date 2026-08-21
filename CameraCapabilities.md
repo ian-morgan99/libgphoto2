@@ -18,7 +18,7 @@ Vendor commands are enabled only when all three identity fields match:
 | Abilities VID:PID | Exact DeviceInfo model | Vendor model | Extension | Evidence |
 |---|---|---:|---:|---|
 | `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo verified on firmware 2.20 |
-| `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Observed client; hardware blocked |
+| `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Hardware-confirmed PC-P identity; initial read-only lifecycle pass |
 
 The K-3 III exposes Microsoft MTP VendorExtensionID `0x6`; exact USB and
 DeviceInfo identity, rather than that generic extension ID, gates Pentax vendor
@@ -36,7 +36,7 @@ does not mean camera-verified.
 | Capability | K-3 III | K-1 II | Current evidence | Hardware acceptance gate |
 |---|---|---|---|---|
 | Generic PTP files | Existing | Existing | Existing ptp2 path compiles | enumerate/download/hash |
-| Vendor lifecycle | Initial 3/3 controlled cold and 3/3 warm pass; larger gates open | Implemented, hardware blocked | exact identity/response guards; earlier poorly isolated runs returned `0x2002` | complete 10+10 and 50-cycle gates |
+| Vendor lifecycle | Initial 3/3 controlled cold and 3/3 warm pass; larger gates open | Initial read-only pass, flags `0x3` | exact identity/response guards; earlier poorly isolated K-3 III runs returned `0x2002` | complete per-body cold/warm gates |
 | Live-view JPEG | 50-frame bounded warm-session pass | Implemented, hardware blocked | bounded parser and restore paths compile | first pass cold lifecycle, then 500 frames, stop, reconnect |
 | Capture/download | Research code, default-disabled | Research code, default-disabled | fault-injected grammar passes sanitizers; ability and dispatch containment enforced | explicit research build only, then JPEG and RAW hash checks |
 | Cancellation/timeout | Implemented | Implemented | callback fault tests pass | cancel at each phase, reconnect |
