@@ -43,7 +43,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Paced preview soak | PASS | 50/50 complete in-memory JPEGs with 250 ms pacing; no retained images or shutter/card operations; strengthened camera exit reported cleanup success |
 | 2026-08-21 | Exit error propagation audit | CORRECTED | Pentax exit continues vendor/session cleanup but now preserves a live-view restoration failure instead of allowing successful vendor disable to mask it |
 | 2026-08-21 | First cold-restart config read | FAIL-CLOSED | Camera returned `0x2002` to vendor enable after power cycle; driver sent no later Pentax opcode and exposed generic MTP only; restart-state requirement remains unknown |
-| 2026-08-21 | Controlled clean-start shutter read | PASS (1/1) | First enable succeeded with flags 0; read-only `0x1014` descriptor for `0xd00f` reported current 1 second and 55 choices; disable/exit succeeded; lifecycle repetition gate remains open |
+| 2026-08-21 | Controlled clean-start shutter read | PASS (2/2) | Both first enables succeeded with flags 0; read-only `0x1014` descriptor for `0xd00f` reported current 1 second and 55 choices; both disable/exits succeeded; initial 3/3 checkpoint remains open |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

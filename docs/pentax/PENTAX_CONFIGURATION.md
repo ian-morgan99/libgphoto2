@@ -30,11 +30,11 @@ exposure compensation, and shutter speed. Several white-balance enumeration
 values remain deliberately labelled `Unknown value` because the existing
 Pentax table does not name them; no labels are guessed.
 
-A controlled cold-start session subsequently reconfirmed shutter property
+A controlled cold-start sequence subsequently reconfirmed shutter property
 `0xd00f` through read-only `GetDevicePropDesc` (`0x1014`): UINT64 rational,
 current 1 second, with 55 choices ranging from 1/8000 through 30 seconds. No
-property value was written. This is one cold-start observation, not lifecycle
-repeatability evidence.
+property value was written. The identical result passed in two power cycles;
+the lifecycle repetition gate remains open.
 
 ## Deliberately withheld widgets
 
