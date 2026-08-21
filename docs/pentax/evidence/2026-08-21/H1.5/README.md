@@ -82,12 +82,16 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
     had yet been sent.
 14. One fresh minimum Far reversal produced `openAvNum=28`, displacement `-23`,
     opcode `0x9017`, retries zero, and raw response `0x2001`. Cleanup succeeded.
-    Physical Far-direction observation remains pending.
+    The operator observed movement farther by approximately the same small
+    amount as Near, while noting that exact equality was difficult to judge.
 
-Status: **MINIMUM NEAR PASS / FAR TRANSPORT PASS, PHYSICAL PENDING**. Corrected
+Status: **BOUNDED BIDIRECTIONAL PASS**. Corrected
 container isolation proves clean initialization, `GetAllConditions` supplies a
 nonzero factor, and the camera returns PTP OK to the source-derived minimum
 Near command. Operator observation confirms that `0x9017(+23)` physically moves
 focus nearer on this body/firmware/lens combination. One equal source-derived
-Far command returned PTP OK with the exact opposite displacement; its physical
-direction observation remains required. Larger displacements remain prohibited.
+Far command returned PTP OK with the exact opposite displacement and visibly
+moved focus farther by approximately the same amount. This is qualitative
+direction/reversal validation, not calibrated image-plane-distance accuracy.
+Larger displacements and the official client's escalating retry loop remain
+unvalidated and prohibited.
