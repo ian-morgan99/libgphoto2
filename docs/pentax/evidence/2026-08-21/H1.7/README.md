@@ -51,3 +51,29 @@ mode values above are transport observations, not visual correlations. A later
 correlation procedure must record settings before connection, reconnect without
 changing them, read once, disconnect cleanly, and verify the same settings after
 the camera returns to its normal display.
+
+## Manual reference image and generic download
+
+The operator disconnected USB, confirmed ISO 200, took one manual photograph
+onto an SD card, and reconnected in PC-P mode. Read-only storage enumeration
+found the new date folder `/store_00010001/DCIM/460_0821` and its sole file
+`K1II8664.DNG`. One standard object download produced:
+
+- size 38,468,076 bytes;
+- SHA-256 `db9ea0c3f402fe6b8d5ad03ca8bcce7d3249ffe073fed7776401d44c1dbdb1a5`;
+- EXIF model `PENTAX K-1 Mark II`;
+- Program AE / Auto exposure, ISO 200, 6 seconds, f/1.4;
+- `HD PENTAX-D FA* 50mm F1.4 SDM AW`, focal length 50 mm;
+- capture time `2026:08:21 12:20:01`.
+
+The temporary host copy was deleted after hashing/metadata extraction. The card
+object was not modified or deleted, and USB was unowned afterward. ISO 200 now
+has display, `GetAllConditions`, and EXIF agreement. Raw exposure mode 21 is a
+strong Program AE candidate, but remains provisional because the status read
+and photograph were separated by a disconnect rather than captured atomically.
+
+The first selection attempt incorrectly assumed the highest-numbered filename
+was newest and downloaded an older K-3 Mark III DNG. Its metadata exposed the
+mistake; the temporary copy was deleted and the card was unchanged. The
+correct rule is to enumerate DCIM folders and select the operator-created date
+folder/object, never infer recency from a cross-camera sequence number.
