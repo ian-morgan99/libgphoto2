@@ -124,6 +124,11 @@ finalization alone proves the candidate was released.
 
 ## Open hardware questions
 
+- Determine why a cold camera restart caused `SetVendorMode` to return General
+  Error `0x2002` in two fresh sessions after it had succeeded before the restart.
+  Establish whether the prerequisite is camera UI state, connection ordering,
+  or client-created state. Do not add an automatic retry loop or alternate
+  handshake without evidence.
 - Confirm response parameters and response codes for vendor-mode enable/disable.
 - Record actual DeviceInfo strings for both target firmware families.
 - Confirm `0xd035` descriptor datatype and mode restoration.

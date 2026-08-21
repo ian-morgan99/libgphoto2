@@ -36,10 +36,14 @@ Camera serial data seen during discovery was not committed.
 | Initial unpaced preview loop | Same temporary live-view operations; no retention | Frames 1 and 2 were valid; frame 3 returned an error; cleanup ran | Added conservative inter-frame pacing and precise failure-stage reporting |
 | Paced preview loop | Ten in-memory previews at 250 ms spacing | 10/10 complete JPEGs; explicit camera exit succeeded | Established a safe repeatable harness |
 | Paced preview soak after cleanup hardening | Fifty in-memory previews at 250 ms spacing | 50/50 complete JPEGs; strengthened camera exit reported cleanup success | Preserved live-view restoration errors instead of allowing later cleanup success to mask them |
+| First cold camera restart and read-only config enumeration | Two full config-tree reads, followed by one named shutter read with sanitized lifecycle logging | Camera re-enumerated as `25fb:0189`, but vendor enable `0x9001` returned General Error `0x2002`; only the five generic MTP properties were exposed and no later Pentax opcode was sent | Treat vendor entry as state-dependent and fail closed; do not claim restart stability or vendor settings in this session |
+| Delayed cold-session retry | Release USB ownership, wait five seconds, open a fresh session, and request the named shutter setting | Vendor enable again returned `0x2002`; shutter was absent because the driver remained safely generic | Startup timing is not a sufficient explanation; do not loop retries or continue vendor probes without identifying the missing state/prerequisite |
 
 The 50-frame result is a bounded soak, not the plan's 500-frame acceptance gate.
 Still capture, transfer from camera storage, configuration writes, cancellation,
 physical disconnect/reconnect, and the 500-frame gate remain untested on hardware.
+One camera power-cycle/re-enumeration has now been observed, but it did not pass
+vendor-mode entry and therefore does not satisfy the reconnect gate.
 
 ## USB identifier postmortem
 
