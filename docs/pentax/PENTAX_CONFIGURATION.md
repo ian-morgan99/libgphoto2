@@ -39,6 +39,13 @@ source-aligned conditions preflight was still acknowledged but ignored. The
 setter now requires the preflight and post-write match, but K-1 II shutter
 writes are closed pending new official-client or wire evidence.
 
+K-1 II also omits extended ISO `0xd01e` from DeviceInfo. The exact-model
+`pentaxdirectiso` widget therefore requests its UINT32 descriptor on demand,
+requires the source-defined Sv-changeable/idle conditions, and verifies the
+post-write value. Its first 200→400 hardware attempt was acknowledged but
+retained 200; the widget correctly returned failure. It is diagnostic evidence,
+not a claim of working K-1 II ISO control.
+
 Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
 exposure compensation, and shutter speed. Several white-balance enumeration
 values remain deliberately labelled `Unknown value` because the existing
@@ -58,8 +65,9 @@ no session retained vendor state into the next.
 ## Deliberately withheld widgets
 
 - Extended ISO `0xd01e` (UINT32; 3200→1600 was confirmed by PTP read-back and
-  the camera display, but the battery failed before restoration to 3200, so no
-  general setter is exposed until that restoration and more bounded values pass)
+  the K-3 III display and was later restored to 3200; K-1 II direct ISO 200→400
+  was acknowledged but retained 200 despite Sv-changeable conditions, so broad
+  exposure-setting support remains withheld)
 - Focus mode (no `0x500a` descriptor; no replacement property yet proven)
 - Drive mode `0xd013`
 - Exposure-bracketing mode/step `0xd014`/`0xd015`

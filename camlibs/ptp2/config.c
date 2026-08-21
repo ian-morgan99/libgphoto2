@@ -10007,6 +10007,89 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 }
 
 static int
+_get_Pentax_DirectISO (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ExtendedISO,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _get_INT (camera, widget, menu, &desc);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_put_Pentax_DirectISO (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPDevicePropDesc verify;
+	PTPPropValue value;
+	PentaxConditions conditions;
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		&conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_SV))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
+	memset (&desc, 0, sizeof (desc));
+	memset (&verify, 0, sizeof (verify));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_ExtendedISO,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _put_INT (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ExtendedISO,
+			&value, PTP_DTC_UINT32);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK) {
+			ret = ptp_generic_getdevicepropdesc (params,
+				PTP_DPC_PENTAX_ExtendedISO, &verify);
+			result = translate_ptp_result (ret);
+			if ((result == GP_OK) && (verify.CurrentValue.u32 != value.u32)) {
+				GP_LOG_E ("Pentax ISO write was acknowledged but not applied "
+					"(requested %u, retained %u).",
+					value.u32, verify.CurrentValue.u32);
+				result = GP_ERROR;
+			}
+		}
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&verify);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
 _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
@@ -12208,6 +12291,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Focus Peaking Descriptor"), "pentaxpropd02b", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
+	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
