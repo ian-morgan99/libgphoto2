@@ -42,6 +42,11 @@ non-ASCII, and path-injection filenames; sequential, overwrite, and sparse
 writes; begin/current/end seeking; negative bounds; invalid commands; and null
 arguments.
 
+The model fixture also proves that only the two exact VID:PID plus DeviceInfo
+model combinations map to vendor model numbers. It rejects the Monochrome PID,
+a suffixed model string, and the correct string under a foreign VID, resetting
+outputs to zero on rejection.
+
 A targeted earlier test run passed 6 of 9 tests. The three failures were from
 the intentionally restricted container/build selection: host USB descriptor
 access in `test-gp-port`, a model expected from a non-PTP camlib in
