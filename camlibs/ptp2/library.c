@@ -3651,6 +3651,7 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 	switch (params->deviceinfo.VendorExtensionID) {
 	case PTP_VENDOR_PENTAX: {
 		PTPPropValue value;
+		size_t jpeg_offset = 0, jpeg_length = 0;
 		int result;
 
 		if (!params->pentax.vendor_mode_enabled)
@@ -3686,7 +3687,15 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			SET_CONTEXT_P (params, NULL);
 			return translate_ptp_result (ret);
 		}
-		result = save_jpeg_in_data_to_preview (data, size, file);
+		result = pentax_jpeg_bounds (data, size, &jpeg_offset, &jpeg_length);
+		if (result == GP_OK)
+			result = gp_file_append (file, (char *)data + jpeg_offset, jpeg_length);
+		if (result == GP_OK)
+			result = gp_file_set_mime_type (file, GP_MIME_JPEG);
+		if (result == GP_OK)
+			result = gp_file_set_name (file, "preview.jpg");
+		if (result == GP_OK)
+			result = gp_file_set_mtime (file, time (NULL));
 		free (data);
 		if (result < GP_OK) {
 			ret = pentax_restore_live_view (params);

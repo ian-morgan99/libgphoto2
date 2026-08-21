@@ -26,6 +26,7 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Candidate filename security audit | PASS | UTF-16 parser rejects separators, non-ASCII/control input, empty names, overflow, and reserved `.`/`..` path components; regression fixtures pass sanitizers |
 | 2026-08-21 | B2 complete-loader cross-build | PASS | Polaris `2b505c7`; full Stage-2 loader plus exact-model policy compiles as ARM EABI5 shared object with `-Werror`; execution/package gates remain BLOCKED without FwPkt |
 | 2026-08-21 | Legacy capability-claim audit | CORRECTED | Replaced speculative checkmark table and K-3 III/Monochrome PID conflation with implementation-vs-hardware evidence matrix; original moved to workspace archive |
+| 2026-08-21 | Pentax live-view framing audit | CORRECTED | Dedicated bounded JPEG parser now requires complete SOI/EOI and rejects missing/trailing/truncated markers; parser fixtures pass sanitizers |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

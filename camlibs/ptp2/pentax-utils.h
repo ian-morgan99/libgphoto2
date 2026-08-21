@@ -30,7 +30,9 @@ int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,
 	unsigned int operation, int32_t displacement);
 int pentax_candidate_filename (const unsigned char *data, uint32_t size,
-	char *filename, size_t filename_size);
+		char *filename, size_t filename_size);
+int pentax_jpeg_bounds (const unsigned char *data, size_t size,
+		size_t *offset, size_t *length);
 int pentax_transfer_run (PentaxCaptureBuffer *buffer,
 	const PentaxTransferOps *operations);
 
