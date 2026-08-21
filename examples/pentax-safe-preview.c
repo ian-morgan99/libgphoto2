@@ -12,8 +12,6 @@
 
 #include "samples.h"
 
-#define PENTAX_MODEL "Pentax:K-3 Mark III (MTP mode)"
-
 int
 main (int argc, char **argv)
 {
@@ -23,12 +21,17 @@ main (int argc, char **argv)
 	long requested;
 	int initialized = 0, result = GP_OK, exit_result, i;
 
-	if (argc != 3) {
-		fprintf (stderr, "usage: %s usb:BUS,DEVICE FRAME_COUNT\n", argv[0]);
+	if (argc != 4) {
+		fprintf (stderr, "usage: %s MODEL usb:BUS,DEVICE FRAME_COUNT\n", argv[0]);
+		return 2;
+	}
+	if (strcmp (argv[1], "Pentax:K-3 Mark III (MTP mode)") &&
+	    strcmp (argv[1], "Pentax:K-1 Mark II (PTP mode)")) {
+		fprintf (stderr, "MODEL is not an explicitly supported Pentax body\n");
 		return 2;
 	}
 	errno = 0;
-	requested = strtol (argv[2], &end, 10);
+	requested = strtol (argv[3], &end, 10);
 	if (errno || !end || *end || (requested < 1) || (requested > 500)) {
 		fprintf (stderr, "FRAME_COUNT must be in the range 1..500\n");
 		return 2;
@@ -37,7 +40,7 @@ main (int argc, char **argv)
 	context = sample_create_context ();
 	if (!context)
 		return 1;
-	result = sample_open_camera (&camera, PENTAX_MODEL, argv[1], context);
+	result = sample_open_camera (&camera, argv[1], argv[2], context);
 	if (result < GP_OK)
 		goto out;
 	result = gp_camera_init (camera, context);
