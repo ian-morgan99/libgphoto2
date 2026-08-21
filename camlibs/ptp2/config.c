@@ -9387,7 +9387,6 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 
 	CR (gp_widget_get_value (widget, &val));
 	if (!val) {
-		*alreadyset = 1;
 		return GP_OK;
 	}
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
@@ -9424,7 +9423,6 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 		gp_context_error (((PTPData *)params->data)->context,
 			_("Pentax minimum focus drive (%d) failed with response 0x%04x."),
 			displacement, ret);
-	*alreadyset = 1;
 	return translate_ptp_result (ret);
 }
 

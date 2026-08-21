@@ -57,10 +57,24 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
    performed only explicit camera open, initialization, and intended cleanup;
    it again returned `GP_ERROR_IO` at `camera-init`. It never retrieved or
    invoked a focus action.
+9. Initialization instrumentation emitted no ptp2 stage message. Inspection of
+   the libgphoto2 core showed the failure preceded the camlib initializer. The
+   container had bus enumeration visibility but no Docker device-cgroup grant;
+   the earlier single-device-only container had the inverse problem.
+10. With both `/dev/bus/usb` enumeration visibility and an explicit
+    `--device /dev/bus/usb/001/011` grant, init-only passed: vendor enable flags
+    were zero and cleanup succeeded without retry. This identifies the earlier
+    `GP_ERROR_IO` results as host-isolation failures, not camera failures.
+11. One minimum Near run under the corrected isolation initialized successfully
+    and then exited 139. Offline audit found that the virtual-action setter
+    dereferenced the deliberately null `alreadyset` argument after the focus
+    transport returned. No raw `0x900f` or `0x9017` error was emitted, so the
+    best current evidence is that both returned OK before the host crash. The
+    null dereference is fixed and the module plus ASan/UBSan utility tests pass.
+    Physical movement observation for this run remains pending.
 
-Status: **BLOCKED AT SESSION INITIALIZATION / STOPPED**. The stage-labelled
-result establishes that the current failure precedes the focus action; it is
-not a hardware rejection of `0x9017` or validation of offset 328. Operator
-observation establishes no physical movement in the first two attempts. Focus
-testing must not resume until lifecycle/recovery investigation restores a
-successful fresh initialization.
+Status: **PROTOCOL COMMAND PROBABLY ACCEPTED / PHYSICAL RESULT PENDING**.
+Corrected container isolation proves clean initialization. Control flow and the
+absence of instrumented transport errors place the crash after a successful
+focus-transport return, but only operator observation can establish physical
+movement. Do not send Far or repeat Near until that observation is recorded.
