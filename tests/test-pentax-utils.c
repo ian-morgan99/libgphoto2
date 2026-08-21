@@ -177,6 +177,11 @@ main (void)
 	fallback = 99;
 	CHECK (pentax_live_view_zoom_fallback (10, 0x201c, &fallback) == 0);
 	CHECK (fallback == 99);
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 1, 0));
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500));
+	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0));
 	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78420) && (extension_version == 1));

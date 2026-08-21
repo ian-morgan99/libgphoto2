@@ -129,6 +129,15 @@ pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 }
 
 int
+pentax_live_view_frame_should_retry (uint16_t response,
+		unsigned int attempts, unsigned int elapsed_ms)
+{
+	/* IT2 identifies 0xa008 as NoUpdateImage.  Thirty attempts at its 33 ms
+	 * cadence are permitted, with an independent 1.5 second wall-time cap. */
+	return (response == 0xa008) && (attempts < 30) && (elapsed_ms < 1500);
+}
+
+int
 pentax_parse_conditions (const unsigned char *data, size_t size,
 		PentaxConditions *conditions)
 {

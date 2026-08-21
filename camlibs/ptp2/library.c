@@ -3658,8 +3658,10 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 		return GP_ERROR_NOT_SUPPORTED;
 #else
 		PTPPropValue value;
+		struct timespec preview_start, preview_now;
 		size_t jpeg_offset = 0, jpeg_length = 0;
-		int result;
+		unsigned int attempts = 0, elapsed_ms = 0;
+		int result, cancelled = 0;
 
 		if (!params->pentax.vendor_mode_enabled)
 			return GP_ERROR_NOT_SUPPORTED;
@@ -3697,11 +3699,27 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			}
 			params->inliveview = 1;
 		}
-		ret = ptp_pentax_get_live_view_frame (params, &data, &size);
+		clock_gettime (CLOCK_MONOTONIC, &preview_start);
+		do {
+			free (data);
+			data = NULL;
+			size = 0;
+			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+				cancelled = 1;
+				break;
+			}
+			ret = ptp_pentax_get_live_view_frame (params, &data, &size);
+			attempts++;
+			clock_gettime (CLOCK_MONOTONIC, &preview_now);
+			elapsed_ms = (unsigned int)((preview_now.tv_sec - preview_start.tv_sec) * 1000 +
+				(preview_now.tv_nsec - preview_start.tv_nsec) / 1000000);
+			if (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms))
+				usleep (33000);
+		} while (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms));
 		gp_context_status (context,
-			_("Pentax preview stage get-frame returned 0x%04x (%u bytes)."),
-			ret, size);
-		if (ret != PTP_RC_OK) {
+			_("Pentax preview stage get-frame returned 0x%04x (%u bytes, %u attempts, %u ms)."),
+			ret, size, attempts, elapsed_ms);
+		if (cancelled || (ret != PTP_RC_OK)) {
 			uint16_t restore_ret = pentax_restore_live_view (params);
 			gp_context_status (context,
 				_("Pentax preview stage restore-after-frame returned 0x%04x."),
@@ -3710,6 +3728,10 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 				GP_LOG_E ("Pentax live view restore after frame error failed with 0x%04x",
 					restore_ret);
 			SET_CONTEXT_P (params, NULL);
+			if (cancelled)
+				return GP_ERROR_CANCEL;
+			if (ret == 0xa008)
+				return GP_ERROR_TIMEOUT;
 			return translate_ptp_result (ret);
 		}
 		result = pentax_jpeg_bounds (data, size, &jpeg_offset, &jpeg_length);
