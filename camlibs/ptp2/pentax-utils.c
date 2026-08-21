@@ -156,6 +156,10 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 	parsed.user_mode = pentax_get_u32le (data + 40);
 	parsed.bulb_timer_seconds = pentax_get_u32le (data + 272);
 	parsed.bulb_timer_denominator = pentax_get_u32le (data + 276);
+	parsed.aperture_numerator = pentax_get_u32le (data + 280);
+	parsed.aperture_denominator = pentax_get_u32le (data + 284);
+	parsed.exposure_comp_numerator = (int32_t)pentax_get_u32le (data + 288);
+	parsed.exposure_comp_denominator = pentax_get_u32le (data + 292);
 	parsed.iso = pentax_get_u32le (data + 312);
 	parsed.astro_status_flags = pentax_get_u32le (data + 320);
 	parsed.open_av_num = pentax_get_u32le (data + 328);

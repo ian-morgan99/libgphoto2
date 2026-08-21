@@ -9754,7 +9754,8 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 		"state=%u; astro-phase=%s; exposure-mode-raw=%u; user-mode-raw=%u; "
 		"drive-mode-raw=%u; ISO=%u; exposure-step=%u; open-av-num=%u; "
 		"shooting=%s; processing=%s; task-changing=%s; Tv-changeable=%s; "
-		"bulb-timer=%s; bulb-seconds=%u/%u; astrotracer3=%s; "
+		"bulb-timer=%s; bulb-seconds=%u/%u; aperture=%u/%u; "
+		"exposure-comp=%d/%u; astrotracer3=%s; "
 		"astro-shift=%s; astro-movement-failed=%s; astro-time-too-long=%s; "
 		"astro-limit=%s%u; gps-state=%u",
 		conditions.operation_state, phase, conditions.exposure_mode,
@@ -9766,6 +9767,9 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 		(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV) ? "yes" : "no",
 		(conditions.capability_flags & PENTAX_CONDITION_BULB_TIMER) ? "yes" : "no",
 		conditions.bulb_timer_seconds, conditions.bulb_timer_denominator,
+		conditions.aperture_numerator, conditions.aperture_denominator,
+		conditions.exposure_comp_numerator,
+		conditions.exposure_comp_denominator,
 		(conditions.capability_flags & PENTAX_CONDITION_ASTROTRACER3) ? "yes" : "no",
 		(conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) ? "yes" : "no",
 		(conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_MOVEMENT_FAILED) ? "yes" : "no",
