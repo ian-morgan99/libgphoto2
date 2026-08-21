@@ -29,6 +29,19 @@ Actual result: `camlibs/ptp2/ptp2.so` linked successfully. The project emitted
 pre-existing warnings in unrelated code; no compiler error was emitted for the
 Pentax changes.
 
+After extracting the pure Pentax parsing and seekable transfer-buffer code, a
+fresh container build and focused test run completed successfully:
+
+```text
+meson test -C /tmp/build test-pentax-utils --print-errorlogs
+1/1 libgphoto2:test-pentax-utils OK
+```
+
+The fixture covers little-endian decoding; valid, truncated, oversized,
+non-ASCII, and path-injection filenames; sequential, overwrite, and sparse
+writes; begin/current/end seeking; negative bounds; invalid commands; and null
+arguments.
+
 A targeted earlier test run passed 6 of 9 tests. The three failures were from
 the intentionally restricted container/build selection: host USB descriptor
 access in `test-gp-port`, a model expected from a non-PTP camlib in
@@ -40,4 +53,3 @@ recorded as regressions or as passes; a full-build test run remains required.
 No Pentax camera was connected. Consequently handshake, preview, capture,
 transfer, cancellation, reconnect, and configuration acceptance are BLOCKED.
 No artifact hashes or hexadecimal camera response codes exist yet.
-

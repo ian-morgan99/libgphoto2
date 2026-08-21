@@ -2,6 +2,8 @@ shared_module(
   'ptp2',
   'ptp.c',
   'ptp.h',
+  'pentax-utils.c',
+  'pentax-utils.h',
   'chdk_ptp.h',
   'chdk_live_view.h',
   'library.c',
