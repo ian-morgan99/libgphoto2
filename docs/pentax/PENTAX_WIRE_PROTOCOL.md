@@ -71,7 +71,9 @@ The transfer sequence is:
    data; operations 4, 5, and 6 seek from begin, current position, and end.
 5. For operation 3, request no more than the reported remaining count and an
    8 MiB safety block. `GetTransferFileDataBlock` (`0x900d`) returns its valid
-   byte count in response `Param1`.
+   byte count in response `Param1`. Continue reading blocks for the same file
+   command until its reported count is consumed or the camera returns a short
+   block; only then request the next file command.
 6. Only after a non-empty local file is cached, send
    `DeleteTransferCandidate` (`0x900e`, GETDATA with no parameters) and discard
    its returned data.
