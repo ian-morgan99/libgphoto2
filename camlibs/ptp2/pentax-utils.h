@@ -95,6 +95,8 @@ int pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
 int pentax_live_view_stop_response_ok (uint16_t response);
 int pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 	uint8_t *fallback);
+int pentax_live_view_frame_should_retry (uint16_t response,
+	unsigned int attempts, unsigned int elapsed_ms);
 int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
