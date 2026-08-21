@@ -3124,6 +3124,27 @@ pentax_identify_supported_model (PTPParams *params, const CameraAbilities *abili
 		&params->pentax.model_no, &params->pentax.vendor_ext_version);
 }
 
+static uint16_t
+pentax_restore_live_view (PTPParams *params)
+{
+	PTPPropValue value;
+	uint16_t ret = PTP_RC_OK;
+
+	if (params->inliveview) {
+		value.u8 = params->pentax.live_view_original_valid ?
+			params->pentax.live_view_original_value : 0;
+		if (value.u8 != 1)
+			ret = ptp_setdevicepropvalue (params,
+				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+	}
+	if (ret == PTP_RC_OK) {
+		params->inliveview = 0;
+		params->pentax.live_view_original_value = 0;
+		params->pentax.live_view_original_valid = 0;
+	}
+	return ret;
+}
+
 int
 camera_abilities (CameraAbilitiesList *list)
 {
@@ -3290,16 +3311,9 @@ camera_exit (Camera *camera, GPContext *context)
 				uint32_t function_flags = 0;
 
 				if (params->inliveview) {
-					PTPPropValue value;
-					uint16_t ret;
-
-					value.u8 = 0;
-					ret = ptp_setdevicepropvalue (params,
-						PTP_DPC_PENTAX_UsbLiveViewMode, &value,
-						PTP_DTC_UINT8);
+					uint16_t ret = pentax_restore_live_view (params);
 					if (ret != PTP_RC_OK)
-						GP_LOG_E ("Pentax live view stop failed with 0x%04x", ret);
-					params->inliveview = 0;
+						GP_LOG_E ("Pentax live view restore failed with 0x%04x", ret);
 				}
 				exit_result = ptp_pentax_set_vendor_mode (params,
 					params->pentax.model_no, 0,
@@ -3643,26 +3657,46 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			return GP_ERROR_NOT_SUPPORTED;
 		SET_CONTEXT_P (params, context);
 		if (!params->inliveview) {
-			value.u8 = 1;
-			ret = ptp_setdevicepropvalue (params,
+			ret = ptp_getdevicepropvalue (params,
 				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
 			if (ret != PTP_RC_OK) {
 				SET_CONTEXT_P (params, NULL);
 				return translate_ptp_result (ret);
 			}
+			params->pentax.live_view_original_value = value.u8;
+			params->pentax.live_view_original_valid = 1;
+			if (value.u8 != 1) {
+				value.u8 = 1;
+				ret = ptp_setdevicepropvalue (params,
+					PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+				if (ret != PTP_RC_OK) {
+					params->pentax.live_view_original_valid = 0;
+					SET_CONTEXT_P (params, NULL);
+					return translate_ptp_result (ret);
+				}
+			}
 			params->inliveview = 1;
 		}
 		ret = ptp_pentax_get_live_view_frame (params, &data, &size);
 		if (ret != PTP_RC_OK) {
+			uint16_t restore_ret = pentax_restore_live_view (params);
+			if (restore_ret != PTP_RC_OK)
+				GP_LOG_E ("Pentax live view restore after frame error failed with 0x%04x",
+					restore_ret);
 			SET_CONTEXT_P (params, NULL);
 			return translate_ptp_result (ret);
 		}
 		result = save_jpeg_in_data_to_preview (data, size, file);
 		free (data);
-		SET_CONTEXT_P (params, NULL);
-		if (result < GP_OK)
+		if (result < GP_OK) {
+			ret = pentax_restore_live_view (params);
+			if (ret != PTP_RC_OK)
+				GP_LOG_E ("Pentax live view restore after invalid frame failed with 0x%04x",
+					ret);
 			gp_context_error (context,
 				_("Pentax live view returned no complete JPEG frame"));
+		}
+		SET_CONTEXT_P (params, NULL);
 		return result;
 	}
 	case PTP_VENDOR_CANON:

@@ -18,6 +18,7 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | Autotools/source-distribution path | PASS | Removed stale invalid Makefile text; `autoreconf`, configure, and `make dist-xz` PASS; archive contains Pentax utility source |
 | 2026-08-21 | Candidate-transfer finalization audit | CORRECTED | New 0x900B–0x900D path now finalizes with GETDATA 0x900E; 0x9003 retained only for legacy object path |
 | 2026-08-21 | Multi-block transfer audit | CORRECTED | Operation 3 now consumes repeated bounded 0x900D blocks before requesting the next file command |
+| 2026-08-21 | Live-view ownership audit | CORRECTED | Read and retain original 0xD035 value; restore on frame error, malformed frame, and exit; retry restoration during exit after a transient failure |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -241,7 +242,8 @@ bounds checking. Implement and hardware-test one at a time:
 3. live-view frame (0x9006);
 4. initiate/terminate capture (0x9011/0x9012);
 5. candidate info, file command, and block transfer (0x900B–0x900D);
-6. acknowledge object (0x9003);
+6. finalize new candidate transfer (GETDATA 0x900E); retain 0x9003 only for the
+   separately observed legacy GetObject path;
 7. interrupt (0x9013);
 8. focus only if observed and in scope.
 

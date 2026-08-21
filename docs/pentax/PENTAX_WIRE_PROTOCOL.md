@@ -49,6 +49,11 @@ are Observed-client. The returned data is searched with bounded JPEG framing;
 whether every supported firmware returns a bare JPEG or a wrapper is
 Unknown-hardware.
 
+The libgphoto2 implementation reads and retains the session's original UINT8
+value before changing it. It restores that exact value after a frame transport
+error, an invalid JPEG frame, or session exit. A failed restoration remains
+pending so exit can retry it before vendor mode is disabled.
+
 ## Still capture and transfer
 
 Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:

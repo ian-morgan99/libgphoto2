@@ -4329,6 +4329,8 @@ struct _PTPParams {
 		uint32_t function_flags;
 		int supported_model;
 		int vendor_mode_enabled;
+		uint8_t live_view_original_value;
+		int live_view_original_valid;
 	} pentax;
 
 	/* PTP: caching time for properties, default 2 */
