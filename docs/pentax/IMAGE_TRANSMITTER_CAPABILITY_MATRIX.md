@@ -89,7 +89,7 @@ vendor capture/candidate workflow.
 | `0x5014` | CI contrast | UINT8, logical value +4 | Source target |
 | `0x5015` | CI sharpness | UINT8, logical value +4 | K-3 III HW-R; writes pending |
 | `0xd009` | LV/CAF geometry | 20 bytes with UINT16 dimensions | Fail-closed parser; K-1 II HW-R 720×480, K-3 III target |
-| `0xd00f` | shutter/Bulb timer | UINT64 as UINT32 numerator/denominator | K-3 III HW-R; K-1 II next direct read |
+| `0xd00f` | shutter/Bulb timer | UINT64 as UINT32 numerator/denominator | K-3 III HW-R; K-1 II HW-R; M-mode write returned `0x2001` but retained 1/500, so HW-W remains open pending conditions bit 1 at offset 504 |
 | `0xd013` | drive mode | K-1 II descriptor is UINT32 enumeration; do not assume one cross-model width | K-1 II HW-R enum 23/current raw 1; K-3 III width re-audit target |
 | `0xd014` | bracket mode | UINT8; K-3 III gate | K-1 II withheld |
 | `0xd015` | bracket step | UINT8 tenths; K-3 III gate | K-1 II withheld |

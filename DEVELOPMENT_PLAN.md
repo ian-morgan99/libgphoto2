@@ -77,6 +77,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 | 2026-08-21 | H1.12 K-1 II single preview | REPRODUCIBLE FAIL-CLOSED | Cardless and inserted-card exact-model attempts both returned the same unlocalized `GP_ERROR_IO`, retained no frame, made no retry, and released USB; card absence is ruled out as sole cause; instrument every start/frame/restore/disable substage before another attempt; see H1.12 |
 | 2026-08-21 | H1.13 K-1 II instrumented preview | START/RESTORE PASS; FRAME NOT READY | Exact stages localized failure: empty `0xd035` pre-read, direct start `0x2001`, first frame `0xa008`/NoUpdateImage, explicit stop restore `0x2001`; implement bounded 33 ms polling for only `0xa008`; see H1.13 |
 | 2026-08-21 | H1.14 K-1 II bounded single preview | PASS | Only `0xa008` retried under 30-attempt/1.5 s/cancellation bounds; valid 31,126-byte JPEG arrived on attempt 10 after 312 ms; in-memory validation and cleanup passed; see H1.14 |
+| 2026-08-21 | H1.15 K-1 II guarded shutter write | ACKNOWLEDGED BUT NOT APPLIED / RESTORED | In physical M, `0xd00f` advertised 1/125 and accepted the exact IT2 payload with `0x2001`, but same- and fresh-session reads retained 1/500; no preview ran; explicit restore and independent read verified 1/500. Setter now verifies application; audit conditions offset 504 before another write; see H1.15 |
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
 | 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
 | 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
@@ -89,26 +90,35 @@ not guessed without real `GetDevicePropDesc` evidence.
 
 This list supersedes completed task narratives later in the document.
 
-1. Run the paced 10-frame K-1 II gate with the same per-frame transient bounds.
+1. Read the K-1 II conditions changeability word at offset 504 without writing;
+   record `IsTvChangeable` (bit 1), exposure mode, task-changing state, live-view
+   state, and any source-derived prerequisite. Do not infer writability from the
+   descriptor's GetSet flag or physical M alone.
+2. Only after that state is understood, repeat one 1/500→1/125→1/500 shutter
+   round trip with mandatory post-write verification. A PTP `0x2001` response
+   without value change is failure, not success.
+3. Run the paced 10-frame K-1 II gate with the same per-frame transient bounds.
    Record attempt count and elapsed time for every frame; stop on the first
    failure and require explicit exit cleanup.
-2. If 10/10 passes, perform a separate stop/reconnect/single-frame test before
+4. If 10/10 passes, perform a separate stop/reconnect/single-frame test before
    the 50-frame gate.
-3. If reconnect passes, run 50 frames, then 500 in a separate session; never
+5. If reconnect passes, run 50 frames, then 500 in a separate session; never
    combine gates or continue after a failure.
-4. After 1/10/50/500 preview gates, perform separate single-variable AF-position
+6. After 1/10/50/500 preview gates, perform separate single-variable AF-position
    and zoom restore tests. Focus peaking remains withheld on K-1 II.
-5. Complete the 10 cold + 10 warm lifecycle gate, then the 50-cycle gate.
-6. Resume K-1 II `0x9016` minimum Near/equal Far only after preview recovery and
+7. Complete the 10 cold + 10 warm lifecycle gate, then the 50-cycle gate.
+8. Resume K-1 II `0x9016` minimum Near/equal Far only after preview recovery and
    lifecycle gates; never use IT2's focus escalation.
-7. Capture/transfer, Bulb, Astro and Polaris integration remain later blocked
+9. Capture/transfer, Bulb, Astro and Polaris integration remain later blocked
    tiers. Default public capture/preview abilities stay disabled.
 
 ## Current hard stop
 
-H1.14 passed one bounded K-1 II frame. The only authorized next hardware action
-is activity 1's paced 10-frame gate. Do not change a setting, move focus,
-capture, delete, reset USB, or start a Polaris hardware test. A failed vendor
+H1.15 proved that physical M plus a GetSet descriptor is not sufficient for a
+K-1 II shutter write: the camera acknowledged 1/125 but retained 1/500. The
+only authorized next hardware action is activity 1's read-only conditions
+audit. Do not change a setting, request preview, move focus, capture, delete,
+reset USB, or start a Polaris hardware test. A failed vendor
 enable remains fail-closed with no in-session retry or later Pentax opcode.
 
 The earlier `0x2002` diagnosis was partly confounded by incomplete container

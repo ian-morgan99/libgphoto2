@@ -19,11 +19,19 @@ expected datatype:
 | `whitebalance` | WhiteBalance `0x5005` | UINT16 | Hardware descriptor verified read/write |
 | `focusmode` | FocusMode `0x500a` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
 | `exposurecompensation` | ExposureBiasCompensation `0x5010` | INT16 | Hardware descriptor verified read/write |
-| `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | Hardware descriptor verified read/write; Pentax model-routing required because DeviceInfo vendor is Microsoft MTP |
+| `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | K-3 III descriptor read; K-1 II direct read verified, but an acknowledged M-mode write was ignored, so general write support is not yet proven |
 
 The `0xd00f` constant already existed as `PTP_DPC_RICOH_ShutterSpeed`; the new
-Pentax name is an alias for the same wire property. Do not add a duplicate menu
-entry.
+Pentax name is an alias for the same wire property. K-1 II does not advertise
+it in DeviceInfo, so the exact-model `pentaxdirectshutter` widget requests its
+descriptor on demand. Its setter verifies the post-write descriptor and fails
+if a camera acknowledges but retains the old value.
+
+On K-1 II in physical M, 1/500→1/125 produced the exact IT2 payload and PTP OK,
+but immediate and fresh-session reads retained 1/500. The explicit restoration
+write and independent verification also read 1/500. No preview followed. Audit
+the conditions changeability word at offset 504 before another shutter write;
+GetSet and physical M are not sufficient authorization or success evidence.
 
 Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
 exposure compensation, and shutter speed. Several white-balance enumeration
