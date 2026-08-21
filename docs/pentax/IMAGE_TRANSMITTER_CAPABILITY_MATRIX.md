@@ -90,7 +90,7 @@ vendor capture/candidate workflow.
 | `0x5015` | CI sharpness | UINT8, logical value +4 | K-3 III HW-R; writes pending |
 | `0xd009` | LV/CAF geometry | 20 bytes with UINT16 dimensions | Fail-closed parser; K-1 II HW-R 720×480, K-3 III target |
 | `0xd00f` | shutter/Bulb timer | UINT64 as UINT32 numerator/denominator | K-3 III HW-R; K-1 II next direct read |
-| `0xd013` | drive mode | UINT8 enumeration | K-3 III HW-R; K-1 II target |
+| `0xd013` | drive mode | K-1 II descriptor is UINT32 enumeration; do not assume one cross-model width | K-1 II HW-R enum 23/current raw 1; K-3 III width re-audit target |
 | `0xd014` | bracket mode | UINT8; K-3 III gate | K-1 II withheld |
 | `0xd015` | bracket step | UINT8 tenths; K-3 III gate | K-1 II withheld |
 | `0xd018` | WB color temperature | UINT16; K-3 III UI gate | Hardware target |
@@ -107,10 +107,10 @@ vendor capture/candidate workflow.
 | `0xd028` | CI highlight contrast | signed byte; detailed-CI gate | K-3 III target; K-1 II withheld |
 | `0xd029` | CI shadow contrast | signed byte; detailed-CI gate | K-3 III target; K-1 II withheld |
 | `0xd02a` | composition-adjustment switch | UINT8 boolean; composition gate | K-3 III target |
-| `0xd02b` | focus peaking | UINT8 | Both source path; hardware target |
+| `0xd02b` | focus peaking | IT2 assumes UINT8; K-1 II instead returns stable `0x4004` array-UINT16 descriptor payload and anomalous 4-byte value | K-1 II withheld; K-3 III hardware target |
 | `0xd02c` | CI cross process | encoded UINT8 normal and 32+ ranges | Source target |
 | `0xd02d` | CI user filter | 8-byte signed triplet structure | Trace before write |
-| `0xd035` | PC live view | UINT8 boolean | K-3 III HW-W restore; K-1 II target |
+| `0xd035` | PC live view | IT2 writes UINT8 boolean; K-1 II descriptor is a datatype-zero six-byte placeholder with empty value | K-3 III HW-W restore; K-1 II source-defined path only, one-frame restore target |
 | `0xd036` | LV AF position | 4-byte response means geometry centre; >=8 bytes has X/Y UINT16 at 4/6; setter is `{2,0,0,0,Xlo,Xhi,Ylo,Yhi}` | Parser/encoder fixtures; K-1 II HW-R 8-byte centre 360,240; bounded write target |
 | `0xd037` | LV zoom | `{4,0,0,0,Xlo,Xhi,Ylo,Yhi,mag,0,0,0}`; disable mag 1 | Encoder fixture; K-1 II HW-R raw 1; public config target; 16x fallback once to 10x only on `0x201c` after hardware gate |
 | `0xd039` | movie mode | UINT8 boolean; movie gate | Both source target |
