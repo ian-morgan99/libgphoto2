@@ -36,6 +36,10 @@ typedef struct {
 	uint32_t exposure_step;
 	uint32_t bulb_timer_seconds;
 	uint32_t bulb_timer_denominator;
+	uint32_t aperture_numerator;
+	uint32_t aperture_denominator;
+	int32_t exposure_comp_numerator;
+	uint32_t exposure_comp_denominator;
 	uint32_t iso;
 	uint32_t open_av_num;
 	uint32_t astro_status_flags;

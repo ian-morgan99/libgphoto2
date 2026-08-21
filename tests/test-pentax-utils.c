@@ -215,6 +215,10 @@ main (void)
 	put_u32le (condition_data, 184, 12);
 	put_u32le (condition_data, 272, 300);
 	put_u32le (condition_data, 276, 1);
+	put_u32le (condition_data, 280, 28);
+	put_u32le (condition_data, 284, 10);
+	put_u32le (condition_data, 288, (uint32_t)-3);
+	put_u32le (condition_data, 292, 10);
 	put_u32le (condition_data, 312, 3200);
 	put_u32le (condition_data, 320, PENTAX_CONDITION_ASTRO_SHIFT_MODE |
 		PENTAX_CONDITION_ASTRO_MOVEMENT_FAILED |
@@ -230,7 +234,12 @@ main (void)
 		(conditions.activity_flags == 3) && (conditions.exposure_mode == 12) &&
 		(conditions.user_mode == 3) && (conditions.exposure_step == 2) &&
 		(conditions.bulb_timer_seconds == 300) &&
-		(conditions.bulb_timer_denominator == 1) && (conditions.iso == 3200) &&
+		(conditions.bulb_timer_denominator == 1) &&
+		(conditions.aperture_numerator == 28) &&
+		(conditions.aperture_denominator == 10) &&
+		(conditions.exposure_comp_numerator == -3) &&
+		(conditions.exposure_comp_denominator == 10) &&
+		(conditions.iso == 3200) &&
 		(conditions.open_av_num == 28) && (conditions.drive_mode == 4));
 	CHECK ((conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_TIME_TOO_LONG) &&
 		(conditions.capability_flags & PENTAX_CONDITION_ASTROTRACER3) &&

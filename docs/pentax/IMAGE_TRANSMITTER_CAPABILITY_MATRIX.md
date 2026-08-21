@@ -140,7 +140,7 @@ captured and fixture-tested.
 | 184, 188, 196 | exposure, program, AF modes | exposure raw implemented |
 | 216, 220, 224, 232 | legacy drive; hyper flags; roll; bracket count | Target |
 | 252 | color temperature | Target |
-| 272/276, 280/284, 288/292 | shutter, aperture, exposure-comp rationals | Bulb subset implemented |
+| 272/276, 280/284, 288/292 | shutter, aperture, exposure-comp rationals | All parsed; K-1 II HW-R 1/500, 20/10 (f/2.0), and 0/10 EV |
 | 304, 312, 316, 320, 328 | max Tv, ISO, program, status flags, open Av | ISO/status/open Av implemented |
 | 368, 420 | battery and focal length | Target |
 | 436–452 | flash state/modes/type | Target/low priority |
