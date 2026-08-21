@@ -8,6 +8,9 @@ consolidates the extraction previously split across `PENTAX_WIRE_PROTOCOL.md`,
 omission means “not advertised”, not “unsupported”: IMAGE Transmitter 2 (IT2)
 directly requests many omitted vendor codes.
 
+The complete IT2 UI-to-wire setting audit and its remaining session/WPD
+differential are recorded in `IMAGE_TRANSMITTER_SETTING_PATH.md`.
+
 Status terms: **IT2** means directly present in the decompiled client; **HW-R**
 means read-only hardware-confirmed; **HW-W** means bounded write plus exact
 restoration confirmed; **target** means not yet closed; **withheld** means not
