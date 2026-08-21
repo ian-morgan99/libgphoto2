@@ -53,6 +53,10 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Init-only check after clean power cycle | FAIL / STOPPED | Camera fully disappeared and re-enumerated at a new address after normal-screen readiness, but exact-model init-only harness still returned `GP_ERROR_IO`; instrument initialization substages/raw responses before more hardware commands |
 | 2026-08-21 | Container isolation correction | PASS | Combining bus enumeration visibility with an explicit grant for the single USB node produced clean init, vendor flags 0, cleanup, and zero retries; prior init failures were host device-cgroup artifacts |
 | 2026-08-21 | Correctly isolated minimum Near | HOST CRASH AFTER TRANSPORT | No transport error appeared before a null `alreadyset` dereference after the focus call; fix compiles and passes focused plus ASan/UBSan tests; record physical observation before Far or repeat |
+| 2026-08-21 | Correctly isolated Near observation | NO PHYSICAL MOVEMENT | Operator saw and heard no lens movement; instrument actual `openAvNum`, computed displacement, and raw response before direction reversal or any increase |
+| 2026-08-21 | Instrumented minimum Near | TRANSPORT PASS / PHYSICAL PENDING | `openAvNum=28` produced source-derived displacement `+23`; K-3 III returned PTP OK `0x2001`, zero retries, clean exit; record movement observation before Far or increase |
+| 2026-08-21 | Minimum Near physical direction | PASS | Operator confirmed `0x9017(+23)` moved the 24–70 focus nearer; permits one equal source-derived Far reversal, still with no retry/escalation |
+| 2026-08-21 | Minimum Far reversal | TRANSPORT PASS / PHYSICAL PENDING | Fresh `openAvNum=28` produced `-23`; camera returned PTP OK `0x2001`, zero retries, clean exit; record visible Far movement before closing bidirectional gate |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately

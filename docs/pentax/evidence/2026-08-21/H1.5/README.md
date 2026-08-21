@@ -72,9 +72,22 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
     best current evidence is that both returned OK before the host crash. The
     null dereference is fixed and the module plus ASan/UBSan utility tests pass.
     Physical movement observation for this run remains pending.
+12. The operator subsequently confirmed no visible or audible lens movement
+    during the correctly isolated Near run.
+13. After compiling explicit status/response reporting, one further fixed
+    minimum Near probe produced `openAvNum=28`, displacement `+23`, opcode
+    `0x9017`, retries zero, and raw response `0x2001` (PTP OK). Initialization,
+    vendor disable, and cleanup succeeded. Physical movement observation is
+    subsequently confirmed by the operator as movement nearer; no Far command
+    had yet been sent.
+14. One fresh minimum Far reversal produced `openAvNum=28`, displacement `-23`,
+    opcode `0x9017`, retries zero, and raw response `0x2001`. Cleanup succeeded.
+    Physical Far-direction observation remains pending.
 
-Status: **PROTOCOL COMMAND PROBABLY ACCEPTED / PHYSICAL RESULT PENDING**.
-Corrected container isolation proves clean initialization. Control flow and the
-absence of instrumented transport errors place the crash after a successful
-focus-transport return, but only operator observation can establish physical
-movement. Do not send Far or repeat Near until that observation is recorded.
+Status: **MINIMUM NEAR PASS / FAR TRANSPORT PASS, PHYSICAL PENDING**. Corrected
+container isolation proves clean initialization, `GetAllConditions` supplies a
+nonzero factor, and the camera returns PTP OK to the source-derived minimum
+Near command. Operator observation confirms that `0x9017(+23)` physically moves
+focus nearer on this body/firmware/lens combination. One equal source-derived
+Far command returned PTP OK with the exact opposite displacement; its physical
+direction observation remains required. Larger displacements remain prohibited.
