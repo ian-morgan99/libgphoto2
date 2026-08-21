@@ -50,7 +50,7 @@ not live view, capture, configuration, or focus control.
 | `0x9002` | camera shutdown; no parameters | Both | Withheld; never a wake/recovery command |
 | `0x9003` | acknowledge old-path object handle | Legacy path | Not the target for these new-transfer bodies |
 | `0x9004` | card writing bitmask | Both | Target; no hardware write |
-| `0x9006` | live-view frame, data-in | Both | Implemented; K-3 III 50-frame HW-R; K-1 II cardless one-frame composite path failed with unlocalized `GP_ERROR_IO`, inserted-card instrumented retry required |
+| `0x9006` | live-view frame, data-in | Both | Implemented; K-3 III 50-frame HW-R; K-1 II composite path reproducibly fails with unlocalized `GP_ERROR_IO` both cardless and with card, instrumentation required |
 | `0x9007` | old-path sub-image, handle, data-in | Legacy path | Not target for these bodies |
 | `0x9008` | old-path main image, handle, data-in | Legacy path | Not target for these bodies |
 | `0x9009` | warning-message flag | Both | Target/low priority |

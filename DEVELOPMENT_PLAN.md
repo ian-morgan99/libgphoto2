@@ -74,7 +74,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 | 2026-08-21 | H1.9 K-1 II MSC baseline | PASS | Hardware-confirmed `25fb:0182` storage-only personality with one populated and one empty LUN; misleading volume label; newest-by-mtime DNG hashed read-only for a future cross-backend transfer comparison; see H1.9 |
 | 2026-08-21 | H1.10 K-1 II LV control discovery | READ-ONLY PASS | Source-derived `0xd009`, `0xd036`, and `0xd037` returned validated 720×480 geometry, centred 8-byte AF position, and zoom-off value 1; no setters, preview, focus, or capture; see H1.10 |
 | 2026-08-21 | H1.11 K-1 II direct descriptor sweep | READ-ONLY PASS 2/2 | Seven conventional properties were byte-stable across individual fresh sessions; corrected drive mode to UINT32; focus-peaking and PC-LV descriptors are stable nonstandard payloads and remain withheld; see H1.11 |
-| 2026-08-21 | H1.12 K-1 II single preview | INCONCLUSIVE / FAIL-CLOSED | Cardless exact-model attempt returned unlocalized `GP_ERROR_IO`, retained no frame, made no retry, ran error-path exit, and released USB; instrument every start/frame/restore/disable substage before one inserted-card retry; see H1.12 |
+| 2026-08-21 | H1.12 K-1 II single preview | REPRODUCIBLE FAIL-CLOSED | Cardless and inserted-card exact-model attempts both returned the same unlocalized `GP_ERROR_IO`, retained no frame, made no retry, and released USB; card absence is ruled out as sole cause; instrument every start/frame/restore/disable substage before another attempt; see H1.12 |
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
 | 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
 | 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
@@ -92,8 +92,8 @@ This list supersedes completed task narratives later in the document.
    each report their raw result while preserving the first failure.
 2. Rebuild offline and add forced-failure cleanup fixtures for failure at every
    stage. Prove restoration is attempted only when start succeeded.
-3. With the inserted card recorded and capacity read-only confirmed, run exactly
-   one K-1 II frame once. Stop on any non-OK result. Only a valid
+3. Run exactly one instrumented K-1 II frame once. Stop on any non-OK result.
+   Only a valid
    bounded JPEG plus explicit successful restoration permits 10 frames.
 4. After 1/10/50/500 preview gates, perform separate single-variable AF-position
    and zoom restore tests. Focus peaking remains withheld on K-1 II.
