@@ -3116,24 +3116,12 @@ is_mtp_capable(Camera *camera) {
 static void
 pentax_identify_supported_model (PTPParams *params, const CameraAbilities *abilities)
 {
-	const char *model = params->deviceinfo.Model;
-
 	memset (&params->pentax, 0, sizeof (params->pentax));
-	if (!model || !abilities || (abilities->usb_vendor != 0x25fb))
+	if (!abilities)
 		return;
-	if ((abilities->usb_product == 0x018c) &&
-	    !strcmp (model, "PENTAX K-3 Mark III")) {
-		params->pentax.model_no = 78420;
-		params->pentax.vendor_ext_version = 1;
-		params->pentax.supported_model = 1;
-		return;
-	}
-	if ((abilities->usb_product == 0x0183) &&
-	    !strcmp (model, "PENTAX K-1 Mark II")) {
-		params->pentax.model_no = 78400;
-		params->pentax.vendor_ext_version = 1;
-		params->pentax.supported_model = 1;
-	}
+	params->pentax.supported_model = pentax_lookup_model (
+		abilities->usb_vendor, abilities->usb_product, params->deviceinfo.Model,
+		&params->pentax.model_no, &params->pentax.vendor_ext_version);
 }
 
 int

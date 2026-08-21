@@ -12,6 +12,8 @@ typedef struct {
 } PentaxCaptureBuffer;
 
 uint32_t pentax_get_u32le (const unsigned char *data);
+int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
+	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,

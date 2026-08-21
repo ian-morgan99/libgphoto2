@@ -18,6 +18,31 @@ pentax_get_u32le (const unsigned char *data)
 	       ((uint32_t)data[3] << 24);
 }
 
+int
+pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
+		const char *device_model, uint32_t *model_no, uint32_t *extension_version)
+{
+	if (!model_no || !extension_version)
+		return 0;
+	*model_no = 0;
+	*extension_version = 0;
+	if (!device_model || (usb_vendor != 0x25fb))
+		return 0;
+	if ((usb_product == 0x018c) &&
+	    !strcmp (device_model, "PENTAX K-3 Mark III")) {
+		*model_no = 78420;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x0183) &&
+	    !strcmp (device_model, "PENTAX K-1 Mark II")) {
+		*model_no = 78400;
+		*extension_version = 1;
+		return 1;
+	}
+	return 0;
+}
+
 static int
 pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 {

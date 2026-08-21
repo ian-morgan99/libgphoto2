@@ -29,9 +29,23 @@ main (void)
 	const unsigned char first[] = {1, 2, 3, 4};
 	const unsigned char patch[] = {9, 8};
 	char name[32];
+	uint32_t model_no = 99, extension_version = 99;
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
+	CHECK (pentax_lookup_model (0x25fb, 0x018c, "PENTAX K-3 Mark III",
+		&model_no, &extension_version));
+	CHECK ((model_no == 78420) && (extension_version == 1));
+	CHECK (pentax_lookup_model (0x25fb, 0x0183, "PENTAX K-1 Mark II",
+		&model_no, &extension_version));
+	CHECK ((model_no == 78400) && (extension_version == 1));
+	CHECK (!pentax_lookup_model (0x25fb, 0x018f,
+		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
+	CHECK ((model_no == 0) && (extension_version == 0));
+	CHECK (!pentax_lookup_model (0x25fb, 0x018c,
+		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
+	CHECK (!pentax_lookup_model (0x1234, 0x018c, "PENTAX K-3 Mark III",
+		&model_no, &extension_version));
 	CHECK (pentax_candidate_filename (filename, sizeof (filename), name,
 		sizeof (name)) == GP_OK);
 	CHECK (!strcmp (name, "IMG0001.JPG"));
