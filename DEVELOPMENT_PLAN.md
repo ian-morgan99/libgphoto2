@@ -12,10 +12,10 @@ any real-hardware test; the plan status table is not a substitute for it.
 |---|---|---|---|
 | 2026-08-21 | Canonical plan review and cloud publication | PASS | Commit `9ca537595`; obsolete workspace plans moved to `archive/` |
 | 2026-08-21 | M0 repository, tool, and camera inventory | PARTIAL | Repository/tool inventory PASS; target hardware BLOCKED; see `docs/pentax/evidence/2026-08-21/M0.1/` |
-| 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Wire contract documented; USB observations remain BLOCKED |
-| 2026-08-21 | P2 wrappers and guarded session state | COMPILE PASS | Hardware transaction gate BLOCKED |
-| 2026-08-21 | P3 vendor lifecycle | HARDWARE PASS | Firmware 2.20 enable/descriptor refresh/disable and independent cleanup verification pass; reconnect repetition remains |
-| 2026-08-21 | P4 preview path | PARTIAL HARDWARE PASS | One bounded 1080x720 JPEG frame passed and original `0xd035=0` restored; 500-frame gate remains |
+| 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Passive USB and limited warm-session observations exist; official-client handshake trace and capture/transfer traces remain BLOCKED |
+| 2026-08-21 | P2 wrappers and guarded session state | PARTIAL HARDWARE PASS | `0x9001` and `0x9006` have bounded warm-session evidence; all capture/transfer and dormant wrappers remain hardware-blocked |
+| 2026-08-21 | P3 vendor lifecycle | REGRESSION / BLOCKED | Warm-state enable/refresh/disable passed, but two fresh sessions after a camera power cycle returned `0x2002`; connection ordering or camera-state prerequisite remains unknown |
+| 2026-08-21 | P4 preview path | PARTIAL HARDWARE PASS | A 50-frame paced warm-session soak passed with cleanup; cold-start lifecycle and 500-frame gates remain |
 | 2026-08-21 | P5 capture and transfer state machine | COMPILE PASS | JPEG/RAW/cancel camera gate BLOCKED |
 | 2026-08-21 | Obsolete `pentaxmodern` prototype | ARCHIVED | Removed stale build registrations; source retained under workspace `archive/obsolete-source/` and in Git history |
 | 2026-08-21 | Pentax parser/transfer-buffer unit tests | PASS | Fresh container compile plus `test-pentax-utils` 1/1 PASS |
@@ -33,7 +33,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Pentax live-view framing audit | CORRECTED | Dedicated bounded JPEG parser now requires complete SOI/EOI and rejects missing/trailing/truncated markers; parser fixtures pass sanitizers |
 | 2026-08-21 | H1.1 K-3 III passive/read-only discovery | PASS | Real firmware 2.20: MTP `25fb:0189`, CD-ROM `25fb:018a`, exact DeviceInfo model, Microsoft extension `0x6`, SD1/SD2; no mutation commands; serial redacted |
 | 2026-08-21 | K-3 III routing correction | HARDWARE PASS | Moved hardware-proven `0189` from legacy USB-SCSI camlib to ptp2; exact model state gates lifecycle/config routing despite Microsoft MTP extension ID |
-| 2026-08-21 | H1.2 vendor lifecycle and descriptors | PASS | Guarded enable exposed Pentax properties; exit hid them again in an independent generic session; only 0x9001 state changed; ISO/focus assumptions corrected |
+| 2026-08-21 | H1.2 vendor lifecycle and descriptors | CONDITIONAL PASS | One warm-state lifecycle exposed and then hid Pentax properties, but cold-start repetition failed with `0x2002`; the result proves one session, not a stable handshake |
 | 2026-08-21 | Post-enable DeviceInfo cache audit | CORRECTED | Normal config listing initially saw only pre-vendor properties; candidate now atomically refreshes after enable and rolls vendor mode back on refresh/fixup failure |
 | 2026-08-21 | Read-only configuration widgets | PARTIAL PASS | Aperture, exposure compensation, and shutter decode correctly; Pentax white-balance vendor labels required effective-vendor routing correction; ISO/focus remain withheld |
 | 2026-08-21 | H1.3 single live-view frame | PASS | Valid 1080x720 JPEG returned; disposable host file only; `0xd035` independently verified restored to 0; see evidence record |
@@ -47,6 +47,105 @@ any real-hardware test; the plan status table is not a substitute for it.
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
 not guessed without real `GetDevicePropDesc` evidence.
+
+## Current hard stop
+
+The next executable task is handshake/recovery investigation, not additional
+settings, preview, capture, transfer, or Polaris work. After a camera power
+cycle, two fresh candidate sessions received General Error `0x2002` from
+`SetVendorMode`; the driver correctly issued no later Pentax operation. Until a
+repeatable cold-start sequence is observed and documented:
+
+- do not send any other Pentax opcode in the failed session;
+- do not retry `0x9001` in a loop or automatically reset the USB device;
+- do not change camera settings to hunt for a working state without recording
+  the exact before/after state and obtaining approval for persistent changes;
+- do not claim vendor lifecycle, configuration, preview, or capture as
+  reconnect-safe;
+- do not expose unverified still capture or preview through static ability
+  flags in a release candidate.
+
+The current code remains research-only. A containment commit that removes
+unverified static capability advertising is required before the next release
+candidate build; the constrained explicit-port preview harness remains the only
+approved way to repeat preview after lifecycle recovery is proven.
+
+### Immediate execution queue
+
+Complete these cards in order. A junior agent must stop on the first failed or
+missing exit criterion and must not begin a later card.
+
+#### R0 — Contain unverified public capabilities (offline only)
+
+1. Remove `PTP_CAP` and `PTP_CAP_PREVIEW` from both new Pentax ability rows.
+2. Compile-gate the Pentax capture/transfer dispatch off by default while
+   retaining parser/state fixtures as offline research code.
+3. Confirm direct calls fail with `GP_ERROR_NOT_SUPPORTED` unless the research
+   build flag is explicitly enabled; no runtime preference may silently enable
+   it.
+4. Build both `ptp2` and legacy `pentax` camlibs; run the full available test
+   suite and focused sanitizer fixtures.
+
+Exit: ordinary discovery advertises neither preview nor capture for these rows,
+generic file access remains available, and no camera is required.
+
+#### R1 — Establish the official cold-start handshake (capture only)
+
+1. Record camera firmware, MTP setting, visible screen, mode dial, power-cycle
+   state, USB enumeration time, and host ownership.
+2. From a cold camera, capture one IMAGE Transmitter connection and clean
+   disconnection without changing a camera setting or taking a photograph.
+3. Redact serial/string descriptors and store the capture outside Git; commit a
+   transaction table and SHA-256 only.
+4. Tabulate USB-level `GetDeviceInfo`, `OpenSession`, `0x9001`, response
+   parameters, any intervening commands, descriptor refresh, disable, and
+   `CloseSession` in exact order.
+
+Stop: if the official client also receives `0x2002`, do not alter the driver;
+record the camera/UI state mismatch for user review.
+
+Exit: the first successful official cold-start handshake is reproducible twice
+and its wire order is unambiguous.
+
+#### R2 — Reconcile candidate ordering (one variable per probe)
+
+1. Diff candidate and official transaction tables, including whether WPD opened
+   a PTP session implicitly.
+2. Write a fixture for the expected command order and response-parameter count.
+3. Make the smallest ordering/state change supported by the trace.
+4. Build and test offline before connecting hardware.
+5. Run one candidate cold-start connection. On any non-OK response, stop; do not
+   try another ordering in the same session.
+
+Exit: 3/3 cold-start and 3/3 warm candidate lifecycles pass with exact cleanup,
+and a forced `0x2002` fixture proves that no subsequent Pentax opcode is sent.
+
+#### R3 — Implement bounded recovery
+
+1. Represent lifecycle as explicit states: generic, enabling, enabled,
+   restoring, disabling, and failed. Reset all fields on initialization and
+   after exit.
+2. On enable failure, preserve generic access and an actionable diagnostic.
+3. Permit one retry only after the old session is closed, USB ownership is
+   released, a new connection event occurs, and identity is read again.
+4. Unit-test enable failure, descriptor-refresh failure, live-view restoration
+   failure, disable failure, disconnect at each state, and two camera instances.
+
+Exit: R2's 10+10 lifecycle gate and then P3's 50-cycle gate pass. Logs prove no
+in-place retry, USB reset, speculative parameters, stale state, or serial leak.
+
+#### R4 — Resume read-only setting enumeration
+
+1. Use the successful cold-start lifecycle from R3.
+2. Capture three raw descriptor snapshots as specified in P6.
+3. Produce a table with property code, datatype, GetSet, default, current,
+   form, choices/range, visible camera value, and confidence label.
+4. Update `PENTAX_CONFIGURATION.md`, the real-hardware log, and the evidence
+   matrix in the same commit. Do not add a setter.
+
+Exit: all stable descriptors are documented; dynamic and unexplained values are
+isolated; every unknown remains numeric. Setting writes require a separate,
+explicitly approved P6 task.
 
 This is the single source of truth for adding Pentax tethering support to the
 libgphoto2 fork and delivering that build through BenroPolarisPatcher. Copies of
@@ -126,7 +225,9 @@ These are non-negotiable design constraints.
 8. Status offsets are byte offsets. Every read is little-endian and
    bounds-checked. Conflicting documented offsets remain unresolved until traced.
 9. Capture is a state machine including completion detection, block-length
-   response handling, cancellation, and 0x9003 acknowledgement.
+   response handling, cancellation, and finalization. New candidate transfer
+   uses `0x900e`; `0x9003` is reserved for the separately observed legacy
+   GetObject path.
 10. Hardware validation occurs after each new transaction, not after all code is
     written.
 
@@ -146,6 +247,12 @@ inside the libgphoto2 Git repository containing:
 
 Large captures stay outside Git. Commit only a redacted transaction table and
 the capture’s SHA-256.
+
+Every hardware command must also be entered in
+`docs/pentax/REAL_HARDWARE_TEST_LOG.md`, including failed and aborted probes.
+Record the camera's visible UI state, mode dial, USB setting, whether it was
+power-cycled, the time since enumeration, USB owner check, session ordering,
+request parameters, response code, and which cleanup operations actually ran.
 
 ## 5. Milestones and task cards
 
@@ -225,6 +332,13 @@ Capture and tabulate separately:
 Record opcode, data-phase direction, every command parameter, response code,
 every response parameter, data size, and ordering. Redact identifiers.
 
+Handshake capture is the first mandatory trace. Determine whether Windows WPD
+sends `OpenSession` on the wire before `0x9001`; the decompiled `Connect()` call
+sequence (`OpenDevice`, then vendor mode) does not establish USB transaction
+ordering because WPD may manage PTP sessions internally. Do not test an
+out-of-session vendor command from libgphoto2 until the official-client trace
+establishes that ordering.
+
 #### P1.3 Resolve protocol questions
 
 | Question | Required evidence |
@@ -237,11 +351,14 @@ every response parameter, data size, and ordering. Redact identifiers.
 | When is 0x9003 sent? | Successful and cancelled transfer traces |
 | Which status layout applies per model/version? | Blob lengths and changing byte ranges |
 | Which properties are writable in which modes? | Descriptors and set attempts |
+| Why does cold-start `0x9001` return `0x2002`? | Repeated official-client and candidate traces with camera UI state and session ordering |
 
 Deliverable: `libgphoto2/docs/pentax/PENTAX_WIRE_PROTOCOL.md`, labeling every
 field Observed, Inferred, or Unknown and citing its trace/work-record ID.
 
-Gate P1: no Unknown may affect handshake, preview, or capture.
+Gate P1: no Unknown may affect handshake, preview, or capture. This is a hard
+dependency: code may parse captured fixtures offline, but no dependent vendor
+transaction may be sent to hardware while the handshake gate is open.
 
 ### P2 — Add a minimal protocol layer
 
@@ -280,20 +397,41 @@ responses. A local “enabled” flag never substitutes for real lifecycle handl
 Gate P2: each wrapper has a successful hardware record or is removed. Stubs and
 uncalled wrappers do not pass.
 
+Current corrective task: inventory every `ptp_pentax_*` wrapper. Keep
+`SetVendorMode` and live-view-frame wrappers as conditional research code because
+they have bounded hardware evidence. Remove or compile-gate the dormant
+shutdown, legacy-object, sub-image, main-image, terminate, interrupt, and focus
+wrappers until individually observed. Compile-gate the still-capture/transfer
+chain so ordinary libgphoto2 callers cannot reach it before P5 passes.
+
 ### P3 — Integrate the camera lifecycle
 
 Primary file: `camlibs/ptp2/library.c`.
 
-1. After session open and DeviceInfo retrieval, match an exact supported model.
-2. Enable vendor mode once, store returned flags, then refresh descriptors if P1
-   proves that necessary.
-3. On failure, retain generic PTP and suppress Pentax-only features.
-4. On exit, stop live view, cancel active transfer if required, disable vendor
-   mode, and continue cleanup even when one cleanup command fails.
-5. Verify reconnect and two simultaneous camera instances.
+1. Establish official-client wire ordering from a redacted USB trace.
+2. Build a test matrix containing cold power-on, warm reconnect, official-client
+   clean disconnect followed by candidate connection, camera shooting/playback/
+   menu state, and relevant mode-dial state. Change one factor per test.
+3. After the proven session ordering and DeviceInfo retrieval, match an exact
+   supported model and send vendor enable once.
+4. Store returned flags only after validating response count/code, then refresh
+   descriptors if the trace and camera evidence require it.
+5. On `0x2002` or any failure, clear Pentax lifecycle/live-view/transfer state,
+   retain generic PTP, suppress every Pentax-only feature, and emit an actionable
+   diagnostic containing no serial data.
+6. Recovery is bounded: release the session and USB ownership; allow at most one
+   delayed reconnect after a new connection event and fresh identity read. Never
+   loop, automatically USB-reset, power-cycle, or try alternate parameters.
+7. On exit, restore live view first; disable vendor mode only if enable succeeded;
+   close the PTP session even if cleanup failed, preserving the first meaningful
+   cleanup error.
+8. Verify reconnect and two simultaneous camera instances.
 
-Gate P3: 50 connect/disconnect cycles, including unplug during initialization,
-without crash, stale state, or failure of the next generic connection.
+Gate P3: first pass 10/10 cold-power-on connections and 10/10 warm reconnects;
+then 50 connect/disconnect cycles including rejected enable and unplug during
+initialization, without crash, hidden retries, stale state, or failure of the
+next generic connection. Confirm with logs that no later Pentax opcode follows a
+failed enable.
 
 ### P4 — Implement live view as the first vertical slice
 
@@ -311,6 +449,7 @@ Tests: 500 decoded frames; 20 start/stop cycles; cancellation and unplug; still
 capture after preview; no Pentax branch for unsupported/non-Pentax devices.
 
 Gate P4: all tests pass on the primary body. Do not infer secondary support.
+P4 cannot resume until P3 passes from cold power-on.
 
 ### P5 — Implement capture and transfer as one state machine
 
@@ -319,7 +458,7 @@ Document these states and all error transitions in
 
 ```text
 IDLE -> TRIGGERED -> WAITING -> CANDIDATE -> TRANSFERRING
-     -> ACKNOWLEDGING -> COMPLETE -> IDLE
+     -> CACHING -> FINALIZING -> COMPLETE -> IDLE
 ```
 
 1. Wire trigger into the correct `camera_trigger_capture()` and/or
@@ -329,7 +468,9 @@ IDLE -> TRIGGERED -> WAITING -> CANDIDATE -> TRANSFERRING
 3. Validate metadata lengths and UTF-16 conversion.
 4. Stream blocks via `PTPDataHandler` or bounded buffers. Requested length is
    not assumed to equal returned response length.
-5. Verify total size and send 0x9003 exactly when observed.
+5. Verify total size, cache the complete host file, and finalize with `0x900e`
+   only after the P1 trace confirms its response/data behavior. Use `0x9003`
+   only if separately implementing the observed legacy GetObject path.
 6. Surface the correct file path/event and invalidate relevant caches.
 
 Tests: JPEG, RAW, RAW+JPEG if supported, five sequential captures, full card,
@@ -338,6 +479,11 @@ no card, two slots, timeout, cancel, unplug, and hash comparison.
 Gate P5: no successful or cancelled transfer leaves a stuck candidate unless a
 documented protocol limitation requires reconnect.
 
+Before P5 hardware work, remove still-capture capability advertising. Restore
+it only in the same commit that records a complete JPEG vertical-slice pass;
+RAW and RAW+JPEG remain separately gated. Never use capture itself as a probe to
+discover whether the handshake succeeded.
+
 ### P6 — Add configuration incrementally
 
 One property per commit: ISO, aperture, shutter, white balance, exposure
@@ -345,11 +491,21 @@ compensation, focus mode, drive mode, then file format.
 
 For each property:
 
-1. Use a real `submenu` entry and typed get/put pattern from `config.c`.
-2. Use the device descriptor. Hard-code only when the descriptor is absent and
+1. Require a successful cold-start P3 session. A generic-only configuration
+   tree after failed vendor enable is a valid fail-closed result, not evidence
+   that vendor properties disappeared from the firmware.
+2. Capture two read-only raw descriptor snapshots in one session and a third in
+   a fresh session. Normalize only documented dynamic fields such as clock and
+   battery before comparing them; explain every other difference.
+3. Compare each current value with the camera display without changing it.
+4. Use a real `submenu` entry and typed get/put pattern from `config.c`.
+5. Use the device descriptor. Hard-code only when the descriptor is absent and
    P1 observed every supported value on each claimed model.
-3. Respect GetSet and camera mode; omit unsupported widgets.
-4. After set, invalidate/refetch and verify round-trip, then restore the original.
+6. Respect GetSet and camera mode; omit unsupported widgets.
+7. A write test requires explicit approval and a pre-recorded restoration plan.
+   Change one reversible setting by one supported step, refetch it, compare the
+   display, restore the exact original value, refetch, and power-cycle to prove
+   restoration. Abort further writes on any discrepancy.
 
 Gate P6: the five required settings meet the definition of done. Record genuine
 read-only exceptions instead of forcing writes.
@@ -456,6 +612,8 @@ protocol. Do not change public APIs without upstream design review.
 
 - Unsupported feature: omit it and retain generic PTP.
 - Vendor enable failure: remain generic and issue no later vendor commands.
+- Automatic recovery: clear state and release ownership; retry only once after
+  a new connection event, never in-place and never with speculative parameters.
 - Malformed response: return an error without partial parsing.
 - Timeout/cancel: use only cleanup proven by P1 and report reconnect needs.
 - Polaris verification failure: produce no flashable output.
