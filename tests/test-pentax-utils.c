@@ -16,6 +16,84 @@
 	} \
 } while (0)
 
+typedef struct {
+	uint8_t commands[8];
+	int32_t command_info[8];
+	size_t command_count;
+	size_t command_index;
+	uint32_t requests[8];
+	size_t request_count;
+	int command_error_at;
+	int block_error_at;
+	int zero_block;
+	int oversized_block;
+	int cancelled;
+	int timed_out;
+} MockTransfer;
+
+static int
+mock_get_command (void *user_data, uint8_t *operation, int32_t *operation_info)
+{
+	MockTransfer *mock = user_data;
+
+	if ((mock->command_error_at >= 0) &&
+	    ((int)mock->command_index == mock->command_error_at))
+		return GP_ERROR_IO;
+	if (mock->command_index >= mock->command_count)
+		return GP_ERROR_CORRUPTED_DATA;
+	*operation = mock->commands[mock->command_index];
+	*operation_info = mock->command_info[mock->command_index];
+	mock->command_index++;
+	return GP_OK;
+}
+
+static int
+mock_get_block (void *user_data, uint32_t requested, unsigned char **data,
+		uint32_t *transferred)
+{
+	MockTransfer *mock = user_data;
+	size_t index = mock->request_count++;
+
+	if (index < sizeof (mock->requests) / sizeof (mock->requests[0]))
+		mock->requests[index] = requested;
+	if ((mock->block_error_at >= 0) && ((int)index == mock->block_error_at)) {
+		*data = malloc (1);
+		*transferred = 1;
+		return GP_ERROR_IO;
+	}
+	if (mock->zero_block) {
+		*data = NULL;
+		*transferred = 0;
+		return GP_OK;
+	}
+	*transferred = mock->oversized_block ? requested + 1 : requested;
+	*data = malloc (*transferred);
+	if (!*data)
+		return GP_ERROR_NO_MEMORY;
+	memset (*data, (int)('A' + index), *transferred);
+	return GP_OK;
+}
+
+static int
+mock_cancelled (void *user_data)
+{
+	return ((MockTransfer *)user_data)->cancelled;
+}
+
+static int
+mock_timed_out (void *user_data)
+{
+	return ((MockTransfer *)user_data)->timed_out;
+}
+
+static void
+mock_init (MockTransfer *mock)
+{
+	memset (mock, 0, sizeof (*mock));
+	mock->command_error_at = -1;
+	mock->block_error_at = -1;
+}
+
 int
 main (void)
 {
@@ -30,6 +108,8 @@ main (void)
 	const unsigned char patch[] = {9, 8};
 	char name[32];
 	uint32_t model_no = 99, extension_version = 99;
+	MockTransfer mock;
+	PentaxTransferOps transfer_operations;
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
@@ -77,6 +157,103 @@ main (void)
 	CHECK (pentax_capture_buffer_seek (&buffer, 4, -1) == GP_ERROR_BAD_PARAMETERS);
 	CHECK (pentax_capture_buffer_seek (&buffer, 7, 0) == GP_ERROR_BAD_PARAMETERS);
 	CHECK (pentax_capture_buffer_write (NULL, patch, sizeof (patch)) ==
+		GP_ERROR_BAD_PARAMETERS);
+
+	free (buffer.data);
+	memset (&buffer, 0, sizeof (buffer));
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 10;
+	mock.commands[2] = 2;
+	mock.command_count = 3;
+	transfer_operations.user_data = &mock;
+	transfer_operations.max_block_size = 4;
+	transfer_operations.get_command = mock_get_command;
+	transfer_operations.get_block = mock_get_block;
+	transfer_operations.is_cancelled = mock_cancelled;
+	transfer_operations.is_timed_out = mock_timed_out;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_OK);
+	CHECK ((mock.request_count == 3) && (mock.requests[0] == 4) &&
+		(mock.requests[1] == 4) && (mock.requests[2] == 2));
+	CHECK ((buffer.size == 10) && !memcmp (buffer.data, "AAAABBBBCC", 10));
+
+	free (buffer.data);
+	memset (&buffer, 0, sizeof (buffer));
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 4;
+	mock.commands[2] = 4;
+	mock.command_info[2] = 1;
+	mock.commands[3] = 3;
+	mock.command_info[3] = 2;
+	mock.commands[4] = 2;
+	mock.command_count = 5;
+	transfer_operations.user_data = &mock;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_OK);
+	CHECK ((buffer.size == 4) && !memcmp (buffer.data, "ABBA", 4));
+
+	free (buffer.data);
+	memset (&buffer, 0, sizeof (buffer));
+	mock_init (&mock);
+	mock.commands[0] = 2;
+	mock.command_count = 1;
+	transfer_operations.user_data = &mock;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 1;
+	mock.command_count = 2;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 2;
+	mock.command_count = 2;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 9;
+	mock.command_count = 2;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_NOT_SUPPORTED);
+	mock_init (&mock);
+	mock.command_error_at = 0;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_IO);
+	mock_init (&mock);
+	mock.cancelled = 1;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_CANCEL);
+	mock_init (&mock);
+	mock.timed_out = 1;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_TIMEOUT);
+
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 4;
+	mock.command_count = 2;
+	mock.zero_block = 1;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 4;
+	mock.command_count = 2;
+	mock.oversized_block = 1;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 4;
+	mock.command_count = 2;
+	mock.block_error_at = 0;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_IO);
+	CHECK (pentax_transfer_run (NULL, &transfer_operations) ==
 		GP_ERROR_BAD_PARAMETERS);
 
 	free (buffer.data);

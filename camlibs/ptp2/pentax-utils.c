@@ -142,3 +142,93 @@ pentax_candidate_filename (const unsigned char *data, uint32_t size,
 	filename[output] = '\0';
 	return GP_OK;
 }
+
+static int
+pentax_transfer_interrupted (const PentaxTransferOps *operations)
+{
+	if (operations->is_cancelled &&
+	    operations->is_cancelled (operations->user_data))
+		return GP_ERROR_CANCEL;
+	if (operations->is_timed_out &&
+	    operations->is_timed_out (operations->user_data))
+		return GP_ERROR_TIMEOUT;
+	return GP_OK;
+}
+
+int
+pentax_transfer_run (PentaxCaptureBuffer *buffer,
+		const PentaxTransferOps *operations)
+{
+	unsigned int command_count = 0;
+	int ret;
+
+	if (!buffer || !operations || !operations->get_command ||
+	    !operations->get_block || !operations->max_block_size)
+		return GP_ERROR_BAD_PARAMETERS;
+	for (;;) {
+		uint8_t operation = 0;
+		int32_t operation_info = 0;
+
+		if (++command_count > 100000U)
+			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+		ret = pentax_transfer_interrupted (operations);
+		if (ret < GP_OK)
+			return ret;
+		ret = operations->get_command (operations->user_data, &operation,
+			&operation_info);
+		if (ret < GP_OK)
+			return ret;
+		if (command_count == 1) {
+			if (operation != 1)
+				return GP_ERROR_CORRUPTED_DATA;
+			continue;
+		}
+		if (operation == 1)
+			return GP_ERROR_CORRUPTED_DATA;
+		if (operation == 2)
+			return buffer->size ? GP_OK : GP_ERROR_CORRUPTED_DATA;
+		if (operation == 3) {
+			uint32_t remaining;
+
+			if (operation_info <= 0)
+				return GP_ERROR_CORRUPTED_DATA;
+			remaining = (uint32_t)operation_info;
+			while (remaining) {
+				unsigned char *data = NULL;
+				uint32_t request = remaining;
+				uint32_t transferred = 0;
+
+				ret = pentax_transfer_interrupted (operations);
+				if (ret < GP_OK)
+					return ret;
+				if (request > operations->max_block_size)
+					request = operations->max_block_size;
+				ret = operations->get_block (operations->user_data, request,
+					&data, &transferred);
+				if (ret < GP_OK) {
+					free (data);
+					return ret;
+				}
+				if (!data || !transferred || (transferred > request)) {
+					free (data);
+					return GP_ERROR_CORRUPTED_DATA;
+				}
+				ret = pentax_capture_buffer_write (buffer, data, transferred);
+				free (data);
+				if (ret < GP_OK)
+					return ret;
+				remaining -= transferred;
+				if (transferred < operations->max_block_size)
+					break;
+			}
+			continue;
+		}
+		if ((operation >= 4) && (operation <= 6)) {
+			ret = pentax_capture_buffer_seek (buffer, operation, operation_info);
+			if (ret < GP_OK)
+				return ret;
+			continue;
+		}
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+}

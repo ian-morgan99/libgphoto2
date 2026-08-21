@@ -185,6 +185,17 @@ struct _PTPIPHeader {
 };
 typedef struct _PTPIPHeader PTPIPHeader;
 
+typedef enum {
+	PTP_PENTAX_TRANSFER_IDLE = 0,
+	PTP_PENTAX_TRANSFER_TRIGGERED,
+	PTP_PENTAX_TRANSFER_WAITING,
+	PTP_PENTAX_TRANSFER_CANDIDATE,
+	PTP_PENTAX_TRANSFER_TRANSFERRING,
+	PTP_PENTAX_TRANSFER_CACHING,
+	PTP_PENTAX_TRANSFER_FINALIZING,
+	PTP_PENTAX_TRANSFER_COMPLETE
+} PTPPentaxTransferState;
+
 /* Vendor IDs */
 /* List is linked from here: http://www.imaging.org/site/IST/Standards/PTP_Standards.aspx */
 #define PTP_VENDOR_EASTMAN_KODAK		0x00000001
@@ -4035,6 +4046,8 @@ struct _PTPParams {
 		int vendor_mode_enabled;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
+		PTPPentaxTransferState transfer_state;
+		uint32_t candidate_handle;
 	} pentax;
 
 	/* PTP: caching time for properties, default 2 */

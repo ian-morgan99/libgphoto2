@@ -89,6 +89,28 @@ The command grammar and finalization ordering are Observed-client. Timeouts,
 strict length checks, a 2 GiB file cap, a command-count cap, cancellation, seek
 bounds, and filename path rejection are defensive host policy.
 
+### Host state and error transitions
+
+```text
+IDLE -> TRIGGERED -> WAITING -> CANDIDATE -> TRANSFERRING
+     -> CACHING -> FINALIZING -> COMPLETE -> IDLE
+```
+
+The current state and candidate handle are session-local, never global. Every
+error returns to host state IDLE and releases host buffers/files. An initiation
+error returns directly from IDLE. Timeout, cancellation, malformed/short status,
+or a status transport error can exit WAITING. Candidate metadata errors exit
+CANDIDATE. Invalid command ordering, unsupported commands, invalid seeks,
+zero/oversized blocks, allocation limits, block/command transport failures,
+timeout, and cancellation can exit TRANSFERRING. Local file/cache failures exit
+CACHING. A `0x900e` failure exits FINALIZING after the host file has already been
+cached.
+
+No unobserved cleanup command is sent on those error paths. Consequently a
+camera-side candidate may remain after failures from CANDIDATE onward; this is a
+documented hardware question, not a claimed clean cancellation. Successful
+finalization alone proves the candidate was released.
+
 ## Open hardware questions
 
 - Confirm response parameters and response codes for vendor-mode enable/disable.
