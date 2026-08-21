@@ -5958,30 +5958,47 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		if (operation == 2)
 			break;
 		if (operation == 3) {
-			uint32_t request, transferred = 0;
+			uint32_t remaining;
 
 			if (operation_info <= 0) {
 				ret = GP_ERROR_CORRUPTED_DATA;
 				goto out;
 			}
-			request = (uint32_t)operation_info;
-			if (request > PENTAX_TRANSFER_BLOCK_SIZE)
-				request = PENTAX_TRANSFER_BLOCK_SIZE;
-			free (data);
-			data = NULL;
-			ptpres = ptp_pentax_get_transfer_block (params, request,
-				&data, &size, &transferred);
-			if (ptpres != PTP_RC_OK) {
-				ret = translate_ptp_result (ptpres);
-				goto out;
+			remaining = (uint32_t)operation_info;
+			while (remaining) {
+				uint32_t request = remaining;
+				uint32_t transferred = 0;
+
+				if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+					ret = GP_ERROR_CANCEL;
+					goto out;
+				}
+				if (time_since (started) >= PENTAX_TRANSFER_TIMEOUT_MS) {
+					ret = GP_ERROR_TIMEOUT;
+					goto out;
+				}
+				if (request > PENTAX_TRANSFER_BLOCK_SIZE)
+					request = PENTAX_TRANSFER_BLOCK_SIZE;
+				free (data);
+				data = NULL;
+				ptpres = ptp_pentax_get_transfer_block (params, request,
+					&data, &size, &transferred);
+				if (ptpres != PTP_RC_OK) {
+					ret = translate_ptp_result (ptpres);
+					goto out;
+				}
+				if (!transferred) {
+					ret = GP_ERROR_CORRUPTED_DATA;
+					goto out;
+				}
+				ret = pentax_capture_buffer_write (&capture, data, transferred);
+				if (ret < GP_OK)
+					goto out;
+				remaining -= transferred;
+				/* A short block terminates this camera read command. */
+				if (transferred < PENTAX_TRANSFER_BLOCK_SIZE)
+					break;
 			}
-			if (!transferred) {
-				ret = GP_ERROR_CORRUPTED_DATA;
-				goto out;
-			}
-			ret = pentax_capture_buffer_write (&capture, data, transferred);
-			if (ret < GP_OK)
-				goto out;
 			continue;
 		}
 		if ((operation >= 4) && (operation <= 6)) {
