@@ -47,6 +47,13 @@ model combinations map to vendor model numbers. It rejects the Monochrome PID,
 a suffixed model string, and the correct string under a foreign VID, resetting
 outputs to zero on rejection.
 
+A host-side build of the same focused fixture with `-Werror`, AddressSanitizer,
+and UndefinedBehaviorSanitizer passed with leak detection enabled. The Git
+checkout was also bootstrapped through Autotools in Ubuntu 24.04; configure and
+`make dist-xz` passed, and the resulting exact-source archive contained
+`camlibs/ptp2/pentax-utils.c`. This validates the source form consumed by the
+Polaris patcher, not its ARM link or firmware install.
+
 A targeted earlier test run passed 6 of 9 tests. The three failures were from
 the intentionally restricted container/build selection: host USB descriptor
 access in `test-gp-port`, a model expected from a non-PTP camlib in
