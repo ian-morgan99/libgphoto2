@@ -65,6 +65,7 @@ Camera serial data seen during discovery was not committed.
 | K-1 II version/display limitation | Separate read-only device-version query; operator observation of camera UI | Firmware 1.02; vendor flags again `0x00000003`; PC-P mode does not show settings on the camera display; USB released | ISO/mode values from PC-P cannot be called visually correlated; use a pre-connect/read/disconnect/post-check procedure later |
 | K-1 II manual-reference DNG discovery | Operator disconnected, confirmed ISO 200, took one manual image, then reconnected; enumerate storage/folders/files only | New folder `460_0821` contained sole object `K1II8664.DNG`. An initial highest-sequence heuristic selected an older K-3 III file and was rejected by EXIF | Select reference objects by the operator-created folder/object, never cross-camera filename sequence; no card change occurred |
 | K-1 II generic DNG download and EXIF | Standard read-only object download of `K1II8664.DNG`; hash/selected EXIF; delete temporary host copy only | 38,468,076 bytes; SHA-256 `db9ea0c3f402fe6b8d5ad03ca8bcce7d3249ffe073fed7776401d44c1dbdb1a5`; K-1 II, Program AE, ISO 200, 6 s, f/1.4, D FA* 50 mm; card object untouched; USB released | Generic DNG download passes once. ISO 200 agrees across display/status/EXIF; raw mode 21→Program AE remains provisional because readings straddled a disconnect |
+| K-1 II B-mode condition and duplicate configuration snapshots | Physical dial `B`; one named condition read followed by two independent complete public configuration reads from the current source build; exact transmitted-opcode audit | All sessions passed with flags `0x00000003` and clean exit. Both configuration trees had 188 lines and normalized identically after clock/battery drift removal. Conditions were 568 bytes: raw mode 9, drive 0, ISO 200, Bulb timer 30/1, inactive Astro/error flags. Each full read used five `0x1014` descriptors plus one `0x900f`; zero forbidden writes/actions | Read-only B baseline passes 2/2. Only five generic property descriptors were exposed, so K-3 III vendor-property assumptions must not be transferred to this body; see H1.8 |
 
 ## Pending hardware tests (not executed)
 
@@ -145,6 +146,7 @@ Detailed records are retained in:
 - `docs/pentax/evidence/2026-08-21/H1.5/README.md` — bounded focus-drive probe.
 - `docs/pentax/evidence/2026-08-21/H1.6/README.md` — Bulb-mode read-only baseline.
 - `docs/pentax/evidence/2026-08-21/H1.7/README.md` — K-1 II initial read-only gate.
+- `docs/pentax/evidence/2026-08-21/H1.8/README.md` — K-1 II B-mode read-only baseline.
 
 Implementation commits arising directly from these tests are `b72d9cbdc` and
 `abf55fbcb`.
