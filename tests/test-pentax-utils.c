@@ -107,6 +107,7 @@ main (void)
 	const unsigned char first[] = {1, 2, 3, 4};
 	const unsigned char patch[] = {9, 8};
 	char name[32];
+	size_t jpeg_offset = 99, jpeg_length = 99;
 	uint32_t model_no = 99, extension_version = 99;
 	MockTransfer mock;
 	PentaxTransferOps transfer_operations;
@@ -166,6 +167,23 @@ main (void)
 	CHECK (pentax_capture_buffer_seek (&buffer, 7, 0) == GP_ERROR_BAD_PARAMETERS);
 	CHECK (pentax_capture_buffer_write (NULL, patch, sizeof (patch)) ==
 		GP_ERROR_BAD_PARAMETERS);
+	{
+		const unsigned char framed_jpeg[] = {
+			0, 1, 0xff, 0xd8, 3, 4, 0xff, 0xd9, 5
+		};
+		const unsigned char no_soi[] = {0, 0xff, 0xd9};
+		const unsigned char no_eoi[] = {0xff, 0xd8, 1, 0xff};
+		CHECK (pentax_jpeg_bounds (framed_jpeg, sizeof (framed_jpeg),
+			&jpeg_offset, &jpeg_length) == GP_OK);
+		CHECK ((jpeg_offset == 2) && (jpeg_length == 6));
+		CHECK (pentax_jpeg_bounds (no_soi, sizeof (no_soi),
+			&jpeg_offset, &jpeg_length) == GP_ERROR_CORRUPTED_DATA);
+		CHECK (pentax_jpeg_bounds (no_eoi, sizeof (no_eoi),
+			&jpeg_offset, &jpeg_length) == GP_ERROR_CORRUPTED_DATA);
+		CHECK ((jpeg_offset == 0) && (jpeg_length == 0));
+		CHECK (pentax_jpeg_bounds (NULL, 0, &jpeg_offset, &jpeg_length) ==
+			GP_ERROR_BAD_PARAMETERS);
+	}
 
 	free (buffer.data);
 	memset (&buffer, 0, sizeof (buffer));

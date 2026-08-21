@@ -45,9 +45,10 @@ step fails.
 
 The client writes UINT8 value 1 to device property `0xd035`, then repeatedly
 reads opcode `0x9006`. It writes UINT8 value 0 to stop. This sequence and type
-are Observed-client. The returned data is searched with bounded JPEG framing;
-whether every supported firmware returns a bare JPEG or a wrapper is
-Unknown-hardware.
+are Observed-client. A unit-tested bounds parser requires complete JPEG SOI
+(`ff d8`) and EOI (`ff d9`) markers and rejects missing or truncated markers.
+Bytes outside those markers are not returned. Whether every supported firmware
+returns a bare JPEG or a wrapper is Unknown-hardware.
 
 The libgphoto2 implementation reads and retains the session's original UINT8
 value before changing it. It restores that exact value after a frame transport

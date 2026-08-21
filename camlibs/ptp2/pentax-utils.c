@@ -145,6 +145,30 @@ pentax_candidate_filename (const unsigned char *data, uint32_t size,
 	return GP_OK;
 }
 
+int
+pentax_jpeg_bounds (const unsigned char *data, size_t size,
+		size_t *offset, size_t *length)
+{
+	size_t start, end;
+
+	if (!data || !offset || !length)
+		return GP_ERROR_BAD_PARAMETERS;
+	*offset = 0;
+	*length = 0;
+	for (start = 0; start + 1 < size; start++)
+		if ((data[start] == 0xff) && (data[start + 1] == 0xd8))
+			break;
+	if (start + 1 >= size)
+		return GP_ERROR_CORRUPTED_DATA;
+	for (end = start + 2; end + 1 < size; end++)
+		if ((data[end] == 0xff) && (data[end + 1] == 0xd9)) {
+			*offset = start;
+			*length = end + 2 - start;
+			return GP_OK;
+		}
+	return GP_ERROR_CORRUPTED_DATA;
+}
+
 static int
 pentax_transfer_interrupted (const PentaxTransferOps *operations)
 {
