@@ -44,6 +44,7 @@
 #include "ptp.h"
 #include "ptp-bugs.h"
 #include "ptp-private.h"
+#include "pentax-utils.h"
 
 #ifdef __GNUC__
 # define __unused__ __attribute__((unused))
@@ -9705,6 +9706,72 @@ _get_Sony_Autofocus(CONFIG_GET_ARGS) {
 }
 
 static int
+_get_Pentax_MinimumFocusDrive (CONFIG_GET_ARGS)
+{
+	int val = 0;
+
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	uint32_t open_av_num;
+	int32_t displacement;
+	int direction, val;
+	const char *name;
+	uint16_t ret;
+
+	CR (gp_widget_get_value (widget, &val));
+	if (!val) {
+		*alreadyset = 1;
+		return GP_OK;
+	}
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_name (widget, &name));
+	if (!strcmp (name, "manualfocusdrivenear"))
+		direction = 1;
+	else if (!strcmp (name, "manualfocusdrivefar"))
+		direction = -1;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	ret = ptp_pentax_get_all_conditions (params, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax GetAllConditions failed with response 0x%04x."), ret);
+		return translate_ptp_result (ret);
+	}
+	if (size < 332) {
+		free (data);
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax GetAllConditions returned only %u bytes; at least 332 are required."),
+			size);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	open_av_num = pentax_get_u32le (data + 328);
+	free (data);
+	CR (pentax_minimum_focus_displacement (open_av_num, direction,
+		&displacement));
+	GP_LOG_D ("Pentax minimum focus drive openAvNum=%u displacement=%d",
+		open_av_num, displacement);
+	ret = ptp_pentax_focus_control_new (params, (uint32_t)displacement);
+	if (ret != PTP_RC_OK)
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax minimum focus drive (%d) failed with response 0x%04x."),
+			displacement, ret);
+	*alreadyset = 1;
+	return translate_ptp_result (ret);
+}
+
+static int
 _put_Sony_Autofocus(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
@@ -11773,6 +11840,8 @@ static struct submenu camera_actions_menu[] = {
 
 	{ N_("Auto-Focus"),                     "autofocus",        PTP_DPC_SONY_ShutterHalfRelease, PTP_VENDOR_SONY, PTP_DTC_UINT16, _get_Sony_Autofocus,      _put_Sony_Autofocus },
 	{ N_("Manual-Focus"),                   "manualfocus",      PTP_DPC_SONY_ManualFocusAdjust,  PTP_VENDOR_SONY, PTP_DTC_INT16,  _get_Sony_ManualFocus,    _put_Sony_ManualFocus },
+	{ N_("Drive Pentax focus near (minimum)"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
+	{ N_("Drive Pentax focus far (minimum)"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
 	{ N_("Capture"),                        "capture",          PTP_DPC_SONY_ShutterRelease,PTP_VENDOR_SONY,PTP_DTC_UINT16, _get_Sony_Capture,              _put_Sony_Capture },
 	{ N_("Power Down"),                     "powerdown",        0,  0,                  PTP_OC_PowerDown,                   _get_PowerDown,                 _put_PowerDown },
 	{ N_("Focus Lock"),                     "focuslock",        0,  PTP_VENDOR_CANON,   PTP_OC_CANON_FocusLock,             _get_Canon_FocusLock,           _put_Canon_FocusLock },

@@ -97,6 +97,7 @@ mock_init (MockTransfer *mock)
 int
 main (void)
 {
+	int32_t displacement = 0;
 	PentaxCaptureBuffer buffer = {0};
 	const unsigned char filename[] = {
 		1, 2, 3, 11,
@@ -281,6 +282,12 @@ main (void)
 	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_IO);
 	CHECK (pentax_transfer_run (NULL, &transfer_operations) ==
 		GP_ERROR_BAD_PARAMETERS);
+	CHECK (pentax_minimum_focus_displacement (35, 1, &displacement) == GP_OK);
+	CHECK (displacement == 29);
+	CHECK (pentax_minimum_focus_displacement (35, -1, &displacement) == GP_OK);
+	CHECK (displacement == -29);
+	CHECK (pentax_minimum_focus_displacement (0, 1, &displacement) == GP_ERROR_CORRUPTED_DATA);
+	CHECK (pentax_minimum_focus_displacement (35, 0, &displacement) == GP_ERROR_BAD_PARAMETERS);
 
 	free (buffer.data);
 	return 0;
