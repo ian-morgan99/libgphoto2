@@ -53,12 +53,21 @@
 
 #define SET_CONTEXT(camera, ctx) ((PTPData *) camera->pl->params.data)->context = ctx
 
+static int
+config_vendor_matches (Camera *camera, uint16_t vendor)
+{
+	return (camera->pl->params.deviceinfo.VendorExtensionID == vendor) ||
+		((vendor == PTP_VENDOR_PENTAX) &&
+		 camera->pl->params.pentax.vendor_mode_enabled);
+}
+
 int
 have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 	unsigned int i;
+	int vendor_matches = config_vendor_matches (camera, vendor);
 
 	/* prop 0 matches */
-	if (!prop && (camera->pl->params.deviceinfo.VendorExtensionID==vendor))
+	if (!prop && vendor_matches)
 		return 1;
 
 	if (	((prop & 0x7000) == 0x5000) ||
@@ -68,10 +77,10 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 			if (prop != camera->pl->params.deviceinfo.DeviceProps[i])
 				continue;
 			if ((prop & 0xf000) == 0x5000) { /* generic property */
-				if (!vendor || (camera->pl->params.deviceinfo.VendorExtensionID==vendor))
+				if (!vendor || vendor_matches)
 					return 1;
 			}
-			if (camera->pl->params.deviceinfo.VendorExtensionID==vendor)
+			if (vendor_matches)
 				return 1;
 		}
 	}
@@ -82,7 +91,7 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 				continue;
 			if ((prop & 0xf000) == 0x1000) /* generic property */
 				return 1;
-			if (camera->pl->params.deviceinfo.VendorExtensionID==vendor)
+			if (vendor_matches)
 				return 1;
 		}
 	}
@@ -736,7 +745,7 @@ _get_Generic##bits##Table(CONFIG_GET_ARGS, struct deviceproptable##bits * tbl, i
 			/* fill in with all values we have in the table. */ \
 			for (j=0;j<tblsize;j++) { \
 				if ((tbl[j].vendor_id == 0) || \
-				    (tbl[j].vendor_id == camera->pl->params.deviceinfo.VendorExtensionID) \
+				    config_vendor_matches (camera, tbl[j].vendor_id) \
 				) { \
 					gp_widget_add_choice (*widget, _(tbl[j].label)); \
 					if (tbl[j].value == dpd->CurrentValue.bits) { \
@@ -752,7 +761,7 @@ _get_Generic##bits##Table(CONFIG_GET_ARGS, struct deviceproptable##bits * tbl, i
 			for (j=0;j<tblsize;j++) { \
 				if ((tbl[j].value == dpd->FORM.Enum.SupportedValue[i].bits) && \
 				    ((tbl[j].vendor_id == 0) || \
-				     (tbl[j].vendor_id == camera->pl->params.deviceinfo.VendorExtensionID)) \
+				     config_vendor_matches (camera, tbl[j].vendor_id)) \
 				) { \
 					gp_widget_add_choice (*widget, _(tbl[j].label)); \
 					if (tbl[j].value == dpd->CurrentValue.bits) { \
@@ -784,7 +793,7 @@ _get_Generic##bits##Table(CONFIG_GET_ARGS, struct deviceproptable##bits * tbl, i
 			for (j=0;j<tblsize;j++) { \
 				if ((tbl[j].value == r) && \
 				    ((tbl[j].vendor_id == 0) || \
-				     (tbl[j].vendor_id == camera->pl->params.deviceinfo.VendorExtensionID)) \
+				     config_vendor_matches (camera, tbl[j].vendor_id)) \
 				) { \
 					gp_widget_add_choice (*widget, _(tbl[j].label)); \
 					if (r == dpd->CurrentValue.bits) { \
@@ -813,7 +822,7 @@ _get_Generic##bits##Table(CONFIG_GET_ARGS, struct deviceproptable##bits * tbl, i
 	if (!isset2) { \
 		for (j=0;j<tblsize;j++) { \
 			if (((tbl[j].vendor_id == 0) || \
-			     (tbl[j].vendor_id == camera->pl->params.deviceinfo.VendorExtensionID)) && \
+			     config_vendor_matches (camera, tbl[j].vendor_id)) && \
 			     (tbl[j].value == dpd->CurrentValue.bits) \
 			) { \
 				gp_widget_add_choice (*widget, _(tbl[j].label)); \
@@ -842,7 +851,7 @@ _put_Generic##bits##Table(CONFIG_PUT_ARGS, struct deviceproptable##bits * tbl, i
 	CR (gp_widget_get_value (widget, &value)); \
 	for (i=0;i<tblsize;i++) { \
 		if ((!strcmp(_(tbl[i].label),value) || !strcmp(tbl[i].label,value)) && \
-		    ((tbl[i].vendor_id == 0) || (tbl[i].vendor_id == camera->pl->params.deviceinfo.VendorExtensionID)) \
+		    ((tbl[i].vendor_id == 0) || config_vendor_matches (camera, tbl[i].vendor_id)) \
 		) { \
 			bits##val = tbl[i].value; \
 			foundvalue = 1; \

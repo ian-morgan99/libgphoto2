@@ -12,18 +12,27 @@ protocol has passed hardware validation.
 - **Inferred-client**: implied by that client's executor or control flow.
 - **Unknown-hardware**: must be checked against a USB capture and camera.
 
-No Pentax camera was attached on 2026-08-21, so every on-device result remains
-Unknown-hardware.
+A K-3 Mark III running firmware 2.20 was attached on 2026-08-21. Passive USB
+enumeration and a forced-generic, read-only DeviceInfo session are recorded in
+`evidence/2026-08-21/H1.1/`; later gates remain Unknown-hardware until their own
+records pass.
 
 ## Supported identity table
 
 | USB VID:PID | Exact DeviceInfo model | Model number | Extension version | Evidence |
 |---|---|---:|---:|---|
-| `25fb:018c` | `PENTAX K-3 Mark III` | 78420 | 1 | Observed-client |
+| `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo + Observed-client |
 | `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Observed-client |
 
 Both USB identity and the exact DeviceInfo string must match before vendor
 commands are sent. Other Pentax devices retain generic PTP behavior.
+
+On firmware 2.20 the K-3 III must be configured for MTP and reports Microsoft
+MTP VendorExtensionID `0x6`; `25fb:018a` is CD-ROM installer mode. Therefore
+the guarded model state, not VendorExtensionID `0x0d`, selects Pentax behavior.
+Its pre-vendor DeviceInfo omits every Pentax property. After successful enable,
+the driver atomically refreshes DeviceInfo; a refresh/fixup failure immediately
+rolls vendor mode back and retains safe generic behavior.
 
 ## Session lifecycle
 

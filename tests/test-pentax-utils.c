@@ -114,7 +114,7 @@ main (void)
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
-	CHECK (pentax_lookup_model (0x25fb, 0x018c, "PENTAX K-3 Mark III",
+	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78420) && (extension_version == 1));
 	CHECK (pentax_lookup_model (0x25fb, 0x0183, "PENTAX K-1 Mark II",
@@ -123,9 +123,9 @@ main (void)
 	CHECK (!pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
 	CHECK ((model_no == 0) && (extension_version == 0));
-	CHECK (!pentax_lookup_model (0x25fb, 0x018c,
+	CHECK (!pentax_lookup_model (0x25fb, 0x0189,
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
-	CHECK (!pentax_lookup_model (0x1234, 0x018c, "PENTAX K-3 Mark III",
+	CHECK (!pentax_lookup_model (0x1234, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK (pentax_candidate_filename (filename, sizeof (filename), name,
 		sizeof (name)) == GP_OK);

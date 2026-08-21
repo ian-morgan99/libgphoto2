@@ -14,29 +14,37 @@ expected datatype:
 
 | Widget | PTP property | Expected type in current handler | Status |
 |---|---:|---:|---|
-| `iso` | ExposureIndex `0x500f` | UINT16 | Existing generic path; hardware unverified |
-| `f-number` / `aperture` | FNumber `0x5007` | UINT16 | Existing generic path; hardware unverified |
-| `whitebalance` | WhiteBalance `0x5005` | UINT16 | Existing generic path; hardware unverified |
-| `focusmode` | FocusMode `0x500a` | UINT16 | Existing generic path; hardware unverified |
-| `exposurecompensation` | ExposureBiasCompensation `0x5010` | INT16 | Existing generic path; hardware unverified |
-| `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | Existing Pentax-vendor path; hardware unverified |
+| `iso` | ExposureIndex `0x500f` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
+| `f-number` / `aperture` | FNumber `0x5007` | UINT16 | Hardware descriptor verified read/write |
+| `whitebalance` | WhiteBalance `0x5005` | UINT16 | Hardware descriptor verified read/write |
+| `focusmode` | FocusMode `0x500a` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
+| `exposurecompensation` | ExposureBiasCompensation `0x5010` | INT16 | Hardware descriptor verified read/write |
+| `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | Hardware descriptor verified read/write; Pentax model-routing required because DeviceInfo vendor is Microsoft MTP |
 
 The `0xd00f` constant already existed as `PTP_DPC_RICOH_ShutterSpeed`; the new
 Pentax name is an alias for the same wire property. Do not add a duplicate menu
 entry.
 
+Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
+exposure compensation, and shutter speed. Several white-balance enumeration
+values remain deliberately labelled `Unknown value` because the existing
+Pentax table does not name them; no labels are guessed.
+
 ## Deliberately withheld widgets
 
+- Extended ISO `0xd01e` (UINT32 on the observed body, but its empty enumeration
+  and numeric meaning require client correlation before any write)
+- Focus mode (no `0x500a` descriptor; no replacement property yet proven)
 - Drive mode `0xd013`
 - Exposure-bracketing mode/step `0xd014`/`0xd015`
 - Color temperature `0xd018`
 - Writing-file-format structure `0xd01b`
 - Live-view zoom/mode `0xd036`/`0xd037`
 
-The Windows client establishes that these codes are used, but not enough to
-prove each target camera's PTP descriptor type, GetSet flag, enumeration, mode
-constraints, or compound payload layout. They remain unexposed until P1 records
-real `GetDevicePropDesc` responses and round-trip tests.
+The Windows client establishes that these codes are used. The H1.2 read-only
+probe establishes several real types and GetSet flags, but not enough to prove
+their numeric semantics, mode constraints, or compound payload layout. They
+remain unexposed until one-property round-trip tests are explicitly approved.
 
 ## Hardware enactment checklist
 
@@ -54,4 +62,3 @@ For each target body and firmware:
 
 Only after those records exist should a missing `submenu` entry or typed handler
 be added, one property per commit as required by the canonical plan.
-
