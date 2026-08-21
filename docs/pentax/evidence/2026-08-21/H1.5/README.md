@@ -1,8 +1,7 @@
 # H1.5 — bounded K-3 III focus-drive probe
 
 Camera: K-3 Mark III firmware 2.20 with a 24–70 mm lens, physical exposure
-mode `M`. Camera/lens AF/MF selector state and visible movement were not
-recorded before the command and remain required evidence.
+mode `M`, focus selector set to AF.
 
 ## Source contract
 
@@ -38,10 +37,19 @@ The camera was exclusively available as `25fb:0189` at `usb:001,010`.
    returned `GP_ERROR_IO`; cleanup was attempted.
 3. The required success condition was not met, so no Far command and no retry
    was sent.
+4. The operator subsequently confirmed that the lens neither moved nor made an
+   audible movement sound and that it was set to AF during the probe.
+5. One diagnostic Near repeat was authorized after stage-specific raw response
+   messages were compiled. It again returned `GP_ERROR_IO`, no Far command was
+   sent, and the operator was asked to observe movement. None of the setter's
+   compiled `0x900f`/`0x9017` error messages appeared. This indicates the error
+   occurred before those instrumented calls, but the first harness version did
+   not label camera-init versus action-widget retrieval.
 
 Status: **INCONCLUSIVE / STOPPED**. The initial build reported only the
 translated error and therefore cannot identify whether `0x900f` or `0x9017`
-failed. It also cannot establish whether the lens moved before the error. The
-next build adds stage-specific raw response reporting. Before another probe,
-record the physical AF/MF selector state and the operator's movement
-observation.
+failed. Operator observation establishes no physical movement for the first
+run; the second observation remains pending. The next build labels every host
+stage from explicit camera open through the one-command setter. Do not make a
+third attempt until the second movement observation is recorded and the newly
+labelled harness is compiled.
