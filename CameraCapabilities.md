@@ -40,12 +40,12 @@ does not mean camera-verified.
 | Live-view JPEG | 50-frame bounded warm-session pass | Implemented, hardware blocked | bounded parser and restore paths compile | first pass cold lifecycle, then 500 frames, stop, reconnect |
 | Capture/download | Research code, default-disabled | Research code, default-disabled | fault-injected grammar passes sanitizers; ability and dispatch containment enforced | explicit research build only, then JPEG and RAW hash checks |
 | Cancellation/timeout | Implemented | Implemented | callback fault tests pass | cancel at each phase, reconnect |
-| ISO | Vendor `0xd01e`, public setter withheld | Conditions read-only; no ISO descriptor exposed | K-3 III display-confirmed 3200→1600→3200 round trip; K-1 II B snapshots report ISO 200 only through conditions | identify K-1 II property from primary evidence before any write |
-| Aperture | Generic descriptor path | Generic descriptor path | `0x5007`, `UINT16` | read and round-trip supported value |
+| ISO | Vendor `0xd01e`, public setter withheld | Image Transmitter maps vendor `0xd01e`; hardware read pending | K-3 III display-confirmed 3200→1600→3200 round trip; K-1 II B snapshots report ISO 200 through conditions | read the source-identified K-1 II descriptor before any write |
+| Aperture | Generic descriptor path | Image Transmitter maps `0x5007` | `UINT16`; not advertised by the tested K-1 II DeviceInfo path | direct read, then round-trip a supported value |
 | White balance | Generic descriptor path | Generic descriptor path | `0x5005`, `UINT16` | read and round-trip supported value |
 | Focus mode | Absent in observed vendor descriptor set | Generic descriptor path | `0x500a` absent on K-3 III firmware 2.20 | identify correct property before any write |
-| Exposure compensation | Generic descriptor path | Generic descriptor path | `0x5010`, `INT16` | read and round-trip supported value |
-| Shutter speed | Existing Pentax/Ricoh path | No descriptor exposed in tested B session | K-3 III `0xd00f`, `UINT64`; K-1 II conditions report a 30-second Bulb timer | identify K-1 II property from primary evidence before any write |
+| Exposure compensation | Generic descriptor path | Image Transmitter maps `0x5010` | `INT16`; not advertised by the tested K-1 II DeviceInfo path | direct read, then round-trip a supported value |
+| Shutter speed | Existing Pentax/Ricoh path | Image Transmitter maps vendor `0xd00f` | K-3 III `UINT64`; K-1 II conditions report a 30-second Bulb timer | direct K-1 II descriptor read before any write |
 | Polaris packaging | Source path implemented | Source path implemented | provenance, safety, ARM loader builds | FwPkt QEMU/repack/install/revert |
 
 ## Explicitly not claimed
