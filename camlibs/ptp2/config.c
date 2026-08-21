@@ -9761,11 +9761,17 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 		&displacement));
 	GP_LOG_D ("Pentax minimum focus drive openAvNum=%u displacement=%d",
 		open_av_num, displacement);
+	gp_context_status (((PTPData *)params->data)->context,
+		_("Pentax minimum focus drive: openAvNum=%u, displacement=%d, opcode=0x9017, retries=0."),
+		open_av_num, displacement);
 	ret = ptp_pentax_focus_control_new (params, (uint32_t)displacement);
 	if (ret != PTP_RC_OK)
 		gp_context_error (((PTPData *)params->data)->context,
 			_("Pentax minimum focus drive (%d) failed with response 0x%04x."),
 			displacement, ret);
+	else
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax minimum focus drive returned response 0x%04x."), ret);
 	return translate_ptp_result (ret);
 }
 
