@@ -95,7 +95,7 @@ vendor capture/candidate workflow.
 | `0xd015` | bracket step | UINT8 tenths; K-3 III gate | K-1 II withheld |
 | `0xd018` | WB color temperature | UINT16; K-3 III UI gate | Hardware target |
 | `0xd01b` | file format/size/quality/RAW/card/movie | compound 10/11-byte structure | High-risk: read/trace before any write |
-| `0xd01e` | extended ISO | UINT32 enumeration | K-3 III HW-W restored; K-1 II next direct read |
+| `0xd01e` | extended ISO | UINT32 enumeration | K-3 III HW-W restored; K-1 II HW-R, but M/Sv-changeable 200→400 was acknowledged and retained 200; HW-W closed pending common exposure-write prerequisite |
 | `0xd020` | CI mode | UINT8 | Base-CI source target |
 | `0xd021` | CI saturation | signed byte | Base-CI source target |
 | `0xd022` | CI hue | signed byte | Base-CI source target |
