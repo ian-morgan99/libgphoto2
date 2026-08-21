@@ -62,6 +62,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | B-mode ISO 3200→1600→restore | INTERRUPTED BEFORE RESTORE | PTP read-back and camera display confirmed `0xd01e` is ISO and changed to 1600; camera then lost USB/power with a flat battery before restore container launch, so no 3200 restore was sent; restore is the next mandatory action after charging |
 | 2026-08-21 | H0 interrupted ISO restoration | PASS | After charging, display and a guarded PTP read confirmed retained 1600; exactly one write restored advertised value 3200; a fresh PTP session and operator display confirmation both reported 3200; USB ownership was released cleanly |
 | 2026-08-21 | B/Astro condition parser and read-only status | OFFLINE PASS / HARDWARE PENDING | Bounded `0x900f` parser covers activity, raw modes, ISO, Bulb timer, Astro phase/errors/limit, and changeability flags; 508/532-byte boundary fixtures and ptp2 build pass; one status widget performs one read and no write |
+| 2026-08-21 | R0 public capture containment | OFFLINE PASS | K-1 II/K-3 III advertise no capture/preview/trigger operations; default dispatch fails before vendor capture operations; explicit compile-time research macro only; default two-camlib build, research build, abilities regression, and ASan/UBSan fixture pass; restricted full suite 7/10 with the same three environment/subset failures already recorded |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -127,8 +128,20 @@ and unknown mode IDs remain numeric.
 4. Build both `ptp2` and legacy `pentax` camlibs; run the full available test
    suite and focused sanitizer fixtures.
 
-Exit: ordinary discovery advertises neither preview nor capture for these rows,
-generic file access remains available, and no camera is required.
+The only research opt-in is the compile-time
+`LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE` macro, for example by supplying
+`-Dc_args=-DLIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1` to a separate Meson
+build directory. There is deliberately no runtime preference. Ability flags
+remain suppressed even in that research build.
+
+Exit: **PASS 2026-08-21.** Ordinary abilities suppress capture, preview, and
+trigger capture for both rows; a camera-list regression enforces this; default
+dispatch returns `GP_ERROR_NOT_SUPPORTED`; both camlibs compile together; the
+explicit research variant also compiles. Focused tests pass normally and under
+ASan/UBSan with leak detection. The deliberately restricted two-camlib full
+suite remains 7/10: `test-gp-port` requires host USB semantics,
+`test-gphoto2` expects the omitted Directory Browse camlib, and `test-filesys`
+fails under the same subset. These are recorded limitations, not passes.
 
 #### R1 — Establish the official cold-start handshake (capture only)
 

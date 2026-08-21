@@ -2812,8 +2812,8 @@ static struct {
 	/* Pentax K-3 Mark III Monochrome, USB setting: MTP */
 	{"Pentax:K-3 Mark III Monochrome (PTP Mode)", 0x25fb, 0x018f, 0},
 	/* Ian Morgan <github@morgan-multinational.co.uk> */
-	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, PTP_CAP|PTP_CAP_PREVIEW},
-	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, PTP_CAP|PTP_CAP_PREVIEW},
+	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, 0},
+	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, 0},
 
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
@@ -3652,6 +3652,9 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 	switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
 		params->deviceinfo.VendorExtensionID) {
 	case PTP_VENDOR_PENTAX: {
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+		return GP_ERROR_NOT_SUPPORTED;
+#else
 		PTPPropValue value;
 		size_t jpeg_offset = 0, jpeg_length = 0;
 		int result;
@@ -3709,6 +3712,7 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 		}
 		SET_CONTEXT_P (params, NULL);
 		return result;
+#endif
 	}
 	case PTP_VENDOR_CANON:
 		/* Canon PowerShot / IXUS preview mode */
@@ -6098,8 +6102,14 @@ camera_capture (Camera *camera, CameraCaptureType type, CameraFilePath *path,
 
 	SET_CONTEXT_P(params, context);
 	camera->pl->checkevents = TRUE;
-	if (params->pentax.vendor_mode_enabled)
+	if (params->pentax.vendor_mode_enabled) {
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+		SET_CONTEXT_P (params, NULL);
+		return GP_ERROR_NOT_SUPPORTED;
+#else
 		return camera_pentax_capture (camera, path, context);
+#endif
+	}
 
 	/* first, draining existing events if the caller did not do it. */
 	while (ptp_get_one_event(params, &event)) {

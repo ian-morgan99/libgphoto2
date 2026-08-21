@@ -36,11 +36,11 @@ does not mean camera-verified.
 | Capability | K-3 III | K-1 II | Current evidence | Hardware acceptance gate |
 |---|---|---|---|---|
 | Generic PTP files | Existing | Existing | Existing ptp2 path compiles | enumerate/download/hash |
-| Vendor lifecycle | Conditional warm-session pass; cold restart fails | Implemented, hardware blocked | exact identity and response guards tested; K-3 III cold restart returns `0x2002` | resolve ordering/state, then enable, disable, cold reconnect |
+| Vendor lifecycle | Initial 3/3 controlled cold and 3/3 warm pass; larger gates open | Implemented, hardware blocked | exact identity/response guards; earlier poorly isolated runs returned `0x2002` | complete 10+10 and 50-cycle gates |
 | Live-view JPEG | 50-frame bounded warm-session pass | Implemented, hardware blocked | bounded parser and restore paths compile | first pass cold lifecycle, then 500 frames, stop, reconnect |
-| Capture/download | Research code; hardware blocked | Research code; hardware blocked | fault-injected transfer grammar passes sanitizers; opcodes unverified on camera | suppress capability until JPEG and RAW hash checks pass |
+| Capture/download | Research code, default-disabled | Research code, default-disabled | fault-injected grammar passes sanitizers; ability and dispatch containment enforced | explicit research build only, then JPEG and RAW hash checks |
 | Cancellation/timeout | Implemented | Implemented | callback fault tests pass | cancel at each phase, reconnect |
-| ISO | Absent in observed vendor descriptor set | Generic descriptor path | `0x500f` absent on K-3 III firmware 2.20 | identify correct property before any write |
+| ISO | Vendor `0xd01e`, public setter withheld | Generic descriptor path | display-confirmed 3200→1600→3200 round trip; standard `0x500f` absent | test more approved values/modes before exposing setter |
 | Aperture | Generic descriptor path | Generic descriptor path | `0x5007`, `UINT16` | read and round-trip supported value |
 | White balance | Generic descriptor path | Generic descriptor path | `0x5005`, `UINT16` | read and round-trip supported value |
 | Focus mode | Absent in observed vendor descriptor set | Generic descriptor path | `0x500a` absent on K-3 III firmware 2.20 | identify correct property before any write |

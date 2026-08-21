@@ -136,6 +136,13 @@ not infer that Astro is ready and does not initiate an exposure.
 
 ## Still capture and transfer
 
+This section describes research code, not an ordinary advertised capability.
+Default builds return `GP_ERROR_NOT_SUPPORTED` from Pentax preview/capture
+dispatch before a vendor capture operation. The code can be reached only in a
+separate build compiled with
+`LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1`; even that build does not advertise
+capture, preview, or trigger-capture abilities.
+
 Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
 release mode 0, focus mode, manual-white-balance mode 0, sync mode 0, and
 aperture-reset 0. The client uses focus mode 3 with autofocus and 2 without it.
