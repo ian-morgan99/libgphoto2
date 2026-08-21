@@ -51,6 +51,7 @@ Camera serial data seen during discovery was not committed.
 | Instrumented fixed minimum Near | Correct dual container isolation; exact model/port; fresh `0x900f`; source-derived one-shot Near; no retry, Far, autofocus, or shutter | Vendor flags 0; `openAvNum=28`; displacement `+23`; `0x9017` response `0x2001`; cleanup OK | Hardware confirms protocol acceptance of nonzero K-3 III new-focus command. Physical movement/direction observation remains pending; no Far yet |
 | Instrumented Near physical observation | Operator watched the 24–70 mm lens during the `+23` probe | Focus moved nearer | Minimum Near passes protocol and physical-direction acceptance; one equal Far reversal is now permitted |
 | Instrumented fixed minimum Far | Fresh status and one source-derived Far reversal under the same corrected isolation; no retry or follow-up | `openAvNum=28`; displacement `-23`; `0x9017` response `0x2001`; cleanup OK | Far transport passes with exact opposite displacement; physical direction/reversal observation pending |
+| Instrumented Far physical observation | Operator watched the 24–70 mm lens after the `-23` reversal | Focus visibly moved farther by about the same small amount; exact equality was difficult to judge | Bounded bidirectional focus gate passes qualitatively. Do not claim calibrated displacement accuracy or enable escalation/larger steps from this result |
 
 The 50-frame result is a bounded soak, not the plan's 500-frame acceptance gate.
 Still capture, transfer from camera storage, configuration writes, cancellation,
