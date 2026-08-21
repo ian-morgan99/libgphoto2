@@ -37,6 +37,10 @@ property value was written. The identical result passed in three controlled
 power cycles after explicit shooting-screen readiness; the larger lifecycle
 repetition gate remains open.
 
+Three immediately subsequent warm reconnect sessions returned the same current
+value and descriptor. Each independently enabled and disabled vendor mode, and
+no session retained vendor state into the next.
+
 ## Deliberately withheld widgets
 
 - Extended ISO `0xd01e` (UINT32 on the observed body, but its empty enumeration
