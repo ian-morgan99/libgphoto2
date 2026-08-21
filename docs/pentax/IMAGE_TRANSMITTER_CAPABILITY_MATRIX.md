@@ -19,7 +19,7 @@ available through ordinary libgphoto2 APIs. Source anchors are member names in
 
 | Gate | K-1 Mark II | K-3 Mark III |
 |---|---:|---:|
-| Exact model / USB | `PENTAX K-1 Mark II`, `25fb:0183` | `PENTAX K-3 Mark III`, `25fb:0189` |
+| Exact model / USB | PC-P `PENTAX K-1 Mark II`, `25fb:0183`; MSC `25fb:0182` | `PENTAX K-3 Mark III`, `25fb:0189`; MSC identity target |
 | Vendor model / extension | 78400 / 1 | 78420 / 1 |
 | Dual slot / new transfer / movie | Yes / Yes / Yes | Yes / Yes / Yes |
 | New focus control | No: old `0x9016` | Yes: new `0x9017` |
@@ -33,6 +33,14 @@ available through ordinary libgphoto2 APIs. Source anchors are member names in
 
 The tested firmware versions, K-1 II 1.02 and K-3 III 2.20, satisfy Satobi.
 Runtime `0x9001` function flags are separate: K-1 II returned 3; K-3 III 0.
+
+The K-1 II USB identities are separate personalities. `25fb:0183` exposes an
+Imaging/PTP interface and is the only one eligible for the Pentax `ptp2`
+control path. `25fb:0182` exposes only USB Mass Storage class `08/06/50`
+(SCSI transparent, Bulk-Only); it must use the operating-system mounted-volume
+or libgphoto2 Directory Browse path. Never add `0182` to the `ptp2` ability
+table. MSC supports file enumeration, copying, hashing, and metadata reads, but
+not live view, capture, configuration, or focus control.
 
 ## Vendor operation matrix
 

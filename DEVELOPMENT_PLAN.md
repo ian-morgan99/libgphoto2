@@ -247,6 +247,14 @@ PENTAX K-1 Mark II (`25fb:0183`) is the second validation body. Adding a USB ID
 does not mean that a camera has vendor support. Unknown Pentax bodies must retain
 safe generic PTP behaviour.
 
+The same K-1 II uses `25fb:0182` in MSC mode. This is a separate storage-only
+USB personality, not an alias for the `ptp2` entry. Polaris support must dispatch
+`0183` to libgphoto2 camera control and `0182` to a mounted-volume backend. That
+backend may enumerate/copy/hash files and read metadata, but must not offer
+capture, settings, live view, zoom, or focus. Identify the mounted camera using
+udev identity plus the resolved block device; never rely on a mutable volume
+label, drive letter, or mount path alone.
+
 ## 1. Outcome and definition of done
 
 The work is complete only when all applicable rows below have recorded evidence.
