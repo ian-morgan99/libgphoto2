@@ -55,6 +55,15 @@ executable(
 )
 
 executable(
+  'pentax-safe-preview',
+  'pentax-safe-preview.c',
+  'samples.h',
+  'autodetect.c',
+  'context.c',
+  dependencies: libgphoto2_dep,
+)
+
+executable(
   'sample-tether',
   'sample-tether.c',
   'samples.h',

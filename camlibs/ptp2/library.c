@@ -3307,8 +3307,10 @@ camera_exit (Camera *camera, GPContext *context)
 
 				if (params->inliveview) {
 					uint16_t ret = pentax_restore_live_view (params);
-					if (ret != PTP_RC_OK)
+					if (ret != PTP_RC_OK) {
 						GP_LOG_E ("Pentax live view restore failed with 0x%04x", ret);
+						exit_gp_result = translate_ptp_result (ret);
+					}
 				}
 				exit_result = ptp_pentax_set_vendor_mode (params,
 					params->pentax.model_no, 0,
