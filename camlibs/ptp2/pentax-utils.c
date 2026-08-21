@@ -78,17 +78,25 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		return 0;
 	if ((usb_product == 0x0189) &&
 	    !strcmp (device_model, "PENTAX K-3 Mark III")) {
-		*model_no = 78420;
+		*model_no = PENTAX_MODEL_K3_MARK_III;
 		*extension_version = 1;
 		return 1;
 	}
 	if ((usb_product == 0x0183) &&
 	    !strcmp (device_model, "PENTAX K-1 Mark II")) {
-		*model_no = 78400;
+		*model_no = PENTAX_MODEL_K1_MARK_II;
 		*extension_version = 1;
 		return 1;
 	}
 	return 0;
+}
+
+int
+pentax_model_uses_new_focus (uint32_t model_no)
+{
+	/* IT2 explicitly selects 0x9017 only for its new-focus models.  The
+	 * K-1 II is an old-focus 0x9016 model and must fail closed here. */
+	return model_no == PENTAX_MODEL_K3_MARK_III;
 }
 
 static int
