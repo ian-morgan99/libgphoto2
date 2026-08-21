@@ -33,6 +33,12 @@ write and independent verification also read 1/500. No preview followed. Audit
 the conditions changeability word at offset 504 before another shutter write;
 GetSet and physical M are not sufficient authorization or success evidence.
 
+That conditions audit subsequently reported IT2 Manual mode (raw 8),
+Tv-changeable, idle, and not task-changing. Repeating the bounded write after a
+source-aligned conditions preflight was still acknowledged but ignored. The
+setter now requires the preflight and post-write match, but K-1 II shutter
+writes are closed pending new official-client or wire evidence.
+
 Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
 exposure compensation, and shutter speed. Several white-balance enumeration
 values remain deliberately labelled `Unknown value` because the existing

@@ -9606,11 +9606,31 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	PTPDevicePropDesc desc;
 	PTPDevicePropDesc verify;
 	PTPPropValue value;
+	PentaxConditions conditions;
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
 	uint16_t ret;
 	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		&conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
 	memset (&desc, 0, sizeof (desc));
 	memset (&verify, 0, sizeof (verify));
 	memset (&value, 0, sizeof (value));
