@@ -45,6 +45,12 @@ default. Its storage and capture-target compatibility shims are exact-name
 Canon R5 II gates; the policy test confirms both Pentax target names are pure
 pass-through. The policy test passed again during this audit.
 
+After libgphoto2 baseline `c82d19052` was committed, the patcher source-input
+preflight passed against that exact clean checkout, including clean provenance,
+dirty rejection and explicit opt-in, stable dirty hashing, source-archive
+handling, and unsafe archive rejection. Polaris commit `7814a8d` replaces its
+stale matrix with the normative links and records that baseline.
+
 The patcher still contained the original 621-line capability extraction. That
 copy included the superseded K-3 III `0x018f` identifier and incorrect K-1 II
 flags. Since an archived copy already exists in the workspace archive, the
