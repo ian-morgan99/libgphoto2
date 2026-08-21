@@ -59,6 +59,12 @@ remain unexposed until one-property round-trip tests are explicitly approved.
 
 ## Hardware enactment checklist
 
+Test physical Bulb (`B`) as a required mode separate from Manual: compare
+shutter representation, bulb timer/long-exposure controls, Astrotracer-related
+properties, and descriptor writability without triggering an exposure. Saved
+U1–U3 profiles may be tested later, but first record their existing assignments;
+changing a U profile is persistent and must have an explicit restoration plan.
+
 For each target body and firmware:
 
 1. Save `--list-all-config` and raw property descriptors before changing state.
