@@ -9890,6 +9890,7 @@ camera_init (Camera *camera, GPContext *context)
 	char		buf[20];
 	int 		start_timeout = USB_START_TIMEOUT;
 	int 		canon_start_timeout = USB_CANON_START_TIMEOUT;
+	int		pentax_candidate;
 
 	gp_port_get_settings (camera->port, &settings);
 	/* Make sure our port is either USB or PTP/IP. */
@@ -9929,6 +9930,8 @@ camera_init (Camera *camera, GPContext *context)
 		camloc = "UCS-2BE";
 
 	gp_camera_get_abilities(camera, &a);
+	pentax_candidate = (a.usb_vendor == 0x25fb) &&
+		((a.usb_product == 0x0189) || (a.usb_product == 0x0183));
 
 #if defined(HAVE_ICONV) && defined(HAVE_LANGINFO_H)
 	curloc = nl_langinfo (CODESET);
@@ -10079,6 +10082,10 @@ camera_init (Camera *camera, GPContext *context)
 			break;
 
 		tries++;
+		if (pentax_candidate)
+			gp_context_error (context,
+				_("Pentax init stage OpenSession attempt %d, session %u, returned 0x%04x."),
+				tries, sessionid, ret);
 
 		if (ret==PTP_RC_InvalidTransactionID) {
 			sessionid++;
@@ -10094,8 +10101,13 @@ camera_init (Camera *camera, GPContext *context)
 			}
 		} else if ((ret == PTP_ERROR_RESP_EXPECTED) || (ret == PTP_ERROR_IO)) {
 			/* Try whacking PTP device */
-			if (tries < 3 && camera->port->type == GP_PORT_USB)
+			if (tries < 3 && camera->port->type == GP_PORT_USB) {
+				if (pentax_candidate)
+					gp_context_error (context,
+						_("Pentax init recovery is issuing the existing USB control reset after OpenSession attempt %d."),
+						tries);
 				ptp_usb_control_device_reset_request (params);
+			}
 		}
 
 		if (tries < 3)
@@ -10168,11 +10180,23 @@ camera_init (Camera *camera, GPContext *context)
 	/* Seems HP does not like getdevinfo outside of session
 	   although it's legal to do so */
 	/* get device info */
-	C_PTP_REP (ptp_getdeviceinfo(params, &params->deviceinfo));
+	ret = ptp_getdeviceinfo (params, &params->deviceinfo);
+	if (ret != PTP_RC_OK) {
+		if (pentax_candidate)
+			gp_context_error (context,
+				_("Pentax init stage initial GetDeviceInfo returned 0x%04x."), ret);
+		C_PTP_REP (ret);
+	}
 
 	print_debug_deviceinfo(params, &params->deviceinfo);
 
-	CR (fixup_cached_deviceinfo (camera,&params->deviceinfo));
+	ret = fixup_cached_deviceinfo (camera, &params->deviceinfo);
+	if (ret < GP_OK) {
+		if (pentax_candidate)
+			gp_context_error (context,
+				_("Pentax init stage initial DeviceInfo cache fixup returned %d."), ret);
+		return ret;
+	}
 
 	print_debug_deviceinfo(params, &params->deviceinfo);
 	pentax_identify_supported_model (params, &a);
@@ -10184,6 +10208,9 @@ camera_init (Camera *camera, GPContext *context)
 			params->pentax.model_no, 1,
 			params->pentax.vendor_ext_version, &function_flags);
 		if (ret == PTP_RC_OK) {
+			gp_context_status (context,
+				_("Pentax init stage vendor enable succeeded; function flags 0x%08x."),
+				function_flags);
 			PTPDeviceInfo refreshed = {0};
 			uint16_t refresh_ret;
 
@@ -10206,6 +10233,9 @@ camera_init (Camera *camera, GPContext *context)
 				params->pentax.function_flags = 0;
 				GP_LOG_E ("Pentax post-enable DeviceInfo refresh failed with 0x%04x; vendor mode rolled back",
 					refresh_ret);
+				gp_context_error (context,
+					_("Pentax init stage post-enable GetDeviceInfo returned 0x%04x; vendor mode was rolled back."),
+					refresh_ret);
 			} else {
 				ptp_free_deviceinfo (&params->deviceinfo);
 				params->deviceinfo = refreshed;
@@ -10223,6 +10253,9 @@ camera_init (Camera *camera, GPContext *context)
 			}
 		} else {
 			GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x; using generic PTP",
+				ret);
+			gp_context_error (context,
+				_("Pentax init stage vendor enable returned 0x%04x; continuing in generic PTP mode."),
 				ret);
 		}
 	}
