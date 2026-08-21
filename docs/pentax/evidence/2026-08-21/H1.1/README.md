@@ -30,3 +30,5 @@ select MTP. CD-ROM mode exposes the bundled software installer.
 The previous `018c` and Pentax-VendorExtensionID assumptions were contradicted.
 The candidate must use `0189`, avoid duplicate registration in the legacy
 USB-SCSI camlib, and gate vendor routing on exact verified model identity.
+The provenance and process failure behind `018c` are documented in
+`docs/pentax/REAL_HARDWARE_TEST_LOG.md`.
