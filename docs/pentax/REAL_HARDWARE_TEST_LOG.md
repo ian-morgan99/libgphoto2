@@ -7,6 +7,8 @@ work and acceptance gates, and from the smaller per-gate evidence records.
 Camera: PENTAX K-3 Mark III, firmware 2.20. Test date: 2026-08-21. The camera
 serial number and all image content are deliberately omitted. Unless explicitly
 stated otherwise, tests used the colour K-3 Mark III in MTP mode over USB.
+The K-1 Mark II H1.7 rows explicitly identify the second body and used its PC-P
+USB mode; its firmware version was not yet recorded.
 
 ## Non-destructive test policy
 
@@ -57,6 +59,9 @@ Camera serial data seen during discovery was not committed.
 | Bulb-mode full parameter enumeration | Physical dial `B`; two complete public config-tree reads under corrected single-device isolation; exact transmitted-opcode audit on snapshot 2 | Both snapshots returned 700 lines. Snapshot 2 sent zero setters, focus, or capture operations. Shutter/`0xd00f` exposed 1–600 seconds, current 300; `0xd013` narrowed from M's 12 choices/current 4 to 3 choices/current 0 | Read-only B baseline passes 2/2. Treat `0xd00f` as a B timer domain; withhold `0xd013` value labels and all writes pending display correlation; see H1.6 |
 | First ISO write and interrupted restore | Read `0xd01e=3200`; set 1600; read back; request operator display confirmation; plan exact restore to 3200 | PTP and camera display both confirmed ISO 1600. Before restore, USB node vanished and the restore container did not launch. Camera screen was black; after restart attempt operator identified a flat battery | Property identity/write/read-back passes, but reversibility gate remains open. No restore command was sent; expected retained value is 1600. Charge/replace battery, confirm, then restore 3200 before any further write or exposure |
 | H0 exact ISO restoration after charging | Operator confirmed retained ISO 1600; exclusive ownership; fresh read requiring `0xd01e=1600`; one set to advertised 3200; independent fresh-session read; operator display confirmation | All three vendor enables succeeded with flags 0. Pre-read was 1600, the sole write returned success, fresh PTP read was 3200, and the camera display showed ISO 3200. USB node was unowned after exit | Interrupted reversibility gate is closed. `0xd01e` identity and exact 3200→1600→3200 round trip pass; this does not authorize arbitrary ISO values or other setting writes |
+| K-1 II passive PC-P identity | USB/udev descriptor reads and ownership check only | `25fb:0183`, Imaging/PTP `06/01/01`, exact USB product string; no node owner | First hardware confirmation of the K-1 II identifier; only ptp2 claims the model |
+| K-1 II guarded model read | Exact-model init, vendor enable, read-only camera-model widget, exit | Enable succeeded with function flags `0x00000003`; exact model returned; USB released | Initial K-1 II lifecycle pass; flags differ from K-3 III and remain model-specific evidence |
+| K-1 II condition snapshot | Separate exact-model session; one read-only `status/pentaxconditions` widget | 568-byte response parsed: state 0, exposure mode raw 21, drive raw 4, ISO 200, `openAvNum=14`, no active Bulb/Astro/error flags; USB released | Layout is compatible through optional offset 528; no setting semantics beyond reported/raw values are claimed; see H1.7 |
 
 ## Pending hardware tests (not executed)
 
@@ -136,6 +141,7 @@ Detailed records are retained in:
 - `docs/pentax/evidence/2026-08-21/H1.3/README.md` — live-view probes and soak.
 - `docs/pentax/evidence/2026-08-21/H1.5/README.md` — bounded focus-drive probe.
 - `docs/pentax/evidence/2026-08-21/H1.6/README.md` — Bulb-mode read-only baseline.
+- `docs/pentax/evidence/2026-08-21/H1.7/README.md` — K-1 II initial read-only gate.
 
 Implementation commits arising directly from these tests are `b72d9cbdc` and
 `abf55fbcb`.
