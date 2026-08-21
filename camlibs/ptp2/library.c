@@ -2813,7 +2813,7 @@ static struct {
 	{"Pentax:K-3 Mark III Monochrome (PTP Mode)", 0x25fb, 0x018f, 0},
 	/* Ian Morgan <github@morgan-multinational.co.uk> */
 	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, PTP_CAP|PTP_CAP_PREVIEW},
-	{"Pentax:K-3 Mark III (PTP mode)",	0x25fb, 0x018c, PTP_CAP|PTP_CAP_PREVIEW},
+	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, PTP_CAP|PTP_CAP_PREVIEW},
 
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
@@ -3299,7 +3299,8 @@ camera_exit (Camera *camera, GPContext *context)
 		PTPContainer event;
 		SET_CONTEXT_P(params, context);
 
-		switch (params->deviceinfo.VendorExtensionID) {
+		switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
+			params->deviceinfo.VendorExtensionID) {
 		case PTP_VENDOR_PENTAX:
 			if (params->pentax.vendor_mode_enabled) {
 				uint32_t function_flags = 0;
@@ -3646,7 +3647,8 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 	PTPParams *params = &camera->pl->params;
 
 	camera->pl->checkevents = TRUE;
-	switch (params->deviceinfo.VendorExtensionID) {
+	switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
+		params->deviceinfo.VendorExtensionID) {
 	case PTP_VENDOR_PENTAX: {
 		PTPPropValue value;
 		size_t jpeg_offset = 0, jpeg_length = 0;
@@ -6094,7 +6096,7 @@ camera_capture (Camera *camera, CameraCaptureType type, CameraFilePath *path,
 
 	SET_CONTEXT_P(params, context);
 	camera->pl->checkevents = TRUE;
-	if (params->deviceinfo.VendorExtensionID == PTP_VENDOR_PENTAX)
+	if (params->pentax.vendor_mode_enabled)
 		return camera_pentax_capture (camera, path, context);
 
 	/* first, draining existing events if the caller did not do it. */
@@ -10140,24 +10142,58 @@ camera_init (Camera *camera, GPContext *context)
 	print_debug_deviceinfo(params, &params->deviceinfo);
 	pentax_identify_supported_model (params, &a);
 
+	if (params->pentax.supported_model) {
+		uint32_t function_flags = 0;
+
+		ret = ptp_pentax_set_vendor_mode (params,
+			params->pentax.model_no, 1,
+			params->pentax.vendor_ext_version, &function_flags);
+		if (ret == PTP_RC_OK) {
+			PTPDeviceInfo refreshed = {0};
+			uint16_t refresh_ret;
+
+			params->pentax.function_flags = function_flags;
+			params->pentax.vendor_mode_enabled = 1;
+			GP_LOG_D ("Pentax vendor mode enabled, function flags 0x%08x",
+				function_flags);
+			/* K-3 III firmware 2.20 exposes its vendor property list only
+			 * after 0x9001 succeeds. Refresh atomically so a failed read keeps
+			 * the valid pre-vendor DeviceInfo and rolls the mode back. */
+			refresh_ret = ptp_getdeviceinfo (params, &refreshed);
+			if (refresh_ret != PTP_RC_OK) {
+				uint32_t ignored_flags = 0;
+
+				ptp_free_deviceinfo (&refreshed);
+				(void)ptp_pentax_set_vendor_mode (params,
+					params->pentax.model_no, 0,
+					params->pentax.vendor_ext_version, &ignored_flags);
+				params->pentax.vendor_mode_enabled = 0;
+				params->pentax.function_flags = 0;
+				GP_LOG_E ("Pentax post-enable DeviceInfo refresh failed with 0x%04x; vendor mode rolled back",
+					refresh_ret);
+			} else {
+				ptp_free_deviceinfo (&params->deviceinfo);
+				params->deviceinfo = refreshed;
+				ret = fixup_cached_deviceinfo (camera, &params->deviceinfo);
+				if (ret < GP_OK) {
+					uint32_t ignored_flags = 0;
+
+					(void)ptp_pentax_set_vendor_mode (params,
+						params->pentax.model_no, 0,
+						params->pentax.vendor_ext_version, &ignored_flags);
+					params->pentax.vendor_mode_enabled = 0;
+					params->pentax.function_flags = 0;
+					return ret;
+				}
+			}
+		} else {
+			GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x; using generic PTP",
+				ret);
+		}
+	}
+
 	switch (params->deviceinfo.VendorExtensionID) {
 	case PTP_VENDOR_PENTAX:
-		if (params->pentax.supported_model) {
-			uint32_t function_flags = 0;
-
-			ret = ptp_pentax_set_vendor_mode (params,
-				params->pentax.model_no, 1,
-				params->pentax.vendor_ext_version, &function_flags);
-			if (ret == PTP_RC_OK) {
-				params->pentax.function_flags = function_flags;
-				params->pentax.vendor_mode_enabled = 1;
-				GP_LOG_D ("Pentax vendor mode enabled, function flags 0x%08x",
-					function_flags);
-			} else {
-				GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x; using generic PTP",
-					ret);
-			}
-		}
 		break;
 	case PTP_VENDOR_CANON:
 #if 0

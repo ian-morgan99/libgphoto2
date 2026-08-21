@@ -170,12 +170,6 @@ camera_abilities (CameraAbilitiesList *list)
 	if (GP_OK != (ret = gp_abilities_list_append (list, a)))
 		return ret;
 
-	strcpy (a.model, "Pentax:K3III");
-	a.usb_vendor		= 0x25fb;
-	a.usb_product           = 0x0189;
-	if (GP_OK != (ret = gp_abilities_list_append (list, a)))
-		return ret;
-
 	return GP_OK;
 }
 

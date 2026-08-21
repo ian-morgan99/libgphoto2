@@ -10,8 +10,8 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | M0 repository, tool, and camera inventory | PARTIAL | Repository/tool inventory PASS; target hardware BLOCKED; see `docs/pentax/evidence/2026-08-21/M0.1/` |
 | 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Wire contract documented; USB observations remain BLOCKED |
 | 2026-08-21 | P2 wrappers and guarded session state | COMPILE PASS | Hardware transaction gate BLOCKED |
-| 2026-08-21 | P3 vendor lifecycle | COMPILE PASS | Enable/disable/reconnect gate BLOCKED |
-| 2026-08-21 | P4 preview path | COMPILE PASS | 500-frame camera gate BLOCKED |
+| 2026-08-21 | P3 vendor lifecycle | HARDWARE PASS | Firmware 2.20 enable/descriptor refresh/disable and independent cleanup verification pass; reconnect repetition remains |
+| 2026-08-21 | P4 preview path | PARTIAL HARDWARE PASS | One bounded 1080x720 JPEG frame passed and original `0xd035=0` restored; 500-frame gate remains |
 | 2026-08-21 | P5 capture and transfer state machine | COMPILE PASS | JPEG/RAW/cancel camera gate BLOCKED |
 | 2026-08-21 | Obsolete `pentaxmodern` prototype | ARCHIVED | Removed stale build registrations; source retained under workspace `archive/obsolete-source/` and in Git history |
 | 2026-08-21 | Pentax parser/transfer-buffer unit tests | PASS | Fresh container compile plus `test-pentax-utils` 1/1 PASS |
@@ -27,6 +27,12 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | B2 complete-loader cross-build | PASS | Polaris `2b505c7`; full Stage-2 loader plus exact-model policy compiles as ARM EABI5 shared object with `-Werror`; execution/package gates remain BLOCKED without FwPkt |
 | 2026-08-21 | Legacy capability-claim audit | CORRECTED | Replaced speculative checkmark table and K-3 III/Monochrome PID conflation with implementation-vs-hardware evidence matrix; original moved to workspace archive |
 | 2026-08-21 | Pentax live-view framing audit | CORRECTED | Dedicated bounded JPEG parser now requires complete SOI/EOI and rejects missing/trailing/truncated markers; parser fixtures pass sanitizers |
+| 2026-08-21 | H1.1 K-3 III passive/read-only discovery | PASS | Real firmware 2.20: MTP `25fb:0189`, CD-ROM `25fb:018a`, exact DeviceInfo model, Microsoft extension `0x6`, SD1/SD2; no mutation commands; serial redacted |
+| 2026-08-21 | K-3 III routing correction | HARDWARE PASS | Moved hardware-proven `0189` from legacy USB-SCSI camlib to ptp2; exact model state gates lifecycle/config routing despite Microsoft MTP extension ID |
+| 2026-08-21 | H1.2 vendor lifecycle and descriptors | PASS | Guarded enable exposed Pentax properties; exit hid them again in an independent generic session; only 0x9001 state changed; ISO/focus assumptions corrected |
+| 2026-08-21 | Post-enable DeviceInfo cache audit | CORRECTED | Normal config listing initially saw only pre-vendor properties; candidate now atomically refreshes after enable and rolls vendor mode back on refresh/fixup failure |
+| 2026-08-21 | Read-only configuration widgets | PARTIAL PASS | Aperture, exposure compensation, and shutter decode correctly; Pentax white-balance vendor labels required effective-vendor routing correction; ISO/focus remain withheld |
+| 2026-08-21 | H1.3 single live-view frame | PASS | Valid 1080x720 JPEG returned; disposable host file only; `0xd035` independently verified restored to 0; see evidence record |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -36,7 +42,8 @@ This is the single source of truth for adding Pentax tethering support to the
 libgphoto2 fork and delivering that build through BenroPolarisPatcher. Copies of
 this plan elsewhere are informational only.
 
-The primary target is the PENTAX K-3 Mark III colour body (`25fb:018c`). The
+The primary target is the PENTAX K-3 Mark III colour body in its required MTP
+mode (`25fb:0189`). The
 PENTAX K-1 Mark II (`25fb:0183`) is the second validation body. Adding a USB ID
 does not mean that a camera has vendor support. Unknown Pentax bodies must retain
 safe generic PTP behaviour.

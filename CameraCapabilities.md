@@ -17,8 +17,12 @@ Vendor commands are enabled only when all three identity fields match:
 
 | Abilities VID:PID | Exact DeviceInfo model | Vendor model | Extension | Evidence |
 |---|---|---:|---:|---|
-| `25fb:018c` | `PENTAX K-3 Mark III` | 78420 | 1 | Observed client; hardware blocked |
+| `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo verified on firmware 2.20 |
 | `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Observed client; hardware blocked |
+
+The K-3 III exposes Microsoft MTP VendorExtensionID `0x6`; exact USB and
+DeviceInfo identity, rather than that generic extension ID, gates Pentax vendor
+mode. `25fb:018a` is its CD-ROM installer mode and is excluded.
 
 `25fb:018f` is the K-3 Mark III Monochrome entry and is deliberately excluded
 from this vendor implementation. All unmatched identities remain on generic

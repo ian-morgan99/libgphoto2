@@ -28,7 +28,7 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	*extension_version = 0;
 	if (!device_model || (usb_vendor != 0x25fb))
 		return 0;
-	if ((usb_product == 0x018c) &&
+	if ((usb_product == 0x0189) &&
 	    !strcmp (device_model, "PENTAX K-3 Mark III")) {
 		*model_no = 78420;
 		*extension_version = 1;
