@@ -24,6 +24,8 @@ Status: canonical plan, revision 2026-08-21
 | 2026-08-21 | P6 configuration-path audit | DOCUMENTED | Six required settings already have descriptor-gated ptp2 handlers; vendor structures withheld pending real descriptors; see `docs/pentax/PENTAX_CONFIGURATION.md` |
 | 2026-08-21 | B2 runtime-shim policy audit | PARTIAL PASS | Polaris R5-II storage/capturetarget shims now require an exact R5 II abilities model and fail closed for Pentax/unknown cameras; native and ARM policy tests PASS; full loader/QEMU/repack remain BLOCKED without FwPkt |
 | 2026-08-21 | Candidate filename security audit | PASS | UTF-16 parser rejects separators, non-ASCII/control input, empty names, overflow, and reserved `.`/`..` path components; regression fixtures pass sanitizers |
+| 2026-08-21 | B2 complete-loader cross-build | PASS | Polaris `2b505c7`; full Stage-2 loader plus exact-model policy compiles as ARM EABI5 shared object with `-Werror`; execution/package gates remain BLOCKED without FwPkt |
+| 2026-08-21 | Legacy capability-claim audit | CORRECTED | Replaced speculative checkmark table and K-3 III/Monochrome PID conflation with implementation-vs-hardware evidence matrix; original moved to workspace archive |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -62,7 +64,8 @@ feature acceptance test.
 - libgphoto2 repository: `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2`
 - Polaris repository: `/home/ian/Documents/VSCodeProjects/BenroPolarisPatcher`
 - Decompiled reference: `ImageTransmitter2/IMAGETransmitter2/MtpDevice.cs`
-- Extracted notes: `CameraCapabilities.md`
+- Evidence-status matrix: `CameraCapabilities.md`
+- Archived extracted notes: workspace `archive/CameraCapabilities.extracted-obsolete-20260821.md`
 
 The decompiled application is evidence about one host implementation, not a
 wire-protocol specification. USB captures and real camera responses outrank it.
