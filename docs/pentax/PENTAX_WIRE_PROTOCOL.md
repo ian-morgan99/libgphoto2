@@ -102,9 +102,37 @@ The official client retries response `0xa00c` up to ten times and multiplies
 the displacement by `sqrt(2)` after each failure. Libgphoto2 deliberately does
 not reproduce that escalation: each public action makes a fresh status read,
 requires at least 332 bytes and a non-zero bounded displacement, sends exactly
-one `0x9017`, and returns the first response. The first hardware probe returned
-a translated I/O error without stage-specific logging, so neither offset 328
-nor physical focus movement is hardware-validated yet.
+one `0x9017`, and returns the first response. On the K-3 Mark III with a
+24–70 mm AF lens, offset 328 was 28: `+23` returned `0x2001` and moved focus
+nearer; a fresh `-23` returned `0x2001` and moved it farther by approximately
+the same small amount. This validates direction and bounded transport, not
+calibrated distance or larger displacements.
+
+## GetAllConditions status subset
+
+The candidate parses only source-traced fields and preserves uncorrelated modes
+as raw numbers. The mandatory subset ends after offset 504 and therefore
+requires at least 508 bytes. Astro limit time at offset 528 is optional and is
+read only from responses of at least 532 bytes.
+
+| Offset | Width | Meaning used by the candidate |
+|---:|---:|---|
+| 24 | 4 | low byte operation state; 49 Astro pre-exposure, 50 Astro main exposure |
+| 40 | 4 | raw user mode |
+| 104 | 4 | shooting/processing/movie/mirror/interval/multi/self-timer activity bits |
+| 168 | 4 | exposure step |
+| 184 | 4 | raw exposure mode |
+| 272, 276 | 4 each | Bulb timer value numerator/denominator |
+| 312 | 4 | ISO |
+| 320 | 4 | Astro shift/aperture flags and movement-failed/time-too-long bits |
+| 328 | 4 | `openAvNum`, used for minimum focus displacement |
+| 492 | 4 | raw drive mode |
+| 504 | 4 | Av/Tv/Sv/Xv changeability, task-changing, Bulb timer, GPS, AstroTracer3 bits |
+| 528 | 4 | optional Astro limit seconds |
+
+The public `status/pentaxconditions` text widget issues one `0x900f`, has no
+setter, and exposes raw IDs where hardware correlation is incomplete. It does
+not infer that Astro is ready and does not initiate an exposure.
 
 ## Still capture and transfer
 

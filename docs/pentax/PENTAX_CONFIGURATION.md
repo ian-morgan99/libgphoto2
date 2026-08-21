@@ -43,8 +43,9 @@ no session retained vendor state into the next.
 
 ## Deliberately withheld widgets
 
-- Extended ISO `0xd01e` (UINT32 on the observed body, but its empty enumeration
-  and numeric meaning require client correlation before any write)
+- Extended ISO `0xd01e` (UINT32; 3200→1600 was confirmed by PTP read-back and
+  the camera display, but the battery failed before restoration to 3200, so no
+  general setter is exposed until that restoration and more bounded values pass)
 - Focus mode (no `0x500a` descriptor; no replacement property yet proven)
 - Drive mode `0xd013`
 - Exposure-bracketing mode/step `0xd014`/`0xd015`
@@ -56,6 +57,16 @@ The Windows client establishes that these codes are used. The H1.2 read-only
 probe establishes several real types and GetSet flags, but not enough to prove
 their numeric semantics, mode constraints, or compound payload layout. They
 remain unexposed until one-property round-trip tests are explicitly approved.
+
+## Read-only aggregate status
+
+`status/pentaxconditions` performs one `GetAllConditions` (`0x900f`) read and
+has no setter. It reports activity/changeability flags, ISO, Bulb timer state
+and rational value, raw exposure/user/drive modes, and source-traced Astro
+phase/error/limit fields. The parser requires 508 bytes before reading the
+mandatory final field and separately requires 532 bytes for the optional Astro
+limit. Unknown modes remain numeric. This widget must not be interpreted as an
+Astro-ready decision or an exposure command.
 
 ## Hardware enactment checklist
 

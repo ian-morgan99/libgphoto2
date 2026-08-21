@@ -17,7 +17,9 @@ owned the device. Candidate builds ran from a read-only source mount in a
 disposable Ubuntu container.
 
 No completed test in this record issued a still-capture, shutter-release,
-delete, file-write, reset, firmware-update, or persistent configuration command.
+delete, file-write, reset, or firmware-update command. One explicitly approved
+ISO write changed 3200 to 1600; battery loss interrupted its restore, and that
+open restoration obligation is recorded below.
 Preview JPEGs existed only in memory or disposable storage and were not retained.
 Camera serial data seen during discovery was not committed.
 
@@ -54,6 +56,15 @@ Camera serial data seen during discovery was not committed.
 | Instrumented Far physical observation | Operator watched the 24–70 mm lens after the `-23` reversal | Focus visibly moved farther by about the same small amount; exact equality was difficult to judge | Bounded bidirectional focus gate passes qualitatively. Do not claim calibrated displacement accuracy or enable escalation/larger steps from this result |
 | Bulb-mode full parameter enumeration | Physical dial `B`; two complete public config-tree reads under corrected single-device isolation; exact transmitted-opcode audit on snapshot 2 | Both snapshots returned 700 lines. Snapshot 2 sent zero setters, focus, or capture operations. Shutter/`0xd00f` exposed 1–600 seconds, current 300; `0xd013` narrowed from M's 12 choices/current 4 to 3 choices/current 0 | Read-only B baseline passes 2/2. Treat `0xd00f` as a B timer domain; withhold `0xd013` value labels and all writes pending display correlation; see H1.6 |
 | First ISO write and interrupted restore | Read `0xd01e=3200`; set 1600; read back; request operator display confirmation; plan exact restore to 3200 | PTP and camera display both confirmed ISO 1600. Before restore, USB node vanished and the restore container did not launch. Camera screen was black; after restart attempt operator identified a flat battery | Property identity/write/read-back passes, but reversibility gate remains open. No restore command was sent; expected retained value is 1600. Charge/replace battery, confirm, then restore 3200 before any further write or exposure |
+
+## Pending hardware tests (not executed)
+
+The condition parser and read-only status widget were implemented while the
+camera charged. Their fixture/build results are software evidence, not entries
+in the chronological hardware table. After the ISO restore, run H0.1 from the
+development plan: two B-mode reads, exactly one `0x900f` per named widget read,
+response length recorded, no setter/focus/preview/capture/transfer/delete/reset,
+and operator correlation limited to ISO and visible Bulb-timer state/value.
 
 The 50-frame result is a bounded soak, not the plan's 500-frame acceptance gate.
 Still capture, transfer from camera storage, configuration writes, cancellation,
