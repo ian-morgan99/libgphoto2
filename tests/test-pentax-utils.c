@@ -94,11 +94,22 @@ mock_init (MockTransfer *mock)
 	mock->block_error_at = -1;
 }
 
+static void
+put_u32le (unsigned char *data, size_t offset, uint32_t value)
+{
+	data[offset] = (unsigned char)value;
+	data[offset + 1] = (unsigned char)(value >> 8);
+	data[offset + 2] = (unsigned char)(value >> 16);
+	data[offset + 3] = (unsigned char)(value >> 24);
+}
+
 int
 main (void)
 {
 	int32_t displacement = 0;
 	PentaxCaptureBuffer buffer = {0};
+	PentaxConditions conditions, unchanged;
+	unsigned char condition_data[532] = {0};
 	const unsigned char filename[] = {
 		1, 2, 3, 11,
 		'I', 0, 'M', 0, 'G', 0, '0', 0, '0', 0, '0', 0, '1', 0, '.', 0,
@@ -128,6 +139,47 @@ main (void)
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
 	CHECK (!pentax_lookup_model (0x1234, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
+	memset (&unchanged, 0xa5, sizeof (unchanged));
+	conditions = unchanged;
+	CHECK (pentax_parse_conditions (condition_data, 507, &conditions) ==
+		GP_ERROR_CORRUPTED_DATA);
+	CHECK (!memcmp (&conditions, &unchanged, sizeof (conditions)));
+	CHECK (pentax_parse_conditions (NULL, sizeof (condition_data), &conditions) ==
+		GP_ERROR_BAD_PARAMETERS);
+	CHECK (pentax_parse_conditions (condition_data, sizeof (condition_data), NULL) ==
+		GP_ERROR_BAD_PARAMETERS);
+	put_u32le (condition_data, 24, 49);
+	put_u32le (condition_data, 40, 3);
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING);
+	put_u32le (condition_data, 168, 2);
+	put_u32le (condition_data, 184, 12);
+	put_u32le (condition_data, 272, 300);
+	put_u32le (condition_data, 276, 1);
+	put_u32le (condition_data, 312, 3200);
+	put_u32le (condition_data, 320, PENTAX_CONDITION_ASTRO_SHIFT_MODE |
+		PENTAX_CONDITION_ASTRO_MOVEMENT_FAILED |
+		PENTAX_CONDITION_ASTRO_TIME_TOO_LONG);
+	put_u32le (condition_data, 328, 28);
+	put_u32le (condition_data, 492, 4);
+	put_u32le (condition_data, 504, PENTAX_CONDITION_CAN_CHANGE_TV |
+		PENTAX_CONDITION_TASK_CHANGING | PENTAX_CONDITION_BULB_TIMER |
+		PENTAX_CONDITION_ASTROTRACER3 | 0x00000180U);
+	put_u32le (condition_data, 528, 600);
+	CHECK (pentax_parse_conditions (condition_data, 508, &conditions) == GP_OK);
+	CHECK ((conditions.operation_state == 49) &&
+		(conditions.activity_flags == 3) && (conditions.exposure_mode == 12) &&
+		(conditions.user_mode == 3) && (conditions.exposure_step == 2) &&
+		(conditions.bulb_timer_seconds == 300) &&
+		(conditions.bulb_timer_denominator == 1) && (conditions.iso == 3200) &&
+		(conditions.open_av_num == 28) && (conditions.drive_mode == 4));
+	CHECK ((conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_TIME_TOO_LONG) &&
+		(conditions.capability_flags & PENTAX_CONDITION_ASTROTRACER3) &&
+		!conditions.has_astro_limit);
+	CHECK (pentax_parse_conditions (condition_data, 531, &conditions) == GP_OK);
+	CHECK (!conditions.has_astro_limit);
+	CHECK (pentax_parse_conditions (condition_data, 532, &conditions) == GP_OK);
+	CHECK (conditions.has_astro_limit && (conditions.astro_limit_seconds == 600));
 	CHECK (pentax_candidate_filename (filename, sizeof (filename), name,
 		sizeof (name)) == GP_OK);
 	CHECK (!strcmp (name, "IMG0001.JPG"));

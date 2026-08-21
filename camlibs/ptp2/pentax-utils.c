@@ -19,6 +19,38 @@ pentax_get_u32le (const unsigned char *data)
 }
 
 int
+pentax_parse_conditions (const unsigned char *data, size_t size,
+		PentaxConditions *conditions)
+{
+	PentaxConditions parsed;
+
+	if (!data || !conditions)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* capability_flags at 504 is the final mandatory field. */
+	if (size < 508)
+		return GP_ERROR_CORRUPTED_DATA;
+	memset (&parsed, 0, sizeof (parsed));
+	parsed.operation_state = (uint8_t)pentax_get_u32le (data + 24);
+	parsed.activity_flags = pentax_get_u32le (data + 104);
+	parsed.exposure_step = pentax_get_u32le (data + 168);
+	parsed.exposure_mode = pentax_get_u32le (data + 184);
+	parsed.user_mode = pentax_get_u32le (data + 40);
+	parsed.bulb_timer_seconds = pentax_get_u32le (data + 272);
+	parsed.bulb_timer_denominator = pentax_get_u32le (data + 276);
+	parsed.iso = pentax_get_u32le (data + 312);
+	parsed.astro_status_flags = pentax_get_u32le (data + 320);
+	parsed.open_av_num = pentax_get_u32le (data + 328);
+	parsed.drive_mode = pentax_get_u32le (data + 492);
+	parsed.capability_flags = pentax_get_u32le (data + 504);
+	if (size >= 532) {
+		parsed.astro_limit_seconds = pentax_get_u32le (data + 528);
+		parsed.has_astro_limit = 1;
+	}
+	*conditions = parsed;
+	return GP_OK;
+}
+
+int
 pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 		int32_t *displacement)
 {

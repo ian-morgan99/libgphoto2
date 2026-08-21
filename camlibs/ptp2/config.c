@@ -9374,6 +9374,63 @@ _get_Pentax_MinimumFocusDrive (CONFIG_GET_ARGS)
 }
 
 static int
+_get_Pentax_Conditions (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxConditions conditions;
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	const char *phase;
+	char value[768];
+	int parse_ret;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_all_conditions (params, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	parse_ret = pentax_parse_conditions (data, size, &conditions);
+	free (data);
+	if (parse_ret < GP_OK)
+		return parse_ret;
+	if (conditions.operation_state == 49)
+		phase = "pre-exposure";
+	else if (conditions.operation_state == 50)
+		phase = "main-exposure";
+	else
+		phase = "inactive/other";
+	snprintf (value, sizeof (value),
+		"state=%u; astro-phase=%s; exposure-mode-raw=%u; user-mode-raw=%u; "
+		"drive-mode-raw=%u; ISO=%u; exposure-step=%u; open-av-num=%u; "
+		"shooting=%s; processing=%s; task-changing=%s; Tv-changeable=%s; "
+		"bulb-timer=%s; bulb-seconds=%u/%u; astrotracer3=%s; "
+		"astro-shift=%s; astro-movement-failed=%s; astro-time-too-long=%s; "
+		"astro-limit=%s%u; gps-state=%u",
+		conditions.operation_state, phase, conditions.exposure_mode,
+		conditions.user_mode, conditions.drive_mode, conditions.iso,
+		conditions.exposure_step, conditions.open_av_num,
+		(conditions.activity_flags & PENTAX_CONDITION_ACTIVITY_SHOOTING) ? "yes" : "no",
+		(conditions.activity_flags & PENTAX_CONDITION_ACTIVITY_PROCESSING) ? "yes" : "no",
+		(conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ? "yes" : "no",
+		(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV) ? "yes" : "no",
+		(conditions.capability_flags & PENTAX_CONDITION_BULB_TIMER) ? "yes" : "no",
+		conditions.bulb_timer_seconds, conditions.bulb_timer_denominator,
+		(conditions.capability_flags & PENTAX_CONDITION_ASTROTRACER3) ? "yes" : "no",
+		(conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) ? "yes" : "no",
+		(conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_MOVEMENT_FAILED) ? "yes" : "no",
+		(conditions.astro_status_flags & PENTAX_CONDITION_ASTRO_TIME_TOO_LONG) ? "yes" : "no",
+		conditions.has_astro_limit ? "" : "unavailable/", conditions.astro_limit_seconds,
+		(conditions.capability_flags & PENTAX_CONDITION_GPS_STATE_MASK) >> 7);
+	gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, value);
+	return GP_OK;
+}
+
+static int
 _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
@@ -11561,6 +11618,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Camera Model"),           "cameramodel",      0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_Model_STR,             _put_None },
 	{ N_("Device Version"),         "deviceversion",    0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_DeviceVersion_STR,     _put_None },
 	{ N_("Vendor Extension"),       "vendorextension",  0,  0,  PTP_OC_GetDeviceInfo,   _get_PTP_VendorExtension_STR,   _put_None },
+	{ N_("Pentax Conditions"),       "pentaxconditions", 0,  PTP_VENDOR_PENTAX, PTP_OC_PENTAX_GetAllConditions, _get_Pentax_Conditions, _put_None },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },

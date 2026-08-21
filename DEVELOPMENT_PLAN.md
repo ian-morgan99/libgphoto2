@@ -60,6 +60,7 @@ any real-hardware test; the plan status table is not a substitute for it.
 | 2026-08-21 | Bounded bidirectional focus | PASS (QUALITATIVE) | `+23` moved nearer and `-23` moved farther by approximately the same small amount; both returned `0x2001`, zero retries, clean exits; no calibrated-distance or larger-step claim |
 | 2026-08-21 | Bulb-mode full config snapshots | READ-ONLY PASS (2/2) | Both returned 700 lines; exact audit sent zero setters/focus/capture; `0xd00f` becomes a 1–600 s timer domain (current 300), while `0xd013` narrows to 3 choices/current 0; see H1.6 |
 | 2026-08-21 | B-mode ISO 3200→1600→restore | INTERRUPTED BEFORE RESTORE | PTP read-back and camera display confirmed `0xd01e` is ISO and changed to 1600; camera then lost USB/power with a flat battery before restore container launch, so no 3200 restore was sent; restore is the next mandatory action after charging |
+| 2026-08-21 | B/Astro condition parser and read-only status | OFFLINE PASS / HARDWARE PENDING | Bounded `0x900f` parser covers activity, raw modes, ISO, Bulb timer, Astro phase/errors/limit, and changeability flags; 508/532-byte boundary fixtures and ptp2 build pass; one status widget performs one read and no write |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -67,30 +68,54 @@ not guessed without real `GetDevicePropDesc` evidence.
 
 ## Current hard stop
 
-The next executable task is handshake/recovery investigation, not additional
-settings, preview, capture, transfer, or Polaris work. After a camera power
-cycle, two fresh candidate sessions received General Error `0x2002` from
-`SetVendorMode`; the driver correctly issued no later Pentax operation. Until a
-repeatable cold-start sequence is observed and documented:
+The camera powered down before the verified ISO change from 3200 to 1600 could
+be restored. After charging, the first and only permitted write is therefore an
+exact restore to 3200, followed by PTP read-back and operator display
+confirmation. Until that closes:
 
-- do not send any other Pentax opcode in the failed session;
-- do not retry `0x9001` in a loop or automatically reset the USB device;
-- do not change camera settings to hunt for a working state without recording
-  the exact before/after state and obtaining approval for persistent changes;
-- do not claim vendor lifecycle, configuration, preview, or capture as
-  reconnect-safe;
-- do not expose unverified still capture or preview through static ability
-  flags in a release candidate.
+- do not write another setting, drive focus, start preview, release the shutter,
+  capture, transfer, delete, reset USB, or run a Polaris camera test;
+- a fresh failed `0x9001` session remains fail-closed: send no later Pentax
+  opcode and do not retry in place;
+- do not claim configuration-write reversibility, reconnect stability, capture,
+  transfer, or Astro exposure support.
 
-The current code remains research-only. A containment commit that removes
-unverified static capability advertising is required before the next release
-candidate build; the constrained explicit-port preview harness remains the only
-approved way to repeat preview after lifecycle recovery is proven.
+The earlier `0x2002` diagnosis was partly confounded by incomplete container
+isolation. Controlled clean starts subsequently passed 3/3, but the plan's
+10+10 and 50-cycle lifecycle gates remain open. Both facts must remain visible;
+neither turns the other into evidence that never happened.
 
 ### Immediate execution queue
 
 Complete these cards in order. A junior agent must stop on the first failed or
 missing exit criterion and must not begin a later card.
+
+#### H0 — Close the interrupted ISO restore (first powered-camera action)
+
+1. Confirm the camera display still shows ISO 1600 and record discrepancies.
+2. Establish exclusive USB ownership using both the bus mount and the explicit
+   single-device grant; never grant the whole USB bus through the device cgroup.
+3. Open one exact-model session, read `0xd01e`, and require current value 1600.
+4. Set only `0xd01e` to the recorded original 3200; read it back once.
+5. Ask the operator to confirm ISO 3200 on the camera, then exit and verify
+   vendor disable/session cleanup. On any mismatch or non-OK response, stop.
+6. Update H1.6, the real-hardware log, and this ledger in the same commit.
+
+Exit: PTP and display both show 3200 and cleanup succeeds. No later hardware
+card may start before this exit is recorded.
+
+#### H0.1 — Validate the condition snapshot without exposure
+
+1. Keep the dial at B and make one named `status/pentaxconditions` read.
+2. Audit the transport log: exactly one `0x900f` for this widget and no setter,
+   focus, preview, capture, transfer, delete, or reset opcode.
+3. Correlate only visible/static facts: ISO, Bulb timer enabled/value, and raw
+   exposure/drive IDs. Do not attempt to enter Astro exposure phases.
+4. Repeat once after a clean session. Store sanitized output and exact response
+   length; update the protocol and hardware records.
+
+Exit: 2/2 reads parse successfully, observable values agree, cleanup succeeds,
+and unknown mode IDs remain numeric.
 
 #### R0 — Contain unverified public capabilities (offline only)
 

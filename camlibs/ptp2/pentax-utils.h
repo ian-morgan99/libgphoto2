@@ -22,7 +22,55 @@ typedef struct {
 	int (*is_timed_out) (void *user_data);
 } PentaxTransferOps;
 
+/* Parsed subset of the K-3 Mark III GetAllConditions response.  Mode values
+ * deliberately remain raw until each value has been correlated on hardware. */
+typedef struct {
+	uint8_t operation_state;
+	uint32_t activity_flags;
+	uint32_t exposure_mode;
+	uint32_t user_mode;
+	uint32_t exposure_step;
+	uint32_t bulb_timer_seconds;
+	uint32_t bulb_timer_denominator;
+	uint32_t iso;
+	uint32_t open_av_num;
+	uint32_t astro_status_flags;
+	uint32_t drive_mode;
+	uint32_t capability_flags;
+	uint32_t astro_limit_seconds;
+	int has_astro_limit;
+} PentaxConditions;
+
+#define PENTAX_CONDITION_ACTIVITY_SHOOTING       0x00000001U
+#define PENTAX_CONDITION_ACTIVITY_PROCESSING     0x00000002U
+#define PENTAX_CONDITION_ACTIVITY_MOVIE_MODE     0x00000100U
+#define PENTAX_CONDITION_ACTIVITY_MOVIE_RECORDING 0x00000200U
+#define PENTAX_CONDITION_ACTIVITY_MIRROR_UP_MODE 0x00000400U
+#define PENTAX_CONDITION_ACTIVITY_MIRROR_UPPING  0x00000800U
+#define PENTAX_CONDITION_ACTIVITY_INTERVAL_MODE  0x00001000U
+#define PENTAX_CONDITION_ACTIVITY_MULTI_MODE     0x00004000U
+#define PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE  0x00008000U
+#define PENTAX_CONDITION_ACTIVITY_SELF_TIMER     0x00100000U
+
+#define PENTAX_CONDITION_ASTRO_SHIFT_MODE        0x00000400U
+#define PENTAX_CONDITION_ASTRO_APERTURE_KEEP     0x00001000U
+#define PENTAX_CONDITION_ASTRO_APERTURE_INHIBIT  0x00002000U
+#define PENTAX_CONDITION_ASTRO_MOVEMENT_FAILED   0x00004000U
+#define PENTAX_CONDITION_ASTRO_TIME_TOO_LONG     0x00008000U
+
+#define PENTAX_CONDITION_CAN_CHANGE_AV           0x00000001U
+#define PENTAX_CONDITION_CAN_CHANGE_TV           0x00000002U
+#define PENTAX_CONDITION_CAN_CHANGE_SV           0x00000004U
+#define PENTAX_CONDITION_CAN_CHANGE_XV           0x00000008U
+#define PENTAX_CONDITION_CAN_AUTO_SV             0x00000010U
+#define PENTAX_CONDITION_TASK_CHANGING            0x00000020U
+#define PENTAX_CONDITION_BULB_TIMER               0x00000040U
+#define PENTAX_CONDITION_GPS_STATE_MASK           0x00000180U
+#define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
+
 uint32_t pentax_get_u32le (const unsigned char *data);
+int pentax_parse_conditions (const unsigned char *data, size_t size,
+	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
