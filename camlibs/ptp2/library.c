@@ -2816,11 +2816,10 @@ static struct {
 	{"Pentax:KP (PTP Mode)",		0x25fb, 0x017f, 0},
 	/* Pentax K-3 Mark III Monochrome, USB setting: MTP */
 	{"Pentax:K-3 Mark III Monochrome (PTP Mode)", 0x25fb, 0x018f, 0},
+	/* Ian Morgan <github@morgan-multinational.co.uk> */
+	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, PTP_CAP|PTP_CAP_PREVIEW},
+	{"Pentax:K-3 Mark III (PTP mode)",	0x25fb, 0x018c, PTP_CAP|PTP_CAP_PREVIEW},
 
-	/* Implemented by Ian Morgan github@morgan-multinational.co.uk
-	{ "Pentax:K-1 Mark II (PTP mode)", 0x25fb, 0x0183, "pentaxmodern" },
-	{ "Pentax:K-3 Mark III (PTP mode)", 0x25fb, 0x018c, "pentaxmodern" },
-	
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
 	{"Sanyo:VPC-FH1 (PTP mode)",            0x0474, 0x02e5, 0},
@@ -3113,6 +3112,29 @@ is_mtp_capable(Camera *camera) {
 	return 0;
 }
 
+static void
+pentax_identify_supported_model (PTPParams *params, const CameraAbilities *abilities)
+{
+	const char *model = params->deviceinfo.Model;
+
+	memset (&params->pentax, 0, sizeof (params->pentax));
+	if (!model || !abilities || (abilities->usb_vendor != 0x25fb))
+		return;
+	if ((abilities->usb_product == 0x018c) &&
+	    !strcmp (model, "PENTAX K-3 Mark III")) {
+		params->pentax.model_no = 78420;
+		params->pentax.vendor_ext_version = 1;
+		params->pentax.supported_model = 1;
+		return;
+	}
+	if ((abilities->usb_product == 0x0183) &&
+	    !strcmp (model, "PENTAX K-1 Mark II")) {
+		params->pentax.model_no = 78400;
+		params->pentax.vendor_ext_version = 1;
+		params->pentax.supported_model = 1;
+	}
+}
+
 int
 camera_abilities (CameraAbilitiesList *list)
 {
@@ -3274,6 +3296,31 @@ camera_exit (Camera *camera, GPContext *context)
 		SET_CONTEXT_P(params, context);
 
 		switch (params->deviceinfo.VendorExtensionID) {
+		case PTP_VENDOR_PENTAX:
+			if (params->pentax.vendor_mode_enabled) {
+				uint32_t function_flags = 0;
+
+				if (params->inliveview) {
+					PTPPropValue value;
+					uint16_t ret;
+
+					value.u8 = 0;
+					ret = ptp_setdevicepropvalue (params,
+						PTP_DPC_PENTAX_UsbLiveViewMode, &value,
+						PTP_DTC_UINT8);
+					if (ret != PTP_RC_OK)
+						GP_LOG_E ("Pentax live view stop failed with 0x%04x", ret);
+					params->inliveview = 0;
+				}
+				exit_result = ptp_pentax_set_vendor_mode (params,
+					params->pentax.model_no, 0,
+					params->pentax.vendor_ext_version, &function_flags);
+				if (exit_result != PTP_RC_OK)
+					GP_LOG_E ("Pentax vendor mode disable failed with 0x%04x",
+						exit_result);
+				params->pentax.vendor_mode_enabled = 0;
+			}
+			break;
 		case PTP_VENDOR_CANON:
 			/* Disable EOS capture now, also end viewfinder mode. */
 			if (params->eos_captureenabled) {
@@ -3599,6 +3646,36 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 
 	camera->pl->checkevents = TRUE;
 	switch (params->deviceinfo.VendorExtensionID) {
+	case PTP_VENDOR_PENTAX: {
+		PTPPropValue value;
+		int result;
+
+		if (!params->pentax.vendor_mode_enabled)
+			return GP_ERROR_NOT_SUPPORTED;
+		SET_CONTEXT_P (params, context);
+		if (!params->inliveview) {
+			value.u8 = 1;
+			ret = ptp_setdevicepropvalue (params,
+				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+			if (ret != PTP_RC_OK) {
+				SET_CONTEXT_P (params, NULL);
+				return translate_ptp_result (ret);
+			}
+			params->inliveview = 1;
+		}
+		ret = ptp_pentax_get_live_view_frame (params, &data, &size);
+		if (ret != PTP_RC_OK) {
+			SET_CONTEXT_P (params, NULL);
+			return translate_ptp_result (ret);
+		}
+		result = save_jpeg_in_data_to_preview (data, size, file);
+		free (data);
+		SET_CONTEXT_P (params, NULL);
+		if (result < GP_OK)
+			gp_context_error (context,
+				_("Pentax live view returned no complete JPEG frame"));
+		return result;
+	}
 	case PTP_VENDOR_CANON:
 		/* Canon PowerShot / IXUS preview mode */
 		if (ptp_operation_issupported(params, PTP_OC_CANON_ViewfinderOn)) {
@@ -5778,6 +5855,303 @@ camera_sigma_fp_capture (Camera *camera, CameraCaptureType type, CameraFilePath 
 #endif
 }
 
+/* Pentax file commands describe writes and seeks into a host-side stream. */
+typedef struct {
+	unsigned char *data;
+	size_t size;
+	size_t capacity;
+	size_t offset;
+} PentaxCaptureBuffer;
+
+#define PENTAX_CAPTURE_TIMEOUT_MS (60 * 1000)
+#define PENTAX_TRANSFER_TIMEOUT_MS (5 * 60 * 1000)
+#define PENTAX_TRANSFER_BLOCK_SIZE (8U * 1024U * 1024U)
+#define PENTAX_CAPTURE_MAX_FILE_SIZE ((size_t)2U * 1024U * 1024U * 1024U)
+
+static uint32_t
+pentax_get_u32le (const unsigned char *data)
+{
+	return ((uint32_t)data[0]) |
+	       ((uint32_t)data[1] << 8) |
+	       ((uint32_t)data[2] << 16) |
+	       ((uint32_t)data[3] << 24);
+}
+
+static int
+pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
+{
+	size_t capacity;
+	unsigned char *data;
+
+	if (required > PENTAX_CAPTURE_MAX_FILE_SIZE)
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	if (required <= buffer->capacity)
+		return GP_OK;
+	capacity = buffer->capacity ? buffer->capacity : 1024U * 1024U;
+	while (capacity < required) {
+		if (capacity > PENTAX_CAPTURE_MAX_FILE_SIZE / 2) {
+			capacity = PENTAX_CAPTURE_MAX_FILE_SIZE;
+			break;
+		}
+		capacity *= 2;
+	}
+	data = realloc (buffer->data, capacity);
+	if (!data)
+		return GP_ERROR_NO_MEMORY;
+	buffer->data = data;
+	buffer->capacity = capacity;
+	return GP_OK;
+}
+
+static int
+pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
+		const unsigned char *data, size_t size)
+{
+	size_t end;
+	int ret;
+
+	if (size > PENTAX_CAPTURE_MAX_FILE_SIZE - buffer->offset)
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	end = buffer->offset + size;
+	ret = pentax_capture_buffer_reserve (buffer, end);
+	if (ret < GP_OK)
+		return ret;
+	if (buffer->offset > buffer->size)
+		memset (buffer->data + buffer->size, 0, buffer->offset - buffer->size);
+	memcpy (buffer->data + buffer->offset, data, size);
+	buffer->offset = end;
+	if (end > buffer->size)
+		buffer->size = end;
+	return GP_OK;
+}
+
+static int
+pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer, unsigned int operation,
+		int32_t displacement)
+{
+	int64_t base, destination;
+
+	switch (operation) {
+	case 4: base = 0; break;
+	case 5: base = (int64_t)buffer->offset; break;
+	case 6: base = (int64_t)buffer->size; break;
+	default: return GP_ERROR_BAD_PARAMETERS;
+	}
+	destination = base + displacement;
+	if ((destination < 0) || ((uint64_t)destination > PENTAX_CAPTURE_MAX_FILE_SIZE))
+		return GP_ERROR_BAD_PARAMETERS;
+	buffer->offset = (size_t)destination;
+	return GP_OK;
+}
+
+static int
+pentax_candidate_filename (const unsigned char *data, uint32_t size,
+		char *filename, size_t filename_size)
+{
+	size_t characters, i, output = 0;
+
+	if (!data || (size < 4) || !filename || (filename_size < 2))
+		return GP_ERROR_BAD_PARAMETERS;
+	characters = data[3];
+	if ((characters > (size - 4) / 2) || !characters)
+		return GP_ERROR_CORRUPTED_DATA;
+	for (i = 0; i < characters; i++) {
+		uint16_t character = data[4 + i * 2] | ((uint16_t)data[5 + i * 2] << 8);
+		if (!character)
+			break;
+		/* Camera filenames are ASCII. Reject paths and lossy UTF-16 conversion. */
+		if ((character < 0x20) || (character > 0x7e) ||
+		    (character == '/') || (character == '\\'))
+			return GP_ERROR_CORRUPTED_DATA;
+		if (output + 1 >= filename_size)
+			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+		filename[output++] = (char)character;
+	}
+	if (!output)
+		return GP_ERROR_CORRUPTED_DATA;
+	filename[output] = '\0';
+	return GP_OK;
+}
+
+static int
+camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxCaptureBuffer capture = {0};
+	struct timeval started;
+	unsigned char *data = NULL;
+	uint32_t size = 0, candidate_handle = 0;
+	uint16_t ptpres;
+	char setting[32];
+	uint32_t focus_mode = 2;
+	int back_off_wait = 0, ret = GP_ERROR;
+	CameraFile *file = NULL;
+	unsigned int command_count = 0;
+
+	if (!params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((GP_OK == gp_setting_get ("ptp2", "autofocus", setting)) &&
+	    strcmp (setting, "off"))
+		focus_mode = 3;
+	SET_CONTEXT_P (params, context);
+	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	if (ptpres != PTP_RC_OK) {
+		ret = translate_ptp_result (ptpres);
+		goto out;
+	}
+
+	started = time_now ();
+	do {
+		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+			ret = GP_ERROR_CANCEL;
+			goto out;
+		}
+		free (data);
+		data = NULL;
+		size = 0;
+		ptpres = ptp_pentax_get_all_conditions (params, &data, &size);
+		if (ptpres != PTP_RC_OK) {
+			ret = translate_ptp_result (ptpres);
+			goto out;
+		}
+		if (size < 40) {
+			ret = GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
+		if (pentax_get_u32le (data + 32) == 1) {
+			candidate_handle = pentax_get_u32le (data + 36);
+			if (candidate_handle)
+				break;
+		}
+	} while (waiting_for_timeout (&back_off_wait, started, PENTAX_CAPTURE_TIMEOUT_MS));
+	if (!candidate_handle) {
+		ret = GP_ERROR_TIMEOUT;
+		goto out;
+	}
+
+	free (data);
+	data = NULL;
+	ptpres = ptp_pentax_get_transfer_candidate_info (params, 0, &data, &size);
+	if (ptpres != PTP_RC_OK) {
+		ret = translate_ptp_result (ptpres);
+		goto out;
+	}
+	strcpy (path->folder, "/");
+	ret = pentax_candidate_filename (data, size, path->name, sizeof (path->name));
+	if (ret < GP_OK)
+		goto out;
+	free (data);
+	data = NULL;
+
+	started = time_now ();
+	for (;;) {
+		uint8_t operation;
+		int32_t operation_info;
+
+		if (++command_count > 100000U) {
+			ret = GP_ERROR_FIXED_LIMIT_EXCEEDED;
+			goto out;
+		}
+		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+			ret = GP_ERROR_CANCEL;
+			goto out;
+		}
+		if (time_since (started) >= PENTAX_TRANSFER_TIMEOUT_MS) {
+			ret = GP_ERROR_TIMEOUT;
+			goto out;
+		}
+		free (data);
+		data = NULL;
+		size = 0;
+		ptpres = ptp_pentax_get_file_operation (params, &data, &size);
+		if (ptpres != PTP_RC_OK) {
+			ret = translate_ptp_result (ptpres);
+			goto out;
+		}
+		if (size < 5) {
+			ret = GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
+		operation = data[0];
+		operation_info = (int32_t)pentax_get_u32le (data + 1);
+		if ((command_count == 1) && (operation != 1)) {
+			ret = GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
+		if (operation == 1)
+			continue;
+		if (operation == 2)
+			break;
+		if (operation == 3) {
+			uint32_t request, transferred = 0;
+
+			if (operation_info <= 0) {
+				ret = GP_ERROR_CORRUPTED_DATA;
+				goto out;
+			}
+			request = (uint32_t)operation_info;
+			if (request > PENTAX_TRANSFER_BLOCK_SIZE)
+				request = PENTAX_TRANSFER_BLOCK_SIZE;
+			free (data);
+			data = NULL;
+			ptpres = ptp_pentax_get_transfer_block (params, request,
+				&data, &size, &transferred);
+			if (ptpres != PTP_RC_OK) {
+				ret = translate_ptp_result (ptpres);
+				goto out;
+			}
+			if (!transferred) {
+				ret = GP_ERROR_CORRUPTED_DATA;
+				goto out;
+			}
+			ret = pentax_capture_buffer_write (&capture, data, transferred);
+			if (ret < GP_OK)
+				goto out;
+			continue;
+		}
+		if ((operation >= 4) && (operation <= 6)) {
+			ret = pentax_capture_buffer_seek (&capture, operation, operation_info);
+			if (ret < GP_OK)
+				goto out;
+			continue;
+		}
+		ret = GP_ERROR_NOT_SUPPORTED;
+		goto out;
+	}
+	if (!capture.size) {
+		ret = GP_ERROR_CORRUPTED_DATA;
+		goto out;
+	}
+	ret = gp_file_new (&file);
+	if (ret < GP_OK)
+		goto out;
+	ret = gp_file_set_data_and_size (file, (char *)capture.data, capture.size);
+	if (ret < GP_OK)
+		goto out;
+	capture.data = NULL;
+	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
+	if (ret < GP_OK)
+		goto out;
+	ret = gp_filesystem_set_file_noop (camera->fs, path->folder, path->name,
+		GP_FILE_TYPE_NORMAL, file, context);
+	if (ret < GP_OK)
+		goto out;
+	ptpres = ptp_pentax_received_created_object (params, candidate_handle);
+	if (ptpres != PTP_RC_OK) {
+		ret = translate_ptp_result (ptpres);
+		goto out;
+	}
+	ret = GP_OK;
+
+out:
+	free (data);
+	free (capture.data);
+	if (file)
+		gp_file_free (file);
+	SET_CONTEXT_P (params, NULL);
+	return ret;
+}
+
 
 static int
 camera_capture (Camera *camera, CameraCaptureType type, CameraFilePath *path,
@@ -5796,6 +6170,8 @@ camera_capture (Camera *camera, CameraCaptureType type, CameraFilePath *path,
 
 	SET_CONTEXT_P(params, context);
 	camera->pl->checkevents = TRUE;
+	if (params->deviceinfo.VendorExtensionID == PTP_VENDOR_PENTAX)
+		return camera_pentax_capture (camera, path, context);
 
 	/* first, draining existing events if the caller did not do it. */
 	while (ptp_get_one_event(params, &event)) {
@@ -9868,8 +10244,27 @@ camera_init (Camera *camera, GPContext *context)
 	CR (fixup_cached_deviceinfo (camera,&params->deviceinfo));
 
 	print_debug_deviceinfo(params, &params->deviceinfo);
+	pentax_identify_supported_model (params, &a);
 
 	switch (params->deviceinfo.VendorExtensionID) {
+	case PTP_VENDOR_PENTAX:
+		if (params->pentax.supported_model) {
+			uint32_t function_flags = 0;
+
+			ret = ptp_pentax_set_vendor_mode (params,
+				params->pentax.model_no, 1,
+				params->pentax.vendor_ext_version, &function_flags);
+			if (ret == PTP_RC_OK) {
+				params->pentax.function_flags = function_flags;
+				params->pentax.vendor_mode_enabled = 1;
+				GP_LOG_D ("Pentax vendor mode enabled, function flags 0x%08x",
+					function_flags);
+			} else {
+				GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x; using generic PTP",
+					ret);
+			}
+		}
+		break;
 	case PTP_VENDOR_CANON:
 #if 0
 		if (ptp_operation_issupported(params, PTP_OC_CANON_ThemeDownload)) {

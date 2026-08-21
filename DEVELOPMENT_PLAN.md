@@ -2,6 +2,22 @@
 
 Status: canonical plan, revision 2026-08-21
 
+## Progress ledger
+
+| Date | Work | Result | Evidence / next gate |
+|---|---|---|---|
+| 2026-08-21 | Canonical plan review and cloud publication | PASS | Commit `9ca537595`; obsolete workspace plans moved to `archive/` |
+| 2026-08-21 | M0 repository, tool, and camera inventory | PARTIAL | Repository/tool inventory PASS; target hardware BLOCKED; see `docs/pentax/evidence/2026-08-21/M0.1/` |
+| 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Wire contract documented; USB observations remain BLOCKED |
+| 2026-08-21 | P2 wrappers and guarded session state | COMPILE PASS | Hardware transaction gate BLOCKED |
+| 2026-08-21 | P3 vendor lifecycle | COMPILE PASS | Enable/disable/reconnect gate BLOCKED |
+| 2026-08-21 | P4 preview path | COMPILE PASS | 500-frame camera gate BLOCKED |
+| 2026-08-21 | P5 capture and transfer state machine | COMPILE PASS | JPEG/RAW/cancel camera gate BLOCKED |
+
+Current implementation work does not satisfy the definition of done until the
+hardware gates and full-build tests pass. Configuration values are deliberately
+not guessed without real `GetDevicePropDesc` evidence.
+
 This is the single source of truth for adding Pentax tethering support to the
 libgphoto2 fork and delivering that build through BenroPolarisPatcher. Copies of
 this plan elsewhere are informational only.
@@ -101,8 +117,11 @@ the capture’s SHA-256.
 
 ## 5. Milestones and task cards
 
-Tasks are sequential unless stated otherwise. Do not start the next milestone
-until its gate passes.
+Tasks are ordered by dependency. Offline implementation may proceed when a
+hardware gate is unavailable, but the affected task remains BLOCKED and no
+dependent capability may be called accepted, releasable, or production-ready.
+Before release, run the hardware gates in order and return to implementation on
+the first failure.
 
 ### M0 — Freeze baselines and targets
 
@@ -137,7 +156,10 @@ Exit: baseline build/test results are recorded before Pentax feature changes.
 
 ### P1 — Produce a wire-protocol specification
 
-No feature code is allowed in this milestone.
+Protocol extraction is kept separate from feature commits. If hardware is
+unavailable, client-derived fields must remain labeled Inferred/Unknown and
+must be guarded and validated before use; they cannot satisfy this milestone's
+gate.
 
 #### P1.1 Record generic PTP identity and descriptors
 

@@ -1942,6 +1942,189 @@ ptp_generic_no_data (PTPParams* params, uint16_t code, unsigned int n_param, ...
 	return ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
 }
 
+/* Pentax vendor extension operations.
+ *
+ * Image Transmitter 2 sends these as ordinary host-initiated PTP operations.
+ * All integer arguments passed to this layer are in host byte order.
+ */
+uint16_t
+ptp_pentax_set_vendor_mode (PTPParams *params, uint32_t model_no,
+	uint32_t enable, uint32_t vendor_ext_version, uint32_t *function_flags)
+{
+	PTPContainer ptp;
+	uint16_t ret;
+
+	if (!params || !function_flags || (enable > 1))
+		return PTP_ERROR_BADPARAM;
+	*function_flags = 0;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_SetVendorMode, PTP_VENDOR_PENTAX,
+		model_no, enable, vendor_ext_version, 0);
+	ret = ptp_transaction (params, &ptp, PTP_DP_NODATA, 0, NULL, NULL);
+	if (ret != PTP_RC_OK)
+		return ret;
+	/* The observed Windows client reads response parameter index 1. */
+	if (ptp.Nparam < 2)
+		return PTP_ERROR_BADPARAM;
+	*function_flags = ptp.Param2;
+	return PTP_RC_OK;
+}
+
+uint16_t
+ptp_pentax_camera_shutdown (PTPParams *params)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_CameraShutdown, 0);
+}
+
+uint16_t
+ptp_pentax_received_created_object (PTPParams *params, uint32_t handle)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_ReceivedCreatedObject,
+		1, handle);
+}
+
+uint16_t
+ptp_pentax_get_live_view_frame (PTPParams *params, unsigned char **data,
+	unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetLiveViewFrameData);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_get_sub_image (PTPParams *params, uint32_t handle,
+	unsigned char **data, unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetSubImage, handle);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_get_main_image (PTPParams *params, uint32_t handle,
+	unsigned char **data, unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetMainImage, handle);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_get_transfer_candidate_info (PTPParams *params,
+	uint32_t image_type, unsigned char **data, unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size || (image_type > UINT8_MAX))
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetTransferCandidateFileInfo,
+		image_type);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_get_file_operation (PTPParams *params, unsigned char **data,
+	unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetCamFileOperationCommand);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_get_transfer_block (PTPParams *params, uint32_t requested_size,
+	unsigned char **data, unsigned int *size, uint32_t *transferred_size)
+{
+	PTPContainer ptp;
+	uint16_t ret;
+
+	if (!params || !requested_size || !data || !size || !transferred_size)
+		return PTP_ERROR_BADPARAM;
+	*transferred_size = 0;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetTransferFileDataBlock,
+		requested_size);
+	ret = ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+	if (ret != PTP_RC_OK)
+		return ret;
+	if (ptp.Nparam < 1) {
+		free (*data);
+		*data = NULL;
+		*size = 0;
+		return PTP_ERROR_BADPARAM;
+	}
+	*transferred_size = ptp.Param1;
+	if ((*transferred_size > requested_size) || (*transferred_size > *size)) {
+		free (*data);
+		*data = NULL;
+		*size = 0;
+		*transferred_size = 0;
+		return PTP_ERROR_BADPARAM;
+	}
+	return PTP_RC_OK;
+}
+
+uint16_t
+ptp_pentax_get_all_conditions (PTPParams *params, unsigned char **data,
+	unsigned int *size)
+{
+	PTPContainer ptp;
+
+	if (!params || !data || !size)
+		return PTP_ERROR_BADPARAM;
+	PTP_CNT_INIT (ptp, PTP_OC_PENTAX_GetAllConditions);
+	return ptp_transaction (params, &ptp, PTP_DP_GETDATA, 0, data, size);
+}
+
+uint16_t
+ptp_pentax_initiate_capture (PTPParams *params, uint32_t release_mode,
+	uint32_t focus_mode, uint32_t mwb_mode, uint32_t sync_mode,
+	uint32_t aperture_reset)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_InitiateCapture, 5,
+		release_mode, focus_mode, mwb_mode, sync_mode, aperture_reset);
+}
+
+uint16_t
+ptp_pentax_terminate_capture (PTPParams *params, uint32_t release_mode)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_TerminateCapture, 1,
+		release_mode);
+}
+
+uint16_t
+ptp_pentax_interrupt (PTPParams *params)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_InterruptFunction, 0);
+}
+
+uint16_t
+ptp_pentax_focus_control (PTPParams *params, uint32_t amount,
+	uint32_t direction)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_FocusControl, 2,
+		amount, direction);
+}
+
+uint16_t
+ptp_pentax_focus_control_new (PTPParams *params,
+	uint32_t image_plane_displacement)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_FocusControlNew, 1,
+		image_plane_displacement);
+}
+
 /**
  * ptp_opensession:
  * params:	PTPParams*

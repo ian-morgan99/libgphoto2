@@ -255,6 +255,38 @@ typedef struct _PTPIPHeader PTPIPHeader;
 #define PTP_OC_StopEnumHandles		0x101F
 #define PTP_OC_GetVendorExtensionMaps	0x1020
 #define PTP_OC_GetVendorDeviceInfo	0x1021
+
+/* Pentax vendor extension operations (VendorExtensionID 0x0000000d). */
+#define PTP_OC_PENTAX_SetVendorMode			0x9001
+#define PTP_OC_PENTAX_CameraShutdown			0x9002
+#define PTP_OC_PENTAX_ReceivedCreatedObject		0x9003
+#define PTP_OC_PENTAX_SetCardWritingMode		0x9004
+#define PTP_OC_PENTAX_GetLiveViewFrameData		0x9006
+#define PTP_OC_PENTAX_GetSubImage			0x9007
+#define PTP_OC_PENTAX_GetMainImage			0x9008
+#define PTP_OC_PENTAX_GetTransferCandidateFileInfo	0x900b
+#define PTP_OC_PENTAX_GetCamFileOperationCommand	0x900c
+#define PTP_OC_PENTAX_GetTransferFileDataBlock		0x900d
+#define PTP_OC_PENTAX_DeleteTransferCandidate		0x900e
+#define PTP_OC_PENTAX_GetAllConditions			0x900f
+#define PTP_OC_PENTAX_InitiateCapture			0x9011
+#define PTP_OC_PENTAX_TerminateCapture			0x9012
+#define PTP_OC_PENTAX_InterruptFunction			0x9013
+#define PTP_OC_PENTAX_FocusControl			0x9016
+#define PTP_OC_PENTAX_FocusControlNew			0x9017
+#define PTP_OC_PENTAX_SetCompositionAdjustmentOffset	0x9018
+#define PTP_OC_PENTAX_SetKeepAperturePosition		0x9019
+
+#define PTP_DPC_PENTAX_LiveViewAreaInfo			0xd009
+#define PTP_DPC_PENTAX_ShutterSpeed			0xd00f
+#define PTP_DPC_PENTAX_DriveMode			0xd013
+#define PTP_DPC_PENTAX_ExposureBracketingMode		0xd014
+#define PTP_DPC_PENTAX_ExposureBracketingStep		0xd015
+#define PTP_DPC_PENTAX_ColorTemperature			0xd018
+#define PTP_DPC_PENTAX_WritingFileFormat		0xd01b
+#define PTP_DPC_PENTAX_UsbLiveViewMode			0xd035
+#define PTP_DPC_PENTAX_LiveViewZoom			0xd036
+#define PTP_DPC_PENTAX_LiveViewMode			0xd037
 #define PTP_OC_GetResizedImageObject	0x1022
 #define PTP_OC_GetFilesystemManifest	0x1023
 #define PTP_OC_GetStreamInfo		0x1024
@@ -4290,6 +4322,15 @@ struct _PTPParams {
 	/* live view enabled */
 	int			inliveview;
 
+	/* Pentax vendor extension session state. */
+	struct {
+		uint32_t model_no;
+		uint32_t vendor_ext_version;
+		uint32_t function_flags;
+		int supported_model;
+		int vendor_mode_enabled;
+	} pentax;
+
 	/* PTP: caching time for properties, default 2 */
 	int			cachetime;
 
@@ -4405,6 +4446,35 @@ uint16_t ptp_fujiptpip_jpeg (PTPParams* params, unsigned char** xdata, unsigned 
 uint16_t ptp_getdeviceinfo	(PTPParams* params, PTPDeviceInfo* deviceinfo);
 
 uint16_t ptp_generic_no_data	(PTPParams* params, uint16_t opcode, unsigned int cnt, ...);
+
+uint16_t ptp_pentax_set_vendor_mode (PTPParams *params, uint32_t model_no,
+	uint32_t enable, uint32_t vendor_ext_version, uint32_t *function_flags);
+uint16_t ptp_pentax_camera_shutdown (PTPParams *params);
+uint16_t ptp_pentax_received_created_object (PTPParams *params, uint32_t handle);
+uint16_t ptp_pentax_get_live_view_frame (PTPParams *params,
+	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_sub_image (PTPParams *params, uint32_t handle,
+	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_main_image (PTPParams *params, uint32_t handle,
+	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_transfer_candidate_info (PTPParams *params,
+	uint32_t image_type, unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_file_operation (PTPParams *params,
+	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_get_transfer_block (PTPParams *params,
+	uint32_t requested_size, unsigned char **data, unsigned int *size,
+	uint32_t *transferred_size);
+uint16_t ptp_pentax_get_all_conditions (PTPParams *params,
+	unsigned char **data, unsigned int *size);
+uint16_t ptp_pentax_initiate_capture (PTPParams *params, uint32_t release_mode,
+	uint32_t focus_mode, uint32_t mwb_mode, uint32_t sync_mode,
+	uint32_t aperture_reset);
+uint16_t ptp_pentax_terminate_capture (PTPParams *params, uint32_t release_mode);
+uint16_t ptp_pentax_interrupt (PTPParams *params);
+uint16_t ptp_pentax_focus_control (PTPParams *params, uint32_t amount,
+	uint32_t direction);
+uint16_t ptp_pentax_focus_control_new (PTPParams *params,
+	uint32_t image_plane_displacement);
 
 uint16_t ptp_opensession	(PTPParams *params, uint32_t session);
 
