@@ -1991,6 +1991,27 @@ ptp_pentax_get_device_prop_desc_raw (PTPParams *params, uint16_t propcode,
 }
 
 uint16_t
+ptp_pentax_set_device_prop_raw (PTPParams *params, uint16_t propcode,
+	const unsigned char *data, unsigned int size)
+{
+	PTPContainer ptp;
+	unsigned char *send = NULL;
+	uint16_t ret;
+
+	if (!data || !size)
+		return PTP_ERROR_BADPARAM;
+	send = malloc (size);
+	if (!send)
+		return PTP_ERROR_IO;
+	memcpy (send, data, size);
+	PTP_CNT_INIT (ptp, PTP_OC_SetDevicePropValue, propcode);
+	ret = ptp_transaction (params, &ptp, PTP_DP_SENDDATA, size, &send,
+		NULL);
+	free (send);
+	return ret;
+}
+
+uint16_t
 ptp_pentax_get_sub_image (PTPParams *params, uint32_t handle,
 	unsigned char **data, unsigned int *size)
 {
