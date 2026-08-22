@@ -9603,6 +9603,817 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 	return result;
 }
 
+/* Shared IT2-faithful readiness preflight for exposure-property writes:
+ * two conditions samples 100 ms apart must both report the requested
+ * changeability bit and an idle, non-task-changing camera. */
+static int
+_pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
+	PentaxConditions *conditions)
+{
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
+	uint16_t ret;
+	int result;
+
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions->capability_flags & change_bit))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
+	/* IT2 starts its serialized conditions timer at 100 ms after the initial
+	 * Connect-time conditions load.  Reproduce that second readiness sample
+	 * before a setting write instead of treating one snapshot as sufficient. */
+	usleep (100000);
+	condition_data = NULL;
+	condition_size = 0;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	if (!(conditions->capability_flags & change_bit))
+		return GP_ERROR_NOT_SUPPORTED;
+	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
+		return GP_ERROR_CAMERA_BUSY;
+	return GP_OK;
+}
+
+/* Bounded live-conditions verification after an exposure-property write.
+ * Compares the parsed conditions against the expected numerator/denominator
+ * pair for up to five 100 ms attempts, mirroring IT2's asynchronous polling. */
+static int
+_pentax_verify_rational_in_conditions (PTPParams *params,
+	uint32_t expect_num, uint32_t expect_den,
+	uint32_t (*get_num)(const PentaxConditions *),
+	uint32_t (*get_den)(const PentaxConditions *))
+{
+	PentaxConditions conditions;
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
+	unsigned int attempt;
+	uint16_t ret;
+	int result;
+
+	result = GP_ERROR;
+	for (attempt = 1; attempt <= 5; attempt++) {
+		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+			GP_CONTEXT_FEEDBACK_CANCEL) {
+			return GP_ERROR_CANCEL;
+		}
+		usleep (100000);
+		condition_data = NULL;
+		condition_size = 0;
+		ret = ptp_pentax_get_all_conditions (params, &condition_data,
+			&condition_size);
+		if (ret != PTP_RC_OK) {
+			free (condition_data);
+			return translate_ptp_result (ret);
+		}
+		result = pentax_parse_conditions (condition_data,
+			condition_size, &conditions);
+		free (condition_data);
+		if (result < GP_OK)
+			break;
+		GP_LOG_D ("Pentax rational verification attempt %u: "
+			"expected=%u/%u, conditions=%u/%u", attempt,
+			expect_num, expect_den,
+			get_num (&conditions), get_den (&conditions));
+		if ((get_num (&conditions) == expect_num) &&
+			(get_den (&conditions) == expect_den)) {
+			return GP_OK;
+		}
+		result = GP_ERROR;
+	}
+	if (result == GP_ERROR)
+		GP_LOG_E ("Pentax write was acknowledged but conditions retained "
+			"%u/%u after 500 ms (requested %u/%u).",
+			get_num (&conditions), get_den (&conditions),
+			expect_num, expect_den);
+	return result;
+}
+
+static uint32_t _pentax_cond_aperture_num (const PentaxConditions *c)
+	{ return c->aperture_numerator; }
+static uint32_t _pentax_cond_aperture_den (const PentaxConditions *c)
+	{ return c->aperture_denominator; }
+static uint32_t _pentax_cond_ev_num (const PentaxConditions *c)
+	{ return (uint32_t)c->exposure_comp_numerator; }
+static uint32_t _pentax_cond_ev_den (const PentaxConditions *c)
+	{ return c->exposure_comp_denominator; }
+
+static int
+_get_Pentax_DirectAperture (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_FNumber, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _get_FNumber (camera, widget, menu, &desc);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_put_Pentax_DirectAperture (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	PentaxConditions conditions;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_exposure_write_preflight (params,
+		PENTAX_CONDITION_CAN_CHANGE_AV, &conditions);
+	if (result < GP_OK)
+		return result;
+	memset (&desc, 0, sizeof (desc));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_FNumber, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _put_FNumber (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, PTP_DPC_FNumber,
+			&value, PTP_DTC_UINT16);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK)
+			result = _pentax_verify_rational_in_conditions (params,
+				value.u16, 10,
+				_pentax_cond_aperture_num,
+				_pentax_cond_aperture_den);
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_get_Pentax_DirectEV (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params,
+		PTP_DPC_ExposureBiasCompensation, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if ((desc.FormFlag == PTP_DPFF_Enumeration) &&
+	    (desc.FORM.Enum.NumberOfValues > 0)) {
+		result = _get_ExpCompensation (camera, widget, menu, &desc);
+	} else {
+		/* The K-3 III returns no enumeration for 0x5010.  Expose a
+		 * text widget with the raw thousandths value rather than
+		 * inventing a step size; writes remain enum-gated so none
+		 * can occur until the camera advertises choices. */
+		char buf[32];
+		gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+		gp_widget_set_name (*widget, menu->name);
+		snprintf (buf, sizeof (buf), "%d", desc.CurrentValue.i16);
+		gp_widget_set_value (*widget, buf);
+		result = GP_OK;
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+/* Live-view AF position write (0xd036).  IT2 payload is 8 bytes:
+ * {2,0,0,0, Xlo,Xhi, Ylo,Yhi}.  A 4-byte response means the geometry
+ * centre.  Coordinates are bounded by the live-view area read fresh in
+ * the same session; the write is verified by reading the position back. */
+static int
+_get_Pentax_LiveViewAFPosition (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxLiveViewGeometry geometry;
+	unsigned char *data = NULL;
+	unsigned int size;
+	uint16_t x, y, ret;
+	char buf[64];
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAreaInfo, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_live_view_geometry (data, size, &geometry);
+	free (data);
+	if (result < GP_OK)
+		return result;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAFPosition, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_live_view_af_position (data, size, &geometry,
+		&x, &y);
+	free (data);
+	if (result < GP_OK)
+		return result;
+	gp_widget_new (GP_WIDGET_TEXT, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	snprintf (buf, sizeof (buf), "%u,%u", x, y);
+	gp_widget_set_value (*widget, buf);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_LiveViewAFPosition (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxLiveViewGeometry geometry;
+	unsigned char *data = NULL, out[8];
+	unsigned int size, xr, yr;
+	const char *value;
+	uint16_t x, y, ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if ((sscanf (value, "%u,%u", &xr, &yr) != 2))
+		return GP_ERROR_BAD_PARAMETERS;
+	if ((xr > 0xffff) || (yr > 0xffff))
+		return GP_ERROR_BAD_PARAMETERS;
+	x = (uint16_t)xr;
+	y = (uint16_t)yr;
+	/* Bound the requested point by the current live-view area. */
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAreaInfo, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_live_view_geometry (data, size, &geometry);
+	free (data);
+	if (result < GP_OK)
+		return result;
+	if ((x >= geometry.area_width) || (y >= geometry.area_height)) {
+		GP_LOG_E ("Pentax LV AF position %u,%u outside area %ux%u.",
+			x, y, geometry.area_width, geometry.area_height);
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	CR (pentax_encode_live_view_af_position (x, y, out));
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAFPosition, out, sizeof (out));
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	/* Verify transport with a GET.  Semantics differ per model: the
+	 * K-3 III snaps the point to the nearest sensor and echoes it back,
+	 * so an exact match is required.  The K-1 II accepts the payload
+	 * (8-byte GET proves the property is honoured) but always reports
+	 * the geometry centre, and IT2 tracks the requested spot client-side
+	 * instead of reading it back.  For K-1 II an OK write plus an 8-byte
+	 * GET is success; requiring echoed coordinates would fail-closed on
+	 * every legitimate write. */
+	if (params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) {
+		GP_LOG_D ("Pentax K-1 II LV AF spot stored (%u,%u); camera does "
+			"not echo the selection.", x, y);
+		if (alreadyset)
+			*alreadyset = 1;
+		return GP_OK;
+	}
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAFPosition, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_live_view_af_position (data, size, &geometry,
+		&x, &y);
+	free (data);
+	if (result < GP_OK)
+		return result;
+	if ((x != (uint16_t)xr) || (y != (uint16_t)yr)) {
+		GP_LOG_E ("Pentax LV AF position acknowledged but read-back "
+			"reports %u,%u (requested %u,%u).", x, y, xr, yr);
+		return GP_ERROR;
+	}
+	if (alreadyset)
+		*alreadyset = 1;
+	return GP_OK;
+}
+
+/* Live-view zoom write (0xd037).  IT2 payload is a 12-byte structure:
+ * {4,0,0,0, Xlo,Xhi, Ylo,Yhi, mag,0,0,0}.  Zoom-off is magnification 1 with
+ * centred coordinates.  The write is verified by reading the property back;
+ * the documented 16x->10x fallback on response 0x201c is applied at most
+ * once and only for a requested 16x. */
+static int
+_get_Pentax_LiveViewZoom (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *data = NULL;
+	unsigned int size;
+	uint8_t zoom;
+	uint16_t ret;
+	char buf[32];
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewZoom, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 9) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	zoom = data[8];
+	free (data);
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "off");
+	gp_widget_add_choice (*widget, "2x");
+	gp_widget_add_choice (*widget, "4x");
+	gp_widget_add_choice (*widget, "8x");
+	gp_widget_add_choice (*widget, "10x");
+	gp_widget_add_choice (*widget, "16x");
+	snprintf (buf, sizeof (buf), "%ux", zoom);
+	gp_widget_set_value (*widget, zoom == 1 ? "off" : buf);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_LiveViewZoom (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxLiveViewGeometry geometry;
+	unsigned char *data = NULL, out[12];
+	unsigned int size;
+	const char *value;
+	uint8_t zoom = 1, applied, requested;
+	uint16_t x, y, ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, "off")) {
+		zoom = 1;
+	} else {
+		unsigned int mag;
+		if ((sscanf (value, "%ux", &mag) != 1) ||
+			(mag < 2) || (mag > 16))
+			return GP_ERROR_BAD_PARAMETERS;
+		zoom = (uint8_t)mag;
+	}
+	/* Read current geometry to centre the zoom point. */
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewAreaInfo, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_live_view_geometry (data, size, &geometry);
+	free (data);
+	if (result < GP_OK)
+		return result;
+	x = geometry.area_width / 2;
+	y = geometry.area_height / 2;
+	requested = zoom;
+	CR (pentax_encode_live_view_zoom (x, y, zoom, out));
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewZoom, out, sizeof (out));
+	if (ret != PTP_RC_OK) {
+		uint8_t fallback;
+		/* Source-defined single fallback: 16x may be rejected with
+		 * 0x201c; retry once at 10x.  No other escalation exists. */
+		if (pentax_live_view_zoom_fallback (requested, ret, &fallback)) {
+			CR (pentax_encode_live_view_zoom (x, y, fallback, out));
+			ret = ptp_pentax_set_device_prop_raw (params,
+				PTP_DPC_PENTAX_LiveViewZoom, out, sizeof (out));
+			if (ret != PTP_RC_OK)
+				return translate_ptp_result (ret);
+			zoom = fallback;
+		} else {
+			return translate_ptp_result (ret);
+		}
+	}
+	/* Verify by reading back the applied magnification. */
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_LiveViewZoom, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 9) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	applied = data[8];
+	free (data);
+	if (applied != zoom) {
+		GP_LOG_E ("Pentax LV zoom acknowledged but read-back reports %u "
+			"(requested %u).", applied, zoom);
+		return GP_ERROR;
+	}
+	if (alreadyset)
+		*alreadyset = 1;
+	return GP_OK;
+}
+
+/* Drive mode write (0xd013, UINT32 on K bodies).  The nominal->internal
+ * mapping is Image Transmitter 2's DriveModeLUT.NominalToInternal; its UI
+ * order is: single, continuous-H/M/L, self-timer, self-timer-2s,
+ * remote, remote-3s, mirror-up, and the multi-exposure/interval family.
+ * Writes are verified through the live conditions drive-mode field. */
+static const struct { unsigned int internal; const char *label; } pentax_drive_modes[] = {
+	{ 0U,	"single" },
+	{ 4U,	"continuous-hi" },
+	{ 5U,	"continuous-mid" },
+	{ 6U,	"continuous-lo" },
+	{ 7U,	"self-timer-12s" },
+	{ 8U,	"self-timer-2s" },
+	{ 22U,	"self-timer-cont" },
+	{ 9U,	"remote" },
+	{ 10U,	"remote-3s" },
+	{ 11U,	"remote-cont" },
+	{ 12U,	"mirror-up" },
+	{ 13U,	"mirror-up-remote" },
+	{ 15U,	"multi-exposure" },
+	{ 1U,	"interval" },
+	{ 2U,	"interval-movie" },
+	{ 29U,	"star-stream" },
+};
+#define PENTAX_DRIVE_MODE_COUNT ARRAYSIZE (pentax_drive_modes)
+
+static uint32_t _pentax_cond_drive_mode (const PentaxConditions *c)
+	{ return c->drive_mode; }
+static uint32_t _pentax_cond_drive_mode_none (const PentaxConditions *c)
+	{ return 0; }
+
+static int
+_get_Pentax_DirectDriveMode (CONFIG_GET_ARGS)
+{
+	/* Image Transmitter 2 builds its drive list from the 0xd013 descriptor
+	 * enumeration (RefreshDriveModeList parses BYTE values), then shows or
+	 * hides items per model capability flags and exposure mode.  Mirror
+	 * that: offer only values the camera itself advertises, labelled from
+	 * the IT2 DriveModeLUT where known. */
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PentaxConditions conditions;
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
+	uint32_t current;
+	unsigned int i, j, offered = 0;
+	char buf[64];
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_all_conditions (params, &condition_data,
+		&condition_size);
+	if (ret != PTP_RC_OK) {
+		free (condition_data);
+		return translate_ptp_result (ret);
+	}
+	result = pentax_parse_conditions (condition_data, condition_size,
+		&conditions);
+	free (condition_data);
+	if (result < GP_OK)
+		return result;
+	current = conditions.drive_mode;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_DriveMode,
+		&desc);
+	if (ret != PTP_RC_OK) {
+		ptp_free_devicepropdesc (&desc);
+		return translate_ptp_result (ret);
+	}
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	if ((desc.FormFlag == PTP_DPFF_Enumeration) &&
+	    (desc.FORM.Enum.NumberOfValues > 0)) {
+		for (j = 0; j < desc.FORM.Enum.NumberOfValues; j++) {
+			uint32_t advertised = desc.FORM.Enum.SupportedValue[j].u32;
+			const char *label = NULL;
+			for (i = 0; i < PENTAX_DRIVE_MODE_COUNT; i++)
+				if (pentax_drive_modes[i].internal == advertised) {
+					label = _(pentax_drive_modes[i].label);
+					break;
+				}
+			if (label) {
+				gp_widget_add_choice (*widget, label);
+				offered++;
+			} else {
+				/* Advertised but uncorrelated: keep it numeric. */
+				snprintf (buf, sizeof (buf), "unknown-%u",
+					(unsigned)advertised);
+				gp_widget_add_choice (*widget, buf);
+				offered++;
+			}
+			if (advertised == current) {
+				if (label)
+					gp_widget_set_value (*widget, label);
+				else
+					gp_widget_set_value (*widget, buf);
+			}
+		}
+	} else {
+		/* No usable descriptor enumeration: fall back to the live
+		 * conditions value as a single read-only-ish choice so the
+		 * current state is at least visible and restorable. */
+		for (i = 0; i < PENTAX_DRIVE_MODE_COUNT; i++)
+			if (pentax_drive_modes[i].internal == current) {
+				gp_widget_add_choice (*widget,
+					_(pentax_drive_modes[i].label));
+				gp_widget_set_value (*widget,
+					_(pentax_drive_modes[i].label));
+				offered++;
+				break;
+			}
+		if (!offered) {
+			snprintf (buf, sizeof (buf), "unknown-%u",
+				(unsigned)current);
+			gp_widget_add_choice (*widget, buf);
+			gp_widget_set_value (*widget, buf);
+			offered++;
+		}
+	}
+	ptp_free_devicepropdesc (&desc);
+	if (!offered)
+		return GP_ERROR_CORRUPTED_DATA;
+	return GP_OK;
+}
+
+static int
+_put_Pentax_DirectDriveMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxConditions conditions;
+	PTPPropValue value;
+	const char *value_text;
+	unsigned int i, target = 0;
+	int found = 0;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value_text));
+	for (i = 0; i < PENTAX_DRIVE_MODE_COUNT; i++)
+		if (!strcmp (value_text, pentax_drive_modes[i].label)) {
+			target = pentax_drive_modes[i].internal;
+			found = 1;
+			break;
+		}
+	if (!found)
+		return GP_ERROR_BAD_PARAMETERS;
+	result = _pentax_exposure_write_preflight (params,
+		PENTAX_CONDITION_CAN_CHANGE_TV, &conditions);
+	/* Drive mode is not Tv-gated in IT2; the preflight here only enforces
+	 * idle/not-task-changing.  Accept either outcome of the changeability
+	 * bit but never accept a busy camera. */
+	if (result == GP_ERROR_CAMERA_BUSY || result == GP_ERROR_NOT_SUPPORTED)
+		return result;
+	if (result < GP_OK && result != GP_ERROR_NOT_SUPPORTED)
+		return result;
+	memset (&value, 0, sizeof (value));
+	value.u32 = target;
+	ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_DriveMode,
+		&value, PTP_DTC_UINT32);
+	result = translate_ptp_result (ret);
+	if (result == GP_OK)
+		result = _pentax_verify_rational_in_conditions (params,
+			target, 0, _pentax_cond_drive_mode,
+			_pentax_cond_drive_mode_none);
+	if (result == GP_OK && alreadyset)
+		*alreadyset = 1;
+	return result;
+}
+
+/* White balance write (0x5005, UINT16).  The nominal->wire mapping is
+ * Image Transmitter 2's _camToMtpWBTable applied over its WB combo box
+ * order: Auto, Multi-Auto, Daylight, Shade, Cloudy, Fluorescent D/N/W/L,
+ * Tungsten, Flash, CTE, Manual 1-3, Color Temp 1-3.  Writes are verified
+ * through the live conditions white-balance field at offset 120 once that
+ * offset is parsed; until then verification is descriptor read-back. */
+static const struct { unsigned int wire; const char *label; } pentax_wb_modes[] = {
+	{ 2U,	"auto" },
+	{ 4U,	"daylight" },
+	{ 32770U, "shade" },
+	{ 32771U, "cloudy" },
+	{ 32772U, "fluorescent-d" },
+	{ 32773U, "fluorescent-n" },
+	{ 32774U, "fluorescent-w" },
+	{ 6U,	"tungsten" },
+	{ 7U,	"flash" },
+	{ 32775U, "manual-1" },
+	{ 32776U, "manual-2" },
+	{ 32777U, "manual-3" },
+	{ 32778U, "color-temp-1" },
+	{ 32779U, "color-temp-2" },
+	{ 32780U, "color-temp-3" },
+	/* K-3 III firmware 2.20 reports 0x800f as its Auto WB wire value;
+	 * IT2's table lacks it.  Label it explicitly instead of failing the
+	 * getter when the camera is set to Auto. */
+	{ 32783U, "auto-800f" },
+};
+#define PENTAX_WB_MODE_COUNT ARRAYSIZE (pentax_wb_modes)
+
+static int
+_get_Pentax_DirectWB (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	unsigned int i;
+	uint16_t current, ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_WhiteBalance,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if (desc.DataType != PTP_DTC_UINT16) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	current = desc.CurrentValue.u16;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	for (i = 0; i < PENTAX_WB_MODE_COUNT; i++)
+		gp_widget_add_choice (*widget, _(pentax_wb_modes[i].label));
+	for (i = 0; i < PENTAX_WB_MODE_COUNT; i++) {
+		if (pentax_wb_modes[i].wire == current) {
+			gp_widget_set_value (*widget,
+				_(pentax_wb_modes[i].label));
+			ptp_free_devicepropdesc (&desc);
+			return GP_OK;
+		}
+	}
+	ptp_free_devicepropdesc (&desc);
+	return GP_ERROR_NOT_SUPPORTED;
+}
+
+static int
+_put_Pentax_DirectWB (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxConditions conditions;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	const char *value_text;
+	unsigned int i, target = 0;
+	int found = 0;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value_text));
+	for (i = 0; i < PENTAX_WB_MODE_COUNT; i++)
+		if (!strcmp (value_text, pentax_wb_modes[i].label)) {
+			target = pentax_wb_modes[i].wire;
+			found = 1;
+			break;
+		}
+	if (!found)
+		return GP_ERROR_BAD_PARAMETERS;
+	result = _pentax_exposure_write_preflight (params,
+		PENTAX_CONDITION_CAN_CHANGE_TV, &conditions);
+	if ((result == GP_ERROR_CAMERA_BUSY) ||
+		(result == GP_ERROR_CORRUPTED_DATA))
+		return result;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_WhiteBalance,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if ((desc.FormFlag != PTP_DPFF_Enumeration) ||
+		(desc.DataType != PTP_DTC_UINT16)) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	found = 0;
+	for (i = 0; i < desc.FORM.Enum.NumberOfValues; i++)
+		if (desc.FORM.Enum.SupportedValue[i].u16 == target) {
+			found = 1;
+			break;
+		}
+	if (!found) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	memset (&value, 0, sizeof (value));
+	value.u16 = (uint16_t)target;
+	ret = ptp_setdevicepropvalue (params, PTP_DPC_WhiteBalance,
+		&value, PTP_DTC_UINT16);
+	result = translate_ptp_result (ret);
+	if (result == GP_OK) {
+		/* Verify via fresh descriptor read-back. */
+		ptp_free_devicepropdesc (&desc);
+		memset (&desc, 0, sizeof (desc));
+		ret = ptp_generic_getdevicepropdesc (params,
+			PTP_DPC_WhiteBalance, &desc);
+		if (ret != PTP_RC_OK) {
+			ptp_free_devicepropdesc (&desc);
+			return translate_ptp_result (ret);
+		}
+		if (desc.CurrentValue.u16 != (uint16_t)target) {
+			GP_LOG_E ("Pentax WB acknowledged but read-back reports "
+				"0x%04x (requested 0x%04x).",
+				desc.CurrentValue.u16, target);
+			result = GP_ERROR;
+		}
+	}
+	ptp_free_devicepropdesc (&desc);
+	if (result == GP_OK && alreadyset)
+		*alreadyset = 1;
+	return result;
+}
+
+static int
+_put_Pentax_DirectEV (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	PentaxConditions conditions;
+	int32_t ev_thousandths;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_exposure_write_preflight (params,
+		PENTAX_CONDITION_CAN_CHANGE_XV, &conditions);
+	if (result < GP_OK)
+		return result;
+	memset (&desc, 0, sizeof (desc));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params,
+		PTP_DPC_ExposureBiasCompensation, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _put_ExpCompensation (camera, widget, &value, &desc,
+		alreadyset);
+	if (result == GP_OK) {
+		ev_thousandths = value.i16;
+		ret = ptp_setdevicepropvalue (params,
+			PTP_DPC_ExposureBiasCompensation,
+			&value, PTP_DTC_INT16);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK)
+			/* Conditions report EV in tenths; the wire property is
+			 * thousandths. Verify at tenth granularity. */
+			result = _pentax_verify_rational_in_conditions (params,
+				(uint32_t)(ev_thousandths / 100), 10,
+				_pentax_cond_ev_num, _pentax_cond_ev_den);
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
 static int
 _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 {
@@ -9629,7 +10440,10 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	free (condition_data);
 	if (result < GP_OK)
 		return result;
-	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV))
+	/* Bulb mode clears CAN_CHANGE_TV but sets BULB_TIMER; the timer value
+	 * is the writable domain there (hardware-proven on the K-3 III). */
+	if (!(conditions.capability_flags &
+	      (PENTAX_CONDITION_CAN_CHANGE_TV | PENTAX_CONDITION_BULB_TIMER)))
 		return GP_ERROR_NOT_SUPPORTED;
 	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
 	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
@@ -9649,7 +10463,10 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	free (condition_data);
 	if (result < GP_OK)
 		return result;
-	if (!(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV))
+	/* Bulb mode clears CAN_CHANGE_TV but sets BULB_TIMER; the timer value
+	 * is the writable domain there (hardware-proven on the K-3 III). */
+	if (!(conditions.capability_flags &
+	      (PENTAX_CONDITION_CAN_CHANGE_TV | PENTAX_CONDITION_BULB_TIMER)))
 		return GP_ERROR_NOT_SUPPORTED;
 	if ((conditions.capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
 	    (conditions.activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
@@ -9915,6 +10732,97 @@ _put_Sony_Autofocus(CONFIG_PUT_ARGS)
 	C_PTP (ptp_sony_setdevicecontrolvalueb (params, PTP_DPC_SONY_ShutterHalfRelease, &xpropval, PTP_DTC_UINT16));
 	*alreadyset = 1;
 	return GP_OK;
+}
+
+/* K-1 Mark II (old-focus) manual focus drive via 0x9016.  Image Transmitter
+ * 2's FocusFineTune for old-focus models multiplies the UI step by 5 and
+ * splits the sign: amount is absolute, direction is parameter 2 with
+ * 0 = Near, 1 = Far.  One command per activation, no retries. */
+static int
+_get_Pentax_OldFocusDrive (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int val = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (pentax_model_uses_new_focus (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *name;
+	int val, direction;
+	uint32_t amount;
+	uint16_t ret;
+
+	CR (gp_widget_get_value (widget, &val));
+	if (!val)
+		return GP_OK;
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (pentax_model_uses_new_focus (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_name (widget, &name));
+	/* IT2 precondition: the body must be in an AF mode (conditions
+	 * offset 196 > 0).  0x9016 with MF selected returned 0x02ff on
+	 * hardware and left the camera refusing sessions. */
+	{
+		PentaxConditions conditions;
+		unsigned char *condition_data = NULL;
+		unsigned int condition_size = 0;
+		uint16_t cret;
+		int cresult;
+
+		cret = ptp_pentax_get_all_conditions (params, &condition_data,
+			&condition_size);
+		if (cret != PTP_RC_OK) {
+			free (condition_data);
+			return translate_ptp_result (cret);
+		}
+		cresult = pentax_parse_conditions (condition_data,
+			condition_size, &conditions);
+		free (condition_data);
+		if (cresult < GP_OK)
+			return cresult;
+		if (conditions.af_mode == 0) {
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax old focus drive requires the body to be "
+				"in an AF mode (AF/MF switch set to AF)."));
+			return GP_ERROR_NOT_SUPPORTED;
+		}
+	}
+	if (!strcmp (name, "oldfocusdrivenear") ||
+	    !strcmp (name, "manualfocusdrivenear"))
+		direction = 0;
+	else if (!strcmp (name, "oldfocusdrivefar") ||
+		 !strcmp (name, "manualfocusdrivefar"))
+		direction = 1;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	/* IT2 FocusFineTune: old-path amount = |UI value| * 5; the buttons
+	 * use a single step, so the minimum command is 5. */
+	amount = 5U;
+	gp_context_status (((PTPData *)params->data)->context,
+		_("Pentax old focus drive: amount=%u, direction=%u (%s), opcode=0x9016, retries=0."),
+		amount, (unsigned)direction,
+		direction ? "Far" : "Near");
+	ret = ptp_pentax_focus_control (params, amount,
+		(uint32_t)direction);
+	if (ret != PTP_RC_OK)
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax old focus drive failed with response 0x%04x."), ret);
+	else
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax old focus drive returned response 0x%04x."), ret);
+	return translate_ptp_result (ret);
 }
 
 static int
@@ -11973,6 +12881,10 @@ static struct submenu camera_actions_menu[] = {
 	{ N_("Manual-Focus"),                   "manualfocus",      PTP_DPC_SONY_ManualFocusAdjust,  PTP_VENDOR_SONY, PTP_DTC_INT16,  _get_Sony_ManualFocus,    _put_Sony_ManualFocus },
 	{ N_("Drive Pentax focus near (minimum)"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
 	{ N_("Drive Pentax focus far (minimum)"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
+	{ N_("Drive Pentax old-focus near (K-1 II)"), "oldfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
+	{ N_("Drive Pentax old-focus far (K-1 II)"), "oldfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
+	{ N_("Drive Pentax focus near"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
+	{ N_("Drive Pentax focus far"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
 	{ N_("Capture"),                        "capture",          PTP_DPC_SONY_ShutterRelease,PTP_VENDOR_SONY,PTP_DTC_UINT16, _get_Sony_Capture,              _put_Sony_Capture },
 	{ N_("Power Down"),                     "powerdown",        0,  0,                  PTP_OC_PowerDown,                   _get_PowerDown,                 _put_PowerDown },
 	{ N_("Focus Lock"),                     "focuslock",        0,  PTP_VENDOR_CANON,   PTP_OC_CANON_FocusLock,             _get_Canon_FocusLock,           _put_Canon_FocusLock },
@@ -12044,6 +12956,13 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
+	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },
+	{ N_("Pentax Direct Exposure Compensation"), "pentaxdirectev", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectEV, _put_Pentax_DirectEV },
+	{ N_("Pentax Live View AF Position"), "pentaxliveviewafposition", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewAFPosition, _put_Pentax_LiveViewAFPosition },
+	{ N_("Pentax Live View Zoom"), "pentaxliveviewzoom", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewZoom, _put_Pentax_LiveViewZoom },
+	{ N_("Pentax Drive Mode"), "pentaxdrivemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_DirectDriveMode, _put_Pentax_DirectDriveMode },
+	{ N_("Pentax White Balance"), "pentaxdirectwb", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectWB, _put_Pentax_DirectWB },
+	{ N_("Pentax Live View AF Position"), "pentaxliveviewafposition", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewAFPosition, _put_Pentax_LiveViewAFPosition },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },

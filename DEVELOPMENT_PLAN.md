@@ -89,6 +89,13 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 | 2026-08-21 | K-1 II capability-source correction | SOURCE PASS / HARDWARE PENDING | Image Transmitter explicitly selects model 78400/vendor extension 1 and directly requests vendor descriptors absent from DeviceInfo, including `0xd00f`, `0x5007`, `0xd01e`, `0x5010`, and `0x5008`; the five advertised descriptors are not a capability boundary. Audit all official model gates and direct requests before further K-1 II writes |
 | 2026-08-21 | Consolidated IMAGE Transmitter capability target | SOURCE MATRIX COMPLETE / IMPLEMENTATION AUDIT OPEN | Normative matrix consolidates model gates, vendor operations, direct properties and compound fields, complete condition layout, current evidence, and mandatory closure tiers; all implementation and hardware claims are now audited against its rows |
 | 2026-08-21 | Retrospective matrix audit | CORRECTIONS APPLIED / GATES OPEN | Found and fixed cross-model `0x9017` exposure plus swapped `0xd036`/`0xd037` names; reclassified prior out-of-order hardware results as bounded evidence rather than tier closure; documented direct K-1 II descriptor, model-capability, condition, compound-format, transfer, and recovery gaps in `CAPABILITY_MATRIX_AUDIT.md` |
+| 2026-08-22 | H1.20 K-1 II aperture write | HW-W RESTORED | New `pentaxdirectaperture` widget (`0x5007`); f/2.0→f/2.2→f/2.0 verified through live conditions; shared preflight/verify helpers introduced |
+| 2026-08-22 | H1.21 K-1 II EV write | HW-W RESTORED | New `pentaxdirectev` widget (`0x5010` INT16 thousandths vs conditions tenths); EV 0→+0.3→0 verified. All four exposure corners now hardware-proven |
+| 2026-08-22 | H1.22 K-1 II LV zoom write | HW-W RESTORED | New `pentaxliveviewzoom` widget (`0xd037`) with raw compound setter `ptp_pentax_set_device_prop_raw`; off→2x→4x→off with read-back verification; AF position unchanged |
+| 2026-08-22 | H1.23 K-1 II still capture | HW-W PASS | Research build only; full capture→candidate→transfer→finalize state machine executed on hardware for the first time (`K1II8665.DNG`); post-capture state identical |
+| 2026-08-22 | H1.24/H1.25 K-1 II drive mode and WB writes | HW-W RESTORED | `pentaxdrivemode` (IT2 DriveModeLUT) single→continuous-lo→single; `pentaxdirectwb` (IT2 WB table) auto→daylight→auto. Tier 6 scalar writes closed on K-1 II |
+| 2026-08-22 | K-3 III scripted suite | 5/7 PASS + 2 gaps fixed | ISO/aperture/shutter-Bulb/drive roundtrips pass; Bulb timer domain write proven (300s→600s→300s). EV getter gap (enum-count=0) and WB 0x800f mapping fixed in code same day; AF-position widget added, write pending supervised test. Evidence: `evidence/2026-08-22/K3III-session-log.md` |
+| 2026-08-22 | Battery-depletion fail-closed stop | POLICY UPHELD | K-1 II dropped off bus; K-3 III at 0% but responsive; no writes attempted at low charge; both bodies restored to baseline before power-down |
 
 Current implementation work does not satisfy the definition of done until the
 hardware gates and full-build tests pass. Configuration values are deliberately
@@ -98,28 +105,31 @@ not guessed without real `GetDevicePropDesc` evidence.
 
 This list supersedes completed task narratives later in the document.
 
-1. After the completed 1/10/50/500 preview gates, perform separate single-variable AF-position
-   and zoom restore tests. Focus peaking remains withheld on K-1 II.
-2. Lifecycle checkpoint is proportionally closed at cold 2/2 plus warm 10/10
-   by operator decision. Defer the 50-cycle stress gate until other vertical
-   slices work; it is release evidence, not the next discovery action.
-3. Resume K-1 II `0x9016` minimum Near/equal Far only after preview recovery and
-   lifecycle gates; never use IT2's focus escalation.
-4. Apply the proven live-conditions verification pattern separately to aperture
-   and exposure compensation, with exact restoration harnesses. White balance
-   remains later because its raw labels are not fully correlated.
-5. Capture/transfer, Bulb, Astro and Polaris integration remain later blocked
-   tiers. Default public capture/preview abilities stay disabled.
+1. AF-position write (`0xd036`): widget implemented and read-verified on both
+   bodies; the single-variable write test with exact restoration remains the
+   next authorized hardware action (supervised — it moves the AF point).
+2. K-1 II `0x9016` minimum Near/equal Far focus drive: never yet sent;
+   requires supervised observation. Never use IT2's focus escalation.
+3. Re-run the K-3 III suite after charging: T4 EV and T6 WB should now pass
+   with the range-form getter and 0x800f mapping.
+4. Bulb open-shutter exposure control remains Tier 11: the Bulb *timer setting*
+   write is proven, but an actual open-shutter exposure is a separate gate.
+5. Capture/transfer passed once on K-1 II (H1.23); repeat JPEG capture and
+   RAW hash comparison remain before Tier 9/10 can close.
+6. White balance raw labels beyond the IT2 table need display correlation on
+   each body before broader WB writes are enabled.
+7. Lifecycle 50-cycle stress gate deferred as release evidence.
 
 ## Current hard stop
 
-H1.16 closed the 10/reconnect/50/500 preview sequence and confirmed that even
-IT2's Manual/Tv-changeable/idle conditions do not make the acknowledged shutter
-write apply. The only authorized next hardware writes are activity 1's separate,
-single-variable AF-position and zoom tests after their encoders and exact restore
-paths compile and pass fixtures. Do not move lens focus, capture, delete, reset
-USB, repeat shutter writes, or start a Polaris hardware test. A failed vendor
-enable remains fail-closed with no in-session retry or later Pentax opcode.
+The original H1.16 hard stop (shutter acknowledged-but-not-applied) was
+superseded by H1.19's live-conditions verification pattern, which has since
+proven ISO, shutter, aperture, EV, drive mode, WB, LV zoom, and one full
+capture/transfer on hardware. The current constraint is battery/logistics:
+no further hardware writes until cameras are recharged, and the next writes
+(AF position, `0x9016` focus) require operator supervision because they move
+physical camera state. A failed vendor enable remains fail-closed with no
+in-session retry or later Pentax opcode.
 
 The earlier `0x2002` diagnosis was partly confounded by incomplete container
 isolation. Controlled clean starts subsequently passed 3/3, but the plan's

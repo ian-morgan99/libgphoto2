@@ -25,6 +25,18 @@ typedef struct {
 /* IMAGE Transmitter 2 vendor-model identifiers. */
 #define PENTAX_MODEL_K1_MARK_II 78400U
 #define PENTAX_MODEL_K3_MARK_III 78420U
+/* Reserved: IT2 treats the Monochrome as model 78420 (StartsWith match);
+ * lookup currently maps it to K3_MARK_III.  Keep this ID free until a
+ * hardware difference justifies a distinct entry. */
+#define PENTAX_MODEL_K3_MARK_III_MONO 78421U
+#define PENTAX_MODEL_KP 78380U
+#define PENTAX_MODEL_K70 78370U
+#define PENTAX_MODEL_K3 77760U
+#define PENTAX_MODEL_K1 77970U
+#define PENTAX_MODEL_GR_III 78350U
+#define PENTAX_MODEL_645D 77320U
+/* K-3 II (PID 0x017b) is NOT in IT2: fail-closed, vendor mode stays off.
+ * Revisit only with hardware proof or a newer IT2 build that lists it. */
 
 /* Parsed subset of the Pentax GetAllConditions response.  Mode values
  * deliberately remain raw until each value has been correlated on hardware. */
@@ -44,6 +56,7 @@ typedef struct {
 	uint32_t open_av_num;
 	uint32_t astro_status_flags;
 	uint32_t drive_mode;
+	uint32_t af_mode;
 	uint32_t capability_flags;
 	uint32_t astro_limit_seconds;
 	int has_astro_limit;

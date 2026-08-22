@@ -164,6 +164,8 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 	parsed.astro_status_flags = pentax_get_u32le (data + 320);
 	parsed.open_av_num = pentax_get_u32le (data + 328);
 	parsed.drive_mode = pentax_get_u32le (data + 492);
+	/* IT2 offset 196: AF mode; 0 = MF, >0 = an AF mode. */
+	parsed.af_mode = pentax_get_u32le (data + 196);
 	parsed.capability_flags = pentax_get_u32le (data + 504);
 	if (size >= 532) {
 		parsed.astro_limit_seconds = pentax_get_u32le (data + 528);
@@ -205,9 +207,64 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		*extension_version = 1;
 		return 1;
 	}
+	/* IT2 matches the Monochrome with StartsWith("PENTAX K-3 Mark III"),
+	 * so it shares model_no 78420 and all K-3 III capability flags. */
+	if ((usb_product == 0x018f) &&
+	    !strncmp (device_model, "PENTAX K-3 Mark III", strlen ("PENTAX K-3 Mark III"))) {
+		*model_no = PENTAX_MODEL_K3_MARK_III;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x017f) &&
+	    !strncmp (device_model, "PENTAX KP", strlen ("PENTAX KP"))) {
+		*model_no = PENTAX_MODEL_KP;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x017d) &&
+	    !strncmp (device_model, "PENTAX K-70", strlen ("PENTAX K-70"))) {
+		*model_no = PENTAX_MODEL_K70;
+		*extension_version = 1;
+		return 1;
+	}
 	if ((usb_product == 0x0183) &&
 	    !strcmp (device_model, "PENTAX K-1 Mark II")) {
 		*model_no = PENTAX_MODEL_K1_MARK_II;
+		*extension_version = 1;
+		return 1;
+	}
+	/* IT2 Model setter: 645D uses StartsWith("645D"), model 77320, and is
+	 * the only IT2 model with vendor extension version 0.  IT2's IsSupported
+	 * matches the bare string "645D" (its manufacturer field is "PENTAX",
+	 * not "RICOH IMAGING COMPANY, LTD."), so accept both forms. */
+	if ((usb_product == 0x0130) &&
+	    (!strcmp (device_model, "645D") ||
+	     !strncmp (device_model, "PENTAX 645D", strlen ("PENTAX 645D")))) {
+		*model_no = PENTAX_MODEL_645D;
+		*extension_version = 0;
+		return 1;
+	}
+	/* K-3 II is NOT in IT2, so we have no normative reference for it.
+	 * Fail-closed: assume the older K-3-generation architecture (old
+	 * transfer, old focus 0x9016) until proven otherwise on hardware or
+	 * via a newer IT2 build.  Not listed here, so vendor mode stays off. */
+	/* IT2 Model setter: K-3 (77760), K-1 (77970), GR III (78350) all use
+	 * vendor extension version 1. */
+	if ((usb_product == 0x0165) &&
+	    !strncmp (device_model, "PENTAX K-3", strlen ("PENTAX K-3"))) {
+		*model_no = PENTAX_MODEL_K3;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x0179) &&
+	    !strncmp (device_model, "PENTAX K-1", strlen ("PENTAX K-1"))) {
+		*model_no = PENTAX_MODEL_K1;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x210f) &&
+	    !strncmp (device_model, "RICOH GR III", strlen ("RICOH GR III"))) {
+		*model_no = PENTAX_MODEL_GR_III;
 		*extension_version = 1;
 		return 1;
 	}
@@ -218,8 +275,11 @@ int
 pentax_model_uses_new_focus (uint32_t model_no)
 {
 	/* IT2 explicitly selects 0x9017 only for its new-focus models.  The
-	 * K-1 II is an old-focus 0x9016 model and must fail closed here. */
-	return model_no == PENTAX_MODEL_K3_MARK_III;
+	 * K-1 II is an old-focus 0x9016 model and must fail closed here.
+	 * Per IT2 Model setter: new-focus = K-3 III family, KP, GR III. */
+	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
+	       (model_no == PENTAX_MODEL_KP) ||
+	       (model_no == PENTAX_MODEL_GR_III);
 }
 
 static int

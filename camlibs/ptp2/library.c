@@ -2814,6 +2814,12 @@ static struct {
 	/* Ian Morgan <github@morgan-multinational.co.uk> */
 	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, 0},
 	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, 0},
+	/* 645D PTP PID; also used by the legacy K-01 (SCSI camlib). */
+	{"Pentax:645D (PTP Mode)",		0x25fb, 0x0130, 0},
+	/* K-01 in its native PTP/MTP USB mode (hardware-confirmed 2026-08-22).
+	 * Generic PTP only: IT2 never supported this body and the legacy SCSI
+	 * path needs MSC mode (0x0130). */
+	{"Pentax:K-01 (PTP Mode)",		0x25fb, 0x0131, 0},
 
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
@@ -3195,6 +3201,19 @@ camera_abilities (CameraAbilitiesList *list)
 		}
 		if (models[i].device_flags & PTP_CAP_PREVIEW)
 			a.operations |= GP_OPERATION_CAPTURE_PREVIEW;
+#ifdef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+		/* Research builds only: advertise capture for the two
+		 * vendor Pentax bodies (R0 containment keeps them
+		 * suppressed in public builds). See DEVELOPMENT_PLAN.md R0.
+		 */
+		if ((models[i].usb_vendor == 0x25fb) &&
+		    ((models[i].usb_product == 0x0183) ||
+		     (models[i].usb_product == 0x0189))) {
+			a.operations |= GP_OPERATION_CAPTURE_IMAGE |
+					GP_OPERATION_CAPTURE_PREVIEW |
+					GP_OPERATION_CONFIG;
+		}
+#endif
 		a.file_operations	= GP_FILE_OPERATION_PREVIEW |
 					GP_FILE_OPERATION_DELETE;
 		a.folder_operations	= GP_FOLDER_OPERATION_PUT_FILE |

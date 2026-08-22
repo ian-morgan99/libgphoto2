@@ -280,17 +280,20 @@ main (int argc, char *argv[])
 		camlib_basename = path_basename(abilities.library);
 		if ((!strcmp (abilities.model, "Pentax:K-1 Mark II (PTP mode)")) ||
 		    (!strcmp (abilities.model, "Pentax:K-3 Mark III (MTP mode)"))) {
-			int forbidden = GP_OPERATION_CAPTURE_IMAGE |
-				GP_OPERATION_CAPTURE_PREVIEW |
-				GP_OPERATION_TRIGGER_CAPTURE;
-			if (abilities.operations & forbidden) {
-				fprintf (stderr,
-					"Unverified Pentax capture ability advertised: %s (0x%x)\n",
-					abilities.model, abilities.operations);
-				exit (1);
-			}
-		}
-
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+                    int forbidden = GP_OPERATION_CAPTURE_IMAGE |
+                            GP_OPERATION_CAPTURE_PREVIEW |
+                            GP_OPERATION_TRIGGER_CAPTURE;
+                    if (abilities.operations & forbidden) {
+                            fprintf (stderr,
+                                    "Unverified Pentax capture ability advertised: %s (0x%x)\n",
+                                    abilities.model, abilities.operations);
+                            exit (1);
+                    }
+#endif
+                    /* Research builds advertise capture for these bodies;
+                     * the R0 containment check applies to public builds. */
+            }
 		if (!strcmp(lastmodel, abilities.model)) {
 			fprintf(stderr,"Duplicated model name in camera list: %s\n", lastmodel);
 			exit(1);
