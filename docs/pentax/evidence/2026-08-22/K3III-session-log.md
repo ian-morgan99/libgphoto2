@@ -2774,3 +2774,35 @@ wake for morning session; Entangle will need restart after cameras
 reappear.
 
 All code changes compile clean; offline tests pass. USB released.
+
+============================================================
+SESSION 20 — morning HW regression (post-review fixes)
+============================================================
+Cameras re-plugged (new ports 012/013). GVFS cleared.
+
+ISO ALIAS VERIFIED on K-3 III: /main/imgsettings/iso exists (RADIO),
+roundtrip 3200->800->3200 PASS. Frontends now find ISO at the
+standard path. K-1 II: alias correctly absent (d01e not advertised);
+pentaxdirectiso works (200).
+
+REVIEW-FIX RE-VERIFY: bracket step 2.0->0.3->2.0 PASS through the new
+locale-safe parse; cross process get clean (255, no dup choice).
+
+FULL REGRESSION SWEEP K-3 III — ALL PASS:
+shutterspeed 1/250, f-number f/4, exposurecompensation 0,
+focus peaking on/off, WB Daylight + auto-800f restore,
+drive single/Mirror Up/single, CI flat/natural,
+bracket mode 5/off, movie on/off.
+CAPTURE end-to-end PASS: IMGP3452.JPG captured+downloaded.
+
+K-1 II regression: CI monotone->autoselect PASS, focus peaking off
+PASS. Standard-path exposure widgets absent by design (body does not
+advertise 5005/5007/5010/d00f generically); all exposure control via
+pentaxdirect* widgets, all previously verified.
+
+Entangle restarted via run-entangle.sh with fork env verified in
+process; it holds both cameras (normal for tethered GUI).
+
+test-pentax-utils rc=0 after external edits to the test file.
+All baselines restored (ISO 3200, WB auto-800f, drive single,
+bracket off/step 2.0, CI natural, movie off, peaking off).
