@@ -2618,32 +2618,125 @@ Operator action: restart Entangle (with the fork env) and it should now
 offer capture + preview for both bodies.
 
 ============================================================
-SESSION 17 — full advertised-property sweep + d02b/d035 widgets
+SESSION 15 — IT2 update (262E) analysis
 ============================================================
-K-3 III full /main/other sweep (29 IT2 props). 8 advertised writable:
-5005 WB(17), 5007 AV(19), 5010 EV(31, mode-dependent), d00f Tv(55),
-d013 drive(12), d01e ISO(15), d02b peaking(3), d035 PC-LV(2).
+IT2Update_262E(Win).exe obtained and analyzed. It is an InstallShield
+wrapper containing "IMAGE Transmitter 2.msi". Extracted via Wine run
+(MSI cached to Downloaded Installations) then 7z on Data1.cab.
 
-HW write results via generic passthrough:
-- d02b 0/1/2 roundtrip PASS; d035 0/1 PASS (read-back only updates
-  in-session); d020 CI-family values accepted incl 255; d039 movie
-  flag 0/1 PASS; d015 bracketing step 3<->10 PASS; d014 single-choice
-  (only 0) no-op.
-- REJECTED by camera (0x201c): 5014/5015 contrast/saturation (advertised
-  but mode-gated off in M), d02a=1 stuck-until-retry then ok, d027=0,
-  d021-d026/d028/d029 set=1 all 0x201c (booleans currently false and
-  not changeable in this state).
-- d018 color temp: GET fails (-1). TEXT props d01b/d02d/d036/d037:
-  writes rejected (0x201d / 0x2002) — compound/raw formats.
+FINDING: the main IT2 executable (File1, 1006288 bytes, .NET GUI,
+IMAGETransmitter2.exe with MtpDevice class) is BYTE-IDENTICAL between
+the original ISO installer (S-SW150A, 2014) and the 262E update:
+md5 938af46c31d592a3c623e7171f5a7d59 in both.
 
-NEW CODE: dedicated widgets pentaxfocuspeaking (off/on/on+outline,
-IT2-faithful 1-byte SetDevicePropValue + read-back verify) and
-pentaxpclvmode (off/on, no read-back verify — K-3 III only reflects
-after LV restart, K-1 II returns nothing).
+All other cab files also identical. The "update" changes nothing in the
+application binaries - it is a repackaging/distribution refresh only.
 
-HW verified: K-3 III peaking on/on+outline/off roundtrip PASS;
-PC-LV on/off PASS. K-1 II: peaking get=on, off->on roundtrip PASS
-(first successful d02b write on K-1 II — descriptor parse "fails"
-but raw 1-byte write is accepted); PC-LV widget correctly absent.
+CONCLUSION: our decompile reference (AssemblyVersion 2.6.1.3, from the
+same File1 binary) IS the current IT2 protocol implementation. No new
+protocol information exists in this update. No re-decompile needed.
+
+============================================================
+SESSION 16 — K-01 MSC mode: full pktriggercord path WORKING
+============================================================
+Operator switched K-01 to MSC (25fb:0130). Kernel: usb-storage attached,
+scsi 11:0:0:0 PENTAX DSC_K-01 1.05, /dev/sdb (+/dev/sg1).
+
+Rebuilt fork with usbscsi iolib (-Diolibs=disk,libusb1,usbscsi).
+gphoto2 --camera "Pentax:K01" --port usbscsi:/dev/sg1 --summary:
+FULL STATUS via pktriggercord path - ISO 25600, shutter 1/1600,
+aperture f/5.6 (Tamron 10-24mm), JPEG/DNG, WB, flash, bracketing,
+shake reduction, battery voltages, AF points, drive mode.
+
+Abilities: Image + Trigger Capture + Config + Delete. The FULL control
+set the K-01 offers lives here, exactly as documented.
+
+Note: usbscsi iolib was missing from our meson build config; added.
+K-01 needs a card for capture (media removed per kernel log earlier).
+
+============================================================
+SESSION 17 — K-3 III EV WRITE NOW WORKS (gap closed!)
+============================================================
+Major finding: the K-3 III 0x5010 descriptor NOW returns enum-count=31
+with a full ±5EV choice list (earlier sessions showed enum-count=0).
+The camera advertises choices depending on shooting mode/state — the
+TEXT fallback getter correctly switched to the enum path and exposed
+all 31 choices.
+
+EV WRITE TEST: 0 -> +0.3 -> 0 via pentaxdirectev.
+Conditions verified exposure-comp=3/10 then 0/10. HW-W PASS.
+
+Tier 6 scalar writes now FULLY CLOSED on K-3 III: ISO, aperture,
+shutter/Bulb-timer, WB, drive mode, AND EV.
+
+Full parameter availability confirmed on K-3 III:
+- shutter d00f: 55 enums
+- aperture 5007: 19 enums
+- ISO d01e: 15 enums
+- EV 5010: 31 enums (mode-dependent!)
+- WB 5005: 16 advertised (incl auto-800f)
+- drive d013: 12 enums (UINT8)
+
+============================================================
+SESSION 17 — K-3 III full parameter inventory
+============================================================
+Full raw descriptor sweep of all 29 IT2-table properties:
+
+ADVERTISED (writable, getset=1):
+- 5005 WB: UINT16, 17 enums, current 0x0f80 (auto-800f)
+- 5007 aperture: UINT16, 19 enums, current f/5.0
+- 5010 EV: INT16, 31 enums(!), current 0 — NOTE: enum-count=31 NOW,
+  earlier session showed 0. The camera DOES advertise EV choices in M!
+- d00f shutter: UINT64, 55 enums, current 30/1 (M mode now, not bulb)
+- d013 drive: UINT8, 12 enums, current single(0)
+- d01e ISO: UINT32, 15 enums, current 3200
+- d02b focus peaking: UINT8, 3 enums, current 0
+- d035 PC-LV: UINT8, 2 enums, current 0
+
+NOT ADVERTISED (empty response - absent from DeviceInfo):
+5008 focal, d014/d015 bracketing, d018 color temp, d01b file format,
+d020-d029 CI family, d02a composition, d02c/d02d CI extras,
+d036 AF position, d037 zoom, d039 movie.
+
+IMPORTANT CORRECTION: K-3 III EV descriptor NOW shows enum-count=31
+(previous session showed 0). The earlier empty-EV state was likely a
+mode-dependent advertisement (camera was in different mode). EV write
+may now be possible!
+
+Drive mode widget correctly shows all 12 advertised values including
+mirror-up and multi-exposure (astro-relevant!).
+
+============================================================
+SESSION 18 — six new property widgets (IT2-grounded) + HW verify
+============================================================
+NEW WIDGETS (all IT2-faithful 1-byte SetDevicePropValue):
+- pentaxbracketmode  d014: off/3/5/+2/-2 (IT2 EvBracketMode nominal idx)
+- pentaxbracketstep  d015: descriptor enum, display value/10 ("0.3".."5.0");
+  falls back to full K-3 III observed set when no enumeration
+- pentaxcimode       d020: 14 nominal modes via CIModeLUT internal codes
+  (autoselect=255, vivid=1, natural=0, portrait=2, landscape=3, miyabi=4,
+  satobi=12, poptune=9, honoka=6, flat=11, bleach bypass=8,
+  reversal film=7, monotone=5, cross process=10)
+- pentaxcompositionadjust d02a: on/off (IT2 CompositionAdjustmentSw)
+- pentaxcrossprocess d02c: 0..3 + presets, offset encoding per
+  CICrossProcessType (user v -> wire v+1; preset >3 -> wire+32-3)
+- pentaxmoviemode    d039: on/off (IT2 SetMovieMode)
+
+HW RESULTS:
+K-3 III: bracket step 2.0->0.3->2.0 PASS; CI mode natural->monotone->
+natural PASS; bracket mode off->3->off PASS; movie on->off PASS;
+composition adjust on->off PASS. Cross process GET returns wire 255
+(displayed as-is); SET rejected (-1) — parked, needs USB trace.
+K-1 II: CI mode autoselect->monotone->natural PASS (first successful
+d020 write). Bracket step/movie/composition not accepted by this body
+(GET fails -1): correct — K-1 II does not advertise them.
+
+NOTE: composition adjust needed set+get in same session (read-back
+updates lazily across sessions, same as PC-LV).
+
+ENTANGLE READY: run-entangle.sh at repo root launches Entangle with the
+fork env (LD_LIBRARY_PATH/CAMLIBS/IOLIBS) and kills GVFS holders first.
+Abilities verified: Image+Preview capture advertised for both bodies.
+Research macro confirmed baked into _build c_args.
 
 All states restored to baseline. USB released.
