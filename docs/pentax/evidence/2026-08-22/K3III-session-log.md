@@ -2806,3 +2806,43 @@ process; it holds both cameras (normal for tethered GUI).
 test-pentax-utils rc=0 after external edits to the test file.
 All baselines restored (ISO 3200, WB auto-800f, drive single,
 bracket off/step 2.0, CI natural, movie off, peaking off).
+
+============================================================
+SESSION 21 — AF-position PASS, cross-process SOLVED, Tier 13 done
+============================================================
+AF-POSITION WRITE (long-standing gap) — FULL PASS on K-3 III:
+540,360 (center) -> write 200,150 -> read-back 194,144 (snapped to
+nearest AF point). -> 850,600 -> 842,583. Restored center exactly.
+The widget's snap-and-echo semantics confirmed live.
+
+CROSS-PROCESS d02c — SOLVED: writes were mode-gated. Camera rejects
+(error -1) unless CI mode (d020) = "cross process" first; then user
+value 1 and preset 4 both write+read-back cleanly. Widget comment
+updated with the gating. Restore: CI natural.
+
+TIER 11 BULB OPEN-SHUTTER — BLOCKED, tooling built:
+K-1 II set to B by operator (exposure-mode-raw=9, bulb-timer=yes).
+Bulb shutter choice (0/1) present in pentaxdirectshutter but write
+rejected (-1) — consistent with known K-1 II fw1.02 B-write dead end.
+Built /tmp/bulbtest (standalone initiate(0x9011,release=2)/terminate
+(0x9012) tool with Pentax init recovery). Raw OpenSession kept
+returning 0x02fa through all retries incl USB control resets; the
+resets wedged the camera's PTP stack (camlib also times out now).
+Camera needs power-cycle. LESSON: standalone raw tools lack the
+camlib's full init sequence — future Tier 11 attempt should add a
+release_mode parameter to camera_pentax_capture instead.
+
+POLARIS TIER 13 — COMPLETE:
+Full patcher pipeline ran against stock FwPkt (docker
+polaris-patcher-pentax-v3): extracted appfs, rebuilt libgphoto2
+2.5.34 core+port+ptp2+usb1 for ARM, assembled stage2 loader,
+repacked appfs with exact stock geometry (min_io=2048 leb=126976
+max_leb=660 lzo peb=131072 seq preserved), emitted flashable FwPkt.zip
+(md5 25403283e6f4353a88188ff1aca1837e) + reversible stage2-ondisk
+bundle + LGPL corresponding-source archive.
+Artifacts: BenroPolarisPatcher/builds/2026-08-23/.
+appfs md5 differs from stock as expected (1775c7bc... vs 47f2ae68...);
+all other images byte-preserved. NOT flashed — on-device test is the
+operator's call (install_stage2.sh is reversible).
+
+K-1 II regression skipped (camera wedged, needs power-cycle).
