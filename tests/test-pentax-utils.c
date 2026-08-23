@@ -191,11 +191,12 @@ main (void)
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
 	CHECK (!pentax_model_uses_new_focus (0));
-	/* The Monochrome shares the K-3 III protocol family and is now a
-	 * supported identity; it must resolve with its own model number. */
+	/* The Monochrome shares the K-3 III protocol family; IT2 matches it
+	 * with StartsWith("PENTAX K-3 Mark III") so it resolves to the same
+	 * model_no 78420 and all K-3 III capability flags. */
 	CHECK (pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
-	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III_MONO) &&
+	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
 		(extension_version == 1));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONO) ==
 		!!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));

@@ -2740,3 +2740,37 @@ Abilities verified: Image+Preview capture advertised for both bodies.
 Research macro confirmed baked into _build c_args.
 
 All states restored to baseline. USB released.
+
+============================================================
+SESSION 19 — full code review + fixes + naming cross-check
+============================================================
+CODE REVIEW (subagent, thorough) found 3 real issues in session-18
+code, all fixed:
+1. _get_Pentax_BracketStep: desc freed on all paths now (was leaked on
+   mid-parse failure); returns translate_ptp_result(ret) not bare
+   GP_ERROR.
+2. Enum read guarded by desc.DataType == PTP_DTC_UINT8 (union type
+   safety); falls back to observed table otherwise.
+3. _put_Pentax_BracketStep: atof() replaced with locale-safe manual
+   "W.D" parse (atof breaks under comma-decimal locales).
+4. CrossProcess get: no longer adds duplicate choice when display<=3.
+
+NAMING CROSS-CHECK (frontend compatibility):
+- K-3 III already exposes standard paths: imgsettings/whitebalance,
+  capturesettings/f-number, shutterspeed (Ricoh row), exposurecompensation.
+- GAP FOUND: ISO. Pentax uses vendor d01e, so /main/imgsettings/iso did
+  not exist. ADDED: image_settings_menu row mapping PTP_DPC_PENTAX_
+  ExtendedISO -> pentaxdirectiso handlers under standard name "iso".
+  Compile-verified; HW verify pending (cameras powered down overnight).
+
+STALE TEST FIXED: test-pentax-utils expected MONO model_no 78421 but
+code deliberately returns 78420 (IT2 StartsWith match shares K-3 III
+family). Test aligned to code; both test suites now rc=0.
+
+ENTANGLE: was running with STOCK libgphoto2 env (no CAMLIBS/LD_PATH) —
+killed and relaunched via run-entangle.sh; verified fork env in process.
+NOTE: cameras dropped off USB overnight (auto power-save?) — re-plug/
+wake for morning session; Entangle will need restart after cameras
+reappear.
+
+All code changes compile clean; offline tests pass. USB released.

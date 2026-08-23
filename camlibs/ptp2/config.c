@@ -10180,6 +10180,7 @@ _get_Pentax_BracketStep (CONFIG_GET_ARGS)
 	char buf[16];
 	uint16_t ret;
 	int have_enum = 0;
+	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
@@ -10187,15 +10188,15 @@ _get_Pentax_BracketStep (CONFIG_GET_ARGS)
 	ret = ptp_generic_getdevicepropdesc (params,
 		PTP_DPC_PENTAX_ExposureBracketingStep, &desc);
 	if (ret == PTP_RC_OK &&
-		desc.FormFlag == PTP_DPFF_Enumeration &&
-		desc.FORM.Enum.NumberOfValues > 0)
+	    desc.DataType == PTP_DTC_UINT8 &&
+	    desc.FormFlag == PTP_DPFF_Enumeration &&
+	    desc.FORM.Enum.NumberOfValues > 0)
 		have_enum = 1;
-	if (_pentax_u8_prop_get (params,
-		PTP_DPC_PENTAX_ExposureBracketingStep, &cur) < GP_OK) {
-		if (have_enum)
-			ptp_free_devicepropdesc (&desc);
-		return GP_ERROR;
-	}
+	result = _pentax_u8_prop_get (params,
+		PTP_DPC_PENTAX_ExposureBracketingStep, &cur);
+	ptp_free_devicepropdesc (&desc);
+	if (result < GP_OK)
+		return result;
 	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
 	if (have_enum) {
@@ -10214,9 +10215,10 @@ _get_Pentax_BracketStep (CONFIG_GET_ARGS)
 		}
 	}
 	snprintf (buf, sizeof (buf), "%.1f", cur / 10.0);
-	gp_widget_set_value (*widget, buf);
-	if (have_enum)
-		ptp_free_devicepropdesc (&desc);
+	if (gp_widget_add_choice (*widget, buf) != GP_OK)
+		gp_widget_set_value (*widget, buf); /* unknown current value */
+	else
+		gp_widget_set_value (*widget, buf);
 	return GP_OK;
 }
 
@@ -10225,17 +10227,26 @@ _put_Pentax_BracketStep (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
 	const char *value;
-	double step;
+	long whole, tenth;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
-	step = atof (value);
-	if (step <= 0.0 || step > 5.0)
+	/* Locale-safe parse of "W.D" (one decimal digit): avoid atof(),
+	 * which breaks under comma-decimal locales. */
+	{
+		char *end;
+		whole = strtol (value, &end, 10);
+		if (end == value || (*end != '.' && *end != ',') ||
+			end[1] < '0' || end[1] > '9')
+			return GP_ERROR_BAD_PARAMETERS;
+		tenth = end[1] - '0';
+	}
+	if (whole < 0 || whole > 5 || (whole == 5 && tenth != 0))
 		return GP_ERROR_BAD_PARAMETERS;
 	return _pentax_u8_prop_put (params,
 		PTP_DPC_PENTAX_ExposureBracketingStep,
-		(uint8_t)(step * 10.0 + 0.5));
+		(uint8_t)(whole * 10 + tenth));
 }
 
 /* Custom Image mode (0xd020).  IT2 CIMode writes a 1-byte internal code.
@@ -10360,7 +10371,8 @@ _get_Pentax_CrossProcess (CONFIG_GET_ARGS)
 	gp_widget_add_choice (*widget, "2");
 	gp_widget_add_choice (*widget, "3");
 	snprintf (buf, sizeof (buf), "%u", display);
-	gp_widget_add_choice (*widget, buf);
+	if (display > 3)
+		gp_widget_add_choice (*widget, buf);
 	gp_widget_set_value (*widget, buf);
 	return GP_OK;
 }
@@ -13591,6 +13603,7 @@ static struct submenu image_settings_menu[] = {
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_CANON_ISOSpeed,                 PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_ISO,                 _put_Canon_ISO },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_ExposureIndex,                  PTP_VENDOR_FUJI,    PTP_DTC_INT32,  _get_INT,                       _put_INT },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_ExposureIndex,                  0,                  PTP_DTC_UINT16, _get_INT,                       _put_INT },
+	{ N_("ISO Speed"),              "iso",                  PTP_DPC_PENTAX_ExtendedISO,             PTP_VENDOR_PENTAX,  PTP_DTC_UINT32, _get_Pentax_DirectISO,          _put_Pentax_DirectISO },
 	{ N_("Movie ISO Speed"),        "movieiso",             PTP_DPC_NIKON_MovieISO,                 PTP_VENDOR_NIKON,   PTP_DTC_UINT32, _get_INT,                       _put_INT },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_CANON_EOS_ISOSpeed,             PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_ISO,                 _put_Canon_ISO },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_SONY_QX_ISO,                    PTP_VENDOR_SONY,    PTP_DTC_UINT32, _get_Sony_ISO,                  _put_Sony_QX_ISO },
