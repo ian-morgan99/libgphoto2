@@ -10077,6 +10077,349 @@ _put_Pentax_UsbLiveViewMode (CONFIG_PUT_ARGS)
 	return GP_OK;
 }
 
+/* Generic IT2-faithful UINT8 device-prop widget helper.  All of the
+ * properties below are written by IT2 as a plain 1-byte SetDevicePropValue
+ * payload; choices come from the camera's own descriptor enumeration where
+ * one exists, otherwise from the IT2 nominal tables. */
+static int
+_pentax_u8_prop_get (PTPParams *params, uint16_t propcode, uint8_t *value)
+{
+	unsigned char *data = NULL;
+	unsigned int size;
+	uint16_t ret;
+
+	ret = ptp_pentax_get_device_prop_raw (params, propcode, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 1) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	*value = data[0];
+	free (data);
+	return GP_OK;
+}
+
+static int
+_pentax_u8_prop_put (PTPParams *params, uint16_t propcode, uint8_t value)
+{
+	unsigned char out[1];
+
+	out[0] = value;
+	return translate_ptp_result (ptp_pentax_set_device_prop_raw (params,
+		propcode, out, sizeof (out)));
+}
+
+/* Exposure bracketing mode (0xd014).  IT2 EvBracketMode: nominal index
+ * 0=OFF, 1="3", 2="5", 3="+2", 4="-2"; wire value is the nominal index. */
+static const struct { const char *name; uint8_t wire; } _pentax_bracket_modes[] = {
+	{ "off", 0 }, { "3", 1 }, { "5", 2 }, { "+2", 3 }, { "-2", 4 }
+};
+
+static int
+_get_Pentax_BracketMode (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	uint8_t mode;
+	unsigned int i;
+	char buf[16];
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_u8_prop_get (params,
+		PTP_DPC_PENTAX_ExposureBracketingMode, &mode);
+	if (result < GP_OK)
+		return result;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	for (i = 0; i < ARRAYSIZE (_pentax_bracket_modes); i++)
+		gp_widget_add_choice (*widget, _(_pentax_bracket_modes[i].name));
+	for (i = 0; i < ARRAYSIZE (_pentax_bracket_modes); i++)
+		if (_pentax_bracket_modes[i].wire == mode) {
+			gp_widget_set_value (*widget,
+				_(_pentax_bracket_modes[i].name));
+			return GP_OK;
+		}
+	snprintf (buf, sizeof (buf), "%u", mode);
+	gp_widget_add_choice (*widget, buf);
+	gp_widget_set_value (*widget, buf);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_BracketMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	unsigned int i;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	for (i = 0; i < ARRAYSIZE (_pentax_bracket_modes); i++)
+		if (!strcmp (value, _(_pentax_bracket_modes[i].name)))
+			return _pentax_u8_prop_put (params,
+				PTP_DPC_PENTAX_ExposureBracketingMode,
+				_pentax_bracket_modes[i].wire);
+	return GP_ERROR_BAD_PARAMETERS;
+}
+
+/* Exposure bracketing step (0xd015).  IT2 RefreshExpBracketStepList reads
+ * the descriptor enum and displays value/10 ("0.3","0.5",...,"2.0");
+ * writes are a plain 1-byte raw step value. */
+static int
+_get_Pentax_BracketStep (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint8_t cur;
+	unsigned int i;
+	char buf[16];
+	uint16_t ret;
+	int have_enum = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params,
+		PTP_DPC_PENTAX_ExposureBracketingStep, &desc);
+	if (ret == PTP_RC_OK &&
+		desc.FormFlag == PTP_DPFF_Enumeration &&
+		desc.FORM.Enum.NumberOfValues > 0)
+		have_enum = 1;
+	if (_pentax_u8_prop_get (params,
+		PTP_DPC_PENTAX_ExposureBracketingStep, &cur) < GP_OK) {
+		if (have_enum)
+			ptp_free_devicepropdesc (&desc);
+		return GP_ERROR;
+	}
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	if (have_enum) {
+		for (i = 0; i < desc.FORM.Enum.NumberOfValues; i++) {
+			snprintf (buf, sizeof (buf), "%.1f",
+				desc.FORM.Enum.SupportedValue[i].u8 / 10.0);
+			gp_widget_add_choice (*widget, buf);
+		}
+	} else {
+		/* Full set observed on K-3 III when no enumeration given. */
+		static const uint8_t steps[] = { 50,47,43,40,37,33,30,27,23,
+			20,17,13,10,7,3 };
+		for (i = 0; i < ARRAYSIZE (steps); i++) {
+			snprintf (buf, sizeof (buf), "%.1f", steps[i] / 10.0);
+			gp_widget_add_choice (*widget, buf);
+		}
+	}
+	snprintf (buf, sizeof (buf), "%.1f", cur / 10.0);
+	gp_widget_set_value (*widget, buf);
+	if (have_enum)
+		ptp_free_devicepropdesc (&desc);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_BracketStep (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	double step;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	step = atof (value);
+	if (step <= 0.0 || step > 5.0)
+		return GP_ERROR_BAD_PARAMETERS;
+	return _pentax_u8_prop_put (params,
+		PTP_DPC_PENTAX_ExposureBracketingStep,
+		(uint8_t)(step * 10.0 + 0.5));
+}
+
+/* Custom Image mode (0xd020).  IT2 CIMode writes a 1-byte internal code.
+ * Nominal order per CIModeLUT + MainWindow.xaml combobox; internal codes
+ * from NominalToInternal: 255,1,0,2,3,4,12,9,6,11,8,7,5,10. */
+static const struct { const char *name; uint8_t wire; } _pentax_ci_modes[] = {
+	{ "autoselect", 255 }, { "vivid", 1 }, { "natural", 0 },
+	{ "portrait", 2 }, { "landscape", 3 }, { "miyabi", 4 },
+	{ "satobi", 12 }, { "poptune", 9 }, { "honoka", 6 },
+	{ "flat", 11 }, { "bleach bypass", 8 }, { "reversal film", 7 },
+	{ "monotone", 5 }, { "cross process", 10 }
+};
+
+static int
+_get_Pentax_CIMode (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	uint8_t mode;
+	unsigned int i;
+	char buf[16];
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_u8_prop_get (params,
+		PTP_DPC_PENTAX_CustomImageMode, &mode);
+	if (result < GP_OK)
+		return result;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	for (i = 0; i < ARRAYSIZE (_pentax_ci_modes); i++)
+		gp_widget_add_choice (*widget, _(_pentax_ci_modes[i].name));
+	for (i = 0; i < ARRAYSIZE (_pentax_ci_modes); i++)
+		if (_pentax_ci_modes[i].wire == mode) {
+			gp_widget_set_value (*widget,
+				_(_pentax_ci_modes[i].name));
+			return GP_OK;
+		}
+	snprintf (buf, sizeof (buf), "%u", mode);
+	gp_widget_add_choice (*widget, buf);
+	gp_widget_set_value (*widget, buf);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_CIMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	unsigned int i;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	for (i = 0; i < ARRAYSIZE (_pentax_ci_modes); i++)
+		if (!strcmp (value, _(_pentax_ci_modes[i].name)))
+			return _pentax_u8_prop_put (params,
+				PTP_DPC_PENTAX_CustomImageMode,
+				_pentax_ci_modes[i].wire);
+	return GP_ERROR_BAD_PARAMETERS;
+}
+
+/* Composition adjustment switch (0xd02a).  IT2 CompositionAdjustmentSw:
+ * plain boolean, 1-byte payload. */
+static int
+_get_Pentax_CompositionAdjust (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	uint8_t mode;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_u8_prop_get (params, 0xd02a, &mode);
+	if (result < GP_OK)
+		return result;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, _("off"));
+	gp_widget_add_choice (*widget, _("on"));
+	gp_widget_set_value (*widget, mode == 1 ? _("on") : _("off"));
+	return GP_OK;
+}
+
+static int
+_put_Pentax_CompositionAdjust (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, _("on")))
+		return _pentax_u8_prop_put (params, 0xd02a, 1);
+	if (!strcmp (value, _("off")))
+		return _pentax_u8_prop_put (params, 0xd02a, 0);
+	return GP_ERROR_BAD_PARAMETERS;
+}
+
+/* Cross process type (0xd02c).  IT2 CICrossProcessType maps user values
+ * 0..3 to wire 1..4 and presets >3 to wire+32-3 (offset encoding). */
+static int
+_get_Pentax_CrossProcess (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	uint8_t mode, display;
+	char buf[16];
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_u8_prop_get (params,
+		PTP_DPC_PENTAX_CustomImageCrossProcess, &mode);
+	if (result < GP_OK)
+		return result;
+	display = (mode > 32) ? mode - 32 + 3 : mode - 1;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "0");
+	gp_widget_add_choice (*widget, "1");
+	gp_widget_add_choice (*widget, "2");
+	gp_widget_add_choice (*widget, "3");
+	snprintf (buf, sizeof (buf), "%u", display);
+	gp_widget_add_choice (*widget, buf);
+	gp_widget_set_value (*widget, buf);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_CrossProcess (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	long v;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	v = strtol (value, NULL, 10);
+	if (v < 0 || v > 35)
+		return GP_ERROR_BAD_PARAMETERS;
+	return _pentax_u8_prop_put (params,
+		PTP_DPC_PENTAX_CustomImageCrossProcess,
+		(uint8_t)((v > 3) ? v - 3 + 32 : v + 1));
+}
+
+/* Movie mode flag (0xd039).  IT2 SetMovieMode: 1-byte boolean. */
+static int
+_get_Pentax_MovieMode (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	uint8_t mode;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_u8_prop_get (params, PTP_DPC_PENTAX_MovieMode, &mode);
+	if (result < GP_OK)
+		return result;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, _("off"));
+	gp_widget_add_choice (*widget, _("on"));
+	gp_widget_set_value (*widget, mode == 1 ? _("on") : _("off"));
+	return GP_OK;
+}
+
+static int
+_put_Pentax_MovieMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, _("on")))
+		return _pentax_u8_prop_put (params, PTP_DPC_PENTAX_MovieMode, 1);
+	if (!strcmp (value, _("off")))
+		return _pentax_u8_prop_put (params, PTP_DPC_PENTAX_MovieMode, 0);
+	return GP_ERROR_BAD_PARAMETERS;
+}
+
 /* Live-view zoom write (0xd037).  IT2 payload is a 12-byte structure:
  * {4,0,0,0, Xlo,Xhi, Ylo,Yhi, mag,0,0,0}.  Zoom-off is magnification 1 with
  * centred coordinates.  The write is verified by reading the property back;
@@ -13099,6 +13442,12 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Focus Peaking"), "pentaxfocuspeaking", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_FocusPeaking, _put_Pentax_FocusPeaking },
 	{ N_("Pentax PC Live View Mode"), "pentaxpclvmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_UsbLiveViewMode, _put_Pentax_UsbLiveViewMode },
+	{ N_("Pentax Exposure Bracketing Mode"), "pentaxbracketmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_BracketMode, _put_Pentax_BracketMode },
+	{ N_("Pentax Exposure Bracketing Step"), "pentaxbracketstep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_BracketStep, _put_Pentax_BracketStep },
+	{ N_("Pentax Custom Image Mode"), "pentaxcimode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CIMode, _put_Pentax_CIMode },
+	{ N_("Pentax Composition Adjustment"), "pentaxcompositionadjust", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CompositionAdjust, _put_Pentax_CompositionAdjust },
+	{ N_("Pentax Cross Process Type"), "pentaxcrossprocess", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CrossProcess, _put_Pentax_CrossProcess },
+	{ N_("Pentax Movie Mode"), "pentaxmoviemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_MovieMode, _put_Pentax_MovieMode },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },
