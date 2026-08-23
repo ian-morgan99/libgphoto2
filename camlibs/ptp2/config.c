@@ -9934,6 +9934,149 @@ _put_Pentax_LiveViewAFPosition (CONFIG_PUT_ARGS)
 	return GP_OK;
 }
 
+/* Focus peaking (0xd02b).  IT2 FocusPeakingMode uses a plain 1-byte
+ * SetDevicePropValue payload; values observed: 0=off, 1=on, 2=on+highlight.
+ * Read-back is used to verify the write. */
+static int
+_get_Pentax_FocusPeaking (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *data = NULL;
+	unsigned int size;
+	uint8_t mode;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_FocusPeaking, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 1) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	mode = data[0];
+	free (data);
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "off");
+	gp_widget_add_choice (*widget, "on");
+	gp_widget_add_choice (*widget, "on+outline");
+	gp_widget_set_value (*widget,
+		mode == 2 ? "on+outline" : mode == 1 ? "on" : "off");
+	return GP_OK;
+}
+
+static int
+_put_Pentax_FocusPeaking (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char out[1], *data = NULL;
+	unsigned int size;
+	const char *value;
+	uint8_t mode;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, "on")) {
+		mode = 1;
+	} else if (!strcmp (value, "on+outline")) {
+		mode = 2;
+	} else if (!strcmp (value, "off")) {
+		mode = 0;
+	} else {
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	out[0] = mode;
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_FocusPeaking, out, sizeof (out));
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	/* Verify by read-back. */
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_FocusPeaking, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 1 || data[0] != mode) {
+		GP_LOG_E ("Pentax focus peaking write not echoed (got %u, "
+			"wanted %u).", size >= 1 ? data[0] : 0xff, mode);
+		free (data);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	free (data);
+	return GP_OK;
+}
+
+/* PC live-view output mode (0xd035).  IT2 writes a plain 1-byte value:
+ * 0=normal LV, 1=PC-LV output. */
+static int
+_get_Pentax_UsbLiveViewMode (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *data = NULL;
+	unsigned int size;
+	uint8_t mode;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_UsbLiveViewMode, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size < 1) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	mode = data[0];
+	free (data);
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "off");
+	gp_widget_add_choice (*widget, "on");
+	gp_widget_set_value (*widget, mode == 1 ? "on" : "off");
+	return GP_OK;
+}
+
+static int
+_put_Pentax_UsbLiveViewMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char out[1];
+	const char *value;
+	uint8_t mode;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, "on")) {
+		mode = 1;
+	} else if (!strcmp (value, "off")) {
+		mode = 0;
+	} else {
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	/* No read-back verify here: the K-3 III keeps reporting the previous
+	 * value until a live-view session restarts, and the K-1 II does not
+	 * return a usable value at all. */
+	out[0] = mode;
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_UsbLiveViewMode, out, sizeof (out));
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	return GP_OK;
+}
+
 /* Live-view zoom write (0xd037).  IT2 payload is a 12-byte structure:
  * {4,0,0,0, Xlo,Xhi, Ylo,Yhi, mag,0,0,0}.  Zoom-off is magnification 1 with
  * centred coordinates.  The write is verified by reading the property back;
@@ -12954,6 +13097,8 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Drive Mode Descriptor"), "pentaxpropd013", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Focus Peaking Descriptor"), "pentaxpropd02b", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax PC Live View Descriptor"), "pentaxpropd035", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
+	{ N_("Pentax Focus Peaking"), "pentaxfocuspeaking", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_FocusPeaking, _put_Pentax_FocusPeaking },
+	{ N_("Pentax PC Live View Mode"), "pentaxpclvmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_UsbLiveViewMode, _put_Pentax_UsbLiveViewMode },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },

@@ -2616,3 +2616,34 @@ Build clean; test rc=0.
 
 Operator action: restart Entangle (with the fork env) and it should now
 offer capture + preview for both bodies.
+
+============================================================
+SESSION 17 — full advertised-property sweep + d02b/d035 widgets
+============================================================
+K-3 III full /main/other sweep (29 IT2 props). 8 advertised writable:
+5005 WB(17), 5007 AV(19), 5010 EV(31, mode-dependent), d00f Tv(55),
+d013 drive(12), d01e ISO(15), d02b peaking(3), d035 PC-LV(2).
+
+HW write results via generic passthrough:
+- d02b 0/1/2 roundtrip PASS; d035 0/1 PASS (read-back only updates
+  in-session); d020 CI-family values accepted incl 255; d039 movie
+  flag 0/1 PASS; d015 bracketing step 3<->10 PASS; d014 single-choice
+  (only 0) no-op.
+- REJECTED by camera (0x201c): 5014/5015 contrast/saturation (advertised
+  but mode-gated off in M), d02a=1 stuck-until-retry then ok, d027=0,
+  d021-d026/d028/d029 set=1 all 0x201c (booleans currently false and
+  not changeable in this state).
+- d018 color temp: GET fails (-1). TEXT props d01b/d02d/d036/d037:
+  writes rejected (0x201d / 0x2002) — compound/raw formats.
+
+NEW CODE: dedicated widgets pentaxfocuspeaking (off/on/on+outline,
+IT2-faithful 1-byte SetDevicePropValue + read-back verify) and
+pentaxpclvmode (off/on, no read-back verify — K-3 III only reflects
+after LV restart, K-1 II returns nothing).
+
+HW verified: K-3 III peaking on/on+outline/off roundtrip PASS;
+PC-LV on/off PASS. K-1 II: peaking get=on, off->on roundtrip PASS
+(first successful d02b write on K-1 II — descriptor parse "fails"
+but raw 1-byte write is accepted); PC-LV widget correctly absent.
+
+All states restored to baseline. USB released.
