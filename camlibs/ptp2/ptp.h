@@ -4068,6 +4068,7 @@ struct _PTPParams {
 		int vendor_mode_enabled;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
+		int keep_live_view;
 		PTPPentaxTransferState transfer_state;
 		uint32_t candidate_handle;
 	} pentax;

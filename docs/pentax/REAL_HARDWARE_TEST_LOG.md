@@ -179,3 +179,91 @@ Implementation commits arising directly from these tests are `b72d9cbdc` and
 - Code-only: pentax_lookup_model() now covers KP (017f), K-70 (017d), K-3 III Monochrome (018f→78420), 645D (0130, ext ver 0), K-3 (0165), K-1 (0179), GR III (210f), K-3 II (017b, our ID 77980). Build clean.
 - HW-R: K-01 connected as `25fb:0131` (usb:001,008) — NEW PID finding (handover assumed 0x0130). Model string "K-01"; 0 pentax widgets; vendor mode not engaged. Fail-closed behaviour confirmed.
 - HW-R: K-3 III (usb:001,007) re-read OK after rebuild: vendor enable succeeded (function flags 0x0), 19 pentax widgets present. No writes performed.
+
+## 2026-08-24 — K-1 II session: AF-position validated, d020 verified, 0x9016 wedge hazard confirmed; K-3 III cross-check; model gating implemented
+
+### Environment
+- K-1 II `25fb:0183` at usb:001,004 (later re-enumerated as usb:001,007 after power cycle). GVFS holders killed before each session. Fork libs via LD_LIBRARY_PATH/CAMLIBS/IOLIBS; system gphoto2 CLI.
+- Baseline captured and restored throughout: ISO 200, 1/500, f/2.0, EV 0, WB auto, drive single, cimode autoselect, focuspeaking off, afposition 360,240. Battery 100%.
+
+### K-1 II results
+- **AF position write VALIDATED** (`pentaxliveviewafposition`): bounds check is EXCLUSIVE — write of 720,480 rejected ("outside area 720x480"); valid write 180,120 accepted (SET OK); read-back always shows centre 360,240 (K-1 II never echoes selection; special-case at config.c:10252 treats OK-write as success). Restored centre.
+- **Focus peaking roundtrip PASS**: off→on→off; a transient error on restore was cleared by fresh session confirming off.
+- **CI mode d020 roundtrip PASS**: autoselect→vivid→autoselect. First hardware verification of d020 on K-1 II.
+- **Empty-data-phase findings**: bracketmode (d014), bracketstep (d015), compositionadjust (d02a), moviemode (d039), pclvmode (d035) all fail with PTP OK + EMPTY data phase → GP_ERROR_CORRUPTED_DATA (-102). cimode works fine.
+- **0x9016 old-focus drive WEDGE HAZARD CONFIRMED** (user-approved test): sent oldfocusdrivenear=1 with IT2-faithful params (amount=5, direction=0=Near); camera returned **0x02ff General Error**, then the PTP session wedged permanently. Recovery attempts failed: usbreset OK at USB level but PTP dead; OpenSession → 0x02fa then I/O timeouts (log: /tmp/alive_dbg.log lines 130-150); no self-recovery over ~40 min. Camera later DISAPPEARED from USB bus entirely (~03:39), presumed auto-power-off or battery drain while wedged. Required physical power cycle.
+  - **Rule for future sessions: never send 0x9016/0x9017 to K-1 II without LV active + AF mode confirmed via event data.**
+
+### K-3 III cross-check (usb:001,009, fw 2.20, serial 8093033)
+Evidence: `evidence_k3iii_0904.txt` (project root), `/tmp/k3iii_config_list.txt`.
+- All 5 previously-empty-phase widgets (d014/d015/d02a/d039/d035 mapped as pentaxbracketmode/bracketstep/compositionadjust/moviemode/pclvmode) return **PTP OK + real data** on K-3 III. The K-1 II empty-data-phase behaviour is therefore MODEL-SPECIFIC, not a libgphoto2 protocol bug.
+- **bracketstep roundtrip PASS**: 2.0→1.0→verified→restored 2.0→verified. Note: d015 enum range is dynamic — current value is appended if not in canonical 6-step set (9.6/1.7/1.3/1.0/0.7/0.3).
+- **cimode roundtrip PASS**: natural→vivid→natural.
+- **Silent-ignore anomaly**: compositionadjust (d02a) and focuspeaking (d02b) accept SetDevicePropValue with NO PTP error but value unchanged when Live View is not active. IT2 source confirms both are LV-session features: FocusPeakingMode UI set only fires from PcLiveViewStart context (MainWindow.xaml.cs:1246 within PcLiveViewStart body, 1137-1250); CompositionAdjustmentSw writes are paired with CamCompositionAdjState read from LV event data (MtpDevice.cs:5936, offset 532).
+- **LV-active retest (later same day)**: attempted to activate PC-LV on K-3 III via `pentaxpclvmode=on` — the d035 SET returns **0x2001 (PTP_RC_DeviceBusy / OperationNotSupported class)** and the value stays 0; camera remains healthy but PC-LV cannot be started by property write alone in a fresh session. The `--capture-preview` path (library.c:3664+) DOES start PC-LV: it sets d035=1 via standard SetDevicePropValue (accepted there), pulls one 0x9006 frame (~75 KB valid 1080x720 JPEG), then restores d035=0 at exit — so the LV window exists only inside that call. Setting d02b/d02a immediately before or during this window still shows no effect after the session ends (camera resets them to 0 on LV stop). Conclusion: d02a/d02b writes only stick while an LV session is continuously active; the current capture-preview implementation tears LV down after each frame, so these widgets need a persistent-LV mode before they can be verified end-to-end. Camera state after retests: healthy, battery 100%, all values baseline.
+- moviemode/pclvmode/bracketmode reads verified but not written (scope).
+
+### Code changes (offline during K-1 II outage; built clean)
+- pentax-utils.c/h: added `pentax_model_is_k3iii_family()` + capability helpers `pentax_model_supports_exp_bracket()`, `_composition_adjust()`, `_movie_setting()`, `_pc_live_view()`, mirroring IT2 Model setter flags (MtpDevice.cs:80-230).
+- config.c: model gating added to get+put for bracketmode, bracketstep, compositionadjust, moviemode, pclvmode — return GP_ERROR_NOT_SUPPORTED instead of attempting I/O on models lacking the flag (K-1 II included).
+
+### K-1 II gating regression (post-change verification; evidence_k1ii_test.txt, 312 lines)
+- Baseline re-verified before testing: all 5 values exact (ISO 200, f/2.0, cimode autoselect, focuspeaking off, afposition 360,240); battery 100%.
+- **Gating regression PASS**: built `ptp2.so` confirmed newer than `config.c`; all 5 gated widgets fail with GP_ERROR_NOT_SUPPORTED **before any PTP I/O** — verified via `--debug` logs showing error -6 per widget. No -102 CORRUPTED_DATA occurred.
+  - Correction to earlier expectation: GP_ERROR_NOT_SUPPORTED is **-6** in this codebase (gphoto2-port-result.h), not -41.
+  - Note: `--get-config`/`--list-config` cannot distinguish -6 from -102 directly (both cause silent widget omission from the tree); debug logs required.
+- Focus peaking roundtrip PASS again post-gating (off→on→off; one transient PTP_RC_DeviceBusy self-resolved after 3s).
+- CI mode roundtrip PASS again (autoselect→vivid→autoselect).
+- AF position bounds re-check: 720,480 rejected (-2 Bad parameters), value unchanged; 180,120 accepted, echo centre as known quirk; explicitly restored and verified.
+- Host nuisance flagged: gvfs-gphoto2-volume-monitor/gvfsd-gphoto2 repeatedly grabbed the device between commands; killed specific PIDs each occurrence and disabled GNOME automount.
+
+### Camera state after session
+- K-1 II: baseline fully restored after regression run; battery 100%.
+- K-3 III: untouched baseline; battery 100%.
+
+## 2026-08-24 (cont.) — K-3 III bracketmode d014 silent-ignore; LV-polling root cause; moviemode d039 roundtrip
+
+### Bracketmode d014 — SILENT-IGNORE CONFIRMED AT WIRE LEVEL
+Evidence: /tmp/bm.log (bracketmode=3), /tmp/bm5.log (bracketmode=5), /tmp/cap.log (capture-preview).
+- Set-config path anatomy: gphoto2 CLI builds the whole config tree first — 26×0x1014 desc probes + 24×0x1015 value gets + 2×0x900f conditions pulls (~1.36 s, 52 ops) BEFORE the single 0x1016 d014 write; vendor disable on exit. Whole session ~1.57 s.
+- d014 write signature in BOTH runs: request→OK response ~120 ms delay, **ZERO 0x400c USB interrupt events** during the wait window (bm.log grep count = 0). Value unchanged on next read → camera accepts and ignores.
+- bm5.log's 8 IRQ events all PRECEDE the d014 set (during tree build at 0.75/0.78/1.13/1.17 s) — payloads all 0x400c type `01 00 01 00`/`01 00 02 00`.
+- Contrast (cap.log): d035=1 gets OK after ~430 ms WITH two 0x400c events mid-wait (`01 00 01 00`, `01 00 02 00`) — interrupts signal a REAL state change. d035=0 restore: ~110 ms OK, no events. Diagnostic rule: no IRQs during set ⇒ silent ignore.
+
+### Live-view lifecycle root cause
+- d035=1 alone does not sustain PC-LV; continuous 0x9006 frame polling does (IT2 polls at 33 ms). Persistent LV across processes is architecturally impossible without a resident poller.
+- cap.log 0x9006 anatomy: request @0.489156, chunks 1024+73216+468 bytes, resp @0.505095 — 74.7 KB frame in ~16 ms.
+- Vendor enable/disable payload (32 B): `20 00 00 00 01 00 01 90 ... "T2\x01" magic`, flag byte offset 20 = 01 enable / 00 disable.
+- 0x900f GetAllConditions: 588 bytes consistently; ~545 ms first call, ~5 ms second (camera caches).
+
+### Moviemode d039 roundtrip PASS (K-3 III)
+Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
+- Read: d039 = 00 (off), clean ~8 ms roundtrip.
+- Write on: 0x1016 d039 payload `01`; OK response after ~60 ms; ONE 0x400c IRQ event arrives ~140 ms later (`01 00 01 00`) — active-processing signature, unlike d014's silence.
+- Read-back in fresh session: still `off`. So d039 behaves like a session-scoped flag: accepted with real processing but reset when the vendor session closes (consistent with IT2 gating movie mode to an active remote session).
+- Restore off: payload `00`, OK ~60 ms, zero IRQs. Camera healthy, baseline intact.
+- GOTCHA for future runs: must invoke with `--camera "Pentax K-3 Mark III (MTP mode)"` (specific model entry carrying 25fb:0189 abilities). The generic `USB PTP Class Camera` match populates no usb_vendor/product, so pentax_identify_supported_model() returns 0, vendor enable never fires, and every pentax* widget errors before I/O.
+
+## 2026-08-24 (cont. 2) — Persistent-LV harness (pentaxpclvkeep); d02a/d02b/d039 mid-LV writes
+
+### Harness implementation
+- New session-local config toggle `pentaxpclvkeep` ("Pentax Keep Live View", TOGGLE) in config.c (`_get/_put_Pentax_KeepLiveView`), backed by `params->pentax.keep_live_view` in ptp.h.
+- When set, `pentax_restore_live_view()` (library.c) skips the d035 restore write, so PC-LV stays up across `--capture-preview` calls within one gphoto2 process; camera_exit still closes the vendor session (camera resets LV on close, as expected).
+- Build: clean (only pre-existing strncpy warning).
+
+### Wire results (K-3 III, usb:001,009)
+- Single-session sequence: set pclvkeep=1 → capture-preview (d035=1 + 0x9006 frame, 58.9 KB in 13 ms) → 0x1016 d02b write payload `02` (on+outline) → OK after ~66 ms → read-back `on+outline`. **d02b focuspeaking write ACCEPTED and STICKS while LV is active** — previously untestable.
+- Second capture-preview in the same session succeeded with the new value applied; d02b read-back still `on+outline`.
+- d02a compositionadjust: GET returns 00 during LV; SET `01` gets OK (~7 ms) but read-back stays 00 and NO 0x400c event — silent-ignore signature even during active LV. Likely requires an actual composition-adjust capture flow (half-press/AF), not just the flag.
+- d039 moviemode: SET `01` mid-LV accepted, read-back `on` IN THE SAME SESSION; resets to off once the session closes — confirms session-scoping precisely (previous "fresh-session read-back" test conflated session end with value loss).
+- One 0x400c IRQ (`01 00 01 00`) observed at camera_exit after d02b write — deferred state-change notification.
+
+### Persistence semantics summary
+| Prop | Mid-LV write | Read-back same session | After session close |
+|---|---|---|---|
+| d02b focuspeaking | accepted (~66 ms OK) | sticks | reverts to off |
+| d039 moviemode | accepted (~60 ms OK + IRQ) | sticks | reverts to off |
+| d02a compositionadjust | silently ignored | unchanged | unchanged |
+
+### Camera state after
+- K-3 III: d02b restored to off, verified; healthy. K-1 II: baseline intact via pentaxconditions (ISO 200, f/2.0, bulb-timer ok).

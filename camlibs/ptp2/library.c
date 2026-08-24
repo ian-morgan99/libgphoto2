@@ -3133,7 +3133,9 @@ pentax_restore_live_view (PTPParams *params)
 	if (params->inliveview) {
 		value.u8 = params->pentax.live_view_original_valid ?
 			params->pentax.live_view_original_value : 0;
-		if (value.u8 != 1)
+		/* Research harness: keep_live_view leaves PC-LV running across
+		 * calls; the session owner is responsible for restoring. */
+		if (value.u8 != 1 && !params->pentax.keep_live_view)
 			ret = ptp_setdevicepropvalue (params,
 				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
 	}

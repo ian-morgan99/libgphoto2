@@ -10027,6 +10027,11 @@ _get_Pentax_UsbLiveViewMode (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* IT2 only drives PC live view when _isPcLvHighResolutionSupported
+	 * is set (K-3 III family); the K-1 II answers with an empty data
+	 * phase (HW finding). */
+	if (!pentax_model_supports_pc_live_view (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	ret = ptp_pentax_get_device_prop_raw (params,
 		PTP_DPC_PENTAX_UsbLiveViewMode, &data, &size);
 	if (ret != PTP_RC_OK) {
@@ -10057,6 +10062,8 @@ _put_Pentax_UsbLiveViewMode (CONFIG_PUT_ARGS)
 	uint16_t ret;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_pc_live_view (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	if (!strcmp (value, "on")) {
@@ -10129,6 +10136,11 @@ _get_Pentax_BracketMode (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* IT2 only exposes bracket controls when _isExpBracketSupport is set
+	 * (K-3 III family, 645Z); other bodies answer with an empty data
+	 * phase (K-1 II HW finding). */
+	if (!pentax_model_supports_exp_bracket (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_u8_prop_get (params,
 		PTP_DPC_PENTAX_ExposureBracketingMode, &mode);
 	if (result < GP_OK)
@@ -10158,6 +10170,8 @@ _put_Pentax_BracketMode (CONFIG_PUT_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_exp_bracket (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	for (i = 0; i < ARRAYSIZE (_pentax_bracket_modes); i++)
 		if (!strcmp (value, _(_pentax_bracket_modes[i].name)))
@@ -10183,6 +10197,8 @@ _get_Pentax_BracketStep (CONFIG_GET_ARGS)
 	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_exp_bracket (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	memset (&desc, 0, sizeof (desc));
 	ret = ptp_generic_getdevicepropdesc (params,
@@ -10230,6 +10246,8 @@ _put_Pentax_BracketStep (CONFIG_PUT_ARGS)
 	long whole, tenth;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_exp_bracket (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	/* Locale-safe parse of "W.D" (one decimal digit): avoid atof(),
@@ -10320,6 +10338,12 @@ _get_Pentax_CompositionAdjust (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* IT2 gates the composition UI on _isCompositionAdjSupported
+	 * (K-3 III family, KP); other bodies answer with an empty data
+	 * phase (K-1 II HW finding). */
+	if (!pentax_model_supports_composition_adjust (
+	    params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_u8_prop_get (params, 0xd02a, &mode);
 	if (result < GP_OK)
 		return result;
@@ -10339,6 +10363,9 @@ _put_Pentax_CompositionAdjust (CONFIG_PUT_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_composition_adjust (
+	    params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	if (!strcmp (value, _("on")))
 		return _pentax_u8_prop_put (params, 0xd02a, 1);
@@ -10348,7 +10375,10 @@ _put_Pentax_CompositionAdjust (CONFIG_PUT_ARGS)
 }
 
 /* Cross process type (0xd02c).  IT2 CICrossProcessType maps user values
- * 0..3 to wire 1..4 and presets >3 to wire+32-3 (offset encoding). */
+ * 0..3 to wire 1..4 and presets >3 to wire+32-3 (offset encoding).
+ * HW finding (session 20): the camera rejects writes (error -1) unless
+ * CI mode (0xd020) is set to "cross process" first; with that mode
+ * active both user values and presets write and read back cleanly. */
 static int
 _get_Pentax_CrossProcess (CONFIG_GET_ARGS)
 {
@@ -10405,6 +10435,11 @@ _get_Pentax_MovieMode (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* IT2 gates remote movie settings on _isMovieSettingSupported
+	 * (K-3 III family only); other bodies answer with an empty data
+	 * phase (K-1 II HW finding). */
+	if (!pentax_model_supports_movie_setting (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_u8_prop_get (params, PTP_DPC_PENTAX_MovieMode, &mode);
 	if (result < GP_OK)
 		return result;
@@ -10416,6 +10451,38 @@ _get_Pentax_MovieMode (CONFIG_GET_ARGS)
 	return GP_OK;
 }
 
+/* Keep live view across capture-preview calls (research harness).
+ * When set, camera_capture_preview skips the d035 restore and
+ * pentax_restore_live_view leaves the session in PC-LV. */
+static int
+_get_Pentax_KeepLiveView (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	{
+		int on = params->pentax.keep_live_view ? 1 : 0;
+		gp_widget_set_value (*widget, &on);
+	}
+	return GP_OK;
+}
+
+static int
+_put_Pentax_KeepLiveView (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int value;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	params->pentax.keep_live_view = (value != 0);
+	return GP_OK;
+}
+
 static int
 _put_Pentax_MovieMode (CONFIG_PUT_ARGS)
 {
@@ -10423,6 +10490,8 @@ _put_Pentax_MovieMode (CONFIG_PUT_ARGS)
 	const char *value;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_movie_setting (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	if (!strcmp (value, _("on")))
@@ -13460,6 +13529,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Composition Adjustment"), "pentaxcompositionadjust", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CompositionAdjust, _put_Pentax_CompositionAdjust },
 	{ N_("Pentax Cross Process Type"), "pentaxcrossprocess", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CrossProcess, _put_Pentax_CrossProcess },
 	{ N_("Pentax Movie Mode"), "pentaxmoviemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_MovieMode, _put_Pentax_MovieMode },
+	{ N_("Pentax Keep Live View"), "pentaxpclvkeep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_KeepLiveView, _put_Pentax_KeepLiveView },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },

@@ -121,6 +121,10 @@ int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_model_uses_new_focus (uint32_t model_no);
+int pentax_model_supports_exp_bracket (uint32_t model_no);
+int pentax_model_supports_composition_adjust (uint32_t model_no);
+int pentax_model_supports_movie_setting (uint32_t model_no);
+int pentax_model_supports_pc_live_view (uint32_t model_no);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,

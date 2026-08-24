@@ -282,6 +282,55 @@ pentax_model_uses_new_focus (uint32_t model_no)
 	       (model_no == PENTAX_MODEL_GR_III);
 }
 
+/* IT2 capability gates for the properties below.  IT2's UI only exposes
+ * these controls when the per-model flag is set; on other models the
+ * property exists in the protocol but the camera answers with an OK
+ * response and an EMPTY data phase (verified on K-1 II hardware), which
+ * surfaces as GP_ERROR_CORRUPTED_DATA.  Fail closed instead.
+ *
+ * Exposure bracketing (0xd014/0xd015): _isExpBracketSupport is set only
+ * for K-3 III family and 645Z (MainWindow.xaml.cs:506).  The fork has no
+ * 645Z entry yet, so K-3 III family only until one is added.
+ * Composition adjustment (0xd02a): _isCompositionAdjSupported only for
+ * K-3 III family and KP (MtpDevice.cs:96,173).
+ * Movie mode setting (0xd039): _isMovieSettingSupported only for the
+ * K-3 III family; IsMovieSupported alone also covers bodies that accept
+ * the movie *state* but not remote movie *settings*.
+ * PC live view (0xd035): _isPcLvHighResolutionSupported only for the
+ * K-3 III family (MtpDevice.cs:103). */
+
+static int
+pentax_model_is_k3iii_family (uint32_t model_no)
+{
+	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
+	       (model_no == PENTAX_MODEL_K3_MARK_III_MONO);
+}
+
+int
+pentax_model_supports_exp_bracket (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+int
+pentax_model_supports_composition_adjust (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_KP);
+}
+
+int
+pentax_model_supports_movie_setting (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+int
+pentax_model_supports_pc_live_view (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
 static int
 pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 {
