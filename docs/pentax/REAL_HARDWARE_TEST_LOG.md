@@ -267,3 +267,23 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 
 ### Camera state after
 - K-3 III: d02b restored to off, verified; healthy. K-1 II: baseline intact via pentaxconditions (ISO 200, f/2.0, bulb-timer ok).
+
+## 2026-08-24 (cont. 3) — K-3 III d014 bracketmode is LV-gated; K-1 II old-focus drive gate relaxation + first successful drives
+
+### K-3 III: d014 mid-LV retest revises "silent-ignore" conclusion
+- With `pentaxpclvkeep=1` and PC-LV active, d014 (bracketmode) SETs of values 3, 5, +2/-2 steps and off were ALL accepted: OK response ~190 ms each WITH a 0x400c IRQ event in the wait window — the active-processing signature, not the silent-ignore one.
+- Read-back within the session reflected the written value; value reverted to off when the vendor session closed.
+- Revised finding: **bracketmode d014 is LV-gated like d02b/d039** — accepted and processed only while PC-LV is active, session-scoped persistence. The earlier "silent-ignore" result described only the non-LV case. Updated persistence table:
+
+| Prop | Mid-LV write | Read-back same session | After session close |
+|---|---|---|---|
+| d014 bracketmode | accepted (~190 ms OK + IRQ) | sticks | reverts to off |
+
+### K-1 II: focus-drive widget gate fix + hardware verification
+- Forensics (/tmp/f1.log): K-1 II DeviceInfo advertises NO 0x9016/0x9017 ops (only 0x9001 among vendor ops), so BOTH focus widget pairs were culled by the `have_prop` opcode gate — renaming widgets could not fix it.
+- Fix (config.c have_prop): special-case returning 1 for `PTP_OC_PENTAX_FocusControl` when Pentax vendor mode is enabled on an old-focus-family model (`!pentax_model_uses_new_focus`). The put function still enforces its AF-mode precondition (refuses when MF selected — wedge protection).
+- Build clean. Hardware test (usb:001,007), single-session with pclvkeep + capture-preview:
+  - `oldfocusdrivenear=1` → **response 0x2001 OK**, no wedge, device persisted.
+  - `oldfocusdrivefar=1` → **response 0x2001 OK**, no wedge, device persisted.
+  - Post-test `--summary`: camera responsive, battery 100%, serial matches baseline.
+- This is the FIRST successful 0x9016 focus drive on the K-1 II via libgphoto2 (previous attempt wedged the session; the AF-mode precondition added since then is what makes it safe).

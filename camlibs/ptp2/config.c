@@ -86,6 +86,15 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 		}
 	}
 	if ((prop & 0x7000) == 0x1000) { /* commands */
+		/* The K-1 II does not advertise PTP_OC_PENTAX_FocusControl
+		 * (0x9016) in DeviceInfo, but Image Transmitter 2 sends it
+		 * anyway and the hardware honours it.  Let the old-focus
+		 * drive widgets through the gate; the put function still
+		 * enforces the AF-mode precondition. */
+		if (vendor == PTP_VENDOR_PENTAX && prop == PTP_OC_PENTAX_FocusControl &&
+		    camera->pl->params.pentax.supported_model &&
+		    !pentax_model_uses_new_focus (camera->pl->params.pentax.model_no))
+			return 1;
 		for (i=0; i<camera->pl->params.deviceinfo.Operations_len; i++) {
 
 			if (prop != camera->pl->params.deviceinfo.Operations[i])
