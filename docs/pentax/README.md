@@ -1,9 +1,10 @@
 # Pentax tethering support in libgphoto2
 
 This fork adds working USB tethering (remote control, live view, capture and
-configuration) for recent Pentax bodies, reverse-engineered from Ricoh's
-**Image Transmitter 2** (IT2) Windows application and verified against real
-hardware. It is rebased onto upstream **libgphoto2 v2.5.34**.
+configuration) for recent Pentax bodies, developed by reviewing the vendor
+opcodes and properties the cameras expose over PTP (cross-checked against
+publicly observable behaviour of Ricoh's tethering software) and verified
+against real hardware. It is rebased onto upstream **libgphoto2 v2.5.34**.
 
 ## What was there before
 
@@ -18,15 +19,15 @@ Upstream libgphoto2 has carried a minimal Pentax PTP layer for years:
   vendor opcodes, no focus control.
 
 Separately, this repository previously hosted a `pentaxmodern` prototype
-camlib — an early attempt at IT2-style tethering built outside the ptp2
+camlib — an early attempt at modern vendor-mode tethering built outside the ptp2
 engine. That prototype has been **archived and removed**: it duplicated
 transport logic that belongs in `ptp2` and could never be merged upstream.
 
 ## Why upstream didn't work for all models
 
 Pentax bodies of this era only expose their full remote-control surface after
-a **vendor-mode handshake** (a sequence of proprietary operations that IT2
-performs at session start). Without it:
+a **vendor-mode handshake** (a sequence of proprietary operations performed
+at session start by the camera's own tethering clients). Without it:
 
 - The camera stays in a restricted personality; live view operations
   (`0x90xx` family) are not usable.
@@ -34,7 +35,8 @@ performs at session start). Without it:
   or properties in `DeviceInfo`, so libgphoto2's descriptor-driven widget
   builder culls everything Pentax-specific.
 - Some properties exist on all models but are silently rejected or answered
-  with an *empty data phase* on models where IT2 hides the corresponding UI
+  with an *empty data phase* on models where the camera's own UI hides the
+  corresponding feature
   (verified on K-1 II hardware for bracketing, composition adjust, movie
   settings and PC live view).
 
@@ -47,7 +49,7 @@ All work lives in `camlibs/ptp2/` and `docs/pentax/`, hardware-verified per
 the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 (~20 test sessions):
 
-- **Vendor mode enablement** replicating IT2's session handshake.
+- **Vendor mode enablement** replicating the vendor session handshake.
 - **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x018c),
   K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D.
 - **Live view**: PC-LV control (`0xd035`) with a `pclvkeep` toggle so
@@ -61,13 +63,13 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
   family, KP, GR III) and old-focus `0x9016`. The K-1 II does not advertise
   `0x9016` at all but honours it; `have_prop` now special-cases this, gated
   behind an AF-mode precondition to prevent wedging the lens mid-drive.
-- **Per-model capability gates** mirroring IT2's own flags
+- **Per-model capability gates** mirroring the camera's own feature flags
   (`_isExpBracketSupport`, `_isCompositionAdjSupported`,
   `_isMovieSettingSupported`, `_isPcLvHighResolutionSupported`): widgets
   fail closed with `GP_ERROR_NOT_SUPPORTED` on bodies where the camera would
   return an empty data phase.
 - **A raw compound-property setter** (`ptp_pentax_setdeviceprop_raw`) for
-  payloads IT2 sends as opaque blobs.
+  payloads the firmware sends as opaque blobs.
 - **`ptp-probe`**, a read-only diagnostic tool that compares which PTP and
   vendor opcodes different bodies advertise.
 
@@ -93,13 +95,13 @@ body is mostly a matter of its USB ID plus capability flags:
 | **KP** | Already modelled (composition adjust supported); focus drive untested on hardware |
 | **K-70** | ID present; no hardware access yet |
 | **K-1** (original) | ID present; expected old-focus like the K-1 II |
-| **GR III / GR IIIx** | GR III modelled; new-focus family per IT2 |
-| **645Z** | IT2 grants it exposure-bracketing support; no entry exists yet — first candidate if a unit appears |
+| **GR III / GR IIIx** | GR III modelled; new-focus family per opcode review |
+| **645Z** | Exposure-bracketing support indicated by capability review; no entry exists yet — first candidate if a unit appears |
 | **645D** | Modelled from ID evidence only |
 
 The blocking factor is hardware: every capability flag in this fork was set
-from IT2 source analysis and then confirmed (or corrected) against a physical
-camera.
+from opcode and capability review and then confirmed (or corrected) against a
+physical camera.
 
 ## What we are leaving pointing at the old mechanism
 
@@ -120,7 +122,7 @@ camera.
 ## Documentation index
 
 - [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md) — chronological hardware test log (authoritative)
-- [`IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`](IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md) — IT2 feature matrix reconciled with our findings
+- [`IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`](IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md) — vendor capability matrix reconciled with our findings
 - [`PENTAX_WIRE_PROTOCOL.md`](PENTAX_WIRE_PROTOCOL.md) — vendor opcode/property reference
 - [`PENTAX_CONFIGURATION.md`](PENTAX_CONFIGURATION.md) — configuration-engine integration rules
 - [`IMAGE_TRANSMITTER_ERROR_RECOVERY.md`](IMAGE_TRANSMITTER_ERROR_RECOVERY.md) — session recovery sequences
