@@ -322,3 +322,15 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 ### Queued work dispatched (§9)
 - K-3 III stream: duration-aware capture-timeout verification (bulb-timer value whose +30 s margin busts the old 60 s budget; PASS = no abort + computed timeout visible in debug log). Shutter approved by operator.
 - K-1 II stream: supervised bulb probe `./bulb_probe 1500 usb:001,004 2` (probe binary was stale — rebuild required first; /tmp/iolibs staging per §4). Shutter approved by operator.
+
+### 2026-08-25 — K-3 III duration-aware capture timeout verification (bulb-timer=30s)
+- Commit hash: `23a5a6338`
+- Port: `usb:001,005`, model string: `"Pentax:K-3 Mark III (MTP mode)"`
+- Baseline state (from `/main/status/pentaxconditions`): `state=0; exposure-mode-raw=8; drive-mode-raw=0; ISO=3200; open-av-num=28 (f/2.8); bulb-timer=no; bulb-seconds=1/160; aperture=40/10 (f/4.0); exposure-comp=0/10; astro-limit=0.`
+- Step 1: Re-read `/main/status/pentaxconditions` confirmed baseline unchanged.
+- Step 2: Checked `--list-config`; found `/main/capturesettings/shutterspeed` RADIO with choices up to `30/1` (choice 54). Chose `30/1` which sets `bulb-seconds=30/1` → `bulb_timer_seconds=30`.
+- Step 3: Set `/main/capturesettings/shutterspeed=54` (30/1), verified via conditions poll: `bulb-timer=no; bulb-seconds=30/1`. SET OK with ZERO 0x400c IRQs.
+- Step 4: Operator approval granted for shutter release. Ran `gphoto2 --debug --debug-logfile=docs/pentax/evidence/2026-08-25/k3iii-bulb30s-capture-debug.log --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,005 --capture-image`. Debug log saved to `docs/pentax/evidence/2026-08-25/k3iii-bulb30s-capture-debug.log`.
+- Step 5: PASS criteria met — capture completed without a 60 s timeout abort. Grep of debug log shows `capture wait budget 61000 ms`, confirming the duration-aware path fired (30s bulb + 30s margin = 61000ms).
+- Step 6: Restored baseline shutter speed value (`/main/capturesettings/shutterspeed=17` for 1/160), verified restoration in a FRESH session: `bulb-timer=no; bulb-seconds=1/160`.
+- Evidence files: `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k3iii-baseline-live.txt`, `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k3iii-bulb30s-capture-debug.log`.
