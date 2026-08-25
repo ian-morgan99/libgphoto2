@@ -1,0 +1,7 @@
+=== Current pentaxconditions ===
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Label: Pentax Conditions
+Readonly: 1
+Type: TEXT
+Current: state=0; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=0; ISO=3200; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/160; aperture=40/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+END

@@ -5953,7 +5953,34 @@ camera_sigma_fp_capture (Camera *camera, CameraCaptureType type, CameraFilePath 
 #endif
 }
 
-#define PENTAX_CAPTURE_TIMEOUT_MS (60 * 1000)
+#define PENTAX_CAPTURE_TIMEOUT_MS_BASE (60 * 1000)
+/* Long exposures (bulb timer, astrotracer) and multi-shot composites
+ * (pixel shift = 4 exposures + in-camera processing) need extra wait. */
+#define PENTAX_CAPTURE_PROCESSING_MARGIN_MS (30 * 1000)
+
+/* Compute the capture wait budget from camera conditions: long bulb timers
+ * or astrotracer limits extend the base timeout so slow captures are not
+ * aborted while still in progress. */
+static unsigned int
+pentax_capture_timeout_ms (const PentaxConditions *conditions)
+{
+	unsigned int timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+
+	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) {
+		unsigned int limit_ms = conditions->has_astro_limit ?
+			(conditions->astro_limit_seconds + 1) * 1000 : 0;
+		if (limit_ms > timeout)
+			timeout = limit_ms;
+		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+	}
+	if (conditions->bulb_timer_seconds > 0) {
+		unsigned int bulb_ms = (conditions->bulb_timer_seconds + 1) * 1000 +
+			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		if (bulb_ms > timeout)
+			timeout = bulb_ms;
+	}
+	return timeout;
+}
 #define PENTAX_TRANSFER_TIMEOUT_MS (5 * 60 * 1000)
 #define PENTAX_TRANSFER_BLOCK_SIZE (8U * 1024U * 1024U)
 
@@ -6060,6 +6087,21 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
 	started = time_now ();
+	/* Read conditions once to size the wait budget for this capture
+	 * (bulb timer, astrotracer limit, pixel shift processing). */
+	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	{
+		PentaxConditions conditions;
+		memset (&conditions, 0, sizeof (conditions));
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size) &&
+		    size >= 40 &&
+		    pentax_parse_conditions (data, size, &conditions) == 0)
+			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
+		free (data);
+		data = NULL;
+		size = 0;
+		GP_LOG_D ("capture wait budget %u ms", capture_timeout_ms);
+	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_WAITING;
 	do {
 		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
@@ -6083,7 +6125,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			if (candidate_handle)
 				break;
 		}
-	} while (waiting_for_timeout (&back_off_wait, started, PENTAX_CAPTURE_TIMEOUT_MS));
+	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
 	if (!candidate_handle) {
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
@@ -10137,7 +10179,7 @@ camera_init (Camera *camera, GPContext *context)
 				sessionid = 1;
 				continue;
 			}
-		} else if ((ret == PTP_ERROR_RESP_EXPECTED) || (ret == PTP_ERROR_IO)) {
+		} else if ((ret == PTP_ERROR_RESP_EXPECTED) || (ret == PTP_ERROR_IO) || (ret == 0x02fa)) {
 			/* Try whacking PTP device */
 			if (tries < 3 && camera->port->type == GP_PORT_USB) {
 				if (pentax_candidate)

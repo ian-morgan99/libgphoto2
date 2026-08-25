@@ -147,6 +147,13 @@ Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
 release mode 0, focus mode, manual-white-balance mode 0, sync mode 0, and
 aperture-reset 0. The client uses focus mode 3 with autofocus and 2 without it.
 
+Release mode semantics are only partially correlated. Release mode 0 is the
+verified still-capture path above. The Windows Wi-Fi app's bulb flow suggests
+release mode 2 opens the shutter for a held (bulb) exposure, paired with
+`TerminateCapture` (`0x9012`, same release mode) to close it; this has been
+observed in K-3 III traces but is not yet verified on hardware (K-1 II probe
+pending). Treat release modes other than 0 as Unknown-hardware until probed.
+
 The host polls `GetAllConditions` (`0x900f`). The client treats little-endian
 UINT32 byte offset 32 equal to 1 as a transfer candidate and reads its handle at
 byte offset 36. These fields are Observed-client; their model/firmware stability

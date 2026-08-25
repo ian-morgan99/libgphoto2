@@ -1,0 +1,6 @@
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Label: Pentax Conditions
+Readonly: 1
+Type: TEXT
+Current: state=3; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=4; ISO=200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/500; aperture=20/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+END

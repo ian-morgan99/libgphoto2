@@ -227,6 +227,9 @@ config_data.set_quoted('CAMLIBS', camlibs_dir)
 config_data.set_quoted('GETTEXT_PACKAGE_LIBGPHOTO2_PORT', 'libgphoto2_port-@0@'.format(libgphoto2_port_current_min))
 config_data.set_quoted('GETTEXT_PACKAGE_LIBGPHOTO2', 'libgphoto2-@0@'.format(libgphoto2_current_min))
 config_data.set10('WORDS_BIGENDIAN', target_machine.endian() == 'big')
+if get_option('pentax_research_capture')
+  config_data.set10('LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE', 1)
+endif
 
 config_h = configure_file(
   output: 'config.h',

@@ -35,5 +35,7 @@ option(
   ]
 )
 option('docs', type : 'boolean', value : false)
+option('pentax_research_capture', type : 'boolean', value : false,
+  description : 'Enable experimental Pentax research capture paths (bulb, astro, pixel shift probing).')
 option('docs-internal', type : 'boolean', value : false)
 option('udevscriptdir', type : 'string', value : '')

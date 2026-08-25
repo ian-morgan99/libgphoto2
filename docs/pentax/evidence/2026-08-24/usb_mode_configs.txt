@@ -1,0 +1,7 @@
+=== Looking for USB or mode related configs ===
+/main/status/cameramodel
+/main/status/pentaxpclvmode
+/main/status/pentaxbracketmode
+/main/status/pentaxcimode
+/main/status/pentaxmoviemode
+/main/status/pentaxdrivemode

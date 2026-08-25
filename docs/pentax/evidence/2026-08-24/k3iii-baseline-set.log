@@ -1,0 +1,355 @@
+=== Starting K-3 III baseline setting at Mon Aug 24 06:38:15 PM BST 2026 ===
+Using port: usb:001,
+--- Current values before changes ---
+exposure-mode-raw: 
+user-mode-raw: 
+ISO: 
+drive-mode-raw: 
+bulb-timer: 
+bulb-seconds: 
+aperture: 
+exposure-comp: 
+WB: we need to find the WB widget; checking pentaxdirectwb
+pentaxdirectwb: auto
+--- Setting to baseline ---
+Setting /main/status/exposure-mode-raw to 20
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/exposure-mode-raw=20
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/ISO to 3200
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/ISO=3200
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Getting drive-mode-raw choices:
+Setting /main/status/drive-mode-raw to 0
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/drive-mode-raw=0
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/bulb-timer to 1
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/bulb-timer=1
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/bulb-seconds to 300
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/bulb-seconds=300
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/aperture to 35
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/aperture=35
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/exposure-comp to 0
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/exposure-comp=0
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Getting pentaxdirectwb choices:
+Choice: 0 auto
+Choice: 1 daylight
+Choice: 2 shade
+Choice: 3 cloudy
+Choice: 4 fluorescent-d
+Choice: 5 fluorescent-n
+Choice: 6 fluorescent-w
+Choice: 7 tungsten
+Choice: 8 flash
+Choice: 9 manual-1
+Choice: 10 manual-2
+Choice: 11 manual-3
+Choice: 12 color-temp-1
+Choice: 13 color-temp-2
+Choice: 14 color-temp-3
+Choice: 15 auto-800f
+END
+Setting /main/status/pentaxdirectwb to 32783
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+
+*** Error ***              
+Failed to set new configuration value 32783 for configuration entry /main/status/pentaxdirectwb.
+*** Error (-2: 'Bad parameters') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001, --set-config /main/status/pentaxdirectwb=32783
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+--- Final pentaxconditions read ---
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Label: Pentax Conditions
+Readonly: 1
+Type: TEXT
+Current: state=0; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=4; ISO=200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/500; aperture=20/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+END
+=== Baseline setting finished at Mon Aug 24 06:40:31 PM BST 2026 ===
+=== Starting K-3 III baseline setting at Mon Aug 24 06:41:29 PM BST 2026 ===
+Using port: usb:001,004
+--- Current values before changes ---
+exposure-mode-raw: 
+user-mode-raw: 
+ISO: 
+drive-mode-raw: 
+bulb-timer: 
+bulb-seconds: 
+aperture: 
+exposure-comp: 
+pentaxdirectwb: auto-800f
+--- Setting to baseline ---
+Setting /main/status/exposure-mode-raw to 20
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/exposure-mode-raw=20
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/ISO to 3200
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/ISO=3200
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Getting drive-mode-raw choices:
+Setting /main/status/drive-mode-raw to 0
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/drive-mode-raw=0
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/bulb-timer to 1
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/bulb-timer=1
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/bulb-seconds to 300
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/bulb-seconds=300
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/aperture to 35
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/aperture=35
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Setting /main/status/exposure-comp to 0
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+
+*** Error ***              
+/main not found in configuration tree.
+*** Error (-1: 'Unspecified error') ***       
+
+For debugging messages, please use the --debug option.
+Debugging messages may help finding a solution to your problem.
+If you intend to send any error or debug messages to the gphoto
+developer mailing list <gphoto-devel@lists.sourceforge.net>, please run
+gphoto2 as follows:
+
+    env LANG=C gphoto2 --debug --debug-logfile=my-logfile.txt --camera "Pentax:K-3 Mark III (MTP mode)" --port usb:001,004 --set-config /main/status/exposure-comp=0
+
+Please make sure there is sufficient quoting around the arguments.
+
+Set failed with exit code 1
+Getting pentaxdirectwb choices:
+Choice: 0 auto
+Choice: 1 daylight
+Choice: 2 shade
+Choice: 3 cloudy
+Choice: 4 fluorescent-d
+Choice: 5 fluorescent-n
+Choice: 6 fluorescent-w
+Choice: 7 tungsten
+Choice: 8 flash
+Choice: 9 manual-1
+Choice: 10 manual-2
+Choice: 11 manual-3
+Choice: 12 color-temp-1
+Choice: 13 color-temp-2
+Choice: 14 color-temp-3
+Choice: 15 auto-800f
+END
+Setting /main/status/pentaxdirectwb to 15
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Set succeeded, verifying...
+auto-800f
+--- Final pentaxconditions read ---
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Label: Pentax Conditions
+Readonly: 1
+Type: TEXT
+Current: state=0; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=1; ISO=3200; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/160; aperture=40/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+END
+=== Baseline setting finished at Mon Aug 24 06:41:59 PM BST 2026 ===

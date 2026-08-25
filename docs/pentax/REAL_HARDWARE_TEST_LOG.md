@@ -287,3 +287,21 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
   - `oldfocusdrivefar=1` → **response 0x2001 OK**, no wedge, device persisted.
   - Post-test `--summary`: camera responsive, battery 100%, serial matches baseline.
 - This is the FIRST successful 0x9016 focus drive on the K-1 II via libgphoto2 (previous attempt wedged the session; the AF-mode precondition added since then is what makes it safe).
+
+## 2026-08-24 (cont. 4) — duration-aware capture timeout; bulb probe env fix; MSC blockage
+
+### Code: capture wait budget is now duration-aware (library.c)
+- Replaced fixed `PENTAX_CAPTURE_TIMEOUT_MS` (60 s) with `pentax_capture_timeout_ms()` computed from one `GetAllConditions` read taken right after `InitiateCapture`:
+  - astrotracer shift mode (astro_status_flags bit 0x400): budget = max(60 s, astro_limit_seconds) + 30 s processing margin.
+  - bulb_timer_seconds > 0: budget = bulb_timer_seconds + 30 s margin.
+  - floor remains the original 60 s.
+- Rationale: pixel shift composites 4 exposures plus in-camera processing; astrotracer tracking runs up to astro_limit_seconds — a fixed 60 s aborts legitimate long captures mid-flight.
+- Builds clean (`ninja -C _build`, only pre-existing strncpy warning). NOT yet hardware-verified (cameras in MSC at time of change).
+
+### Environment: correct IOLIBS for research builds
+- Built port drivers live in `_build/libgphoto2_port/libusb1/usb1.so` and `_build/libgphoto2_port/usbscsi/usbscsi.so` — meson does NOT name them `libusb1.so`/place them where ltdl expects. Stage: `mkdir -p /tmp/iolibs && cp .../usb1.so /tmp/iolibs/libusb1.so && cp .../usbscsi.so /tmp/iolibs/usbscsi.so`.
+- LD_LIBRARY_PATH must ALSO include `_build/libgphoto2_port/libgphoto2_port` (port core lib) or the iolib fails with undefined `gp_port_usb_get_sys_device`.
+- With this, autodetect works: `Pentax K1II usbscsi:/dev/sg2` appears.
+
+### Blocker
+- Both cameras currently enumerate as USB Mass Storage (usb-storage bound on 001,011 and 001,012); PTP impossible until switched back to MTP/PTP mode. K-1 II release_mode=2 bulb probe (1500 ms hold) queued behind that.
