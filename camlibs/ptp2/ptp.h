@@ -4066,6 +4066,14 @@ struct _PTPParams {
 		uint32_t function_flags;
 		int supported_model;
 		int vendor_mode_enabled;
+		/* Vendor-mode transition result unknown (a disable/rollback
+		 * SET failed); forces reconciliation before further vendor
+		 * operations (issue #30). */
+		int vendor_mode_unknown;
+		/* SessionAlreadyOpened reconciliation found in-flight camera
+		 * state (active exposure or unreadable conditions); Pentax
+		 * capture is refused until resolved (issue #33). */
+		int recovery_required;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;

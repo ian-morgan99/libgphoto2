@@ -27,6 +27,10 @@ typedef struct {
 	int block_error_at;
 	int zero_block;
 	int oversized_block;
+	/* When >= 0, the block at that index returns only part of the
+	 * requested bytes (issue #35 short-block regression). */
+	int short_block_at;
+	uint32_t short_block_bytes;
 	int cancelled;
 	int timed_out;
 } MockTransfer;
@@ -66,6 +70,20 @@ mock_get_block (void *user_data, uint32_t requested, unsigned char **data,
 		*transferred = 0;
 		return GP_OK;
 	}
+	if ((mock->short_block_at >= 0) && ((int)index == mock->short_block_at)) {
+		uint32_t partial = mock->short_block_bytes;
+
+		/* A configured size at or above the request is not a short
+		 * block; serve the full request. */
+		if (partial && (partial < requested)) {
+			*transferred = partial;
+			*data = malloc (*transferred);
+			if (!*data)
+				return GP_ERROR_NO_MEMORY;
+			memset (*data, (int)('A' + index), *transferred);
+			return GP_OK;
+		}
+	}
 	*transferred = mock->oversized_block ? requested + 1 : requested;
 	*data = malloc (*transferred);
 	if (!*data)
@@ -92,6 +110,7 @@ mock_init (MockTransfer *mock)
 	memset (mock, 0, sizeof (*mock));
 	mock->command_error_at = -1;
 	mock->block_error_at = -1;
+	mock->short_block_at = -1;
 }
 
 static void
@@ -446,6 +465,38 @@ main (void)
 	mock.command_count = 2;
 	mock.block_error_at = 0;
 	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_ERROR_IO);
+
+	/* Issue #35: a short block inside a declared segment must fail the
+	 * transfer instead of silently truncating the image. */
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 10;
+	mock.commands[2] = 2;
+	mock.command_count = 3;
+	mock.short_block_at = 1;	/* second block returns 3 of 4 bytes */
+	mock.short_block_bytes = 3;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) ==
+		GP_ERROR_CORRUPTED_DATA);
+
+	/* A short block that exactly satisfies the final request of a
+	 * segment is legitimate and must still succeed. */
+	free (buffer.data);
+	memset (&buffer, 0, sizeof (buffer));
+	mock_init (&mock);
+	mock.commands[0] = 1;
+	mock.commands[1] = 3;
+	mock.command_info[1] = 6;
+	mock.commands[2] = 2;
+	mock.command_count = 3;
+	mock.short_block_at = 1;	/* only block, full segment in one read */
+	mock.short_block_bytes = 6;
+	transfer_operations.max_block_size = 8;
+	CHECK (pentax_transfer_run (&buffer, &transfer_operations) == GP_OK);
+	CHECK ((mock.request_count == 1) && (mock.requests[0] == 6));
+	CHECK ((buffer.size == 6) && !memcmp (buffer.data, "AAAAAA", 6));
+	transfer_operations.max_block_size = 4;
+
 	CHECK (pentax_transfer_run (NULL, &transfer_operations) ==
 		GP_ERROR_BAD_PARAMETERS);
 	CHECK (pentax_minimum_focus_displacement (35, 1, &displacement) == GP_OK);

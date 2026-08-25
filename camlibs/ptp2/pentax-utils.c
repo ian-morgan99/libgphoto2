@@ -4,10 +4,42 @@
 #include <string.h>
 
 #include <gphoto2/gphoto2-result.h>
+#include <gphoto2/gphoto2-port-log.h>
 
 #include "pentax-utils.h"
 
-#define PENTAX_CAPTURE_MAX_FILE_SIZE ((size_t)2U * 1024U * 1024U * 1024U)
+#define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
+#define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
+
+/* Capture budget is configurable for hosts with constrained storage
+ * (issue #36); parsed once and cached. */
+static size_t
+pentax_capture_max_file_size (void)
+{
+	static int cached;
+	static size_t budget = PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT;
+	const char *env;
+
+	if (cached)
+		return budget;
+	cached = 1;
+	env = getenv ("LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE");
+	if (env && *env) {
+		char *end = NULL;
+		unsigned long long value = strtoull (env, &end, 10);
+
+		if (end && *end == '\0' && value >= PENTAX_CAPTURE_MIN_FILE_SIZE) {
+			budget = (size_t)value;
+			GP_LOG_D ("capture size budget from environment: %llu bytes",
+				value);
+		} else {
+			GP_LOG_E ("invalid LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE '%s'; "
+				"using default %u bytes", env,
+				(unsigned)PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT);
+		}
+	}
+	return budget;
+}
 
 uint32_t
 pentax_get_u32le (const unsigned char *data)
@@ -341,14 +373,14 @@ pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 	size_t capacity;
 	unsigned char *data;
 
-	if (required > PENTAX_CAPTURE_MAX_FILE_SIZE)
+	if (required > pentax_capture_max_file_size())
 		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
 	if (required <= buffer->capacity)
 		return GP_OK;
 	capacity = buffer->capacity ? buffer->capacity : 1024U * 1024U;
 	while (capacity < required) {
-		if (capacity > PENTAX_CAPTURE_MAX_FILE_SIZE / 2) {
-			capacity = PENTAX_CAPTURE_MAX_FILE_SIZE;
+		if (capacity > pentax_capture_max_file_size() / 2) {
+			capacity = pentax_capture_max_file_size();
 			break;
 		}
 		capacity *= 2;
@@ -370,7 +402,7 @@ pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 
 	if (!buffer || (!data && size))
 		return GP_ERROR_BAD_PARAMETERS;
-	if (size > PENTAX_CAPTURE_MAX_FILE_SIZE - buffer->offset)
+	if (size > pentax_capture_max_file_size() - buffer->offset)
 		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
 	end = buffer->offset + size;
 	ret = pentax_capture_buffer_reserve (buffer, end);
@@ -401,7 +433,7 @@ pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer, unsigned int operation,
 	default: return GP_ERROR_BAD_PARAMETERS;
 	}
 	destination = base + displacement;
-	if ((destination < 0) || ((uint64_t)destination > PENTAX_CAPTURE_MAX_FILE_SIZE))
+	if ((destination < 0) || ((uint64_t)destination > pentax_capture_max_file_size()))
 		return GP_ERROR_BAD_PARAMETERS;
 	buffer->offset = (size_t)destination;
 	return GP_OK;
@@ -536,8 +568,15 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
 				if (ret < GP_OK)
 					return ret;
 				remaining -= transferred;
-				if (transferred < operations->max_block_size)
-					break;
+				if (transferred < request) {
+					/* A short block inside a declared
+					 * segment leaves the operation
+					 * incomplete; the camera will not
+					 * resend the missing bytes, so the
+					 * image would be silently truncated
+					 * (issue #35). */
+					return GP_ERROR_CORRUPTED_DATA;
+				}
 			}
 			continue;
 		}

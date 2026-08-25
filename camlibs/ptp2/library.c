@@ -3125,7 +3125,7 @@ pentax_identify_supported_model (PTPParams *params, const CameraAbilities *abili
 }
 
 static uint16_t
-pentax_restore_live_view (PTPParams *params)
+pentax_restore_live_view (PTPParams *params, int force_teardown)
 {
 	PTPPropValue value;
 	uint16_t ret = PTP_RC_OK;
@@ -3150,14 +3150,22 @@ pentax_restore_live_view (PTPParams *params)
 		value.u8 = params->pentax.live_view_original_valid ?
 			params->pentax.live_view_original_value : 0;
 		/* Research harness: keep_live_view leaves PC-LV running across
-		 * calls; the session owner is responsible for restoring. */
-		if (value.u8 != 1 && !params->pentax.keep_live_view) {
+		 * calls; the session owner is responsible for restoring.
+		 * Session teardown (camera_exit) overrides that policy so the
+		 * camera never stays in PC-LV after the controlling process
+		 * disconnects (issue #29). */
+		if ((value.u8 != 1 && !params->pentax.keep_live_view) ||
+		    force_teardown) {
 			ret = ptp_setdevicepropvalue (params,
 				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
 			if (ret == PTP_RC_OK) {
 				params->inliveview = 0;
 				params->pentax.live_view_original_value = 0;
 				params->pentax.live_view_original_valid = 0;
+			} else if (force_teardown) {
+				GP_LOG_E ("teardown d035 restore failed with 0x%04x; "
+					"retaining bookkeeping for reconnect recovery",
+					ret);
 			}
 		}
 		/* When keep_live_view skips the SET the camera is still live:
@@ -3352,11 +3360,15 @@ camera_exit (Camera *camera, GPContext *context)
 		switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
 			params->deviceinfo.VendorExtensionID) {
 		case PTP_VENDOR_PENTAX:
-			if (params->pentax.vendor_mode_enabled) {
+			if (params->pentax.vendor_mode_enabled ||
+			    params->pentax.vendor_mode_unknown) {
 				uint32_t function_flags = 0;
 
 				if (params->inliveview) {
-					uint16_t ret = pentax_restore_live_view (params);
+					/* Teardown must restore d035 even for a
+					 * keep_live_view session: the owning
+					 * process is going away (issue #29). */
+					uint16_t ret = pentax_restore_live_view (params, 1);
 					if (ret != PTP_RC_OK) {
 						GP_LOG_E ("Pentax live view restore failed with 0x%04x", ret);
 						exit_gp_result = translate_ptp_result (ret);
@@ -3365,10 +3377,16 @@ camera_exit (Camera *camera, GPContext *context)
 				exit_result = ptp_pentax_set_vendor_mode (params,
 					params->pentax.model_no, 0,
 					params->pentax.vendor_ext_version, &function_flags);
-				if (exit_result != PTP_RC_OK)
-					GP_LOG_E ("Pentax vendor mode disable failed with 0x%04x",
+				if (exit_result != PTP_RC_OK) {
+					GP_LOG_E ("Pentax vendor mode disable failed with 0x%04x; "
+						"camera state unknown, next session must reconcile",
 						exit_result);
-				params->pentax.vendor_mode_enabled = 0;
+					params->pentax.vendor_mode_unknown = 1;
+				} else {
+					GP_LOG_D ("Pentax vendor mode disabled");
+					params->pentax.vendor_mode_enabled = 0;
+					params->pentax.vendor_mode_unknown = 0;
+				}
 			}
 			break;
 		case PTP_VENDOR_CANON:
@@ -3768,7 +3786,7 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			_("Pentax preview stage get-frame returned 0x%04x (%u bytes, %u attempts, %u ms)."),
 			ret, size, attempts, elapsed_ms);
 		if (cancelled || (ret != PTP_RC_OK)) {
-			uint16_t restore_ret = pentax_restore_live_view (params);
+			uint16_t restore_ret = pentax_restore_live_view (params, 0);
 			gp_context_status (context,
 				_("Pentax preview stage restore-after-frame returned 0x%04x."),
 				restore_ret);
@@ -3793,7 +3811,7 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			result = gp_file_set_mtime (file, time (NULL));
 		free (data);
 		if (result < GP_OK) {
-			ret = pentax_restore_live_view (params);
+			ret = pentax_restore_live_view (params, 0);
 			if (ret != PTP_RC_OK)
 				GP_LOG_E ("Pentax live view restore after invalid frame failed with 0x%04x",
 					ret);
@@ -3807,7 +3825,7 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			 * the preview data itself is valid, and mixing a
 			 * uint16_t PTP code into the int GP return would be
 			 * wrong. */
-			uint16_t restore_ret = pentax_restore_live_view (params);
+			uint16_t restore_ret = pentax_restore_live_view (params, 0);
 			if (restore_ret != PTP_RC_OK) {
 				GP_LOG_E ("Pentax live view restore after success failed with 0x%04x",
 					restore_ret);
@@ -6082,13 +6100,16 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 
 	return (unsigned int) timeout;
 }
-#define PENTAX_TRANSFER_TIMEOUT_MS (5 * 60 * 1000)
+#define PENTAX_TRANSFER_TIMEOUT_MS (30 * 60 * 1000)
+#define PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS (60 * 1000)
 #define PENTAX_TRANSFER_BLOCK_SIZE (8U * 1024U * 1024U)
 
 typedef struct {
 	PTPParams *params;
 	GPContext *context;
 	struct timeval started;
+	struct timeval last_progress;
+	uint64_t bytes_transferred;
 } PentaxCameraTransferContext;
 
 static int
@@ -6130,6 +6151,8 @@ pentax_camera_get_transfer_block (void *user_data, uint32_t requested,
 		*transferred = 0;
 		return translate_ptp_result (ptpres);
 	}
+	transfer->bytes_transferred += *transferred;
+	transfer->last_progress = time_now ();
 	return GP_OK;
 }
 
@@ -6145,8 +6168,24 @@ static int
 pentax_camera_transfer_timed_out (void *user_data)
 {
 	PentaxCameraTransferContext *transfer = user_data;
+	unsigned long long total = time_since (transfer->started);
+	unsigned long long idle = time_since (transfer->last_progress);
 
-	return time_since (transfer->started) >= PENTAX_TRANSFER_TIMEOUT_MS;
+	/* A stalled camera (no bytes for a while) is a different failure
+	 * from one legitimately streaming a huge image for a long time;
+	 * only the former should trip the short bound (issue #38). */
+	if (idle >= PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS) {
+		GP_LOG_E ("transfer stalled: %llu bytes so far, no progress "
+			"for %llu ms", transfer->bytes_transferred, idle);
+		return 1;
+	}
+	if (total >= PENTAX_TRANSFER_TIMEOUT_MS) {
+		GP_LOG_E ("transfer exceeded absolute ceiling of %d ms after "
+			"%llu bytes", PENTAX_TRANSFER_TIMEOUT_MS,
+			transfer->bytes_transferred);
+		return 1;
+	}
+	return 0;
 }
 
 static int
@@ -6190,21 +6229,81 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	initiated = 1;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
+	/* Refuse to fire when a candidate from a previous request is still
+	 * pending: without a generation ID the first observed handle after
+	 * InitiateCapture could be that stale image, mislabelling exposure
+	 * N-1 as N (issue #34). */
+	{
+		unsigned char *bdata = NULL;
+		unsigned int bsize = 0;
+		uint32_t baseline_candidate = 0;
+
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize) &&
+		    bsize >= 40 &&
+		    pentax_get_u32le (bdata + 32) == 1)
+			baseline_candidate = pentax_get_u32le (bdata + 36);
+		free (bdata);
+		if (baseline_candidate) {
+			GP_LOG_E ("stale transfer candidate %u pending before "
+				"capture; refusing new exposure", baseline_candidate);
+			gp_context_error (context,
+				_("A previous capture's transfer candidate (%u) is still pending; resolve it before capturing."),
+				baseline_candidate);
+			ret = GP_ERROR_CAMERA_BUSY;
+			goto out;
+		}
+	}
+
 	started = time_now ();
 	/* Read conditions once to size the wait budget for this capture
-	 * (bulb timer, astrotracer limit, pixel shift processing). */
+	 * (bulb timer, astrotracer pixel shift processing). The probe is
+	 * retried with a bounded policy: once the exposure has been
+	 * initiated we must never silently fall back to the short base
+	 * timeout and abort a valid long exposure (issue #32). */
 	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	int conditions_known = 0;
 	{
 		PentaxConditions conditions;
+		int attempt;
+
 		memset (&conditions, 0, sizeof (conditions));
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size) &&
-		    size >= 40 &&
-		    pentax_parse_conditions (data, size, &conditions) == 0)
+		for (attempt = 0; attempt < 3 && !conditions_known; attempt++) {
+			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+				ret = GP_ERROR_CANCEL;
+				goto out;
+			}
+			free (data);
+			data = NULL;
+			size = 0;
+			if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &data, &size)) {
+				GP_LOG_E ("conditions probe attempt %d failed after "
+					"InitiateCapture", attempt + 1);
+				continue;
+			}
+			if (size < 40 ||
+			    pentax_parse_conditions (data, size, &conditions) != 0) {
+				GP_LOG_E ("conditions probe attempt %d returned "
+					"short/unparseable data (%u bytes)",
+					attempt + 1, size);
+				continue;
+			}
 			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
+			conditions_known = 1;
+		}
 		free (data);
 		data = NULL;
 		size = 0;
-		GP_LOG_D ("capture wait budget %u ms", capture_timeout_ms);
+		if (!conditions_known) {
+			capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_MAX;
+			GP_LOG_E ("conditions unreadable after %d attempts; using "
+				"conservative wait budget of %u ms instead of the "
+				"%d ms base so a live long exposure is not aborted",
+				3, capture_timeout_ms, PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+			gp_context_status (context,
+				_("Camera conditions unreadable; using a conservative long capture wait budget."));
+		}
+		GP_LOG_D ("capture wait budget %u ms%s", capture_timeout_ms,
+			conditions_known ? "" : " (fallback)");
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_WAITING;
 	do {
@@ -6252,7 +6351,49 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	free (data);
 	data = NULL;
 
+	/* Preflight the publication name before the camera-side candidate is
+	 * deleted: once finalized there is no way to re-fetch the image, so a
+	 * filename collision must be resolved while the candidate still
+	 * exists (issue #37). */
+	{
+		int existing = gp_filesystem_number (camera->fs, path->folder,
+			path->name, context);
+		if (existing >= GP_OK) {
+			char stem[sizeof (path->name)];
+			const char *dot;
+			int suffix = 1;
+
+			dot = strrchr (path->name, '.');
+			if (dot)
+				snprintf (stem, sizeof (stem), "%.*s",
+					(int)(dot - path->name), path->name);
+			else
+				snprintf (stem, sizeof (stem), "%s", path->name);
+			do {
+				if (dot)
+					snprintf (path->name, sizeof (path->name),
+						"%s_%d%s", stem, suffix, dot);
+				else
+					snprintf (path->name, sizeof (path->name),
+						"%s_%d", stem, suffix);
+				suffix++;
+				existing = gp_filesystem_number (camera->fs,
+					path->folder, path->name, context);
+			} while (existing >= GP_OK && suffix < 1000);
+			if (existing >= GP_OK) {
+				GP_LOG_E ("could not find collision-free name for capture in %s",
+					path->folder);
+				ret = GP_ERROR_FILE_EXISTS;
+				goto out;
+			}
+			GP_LOG_D ("capture name collided; publishing as %s/%s instead",
+				path->folder, path->name);
+		}
+	}
+
 	transfer.started = time_now ();
+	transfer.last_progress = transfer.started;
+	transfer.bytes_transferred = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRANSFERRING;
 	ret = pentax_transfer_run (&capture, &transfer_operations);
 	if (ret < GP_OK)
@@ -10129,6 +10270,60 @@ static CameraFilesystemFuncs fsfuncs = {
 	.storage_info_func	= storage_info_func
 };
 
+/* Observational reconciliation after SessionAlreadyOpened on a research
+ * Pentax body: a previous process may have left vendor mode enabled, PC
+ * live view running, or an exposure/candidate in flight. Observe only —
+ * never reset state that could destroy an in-flight user exposure
+ * (issue #33). */
+static void
+pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
+{
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	PTPPropValue value;
+
+	GP_LOG_D ("Pentax session was already opened; reconciling observed camera state");
+	gp_context_status (context,
+		_("Pentax session already open from a previous connection; observing camera state."));
+
+	if (PTP_RC_OK == ptp_getdevicepropvalue (params,
+			PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8)) {
+		params->pentax.live_view_original_value = value.u8;
+		params->pentax.live_view_original_valid = 1;
+		if (value.u8 == 1) {
+			params->inliveview = 1;
+			GP_LOG_D ("reconciliation: PC live view is active; "
+				"original d035=%u recorded", value.u8);
+		}
+	} else {
+		GP_LOG_E ("reconciliation: could not read d035");
+	}
+
+	if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size) &&
+	    size >= 108) {
+		uint32_t op_state = pentax_get_u32le (data + 24);
+		uint32_t candidate = pentax_get_u32le (data + 36);
+		uint32_t activity = pentax_get_u32le (data + 104);
+
+		if (activity & 1) {
+			GP_LOG_E ("reconciliation: camera is actively shooting "
+				"(op state %u); refusing capture until idle",
+				op_state);
+			params->pentax.recovery_required = 1;
+		} else if (candidate) {
+			GP_LOG_D ("reconciliation: stale transfer candidate %u "
+				"present; capture will recover or refuse it",
+				candidate);
+			params->pentax.candidate_handle = candidate;
+		}
+	} else {
+		GP_LOG_E ("reconciliation: GetAllConditions unreadable; "
+			"marking session recovery-required");
+		params->pentax.recovery_required = 1;
+	}
+	free (data);
+}
+
 int
 camera_init (Camera *camera, GPContext *context)
 {
@@ -10330,8 +10525,16 @@ camera_init (Camera *camera, GPContext *context)
 	sessionid = 1;
 	while (1) {
 		ret = LOG_ON_PTP_E (ptp_opensession (params, sessionid));
-		if (ret == PTP_RC_SessionAlreadyOpened || ret == PTP_RC_OK)
+		if (ret == PTP_RC_OK)
 			break;
+		if (ret == PTP_RC_SessionAlreadyOpened) {
+			/* A previous process still owns the session. For
+			 * research Pentax bodies observe leftover state
+			 * before treating this as a fresh start (issue #33). */
+			if (pentax_candidate)
+				pentax_reconcile_reused_session (params, context);
+			break;
+		}
 
 		tries++;
 		if (pentax_candidate)
@@ -10476,12 +10679,23 @@ camera_init (Camera *camera, GPContext *context)
 			refresh_ret = ptp_getdeviceinfo (params, &refreshed);
 			if (refresh_ret != PTP_RC_OK) {
 				uint32_t ignored_flags = 0;
+				uint16_t rollback;
 
 				ptp_free_deviceinfo (&refreshed);
-				(void)ptp_pentax_set_vendor_mode (params,
+				rollback = ptp_pentax_set_vendor_mode (params,
 					params->pentax.model_no, 0,
 					params->pentax.vendor_ext_version, &ignored_flags);
-				params->pentax.vendor_mode_enabled = 0;
+				if (rollback == PTP_RC_OK) {
+					params->pentax.vendor_mode_enabled = 0;
+					params->pentax.vendor_mode_unknown = 0;
+				} else {
+					/* The disable itself failed: the camera
+					 * may still be in vendor mode. Do not
+					 * claim a known-good state (issue #30). */
+					params->pentax.vendor_mode_unknown = 1;
+					GP_LOG_E ("Pentax vendor mode rollback failed with 0x%04x; "
+						"camera state unknown", rollback);
+				}
 				params->pentax.function_flags = 0;
 				GP_LOG_E ("Pentax post-enable DeviceInfo refresh failed with 0x%04x; vendor mode rolled back",
 					refresh_ret);
@@ -10494,21 +10708,35 @@ camera_init (Camera *camera, GPContext *context)
 				ret = fixup_cached_deviceinfo (camera, &params->deviceinfo);
 				if (ret < GP_OK) {
 					uint32_t ignored_flags = 0;
+					uint16_t rollback;
 
-					(void)ptp_pentax_set_vendor_mode (params,
+					rollback = ptp_pentax_set_vendor_mode (params,
 						params->pentax.model_no, 0,
 						params->pentax.vendor_ext_version, &ignored_flags);
-					params->pentax.vendor_mode_enabled = 0;
+					if (rollback == PTP_RC_OK) {
+						params->pentax.vendor_mode_enabled = 0;
+						params->pentax.vendor_mode_unknown = 0;
+					} else {
+						params->pentax.vendor_mode_unknown = 1;
+						GP_LOG_E ("Pentax vendor mode rollback failed with 0x%04x; "
+							"camera state unknown", rollback);
+					}
 					params->pentax.function_flags = 0;
 					return ret;
 				}
 			}
 		} else {
-			GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x; using generic PTP",
-				ret);
+			GP_LOG_E ("Pentax vendor mode enable failed with 0x%04x", ret);
 			gp_context_error (context,
-				_("Pentax init stage vendor enable returned 0x%04x; continuing in generic PTP mode."),
+				_("Pentax init stage vendor enable returned 0x%04x; "
+				  "vendor capture/preview/config are unavailable for this session."),
 				ret);
+			/* Research-capable bodies advertise capture/preview/
+			 * config abilities; continuing in generic PTP would
+			 * present a capability contract the runtime cannot
+			 * honour (issue #31). */
+			if (pentax_candidate)
+				return translate_ptp_result (ret);
 		}
 	}
 
