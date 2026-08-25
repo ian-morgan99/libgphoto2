@@ -9885,7 +9885,7 @@ _put_Pentax_LiveViewAFPosition (CONFIG_PUT_ARGS)
 	unsigned char *data = NULL, out[8];
 	unsigned int size, xr, yr;
 	const char *value;
-	uint16_t x, y, ret;
+	uint16_t x, y, rx, ry, ret;
 	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
@@ -9921,18 +9921,10 @@ _put_Pentax_LiveViewAFPosition (CONFIG_PUT_ARGS)
 	/* Verify transport with a GET.  Semantics differ per model: the
 	 * K-3 III snaps the point to the nearest sensor and echoes it back,
 	 * so an exact match is required.  The K-1 II accepts the payload
-	 * (8-byte GET proves the property is honoured) but always reports
-	 * the geometry centre, and IT2 tracks the requested spot client-side
-	 * instead of reading it back.  For K-1 II an OK write plus an 8-byte
-	 * GET is success; requiring echoed coordinates would fail-closed on
-	 * every legitimate write. */
-	if (params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) {
-		GP_LOG_D ("Pentax K-1 II LV AF spot stored (%u,%u); camera does "
-			"not echo the selection.", x, y);
-		if (alreadyset)
-			*alreadyset = 1;
-		return GP_OK;
-	}
+	 * but always reports the geometry centre, so a structurally valid
+	 * 8-byte response is sufficient proof the property is honoured;
+	 * requiring echoed coordinates would fail-closed on every
+	 * legitimate write.  IT2 tracks the requested spot client-side. */
 	ret = ptp_pentax_get_device_prop_raw (params,
 		PTP_DPC_PENTAX_LiveViewAFPosition, &data, &size);
 	if (ret != PTP_RC_OK) {
@@ -9940,13 +9932,16 @@ _put_Pentax_LiveViewAFPosition (CONFIG_PUT_ARGS)
 		return translate_ptp_result (ret);
 	}
 	result = pentax_parse_live_view_af_position (data, size, &geometry,
-		&x, &y);
+		&rx, &ry);
 	free (data);
 	if (result < GP_OK)
 		return result;
-	if ((x != (uint16_t)xr) || (y != (uint16_t)yr)) {
+	if (params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) {
+		GP_LOG_D ("Pentax K-1 II LV AF spot stored (%u,%u); camera does "
+			"not echo the selection.", x, y);
+	} else if ((rx != x) || (ry != y)) {
 		GP_LOG_E ("Pentax LV AF position acknowledged but read-back "
-			"reports %u,%u (requested %u,%u).", x, y, xr, yr);
+			"reports %u,%u (requested %u,%u).", rx, ry, x, y);
 		return GP_ERROR;
 	}
 	if (alreadyset)

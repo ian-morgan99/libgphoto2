@@ -6002,29 +6002,85 @@ camera_sigma_fp_capture (Camera *camera, CameraCaptureType type, CameraFilePath 
 /* Long exposures (bulb timer, astrotracer) and multi-shot composites
  * (pixel shift = 4 exposures + in-camera processing) need extra wait. */
 #define PENTAX_CAPTURE_PROCESSING_MARGIN_MS (30 * 1000)
+/* Pixel shift / multi-shot composites require 4x exposure time plus processing margin */
+#define PENTAX_PIXEL_SHIFT_MULTIPLIER 4
 
-/* Compute the capture wait budget from camera conditions: long bulb timers
- * or astrotracer limits extend the base timeout so slow captures are not
- * aborted while still in progress. */
+/* Camera-reported condition values are untrusted protocol input; compute
+ * in 64-bit and clamp so a corrupt value can never wrap the timeout. */
+#define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
+
+static unsigned int
+pentax_clamp_timeout_ms (uint64_t ms, const char *source)
+{
+	if (ms > PENTAX_CAPTURE_TIMEOUT_MS_MAX) {
+		GP_LOG_E ("Pentax capture budget from %s (%llu ms) exceeds "
+			"clamp; using %u ms.", source,
+			(unsigned long long) ms, PENTAX_CAPTURE_TIMEOUT_MS_MAX);
+		return PENTAX_CAPTURE_TIMEOUT_MS_MAX;
+	}
+	return (unsigned int) ms;
+}
+
+/* Compute the capture wait budget from camera conditions: long bulb timers,
+ * astrotracer limits, or multi-shot composites (pixel shift/astrotracer) extend
+ * the base timeout so slow captures are not aborted while still in progress. */
 static unsigned int
 pentax_capture_timeout_ms (const PentaxConditions *conditions)
 {
-	unsigned int timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	uint64_t timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 
+	/* Handle astro shift mode with limit */
 	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) {
-		unsigned int limit_ms = conditions->has_astro_limit ?
-			(conditions->astro_limit_seconds + 1) * 1000 : 0;
+		uint64_t limit_ms = conditions->has_astro_limit ?
+			((uint64_t) conditions->astro_limit_seconds + 1) * 1000 : 0;
 		if (limit_ms > timeout)
 			timeout = limit_ms;
 		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		timeout = pentax_clamp_timeout_ms (timeout, "astro limit");
 	}
+
+	/* Handle bulb timer */
 	if (conditions->bulb_timer_seconds > 0) {
-		unsigned int bulb_ms = (conditions->bulb_timer_seconds + 1) * 1000 +
+		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000 +
 			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb timer");
 		if (bulb_ms > timeout)
 			timeout = bulb_ms;
 	}
-	return timeout;
+
+	/* Handle multi-shot composites (pixel shift, astrotracer) */
+	if (conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_MULTI_MODE |
+	    PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
+		/* Pixel shift = 4 exposures + in-camera processing */
+		uint64_t multi_ms = 0;
+
+		/* If bulb timer is active, multiply by 4 for pixel shift */
+		if (conditions->bulb_timer_seconds > 0) {
+			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER + PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		} else {
+			/* For regular exposures, use base exposure time * 4 + processing margin */
+			/* Base timeout is 60s, so for pixel shift: 60s * 4 + 30s margin = 270s */
+			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE * PENTAX_PIXEL_SHIFT_MULTIPLIER +
+				PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		}
+
+		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot composite");
+		if (multi_ms > timeout)
+			timeout = multi_ms;
+	}
+
+	/* Handle astrotracer mode (without shift limit) */
+	if ((conditions->astro_status_flags & PENTAX_CONDITION_ASTROTRACER3) &&
+	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
+		/* Astrotracer also requires extended processing time */
+		uint64_t astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE +
+			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		if (astro_ms > timeout)
+			timeout = astro_ms;
+	}
+
+	return (unsigned int) timeout;
 }
 #define PENTAX_TRANSFER_TIMEOUT_MS (5 * 60 * 1000)
 #define PENTAX_TRANSFER_BLOCK_SIZE (8U * 1024U * 1024U)
