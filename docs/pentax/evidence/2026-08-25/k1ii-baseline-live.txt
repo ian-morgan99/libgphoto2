@@ -1,0 +1,3 @@
+# K-1 Mark II live baseline — 2026-08-25 ~12:34 (stream pre-flight, both bodies powered on in M mode)
+# port usb:001,004 | model string "Pentax K-1 Mark II (PTP mode)" | PID 25fb:0183 (PTP OK; MSC blocker cleared)
+state=3; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=4; ISO=200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/500; aperture=20/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0

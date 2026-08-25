@@ -305,3 +305,20 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 
 ### Blocker
 - Both cameras currently enumerate as USB Mass Storage (usb-storage bound on 001,011 and 001,012); PTP impossible until switched back to MTP/PTP mode. K-1 II release_mode=2 bulb probe (1500 ms hold) queued behind that.
+
+## 2026-08-25 — Pre-flight: both cameras in PTP mode; dual test streams launched (K-3 III timeout verification, K-1 II bulb probe)
+
+### Pre-flight checks (runbook §6)
+- Both bodies powered on by operator, in M mode. PTP mode confirmed — the 08-24 MSC blocker is cleared:
+  - K-3 III `25fb:0189` → usb:001,005 (PTP).
+  - K-1 II `25fb:0183` → usb:001,004 (PTP); MSC twin `25fb:0182` present as before — never add to ptp2.
+- Build fresh (`ninja -C _build`: no work to do). ltdl symlinks in `_build/camlibs/` intact. No GVFS claimants on the camera ports (gvfs-gphoto2-volume-monitor idle, not holding a port open).
+- HEAD `23a5a6338`, clean tree — commit hash used for both stream log entries.
+
+### Live baselines captured (both M mode; evidence in docs/pentax/evidence/2026-08-25/)
+- K-3 III (`k3iii-baseline-live.txt`): state=0; exposure-mode-raw=8; ISO 3200; open-av-num=28 (f/2.8); bulb-timer=no; bulb-seconds=1/160; aperture=40/10 (f/4.0); drive-mode-raw=0; astro-limit=0.
+- K-1 II (`k1ii-baseline-live.txt`): state=3; exposure-mode-raw=8; ISO 200; open-av-num=14 (f/2.0); bulb-timer=no; bulb-seconds=1/500; aperture=20/10 (f/2.0); drive-mode-raw=4 (differs from documented "drive single" — recorded as-is, not assumed wrong).
+
+### Queued work dispatched (§9)
+- K-3 III stream: duration-aware capture-timeout verification (bulb-timer value whose +30 s margin busts the old 60 s budget; PASS = no abort + computed timeout visible in debug log). Shutter approved by operator.
+- K-1 II stream: supervised bulb probe `./bulb_probe 1500 usb:001,004 2` (probe binary was stale — rebuild required first; /tmp/iolibs staging per §4). Shutter approved by operator.
