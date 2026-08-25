@@ -89,14 +89,17 @@ pending so exit can retry it before vendor mode is disabled.
 
 ### AF position (`0xd036`)
 
-The AF-position getter accepts only two response forms. An eight-byte (or
-longer) response carries the little-endian UINT16 x coordinate at byte 4 and y
-at byte 6; bytes 0–3 are treated as an opaque header and are not validated,
-because no hardware observation has fixed their meaning. A four-byte response
-is rejected outright: the earlier "geometry centre" interpretation had no
-byte-level evidence, and arbitrary payloads such as `ff ff ff ff` must not be
-accepted as a centre point. Responses of 0–3 or 5–7 bytes are truncated and
-rejected. Coordinates are bounds-checked against the parsed live-view geometry
+The AF-position getter accepts only the exact eight-byte coordinate form
+(issue #26). Byte 0 must carry the encoder tag `2` (the same tag the setter
+emits); bytes 1–3 are an opaque header and are not validated, because no
+hardware observation has fixed their meaning. The little-endian UINT16 x
+coordinate sits at byte 4 and y at byte 6. Any other size — including 12- and
+16-byte responses — is rejected outright: the trailing bytes' meaning is
+Unknown-hardware, so accepting longer frames would let arbitrary payloads pass
+as coordinates. A four-byte response is likewise rejected: the earlier
+"geometry centre" interpretation had no byte-level evidence, and payloads such
+as `ff ff ff ff` must not be accepted as a centre point. Coordinates are
+bounds-checked against the parsed live-view geometry
 (`x < area_width`, `y < area_height`). All six logged K-3 III observations used
 eight-byte responses with `af-response-bytes=8`; no four-byte response has ever
 been observed on hardware. The paired setter emits the IT2 form
@@ -220,6 +223,14 @@ No unobserved cleanup command is sent on those error paths. Consequently a
 camera-side candidate may remain after failures from CANDIDATE onward; this is a
 documented hardware question, not a claimed clean cancellation. Successful
 finalization alone proves the candidate was released.
+
+On pre-candidate failure the host sends `TerminateCapture` (`0x9012`) with
+release mode 0 — the same release mode as the initiating still capture — and
+then re-reads `GetAllConditions` to check that activity flags (byte offset 104,
+bit 0) have cleared. The abort opcode choice follows the documented
+release/close pairing; `InterruptFunction` (`0x9013`, "Green button") is not
+used for cancellation because its semantics are Unknown-hardware. Post-abort
+quiescence is diagnostic only: a non-clear flag is logged, never retried.
 
 ## Open hardware questions
 

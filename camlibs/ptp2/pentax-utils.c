@@ -62,12 +62,14 @@ pentax_parse_live_view_af_position (const unsigned char *data, size_t size,
 
 	if (!data || !geometry || !x || !y)
 		return GP_ERROR_BAD_PARAMETERS;
-	/* Only the 8-byte coordinate form is accepted.  The earlier
-	 * "any 4-byte response means centre" path had no byte-level evidence
-	 * (all logged hardware observations are 8 bytes) and would accept
-	 * arbitrary payloads such as ff ff ff ff as a plausible centre.
-	 * Bytes 0-3 stay unvalidated: their meaning is Unknown-hardware. */
-	if (size < 8)
+	/* Only the exact 8-byte coordinate form is accepted (issue #26).
+	 * Longer payloads are rejected: the trailing bytes' meaning is
+	 * Unknown-hardware, so accepting 12/16-byte responses would let an
+	 * arbitrary frame pass as a coordinate.  Byte 0 must carry the
+	 * encoder tag 2 used by pentax_encode_live_view_af_position. */
+	if (size != 8)
+		return GP_ERROR_CORRUPTED_DATA;
+	if (data[0] != 2)
 		return GP_ERROR_CORRUPTED_DATA;
 	parsed_x = pentax_get_u16le (data + 4);
 	parsed_y = pentax_get_u16le (data + 6);
@@ -164,6 +166,8 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 	parsed.astro_status_flags = pentax_get_u32le (data + 320);
 	parsed.open_av_num = pentax_get_u32le (data + 328);
 	parsed.drive_mode = pentax_get_u32le (data + 492);
+	/* IT2 offset 120: white balance mode (issue #27). */
+	parsed.white_balance = pentax_get_u32le (data + 120);
 	/* IT2 offset 196: AF mode; 0 = MF, >0 = an AF mode. */
 	parsed.af_mode = pentax_get_u32le (data + 196);
 	parsed.capability_flags = pentax_get_u32le (data + 504);

@@ -3131,6 +3131,22 @@ pentax_restore_live_view (PTPParams *params)
 	uint16_t ret = PTP_RC_OK;
 
 	if (params->inliveview) {
+		if (!params->pentax.live_view_original_valid) {
+			/* No pre-preview observation exists: read the camera's
+			 * current d035 value now rather than writing an
+			 * unobserved default (issue #24). */
+			value.u8 = 0;
+			ret = ptp_getdevicepropvalue (params,
+				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+			if (ret == PTP_RC_OK) {
+				params->pentax.live_view_original_value = value.u8;
+				params->pentax.live_view_original_valid = 1;
+			} else {
+				GP_LOG_E ("could not read d035 for live view restore "
+					"(0x%04x); leaving PC-LV untouched", ret);
+				return ret;
+			}
+		}
 		value.u8 = params->pentax.live_view_original_valid ?
 			params->pentax.live_view_original_value : 0;
 		/* Research harness: keep_live_view leaves PC-LV running across
@@ -3150,6 +3166,15 @@ pentax_restore_live_view (PTPParams *params)
 		 * state (issue #14). */
 	}
 	return ret;
+}
+
+/* Research builds only: the vendor Pentax bodies whose capture flow we
+ * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome).
+ */
+static int
+pentax_pid_is_research_capable (unsigned int pid)
+{
+	return (pid == 0x0183) || (pid == 0x0189) || (pid == 0x018f);
 }
 
 int
@@ -3214,8 +3239,7 @@ camera_abilities (CameraAbilitiesList *list)
 		 * suppressed in public builds). See DEVELOPMENT_PLAN.md R0.
 		 */
 		if ((models[i].usb_vendor == 0x25fb) &&
-		    ((models[i].usb_product == 0x0183) ||
-		     (models[i].usb_product == 0x0189))) {
+		    pentax_pid_is_research_capable (models[i].usb_product)) {
 			a.operations |= GP_OPERATION_CAPTURE_IMAGE |
 					GP_OPERATION_CAPTURE_PREVIEW |
 					GP_OPERATION_CONFIG;
@@ -3778,11 +3802,19 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 		} else if (!params->pentax.keep_live_view) {
 			/* A successful one-shot preview must not leave the camera
 			 * in PC live view; restore the pre-preview d035 value
-			 * (issue #13). */
-			ret = pentax_restore_live_view (params);
-			if (ret != PTP_RC_OK)
+			 * (issue #13). The restore result is reported via
+			 * gp_context_status but does not overwrite `result`:
+			 * the preview data itself is valid, and mixing a
+			 * uint16_t PTP code into the int GP return would be
+			 * wrong. */
+			uint16_t restore_ret = pentax_restore_live_view (params);
+			if (restore_ret != PTP_RC_OK) {
 				GP_LOG_E ("Pentax live view restore after success failed with 0x%04x",
-					ret);
+					restore_ret);
+				gp_context_status (context,
+					_("Preview captured, but restoring PC live view failed with 0x%04x."),
+					restore_ret);
+			}
 		}
 		SET_CONTEXT_P (params, NULL);
 		return result;
@@ -6074,7 +6106,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
-	int candidate_deleted = 0, candidate_delete_attempted = 0;
+	int candidate_delete_attempted = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6187,15 +6219,26 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
-	candidate_deleted = 1;
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
 		goto out;
 	ret = gp_filesystem_set_file_noop (camera->fs, path->folder, path->name,
 		GP_FILE_TYPE_NORMAL, file, context);
 	if (ret < GP_OK) {
-		gp_filesystem_delete_file_noop (camera->fs, path->folder,
-			path->name, context);
+		/* Rollback of the fs entry must not fight a user cancel
+		 * (issue #28): when the operation was cancelled, skip the
+		 * delete and leave the entry for a later rescan; otherwise
+		 * perform it and log failures. */
+		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+			GP_LOG_D ("capture cancelled; skipping fs rollback of %s/%s",
+				path->folder, path->name);
+		} else {
+			int rb = gp_filesystem_delete_file_noop (camera->fs,
+				path->folder, path->name, context);
+			if (rb < GP_OK)
+				GP_LOG_E ("fs rollback delete of %s/%s failed (%d)",
+					path->folder, path->name, rb);
+		}
 		goto out;
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
@@ -6212,7 +6255,10 @@ out:
 	 * otherwise ask the camera to abort the in-flight capture (issues
 	 * #10 and #11). */
 	if (ret != GP_OK && initiated) {
-		if (have_candidate && !candidate_delete_attempted) {
+		/* Every abnormal exit with a candidate must issue at least
+		 * one camera-side cleanup attempt; retrying a delete whose
+		 * earlier attempt failed is harmless (issues #11 and #20). */
+		if (have_candidate) {
 			candidate_delete_attempted = 1;
 			if (ptp_pentax_delete_transfer_candidate (params) == PTP_RC_OK)
 				GP_LOG_D ("deleted orphaned transfer candidate %u",
@@ -6220,12 +6266,36 @@ out:
 			else
 				GP_LOG_E ("failed to delete orphaned transfer candidate %u",
 					candidate_handle);
-		} else if (!have_candidate) {
-			if (ptp_pentax_interrupt (params) == PTP_RC_OK)
+		} else {
+			/* TerminateCapture 0x9012 with release mode 0 matches
+			 * the documented still-capture path (issue #21);
+			 * InterruptFunction 0x9013 is characterized only as
+			 * "Green button" and its cancellation semantics are
+			 * unverified. */
+			if (ptp_pentax_terminate_capture (params, 0) == PTP_RC_OK)
 				GP_LOG_D ("aborted capture after pre-candidate failure");
 			else
 				GP_LOG_E ("failed to abort capture after pre-candidate failure");
 		}
+	}
+	if (ret != GP_OK && initiated && !have_candidate) {
+		/* Verify post-abort quiescence via conditions activity flags
+		 * (offset 104, bit 0 = shooting); best-effort diagnostics
+		 * only (issue #21). */
+		unsigned char *qdata = NULL;
+		unsigned int qsize = 0;
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &qdata, &qsize) &&
+		    qsize >= 108) {
+			if (pentax_get_u32le (qdata + 104) & 1)
+				GP_LOG_E ("camera still shooting after abort; "
+					"activity flags 0x%08x",
+					pentax_get_u32le (qdata + 104));
+			else
+				GP_LOG_D ("post-abort conditions show camera idle");
+		} else {
+			GP_LOG_E ("could not verify post-abort quiescence");
+		}
+		free (qdata);
 	}
 	params->pentax.candidate_handle = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_IDLE;
@@ -10057,7 +10127,7 @@ camera_init (Camera *camera, GPContext *context)
 
 	gp_camera_get_abilities(camera, &a);
 	pentax_candidate = (a.usb_vendor == 0x25fb) &&
-		((a.usb_product == 0x0189) || (a.usb_product == 0x0183));
+		pentax_pid_is_research_capable (a.usb_product);
 
 #if defined(HAVE_ICONV) && defined(HAVE_LANGINFO_H)
 	curloc = nl_langinfo (CODESET);

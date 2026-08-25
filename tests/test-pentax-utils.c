@@ -159,12 +159,18 @@ main (void)
 	CHECK (pentax_parse_live_view_af_position (af_data, 0, &geometry,
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
 	CHECK ((af_x == 99) && (af_y == 99));
+	af_data[0] = 2; /* encoder tag required by the parser (issue #26) */
 	af_data[4] = 100; af_data[6] = 200;
 	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
 		&af_x, &af_y) == GP_OK);
 	CHECK ((af_x == 100) && (af_y == 200));
+	/* Longer payloads are rejected: only the exact 8-byte form parses
+	 * (issue #26). */
 	CHECK (pentax_parse_live_view_af_position (af_data, 12, &geometry,
-		&af_x, &af_y) == GP_OK);
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 100) && (af_y == 200));
+	CHECK (pentax_parse_live_view_af_position (af_data, 16, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
 	CHECK ((af_x == 100) && (af_y == 200));
 	CHECK (pentax_parse_live_view_af_position (af_data, 7, &geometry,
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
@@ -181,12 +187,17 @@ main (void)
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
 	CHECK ((af_x == 99) && (af_y == 99));
 	af_data[6] = 200; af_data[7] = 0;
-	/* The opaque header bytes are not validated: any value parses. */
+	/* Byte 0 must carry the encoder tag 2; other header bytes are opaque. */
 	memset (af_data, 0xff, 4);
+	af_data[0] = 2;
 	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
 		&af_x, &af_y) == GP_OK);
 	CHECK ((af_x == 100) && (af_y == 200));
 	af_data[5] = 3;
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	af_data[5] = 0;
+	af_data[0] = 3;
 	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
 	CHECK (pentax_encode_live_view_af_position (300, 200, encoded_af) == GP_OK);

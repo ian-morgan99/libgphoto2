@@ -9623,43 +9623,45 @@ _pentax_readiness_preflight (PTPParams *params, PentaxConditions *conditions)
 	unsigned int condition_size = 0;
 	uint16_t ret;
 	int result;
+	int sample;
 
-	ret = ptp_pentax_get_all_conditions (params, &condition_data,
-		&condition_size);
-	if (ret != PTP_RC_OK) {
+	for (sample = 1; sample <= 2; sample++) {
+		ret = ptp_pentax_get_all_conditions (params, &condition_data,
+			&condition_size);
+		if (ret != PTP_RC_OK) {
+			free (condition_data);
+			return translate_ptp_result (ret);
+		}
+		result = pentax_parse_conditions (condition_data, condition_size,
+			conditions);
 		free (condition_data);
-		return translate_ptp_result (ret);
+		condition_data = NULL;
+		if (result < GP_OK)
+			return result;
+		if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
+			(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+			PENTAX_CONDITION_ACTIVITY_PROCESSING))) {
+			GP_LOG_E ("readiness preflight sample %d rejected: "
+				"task-changing 0x%08x, activity 0x%08x", sample,
+				conditions->capability_flags, conditions->activity_flags);
+			return GP_ERROR_CAMERA_BUSY;
+		}
+		if (sample == 1) {
+			/* IT2 starts its serialized conditions timer at 100 ms after
+			 * the initial Connect-time conditions load.  Reproduce that
+			 * second readiness sample before a setting write instead of
+			 * treating one snapshot as sufficient.  Sleep in short
+			 * cancellable slices so a user cancel is honored promptly
+			 * (issue #25). */
+			int slice;
+			for (slice = 0; slice < 10; slice++) {
+				usleep (10000);
+				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+					GP_CONTEXT_FEEDBACK_CANCEL)
+					return GP_ERROR_CANCEL;
+			}
+		}
 	}
-	result = pentax_parse_conditions (condition_data, condition_size,
-		conditions);
-	free (condition_data);
-	if (result < GP_OK)
-		return result;
-	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
-		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
-		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
-		return GP_ERROR_CAMERA_BUSY;
-	/* IT2 starts its serialized conditions timer at 100 ms after the initial
-	 * Connect-time conditions load.  Reproduce that second readiness sample
-	 * before a setting write instead of treating one snapshot as sufficient. */
-	usleep (100000);
-	condition_data = NULL;
-	condition_size = 0;
-	ret = ptp_pentax_get_all_conditions (params, &condition_data,
-		&condition_size);
-	if (ret != PTP_RC_OK) {
-		free (condition_data);
-		return translate_ptp_result (ret);
-	}
-	result = pentax_parse_conditions (condition_data, condition_size,
-		conditions);
-	free (condition_data);
-	if (result < GP_OK)
-		return result;
-	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
-		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
-		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
-		return GP_ERROR_CAMERA_BUSY;
 	return GP_OK;
 }
 
@@ -10669,6 +10671,8 @@ static uint32_t _pentax_cond_drive_mode (const PentaxConditions *c)
 	{ return c->drive_mode; }
 static uint32_t _pentax_cond_drive_mode_none (const PentaxConditions *c)
 	{ return 0; }
+static uint32_t _pentax_cond_white_balance (const PentaxConditions *c)
+	{ return c->white_balance; }
 
 static int
 _get_Pentax_DirectDriveMode (CONFIG_GET_ARGS)
@@ -10789,6 +10793,7 @@ _put_Pentax_DirectDriveMode (CONFIG_PUT_ARGS)
 		}
 	if (!found)
 		return GP_ERROR_BAD_PARAMETERS;
+	memset (&conditions, 0, sizeof (conditions));
 	/* Drive mode is not Tv-gated in IT2; the readiness preflight here only
 	 * enforces idle/not-task-changing.  Every genuine preflight failure
 	 * (busy, transport, cancellation, parse) is propagated fail-closed. */
@@ -10895,10 +10900,10 @@ _put_Pentax_DirectWB (CONFIG_PUT_ARGS)
 		if (!strcmp (value_text, pentax_wb_modes[i].label)) {
 			target = pentax_wb_modes[i].wire;
 			found = 1;
-			break;
-		}
+			break;		}
 	if (!found)
 		return GP_ERROR_BAD_PARAMETERS;
+	memset (&conditions, 0, sizeof (conditions));
 	/* White balance is not Tv-gated; use the readiness-only preflight and
 	 * propagate every failure fail-closed so no write follows an
 	 * unverified readiness check. */
@@ -10931,21 +10936,11 @@ _put_Pentax_DirectWB (CONFIG_PUT_ARGS)
 		&value, PTP_DTC_UINT16);
 	result = translate_ptp_result (ret);
 	if (result == GP_OK) {
-		/* Verify via fresh descriptor read-back. */
-		ptp_free_devicepropdesc (&desc);
-		memset (&desc, 0, sizeof (desc));
-		ret = ptp_generic_getdevicepropdesc (params,
-			PTP_DPC_WhiteBalance, &desc);
-		if (ret != PTP_RC_OK) {
-			ptp_free_devicepropdesc (&desc);
-			return translate_ptp_result (ret);
-		}
-		if (desc.CurrentValue.u16 != (uint16_t)target) {
-			GP_LOG_E ("Pentax WB acknowledged but read-back reports "
-				"0x%04x (requested 0x%04x).",
-				desc.CurrentValue.u16, target);
-			result = GP_ERROR;
-		}
+		/* Verify via fresh conditions sample at offset 120, mirroring
+		 * the drive-mode verification path (issue #27). */
+		result = _pentax_verify_rational_in_conditions (params,
+			target, 0, _pentax_cond_white_balance,
+			_pentax_cond_drive_mode_none);
 	}
 	ptp_free_devicepropdesc (&desc);
 	if (result == GP_OK && alreadyset)

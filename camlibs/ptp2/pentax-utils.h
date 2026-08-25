@@ -56,6 +56,7 @@ typedef struct {
 	uint32_t open_av_num;
 	uint32_t astro_status_flags;
 	uint32_t drive_mode;
+	uint32_t white_balance;
 	uint32_t af_mode;
 	uint32_t capability_flags;
 	uint32_t astro_limit_seconds;
