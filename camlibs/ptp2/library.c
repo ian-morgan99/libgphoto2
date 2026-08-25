@@ -3135,14 +3135,19 @@ pentax_restore_live_view (PTPParams *params)
 			params->pentax.live_view_original_value : 0;
 		/* Research harness: keep_live_view leaves PC-LV running across
 		 * calls; the session owner is responsible for restoring. */
-		if (value.u8 != 1 && !params->pentax.keep_live_view)
+		if (value.u8 != 1 && !params->pentax.keep_live_view) {
 			ret = ptp_setdevicepropvalue (params,
 				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
-	}
-	if (ret == PTP_RC_OK) {
-		params->inliveview = 0;
-		params->pentax.live_view_original_value = 0;
-		params->pentax.live_view_original_valid = 0;
+			if (ret == PTP_RC_OK) {
+				params->inliveview = 0;
+				params->pentax.live_view_original_value = 0;
+				params->pentax.live_view_original_valid = 0;
+			}
+		}
+		/* When keep_live_view skips the SET the camera is still live:
+		 * retain inliveview and the original-value bookkeeping so a
+		 * later restore (or camera_exit teardown) still has accurate
+		 * state (issue #14). */
 	}
 	return ret;
 }
@@ -3770,6 +3775,14 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 					ret);
 			gp_context_error (context,
 				_("Pentax live view returned no complete JPEG frame"));
+		} else if (!params->pentax.keep_live_view) {
+			/* A successful one-shot preview must not leave the camera
+			 * in PC live view; restore the pre-preview d035 value
+			 * (issue #13). */
+			ret = pentax_restore_live_view (params);
+			if (ret != PTP_RC_OK)
+				GP_LOG_E ("Pentax live view restore after success failed with 0x%04x",
+					ret);
 		}
 		SET_CONTEXT_P (params, NULL);
 		return result;
@@ -6060,6 +6073,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	char setting[32];
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
+	int initiated = 0, have_candidate = 0;
+	int candidate_deleted = 0, candidate_delete_attempted = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6084,6 +6099,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
+	initiated = 1;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
 	started = time_now ();
@@ -6132,6 +6148,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	}
 	params->pentax.candidate_handle = candidate_handle;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_CANDIDATE;
+	have_candidate = 1;
 
 	free (data);
 	data = NULL;
@@ -6160,17 +6177,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	if (ret < GP_OK)
 		goto out;
 	capture.data = NULL;
+	/* Finalize the camera-side candidate before publishing the file so the
+	 * host filesystem never advertises an image the camera has already
+	 * discarded (issue #12). */
+	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_FINALIZING;
+	ptpres = ptp_pentax_delete_transfer_candidate (params);
+	candidate_delete_attempted = 1;
+	if (ptpres != PTP_RC_OK) {
+		ret = translate_ptp_result (ptpres);
+		goto out;
+	}
+	candidate_deleted = 1;
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
 		goto out;
 	ret = gp_filesystem_set_file_noop (camera->fs, path->folder, path->name,
 		GP_FILE_TYPE_NORMAL, file, context);
-	if (ret < GP_OK)
-		goto out;
-	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_FINALIZING;
-	ptpres = ptp_pentax_delete_transfer_candidate (params);
-	if (ptpres != PTP_RC_OK) {
-		ret = translate_ptp_result (ptpres);
+	if (ret < GP_OK) {
+		gp_filesystem_delete_file_noop (camera->fs, path->folder,
+			path->name, context);
 		goto out;
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
@@ -6181,6 +6206,27 @@ out:
 	free (capture.data);
 	if (file)
 		gp_file_free (file);
+	/* Best-effort camera-side cleanup on abnormal exits. Initiation
+	 * failure means no capture was started, so there is nothing to abort.
+	 * Once a candidate exists its deletion is the authoritative cleanup;
+	 * otherwise ask the camera to abort the in-flight capture (issues
+	 * #10 and #11). */
+	if (ret != GP_OK && initiated) {
+		if (have_candidate && !candidate_delete_attempted) {
+			candidate_delete_attempted = 1;
+			if (ptp_pentax_delete_transfer_candidate (params) == PTP_RC_OK)
+				GP_LOG_D ("deleted orphaned transfer candidate %u",
+					candidate_handle);
+			else
+				GP_LOG_E ("failed to delete orphaned transfer candidate %u",
+					candidate_handle);
+		} else if (!have_candidate) {
+			if (ptp_pentax_interrupt (params) == PTP_RC_OK)
+				GP_LOG_D ("aborted capture after pre-candidate failure");
+			else
+				GP_LOG_E ("failed to abort capture after pre-candidate failure");
+		}
+	}
 	params->pentax.candidate_handle = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_IDLE;
 	SET_CONTEXT_P (params, NULL);

@@ -112,7 +112,7 @@ main (void)
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};
-	unsigned char af_data[8] = {0}, encoded_af[8], encoded_zoom[12];
+	unsigned char af_data[16] = {0}, encoded_af[8], encoded_zoom[12];
 	const unsigned char filename[] = {
 		1, 2, 3, 11,
 		'I', 0, 'M', 0, 'G', 0, '0', 0, '0', 0, '0', 0, '1', 0, '.', 0,
@@ -148,15 +148,44 @@ main (void)
 		(geometry.contrast_af_active_height == 360) &&
 		(geometry.contrast_af_spot_width == 60) &&
 		(geometry.contrast_af_spot_height == 40));
+	/* Only the 8-byte coordinate form parses; every 0-7 byte response is
+	 * rejected and outputs stay untouched on failure. */
 	CHECK (pentax_parse_live_view_af_position (af_data, 4, &geometry,
-		&af_x, &af_y) == GP_OK);
-	CHECK ((af_x == 360) && (af_y == 240));
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 99) && (af_y == 99));
+	CHECK (pentax_parse_live_view_af_position (af_data, 3, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 99) && (af_y == 99));
+	CHECK (pentax_parse_live_view_af_position (af_data, 0, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 99) && (af_y == 99));
 	af_data[4] = 100; af_data[6] = 200;
 	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
 		&af_x, &af_y) == GP_OK);
 	CHECK ((af_x == 100) && (af_y == 200));
+	CHECK (pentax_parse_live_view_af_position (af_data, 12, &geometry,
+		&af_x, &af_y) == GP_OK);
+	CHECK ((af_x == 100) && (af_y == 200));
 	CHECK (pentax_parse_live_view_af_position (af_data, 7, &geometry,
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 100) && (af_y == 200));
+	/* Out-of-range coordinates are rejected without touching outputs. */
+	af_x = 99; af_y = 99;
+	af_data[4] = 0xd1; af_data[5] = 0x02; /* x = 720 >= area_width */
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 99) && (af_y == 99));
+	af_data[4] = 100; af_data[5] = 0;
+	af_data[6] = 0xe1; af_data[7] = 0x01; /* y = 480 >= area_height */
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);
+	CHECK ((af_x == 99) && (af_y == 99));
+	af_data[6] = 200; af_data[7] = 0;
+	/* The opaque header bytes are not validated: any value parses. */
+	memset (af_data, 0xff, 4);
+	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
+		&af_x, &af_y) == GP_OK);
+	CHECK ((af_x == 100) && (af_y == 200));
 	af_data[5] = 3;
 	CHECK (pentax_parse_live_view_af_position (af_data, 8, &geometry,
 		&af_x, &af_y) == GP_ERROR_CORRUPTED_DATA);

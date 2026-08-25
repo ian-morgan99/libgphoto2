@@ -87,6 +87,21 @@ value before changing it. It restores that exact value after a frame transport
 error, an invalid JPEG frame, or session exit. A failed restoration remains
 pending so exit can retry it before vendor mode is disabled.
 
+### AF position (`0xd036`)
+
+The AF-position getter accepts only two response forms. An eight-byte (or
+longer) response carries the little-endian UINT16 x coordinate at byte 4 and y
+at byte 6; bytes 0–3 are treated as an opaque header and are not validated,
+because no hardware observation has fixed their meaning. A four-byte response
+is rejected outright: the earlier "geometry centre" interpretation had no
+byte-level evidence, and arbitrary payloads such as `ff ff ff ff` must not be
+accepted as a centre point. Responses of 0–3 or 5–7 bytes are truncated and
+rejected. Coordinates are bounds-checked against the parsed live-view geometry
+(`x < area_width`, `y < area_height`). All six logged K-3 III observations used
+eight-byte responses with `af-response-bytes=8`; no four-byte response has ever
+been observed on hardware. The paired setter emits the IT2 form
+`{2,0,0,0,Xlo,Xhi,Ylo,Yhi}`.
+
 ## Focus drive
 
 IMAGE Transmitter 2 explicitly selects its new focus-fine-control path for the

@@ -62,15 +62,15 @@ pentax_parse_live_view_af_position (const unsigned char *data, size_t size,
 
 	if (!data || !geometry || !x || !y)
 		return GP_ERROR_BAD_PARAMETERS;
-	if (size == 4) {
-		parsed_x = geometry->area_width / 2;
-		parsed_y = geometry->area_height / 2;
-	} else if (size >= 8) {
-		parsed_x = pentax_get_u16le (data + 4);
-		parsed_y = pentax_get_u16le (data + 6);
-	} else {
+	/* Only the 8-byte coordinate form is accepted.  The earlier
+	 * "any 4-byte response means centre" path had no byte-level evidence
+	 * (all logged hardware observations are 8 bytes) and would accept
+	 * arbitrary payloads such as ff ff ff ff as a plausible centre.
+	 * Bytes 0-3 stay unvalidated: their meaning is Unknown-hardware. */
+	if (size < 8)
 		return GP_ERROR_CORRUPTED_DATA;
-	}
+	parsed_x = pentax_get_u16le (data + 4);
+	parsed_y = pentax_get_u16le (data + 6);
 	if ((parsed_x >= geometry->area_width) ||
 	    (parsed_y >= geometry->area_height))
 		return GP_ERROR_CORRUPTED_DATA;

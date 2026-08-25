@@ -9612,12 +9612,12 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 	return result;
 }
 
-/* Shared IT2-faithful readiness preflight for exposure-property writes:
- * two conditions samples 100 ms apart must both report the requested
- * changeability bit and an idle, non-task-changing camera. */
+/* Shared IT2-faithful readiness preflight for vendor-property writes:
+ * two conditions samples 100 ms apart must both report an idle,
+ * non-task-changing camera.  No capability bit is required; callers that
+ * write exposure properties add their own changeability gate on top. */
 static int
-_pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
-	PentaxConditions *conditions)
+_pentax_readiness_preflight (PTPParams *params, PentaxConditions *conditions)
 {
 	unsigned char *condition_data = NULL;
 	unsigned int condition_size = 0;
@@ -9635,8 +9635,6 @@ _pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
 	free (condition_data);
 	if (result < GP_OK)
 		return result;
-	if (!(conditions->capability_flags & change_bit))
-		return GP_ERROR_NOT_SUPPORTED;
 	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
 		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
 		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
@@ -9658,12 +9656,23 @@ _pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
 	free (condition_data);
 	if (result < GP_OK)
 		return result;
-	if (!(conditions->capability_flags & change_bit))
-		return GP_ERROR_NOT_SUPPORTED;
 	if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
 		(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
 		PENTAX_CONDITION_ACTIVITY_PROCESSING)))
 		return GP_ERROR_CAMERA_BUSY;
+	return GP_OK;
+}
+
+static int
+_pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
+	PentaxConditions *conditions)
+{
+	int result = _pentax_readiness_preflight (params, conditions);
+
+	if (result < GP_OK)
+		return result;
+	if (!(conditions->capability_flags & change_bit))
+		return GP_ERROR_NOT_SUPPORTED;
 	return GP_OK;
 }
 
@@ -10780,14 +10789,11 @@ _put_Pentax_DirectDriveMode (CONFIG_PUT_ARGS)
 		}
 	if (!found)
 		return GP_ERROR_BAD_PARAMETERS;
-	result = _pentax_exposure_write_preflight (params,
-		PENTAX_CONDITION_CAN_CHANGE_TV, &conditions);
-	/* Drive mode is not Tv-gated in IT2; the preflight here only enforces
-	 * idle/not-task-changing.  Accept either outcome of the changeability
-	 * bit but never accept a busy camera. */
-	if (result == GP_ERROR_CAMERA_BUSY || result == GP_ERROR_NOT_SUPPORTED)
-		return result;
-	if (result < GP_OK && result != GP_ERROR_NOT_SUPPORTED)
+	/* Drive mode is not Tv-gated in IT2; the readiness preflight here only
+	 * enforces idle/not-task-changing.  Every genuine preflight failure
+	 * (busy, transport, cancellation, parse) is propagated fail-closed. */
+	result = _pentax_readiness_preflight (params, &conditions);
+	if (result < GP_OK)
 		return result;
 	memset (&value, 0, sizeof (value));
 	value.u32 = target;
@@ -10893,10 +10899,11 @@ _put_Pentax_DirectWB (CONFIG_PUT_ARGS)
 		}
 	if (!found)
 		return GP_ERROR_BAD_PARAMETERS;
-	result = _pentax_exposure_write_preflight (params,
-		PENTAX_CONDITION_CAN_CHANGE_TV, &conditions);
-	if ((result == GP_ERROR_CAMERA_BUSY) ||
-		(result == GP_ERROR_CORRUPTED_DATA))
+	/* White balance is not Tv-gated; use the readiness-only preflight and
+	 * propagate every failure fail-closed so no write follows an
+	 * unverified readiness check. */
+	result = _pentax_readiness_preflight (params, &conditions);
+	if (result < GP_OK)
 		return result;
 	memset (&desc, 0, sizeof (desc));
 	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_WhiteBalance,

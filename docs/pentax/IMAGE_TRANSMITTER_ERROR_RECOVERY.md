@@ -69,8 +69,9 @@ event, and identity revalidation.
   error.
 - For live view, record initial `0xd035`, `0xd036`, and `0xd037`; restore all
   values even after frame failure, while preserving the first error.
-- Treat 4-byte `0xd036` as the geometry centre and 8-byte-or-longer values as
-  X/Y at offsets 4 and 6. Reject lengths 5–7 and out-of-area coordinates.
+- Accept only 8-byte-or-longer `0xd036` responses, with X/Y at offsets 4 and 6.
+  Reject lengths 0–7 and out-of-area coordinates; never interpret a 4-byte
+  response as the geometry centre (no byte-level evidence supports that form).
 - Keep zoom values source-derived (K-body UI lists 2, 4, 8, 10, 12, and 16;
   disable uses 1). Do not infer camera support from the UI list: read/trace each
   body first.
