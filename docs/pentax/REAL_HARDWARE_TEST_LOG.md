@@ -334,3 +334,14 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - Step 5: PASS criteria met — capture completed without a 60 s timeout abort. Grep of debug log shows `capture wait budget 61000 ms`, confirming the duration-aware path fired (30s bulb + 30s margin = 61000ms).
 - Step 6: Restored baseline shutter speed value (`/main/capturesettings/shutterspeed=17` for 1/160), verified restoration in a FRESH session: `bulb-timer=no; bulb-seconds=1/160`.
 - Evidence files: `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k3iii-baseline-live.txt`, `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k3iii-bulb30s-capture-debug.log`.
+
+### 2026-08-25 — K-1 II bulb probe (release_mode=2)
+- Commit hash: `c963b639e`
+- Port: `usb:001,004`, model string: `"Pentax:K-1 Mark II (PTP mode)"`
+- Baseline state (from `/main/status/pentaxconditions`): `state=0; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=4; ISO=200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/500; aperture=20/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0`
+- Step 1: Ran `./tests/bulb_probe 1500 usb:001,004 2` with hold_ms=1500, release_mode=2 (bulb-open candidate per K-3 III traces).
+- Step 2: vendor_mode_enabled=1 confirmed. Baseline captured successfully.
+- Step 3: Initiate capture (release_mode=2, focus_mode=2) returned `0x2001` (PTP_RC_OK) after 5ms.
+- Step 4: Poll loop ran for hold_ms+30s but no shooting evidence seen (no state transition to 49/50 or SHOOTING flag).
+- Step 5: Terminate capture (release_mode=2) returned `0x2001` after 105ms. Final settle states remained at state=9, flags=0xe, bulb=1s/500.
+- Result: release_mode=2 did not produce shooting evidence on K-1 II. Previous tests with release_mode=0 showed proper state transitions (state=0 → state=3 → state=2 → state=9). Evidence saved to `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k1ii-bulb-probe-release-mode-2.log`.
