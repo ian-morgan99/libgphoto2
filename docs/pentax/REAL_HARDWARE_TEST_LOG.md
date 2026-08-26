@@ -348,11 +348,33 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 ### 2026-08-26 — K-3 III Astro-mode (ExpMode 20) capture rejection + stale-session recovery
 - Port: `usb:001,006`, model string: `"Pentax:K-3 Mark III (MTP mode)"`
 - Context: operator set camera to Bulb mode type 2; conditions showed `exposure-mode-raw=20` (Astro mode).
-- Finding 1: vendor InitiateCapture `0x9011` rejected with `0x2002` while in Astro mode — vendor capture path does not work in ExpMode 20. Evidence: `docs/pentax/evidence/2026-08-26/`.
+- Finding 1: vendor InitiateCapture `0x9011` rejected with `0x2002` while in Astro mode — vendor capture path does not work in ExpMode 20. Evidence: `docs/pentax/evidence/2026-08-26/`. **SUPERSEDED 2026-08-26 (see entry below)**: the rejection observed in this earlier run was the *vendor wedge* state, not Astro mode itself. A clean K-3 III in Astro mode does accept vendor `0x9011`.
 - Finding 2: after an interrupted exposure the camera entered state=49 (shooting/processing active) and refused OpenSession with `0x201e` (Session Already Opened). No host process held the device.
 - Fix implemented in `camlibs/ptp2/library.c` (~line 10527): on `PTP_RC_SessionAlreadyOpened` for Pentax candidates, attempt one `ptp_closesession` then reopen. Verified live: log shows "stale Pentax session closed; reopening" and OpenSession succeeds. Evidence: `k3iii-stale-session-recovery.log`.
 - Finding 3: even with a fresh session, vendor enable `0x9001` still returns `0x2002` while camera is internally busy — distinct from stale-session issue; requires physical intervention (power cycle / wait out interval sequence). Evidence: `k3iii-vendor-busy-0x2002.log`.
 - Incident: K-3 III battery went flat mid-testing; recharged by operator, testing resumed.
+
+### 2026-08-26 — K-3 III Astro mode: vendor 0x9011 IS accepted; 30s cancel re-wedges
+- Commit hash at start: `0208c658e` (master = origin/master, clean tree). Local build timestamp: `ptp2.so 2026-08-26 12:24:45`.
+- Context: K-3 III post-battery-pull (entry above), in M mode, Astro mode (ExpMode 20), `bulb-timer=yes`, `bulb-seconds=300/1`, `astrotracer3=yes`, `shooting=no`, `processing=no`, `state=0` (idle). Storage: SD1 (60874 MB max, 21621 MB free, 308 free images). Battery 33%. K-1 II also powered on (M mode, 4-capture regression already passed earlier).
+- Test command: `gphoto2 --port "usb:001,010" --debug --debug-logfile=<astro-probe> --capture-image` (30s SIGTERM timeout) — chosen deliberately short to *not* wait out the 300s bulb.
+- **Finding 1 — vendor `0x9011` IS accepted in Astro mode (Supersedes the earlier "ExpMode 20 rejection" conclusion).** Log evidence (`k3iii-astro-capture-probe.log`):
+  - L504: `stale-candidate pre-probe failed or short (576 bytes); proceeding without baseline check` (benign).
+  - L505: `Sending PTP_OC 0x9011 (vendor InitiateCapture) request...`
+  - L511: response read completed, **no `0x2002`** — the prior rejection was the *vendor wedge* state, not Astro mode.
+  - L575: `capture wait budget 331000 ms` = 300000 ms (300s bulb) + ~31000 ms buffer. Confirms the duration-aware capture budget (commit `8ba60c3e7`) is now correctly budgeting for a 5-minute Astro exposure.
+- **Finding 2 — 30s cancel of an active 300s bulb cleanly aborts the camera body.** L7956: `post-abort conditions show camera idle`. No half-written image left behind. `gphoto2` exit on SIGTERM is graceful.
+- **Finding 3 — *However*, the cancel re-wedges the K-3 III vendor session.** Re-probing the K-3 III after the cancel (log `k3iii-post-cancel-debug.log`):
+  - L158: `OpenSession` returns `0x201e` (Session Already Opened) — camera-side session table is still occupied.
+  - L189: `pentax_reconcile_reused_session`: `GetAllConditions` unreadable, marks session recovery-required.
+  - L200–L204: stale Pentax session closed, USB port reset issued, reopen attempted.
+  - L358–L373: re-run vendor enable `0x9001` → still `0x2002` (General Error). The reconciliation path cannot recover from the post-cancel wedge.
+  - The libgphoto2 `pentax_reconcile_reused_session` + USB port reset + reopen path (commit `8ba60c3e7`) exhausts its software recovery options. The camera firmware has not released the vendor session on its side, despite the bulb body having been cleanly aborted.
+- **Required recovery**: battery pull (true cold cycle). Same recovery path as the prior post-power-cycle wedge (entry above).
+- **Implication for the libgphoto2 driver**: do *not* SIGTERM/SIGINT a `--capture-image` (or `--capture-image-and-download`) on K-3 III Astro mode if the bulb-timer is longer than the host-side timeout. Either (a) let the bulb run to completion, (b) the operator physically cancels the exposure from the camera body (which closes the camera-side vendor session cleanly), or (c) the host pre-arms a duration-aware timeout that covers the full bulb. The existing duration-aware capture budget formula is `bulb_seconds * 1000 + ~31000 ms` — for a 300s bulb that is 331s, which is what L575 confirms is now in place.
+- **No new code change is needed for today's test**: the driver already uses the correct budget; the 30s cancel was an intentional test boundary to *find* what happens, not a normal usage pattern. Documenting the gotcha here so future tests don't trip on it.
+- Verdict: Astro mode vendor capture path is **operationally usable** on a clean K-3 III. The "vendor capture rejected in Astro mode" conclusion (earlier entry) is **retracted**. The K-3 III is currently back in a vendor wedge and needs a battery pull before further testing.
+- Evidence: `docs/pentax/evidence/2026-08-26/k3iii-astro-capture-probe.log` (SHA-256 `9f3c4ae5c4d3b40a7d6a791d6a15c3cef37f37d83ab0f667c3dac9b10f5b7556`), `docs/pentax/evidence/2026-08-26/k3iii-post-cancel-debug.log` (SHA-256 `af2a78868b69e5e8550a4174108f87b45ce62311ea89e8fe4c44b46ba1ec1aeb`).
 
 ### 2026-08-26 — Firmware static analysis (astro capture path / Star AF)
 - Analyzed `/home/ian/Downloads/k3III_v220/fwdc233b.bin` (K-3 III v2.20) and previously `/home/ian/Downloads/k1II_v251/fwdc240b.bin` (K-1 II v2.51).
