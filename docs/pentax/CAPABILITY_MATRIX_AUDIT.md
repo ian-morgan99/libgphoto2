@@ -25,7 +25,7 @@ is open.
 
 | Surface | What is correct now | What remains open |
 |---|---|---|
-| Identity | Exact VID:PID plus exact DeviceInfo string; K-1 II 78400 and K-3 III 78420; Monochrome excluded | Add an explicit capability structure before advanced shared implementations |
+| Identity | Exact VID:PID plus exact DeviceInfo string; K-1 II 78400 and K-3 III 78420; K-3 Mark III Monochrome (0x018f) included via StartsWith match in pentax_lookup_model | Add an explicit capability structure before advanced shared implementations |
 | Vendor lifecycle | Correct five parameters; Param2 flags; rollback after refresh failure; cleanup attempts disable | 10 cold + 10 warm per body; readiness/recovery behavior; official trace |
 | DeviceInfo refresh | Atomic refresh after enable is safe and necessary for K-3 III | It cannot discover K-1 II’s omitted direct properties; add guarded direct descriptor inventory |
 | Conditions | 508-byte mandatory bound; 532-byte optional Astro bound; raw unknowns; no setter | Complete safely gated status fields; per-mode correlation; tests for every new boundary |
