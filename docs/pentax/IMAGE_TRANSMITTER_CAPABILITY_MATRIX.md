@@ -18,6 +18,8 @@ available through ordinary libgphoto2 APIs. Source anchors are member names in
 `MtpDevice`, `MtpOpCode`, `ConditionIndex`, `ModeEnableInfo`, `ExpMode`, and
 `DriveModeLUT`; line numbers are intentionally avoided.
 
+**Note on PTP Vendor Extensions (Microsoft DeviceServices):** Some cameras advertise support for PTP vendor extension opcodes (0x9801-0x9805) with Vendor Extension ID `0x6` (`microsoft.com/DeviceServices: 1.0`). These were originally developed by Microsoft for Windows integration but have become a de facto industry standard for PTP camera object property operations. libgphoto2 implements these extensions on Linux to ensure cross-platform compatibility with modern cameras that advertise support for these opcodes via the PTP vendor extension mechanism. This is a protocol feature, not a Windows dependency.
+
 ## Model gates
 
 | Gate | K-1 Mark II | K-3 Mark III |
