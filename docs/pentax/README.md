@@ -84,6 +84,12 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
   K-3 III Monochrome research support, AF-position response validation,
   white-balance preflight enforcement and a drive-mode gating fix.
 
+  Note on the size-budget environment variable: the value is read and
+  **cached once per process** (static initialisation) the first time a
+  Pentax capture runs. Changing it mid-session has no effect; set it
+  before starting the application. Invalid values are logged and the
+  built-in default (2 GiB, floor 1 MiB) is used.
+
 ### Known limitations
 
 - Several camera settings are **LV-gated by the firmware itself**: writes to

@@ -316,3 +316,29 @@ capture+transfer+finalize (K-1 II).
 *Runbook authored 2026-08-25 consolidating the 2026-08-22 → 2026-08-24 sessions.
 Update it whenever an environment fact changes — stale instructions are worse
 than none.*
+
+## Appendix: model coverage status (post-firmware cross-check)
+
+Status of Pentax/Ricoh bodies against the IT2 opcode set implemented here,
+after cross-checking the released firmware images (k1II_v251, k3III_v220)
+and the vendor download list:
+
+| Model            | USB PID  | Status in camlib | Notes |
+|------------------|----------|------------------|-------|
+| K-3 III          | 0x0189   | Supported (hw-verified) | Primary test body; Astro Photo Assist opcodes reverse-engineered from k3III_v220. |
+| K-3 III Mono     | 0x018f   | Supported (research)    | Shares model_no 78420 via prefix match. |
+| K-1 II           | 0x0183   | Supported (hw-verified) | Bulb capture + transfer verified; zero-byte-download issue tracked separately. |
+| KP               | 0x017f   | Supported (unverified on hw) | Same IT2 family; needs a bench pass. |
+| K-70             | 0x017d   | Supported (unverified on hw) | As above. |
+| K-1              | 0x0179   | Supported (unverified on hw) | Prefix "PENTAX K-1" — must not shadow K-1 II. |
+| K-3              | 0x0165   | Supported (unverified on hw) | Prefix "PENTAX K-3". |
+| GR III           | 0x210f   | Supported (unverified on hw) | Fixed-lens; capture path differs. |
+| 645D             | 0x0130   | Supported (unverified on hw) | ext_version 0 legacy path. |
+| **645Z**         | TBD      | **Best next candidate** | Same-generation medium format as 645D; PID must be confirmed by plugging in or from firmware image before adding. |
+| KF               | unverified | Do not add yet        | PID not observed; add only after hardware/firmware confirmation. |
+| GR IIIx          | unverified | Do not add yet        | Same — likely prefix variant of GR III entry once confirmed. |
+| K-3 II           | —        | Deliberately excluded   | No IT2 reference implementation; older protocol generation. |
+
+Rule: never add a model ID without either (a) a hardware plug-in session
+logging its PID/`DeviceModel`, or (b) an extracted firmware image that
+contains the string/PID pair.

@@ -28,14 +28,15 @@ pentax_capture_max_file_size (void)
 		char *end = NULL;
 		unsigned long long value = strtoull (env, &end, 10);
 
-		if (end && *end == '\0' && value >= PENTAX_CAPTURE_MIN_FILE_SIZE) {
+		if (end && *end == '\0' && value >= PENTAX_CAPTURE_MIN_FILE_SIZE &&
+		    value <= SIZE_MAX) {
 			budget = (size_t)value;
 			GP_LOG_D ("capture size budget from environment: %llu bytes",
 				value);
 		} else {
 			GP_LOG_E ("invalid LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE '%s'; "
-				"using default %u bytes", env,
-				(unsigned)PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT);
+				"using default %zu bytes", env,
+				PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT);
 		}
 	}
 	return budget;

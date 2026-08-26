@@ -153,3 +153,9 @@ Makefile.in
 /tests/test-pedantic-cxx98
 
 /tmpwrk*/
+
+# local probe binaries
+/bulb_probe
+
+# raw capture evidence logs are huge; keep gzipped copies only
+docs/pentax/evidence/**/*.log

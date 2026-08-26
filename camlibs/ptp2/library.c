@@ -6026,6 +6026,14 @@ camera_sigma_fp_capture (Camera *camera, CameraCaptureType type, CameraFilePath 
 /* Camera-reported condition values are untrusted protocol input; compute
  * in 64-bit and clamp so a corrupt value can never wrap the timeout. */
 #define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
+/* Fallback when conditions are unreadable after InitiateCapture: long
+ * enough to cover a typical bulb exposure plus processing, but bounded so
+ * a wedged camera cannot pin the caller for up to a day (review #3). */
+#define PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK (2U * 60 * 1000)
+/* GetAllConditions payloads must carry the full parse range; offset 504
+ * (capability_flags) is the final mandatory field, so >=508 bytes is the
+ * single validation floor used everywhere (review #5). */
+#define PENTAX_CONDITIONS_MIN_SIZE 508
 
 static unsigned int
 pentax_clamp_timeout_ms (uint64_t ms, const char *source)
@@ -6215,31 +6223,32 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	if (params->pentax.recovery_required) {
+		GP_LOG_E ("capture refused: session reconciliation flagged "
+			"recovery-required (camera busy or conditions unreadable)");
+		gp_context_error (context,
+			_("Camera is in an unreconciled state from a previous session; reconnect or power-cycle it before capturing."));
+		return GP_ERROR_CAMERA_BUSY;
+	}
 	if (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE)
 		return GP_ERROR_CAMERA_BUSY;
 	if ((GP_OK == gp_setting_get ("ptp2", "autofocus", setting)) &&
 	    strcmp (setting, "off"))
 		focus_mode = 3;
 	SET_CONTEXT_P (params, context);
-	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
-	if (ptpres != PTP_RC_OK) {
-		ret = translate_ptp_result (ptpres);
-		goto out;
-	}
-	initiated = 1;
-	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
 	/* Refuse to fire when a candidate from a previous request is still
 	 * pending: without a generation ID the first observed handle after
 	 * InitiateCapture could be that stale image, mislabelling exposure
-	 * N-1 as N (issue #34). */
+	 * N-1 as N (issue #34).  This must run BEFORE InitiateCapture so
+	 * the shutter is never triggered on a busy camera. */
 	{
 		unsigned char *bdata = NULL;
 		unsigned int bsize = 0;
 		uint32_t baseline_candidate = 0;
 
 		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize) &&
-		    bsize >= 40 &&
+		    bsize >= PENTAX_CONDITIONS_MIN_SIZE &&
 		    pentax_get_u32le (bdata + 32) == 1)
 			baseline_candidate = pentax_get_u32le (bdata + 36);
 		free (bdata);
@@ -6253,6 +6262,14 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			goto out;
 		}
 	}
+
+	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	if (ptpres != PTP_RC_OK) {
+		ret = translate_ptp_result (ptpres);
+		goto out;
+	}
+	initiated = 1;
+	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
 	started = time_now ();
 	/* Read conditions once to size the wait budget for this capture
@@ -6284,7 +6301,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			    pentax_parse_conditions (data, size, &conditions) != 0) {
 				GP_LOG_E ("conditions probe attempt %d returned "
 					"short/unparseable data (%u bytes)",
-					attempt + 1, size);
+					attempt + 1, (unsigned)size);
 				continue;
 			}
 			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
@@ -6294,18 +6311,22 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		data = NULL;
 		size = 0;
 		if (!conditions_known) {
-			capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_MAX;
+			capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK;
 			GP_LOG_E ("conditions unreadable after %d attempts; using "
-				"conservative wait budget of %u ms instead of the "
-				"%d ms base so a live long exposure is not aborted",
+				"bounded wait budget of %u ms instead of the "
+				"%d ms base so a wedged camera cannot hang the "
+				"caller for the 24h ceiling",
 				3, capture_timeout_ms, PENTAX_CAPTURE_TIMEOUT_MS_BASE);
 			gp_context_status (context,
-				_("Camera conditions unreadable; using a conservative long capture wait budget."));
+				_("Camera conditions unreadable; using a bounded capture wait budget of %u ms."),
+				capture_timeout_ms);
 		}
 		GP_LOG_D ("capture wait budget %u ms%s", capture_timeout_ms,
 			conditions_known ? "" : " (fallback)");
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_WAITING;
+	{
+		int conditions_failures = 0;
 	do {
 		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
 			ret = GP_ERROR_CANCEL;
@@ -6315,12 +6336,21 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		data = NULL;
 		size = 0;
 		ptpres = ptp_pentax_get_all_conditions (params, &data, &size);
-		if (ptpres != PTP_RC_OK) {
+		if (ptpres != PTP_RC_OK || size < PENTAX_CONDITIONS_MIN_SIZE) {
+			/* A transient conditions failure must not abort a
+			 * live long exposure (issue #32 / review #4);
+			 * retry within the wait budget, but only a bounded
+			 * number of times so a wedged camera still times
+			 * out with a clear error. */
+			if (++conditions_failures <= 5) {
+				GP_LOG_D ("conditions read failed in-flight "
+					"(ptp 0x%04x, %u bytes); retry %d/5",
+					ptpres, (unsigned)size, conditions_failures);
+				continue;
+			}
+			GP_LOG_E ("conditions unreadable %d times during "
+				"capture wait; aborting", conditions_failures);
 			ret = translate_ptp_result (ptpres);
-			goto out;
-		}
-		if (size < 40) {
-			ret = GP_ERROR_CORRUPTED_DATA;
 			goto out;
 		}
 		if (pentax_get_u32le (data + 32) == 1) {
@@ -6329,6 +6359,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				break;
 		}
 	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
+	}
 	if (!candidate_handle) {
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
@@ -6379,6 +6410,19 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				suffix++;
 				existing = gp_filesystem_number (camera->fs,
 					path->folder, path->name, context);
+				if (existing < GP_OK &&
+				    existing != GP_ERROR_FILE_NOT_FOUND &&
+				    existing != GP_ERROR_BAD_PARAMETERS) {
+					/* A filesystem error is not proof
+					 * the name is free; publishing
+					 * under it could shadow a real
+					 * file (review #7). */
+					GP_LOG_E ("collision probe of %s/%s "
+						"failed (%d)", path->folder,
+						path->name, existing);
+					ret = existing;
+					goto out;
+				}
 			} while (existing >= GP_OK && suffix < 1000);
 			if (existing >= GP_OK) {
 				GP_LOG_E ("could not find collision-free name for capture in %s",
@@ -6403,8 +6447,15 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	if (ret < GP_OK)
 		goto out;
 	ret = gp_file_set_data_and_size (file, (char *)capture.data, capture.size);
-	if (ret < GP_OK)
+	if (ret < GP_OK) {
+		/* Ownership of capture.data is undefined after a failed
+		 * set_data_and_size; free it here and clear so the out:
+		 * path does not double-free (review #6). */
+		free (capture.data);
+		capture.data = NULL;
+		capture.size = 0;
 		goto out;
+	}
 	capture.data = NULL;
 	/* Finalize the camera-side candidate before publishing the file so the
 	 * host filesystem never advertises an image the camera has already
@@ -6482,7 +6533,7 @@ out:
 		unsigned char *qdata = NULL;
 		unsigned int qsize = 0;
 		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &qdata, &qsize) &&
-		    qsize >= 108) {
+		    qsize >= PENTAX_CONDITIONS_MIN_SIZE) {
 			if (pentax_get_u32le (qdata + 104) & 1)
 				GP_LOG_E ("camera still shooting after abort; "
 					"activity flags 0x%08x",
@@ -10300,7 +10351,7 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 	}
 
 	if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size) &&
-	    size >= 108) {
+	    size >= PENTAX_CONDITIONS_MIN_SIZE) {
 		uint32_t op_state = pentax_get_u32le (data + 24);
 		uint32_t candidate = pentax_get_u32le (data + 36);
 		uint32_t activity = pentax_get_u32le (data + 104);
