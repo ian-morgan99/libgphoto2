@@ -1,6 +1,18 @@
 libgphoto2 2.5.34 release
 
 ptp2:
+* pentax: research capture hardening (issues #8-#38):
+  * camera-side capture abort and candidate cleanup on all error paths
+  * atomic capture publication with filename collision preflight
+  * PC live view restore after preview and forced teardown on exit
+  * session-state reconciliation on reconnect (SessionAlreadyOpened)
+  * vendor-mode enable failure now fails init on research-capable bodies;
+    failed disable recorded as unknown state for next-session reconcile
+  * progress-aware transfer timeout (60s no-progress, 30min ceiling)
+  * short transfer blocks inside a declared segment rejected
+  * configurable capture size budget via LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE
+  * K-3 III Monochrome research support; AF-position response validation;
+    white-balance preflight enforcement; drive-mode gating fix
 * new Canon EOS SDRAM capture method added
 * new Nikon Z series property code list method added
 * Sony generation 2 vs 3 handling enhanced

@@ -72,6 +72,17 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
   payloads the firmware sends as opaque blobs.
 - **`ptp-probe`**, a read-only diagnostic tool that compares which PTP and
   vendor opcodes different bodies advertise.
+- **Robustness hardening** (GitHub issues #8–#38): camera-side capture abort
+  and candidate cleanup on every error path, atomic capture publication with
+  filename-collision preflight, PC live-view restore after preview and forced
+  teardown on exit, session-state reconciliation on reconnect
+  (`SessionAlreadyOpened`), fail-closed vendor-mode enablement for
+  research-capable bodies with unknown-state tracking across sessions,
+  progress-aware transfer timeouts (60 s no-progress / 30 min ceiling),
+  rejection of short transfer blocks inside a declared segment, a
+  configurable capture size budget (`LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE`),
+  K-3 III Monochrome research support, AF-position response validation,
+  white-balance preflight enforcement and a drive-mode gating fix.
 
 ### Known limitations
 
