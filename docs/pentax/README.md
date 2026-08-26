@@ -51,7 +51,8 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 
 - **Vendor mode enablement** replicating the vendor session handshake.
 - **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x018c),
-  K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D.
+  K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D,
+  plus firmware-derived entries for 645Z (0x0167) and KF (0x018e).
 - **Live view**: PC-LV control (`0xd035`) with a `pclvkeep` toggle so
   research harnesses can hold a session open; complete-JPEG-frame validation
   and session-state restore across capture-preview calls.
@@ -113,7 +114,8 @@ body is mostly a matter of its USB ID plus capability flags:
 | **K-70** | ID present; no hardware access yet |
 | **K-1** (original) | ID present; expected old-focus like the K-1 II |
 | **GR III / GR IIIx** | GR III modelled; new-focus family per opcode review |
-| **645Z** | Exposure-bracketing support indicated by capability review; no entry exists yet — first candidate if a unit appears |
+| **645Z** | Entry added from its own firmware image (PID 0x0167); needs a bench pass to confirm capability flags |
+| **KF** | Entry added from its own firmware image (PID 0x018e); needs a bench pass |
 | **645D** | Modelled from ID evidence only |
 
 The blocking factor is hardware: every capability flag in this fork was set

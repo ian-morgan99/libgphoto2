@@ -6543,8 +6543,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 out:
 	free (data);
 	free (capture.data);
+	/* The filesystem cache (set_file_noop above) holds its own
+	 * reference when the file was published; use unref so the
+	 * cached copy stays valid for later downloads. Calling
+	 * gp_file_free here would free the data out from under the
+	 * LRU cache and produce 0-byte downloads (issue #31). */
 	if (file)
-		gp_file_free (file);
+		gp_file_unref (file);
 	/* Best-effort camera-side cleanup on abnormal exits. Initiation
 	 * failure means no capture was started, so there is nothing to abort.
 	 * Once a candidate exists its deletion is the authoritative cleanup;
@@ -10027,6 +10032,14 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 	uint32_t handle;
 	CR (find_storage_and_handle_from_path(params, folder, &storage, &handle));
 	handle = find_child(params, filename, storage, handle, NULL);
+
+	/* Pentax vendor capture publishes a virtual fs entry for a file
+	 * whose camera-side candidate was already deleted via opcode
+	 * 0x900e; there is no PTP object to remove. Treat "not found"
+	 * as success so callers (e.g. gphoto2 CLI post-capture cleanup)
+	 * do not report a spurious error (issue #31). */
+	if (handle == PTP_HANDLER_SPECIAL)
+		return GP_OK;
 
 	C_PTP (ptp_deleteobject(params, handle, 0));
 

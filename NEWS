@@ -13,6 +13,12 @@ ptp2:
   * configurable capture size budget via LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE
   * K-3 III Monochrome research support; AF-position response validation;
     white-balance preflight enforcement; drive-mode gating fix
+  * capture fs-cache publication keeps its own reference so later
+    downloads no longer return 0-byte data after LRU eviction (issue #31)
+  * post-capture delete of a virtual fs entry whose camera-side candidate
+    was already removed is reported as success instead of a spurious error
+* added ids:
+  * Pentax: 645Z (0x0167), KF (0x018e) — derived from firmware-image PID extraction
 * new Canon EOS SDRAM capture method added
 * new Nikon Z series property code list method added
 * Sony generation 2 vs 3 handling enhanced
