@@ -73,7 +73,7 @@ not live view, capture, configuration, or focus control.
 | `0x9019` | aperture keep flag/value | K-3 III gate | Target |
 | `0x9021` | WB measurement name; no active call found | Unknown | Withhold pending call-site/trace |
 | `0x9022` | dust-reduction name; no active call found | Unknown | Withhold pending call-site/trace |
-| Star AF trigger | No vendor opcode identified in K-1 II (fwdc240b) or K-3 III (fwdc233b) firmware; no `StarAf*` string or dispatch entry found | Neither | Not implemented; see evidence/2026-08-26/k3iii-fw-astro-analysis.md |
+| Star AF trigger | K-1 II fw contains `StarAfReqType:%d` / `StarAfEvent` debug strings (LZ literals @0x21ffd0/0x223815 in fwdc240b) — feature exists in firmware but opcode unidentified; not in shared 82-op set; no strings in K-3 III fw | K-1 II confirmed in fw | Not implemented; see evidence/2026-08-26/firmware-crosscheck-kp-k1ii-k3iii.md |
 | Astro-mode capture | ExpMode 20 rejects vendor 0x9011 with 0x2002 on the wire; astro capture path not in any identified opcode — candidates are undocumented 0x901a-0x9024 or standard 0x100E | K-3 III | Open; live probe of undocumented ops pending camera availability |
 | `0x97ff` | general command plus four parameters; preview uses command 1 | Both | Withhold pending trace |
 
