@@ -10531,8 +10531,22 @@ camera_init (Camera *camera, GPContext *context)
 			/* A previous process still owns the session. For
 			 * research Pentax bodies observe leftover state
 			 * before treating this as a fresh start (issue #33). */
-			if (pentax_candidate)
+			if (pentax_candidate) {
 				pentax_reconcile_reused_session (params, context);
+				/* If the previous owner crashed without
+				 * CloseSession, the camera refuses vendor
+				 * enable (0x9001 -> 0x2002) until the stale
+				 * session is closed. Try one clean close +
+				 * reopen; harmless if the session is genuinely
+				 * owned by a live process (it will just fail
+				 * again and we keep observing). */
+				if (PTP_RC_OK == ptp_closesession (params)) {
+					GP_LOG_D ("stale Pentax session closed; reopening");
+					ret = LOG_ON_PTP_E (ptp_opensession (params, sessionid));
+					if (ret == PTP_RC_OK)
+						break;
+				}
+			}
 			break;
 		}
 
