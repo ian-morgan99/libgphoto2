@@ -345,3 +345,27 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - Step 4: Poll loop ran for hold_ms+30s but no shooting evidence seen (no state transition to 49/50 or SHOOTING flag).
 - Step 5: Terminate capture (release_mode=2) returned `0x2001` after 105ms. Final settle states remained at state=9, flags=0xe, bulb=1s/500.
 - Result: release_mode=2 did not produce shooting evidence on K-1 II. Previous tests with release_mode=0 showed proper state transitions (state=0 → state=3 → state=2 → state=9). Evidence saved to `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/docs/pentax/evidence/2026-08-25/k1ii-bulb-probe-release-mode-2.log`.
+
+### 2026-08-26 — K-3 III Astro-mode (ExpMode 20) capture rejection + stale-session recovery
+- Port: `usb:001,006`, model string: `"Pentax:K-3 Mark III (MTP mode)"`
+- Context: operator set camera to Bulb mode type 2; conditions showed `exposure-mode-raw=20` (Astro mode).
+- Finding 1: vendor InitiateCapture `0x9011` rejected with `0x2002` while in Astro mode — vendor capture path does not work in ExpMode 20. Evidence: `docs/pentax/evidence/2026-08-26/`.
+- Finding 2: after an interrupted exposure the camera entered state=49 (shooting/processing active) and refused OpenSession with `0x201e` (Session Already Opened). No host process held the device.
+- Fix implemented in `camlibs/ptp2/library.c` (~line 10527): on `PTP_RC_SessionAlreadyOpened` for Pentax candidates, attempt one `ptp_closesession` then reopen. Verified live: log shows "stale Pentax session closed; reopening" and OpenSession succeeds. Evidence: `k3iii-stale-session-recovery.log`.
+- Finding 3: even with a fresh session, vendor enable `0x9001` still returns `0x2002` while camera is internally busy — distinct from stale-session issue; requires physical intervention (power cycle / wait out interval sequence). Evidence: `k3iii-vendor-busy-0x2002.log`.
+- Incident: K-3 III battery went flat mid-testing; recharged by operator, testing resumed.
+
+### 2026-08-26 — Firmware static analysis (astro capture path / Star AF)
+- Analyzed `/home/ian/Downloads/k3III_v220/fwdc233b.bin` (K-3 III v2.20) and previously `/home/ian/Downloads/k1II_v251/fwdc240b.bin` (K-1 II v2.51).
+- Extracted full vendor opcode table from DeviceInfo blob at file offset `0x1f4f8dc`: ops 0x9001–0x9006, 0x900b–0x900d, 0x900f–0x9011, 0x9014–0x9017, 0x9019–0x9024, 0x902d–0x9055 range through 0x907f. Ops 0x901a–0x9024 and beyond are undocumented candidates for astro capture.
+- Found five per-model device property tables at ~0x1e00c1a (0xd0xx–0xd4xx ranges, ~95 props each).
+- String mining found only sparse LZ literals (`AstroTr`, `M6AstroT…`, `AstroCalcFwhm`, menu icons); **no StarAf/ReadAstro strings** — Star AF trigger has no identifiable opcode in either firmware.
+- Both firmwares use custom interleaved compression (entropy ~8.0 bands alternating with CODE/DATA; no standard container magic) — handler disassembly blocked without decompression.
+- Conclusion: astro capture path must be found by live-probing undocumented ops 0x901a–0x9024 and d0xx–d4xx props, plus testing standard PTP `0x100E` as alternative to vendor `0x9011` in Astro mode.
+- Full writeup: `docs/pentax/evidence/2026-08-26/k3iii-fw-astro-analysis.md`. Capability matrix updated (Star AF trigger row: confirmed absent in both firmwares).
+
+### 2026-08-26 — Outstanding items
+- [ ] K-3 III remained unavailable for probing at session end (init fails; camera busy/state=49 persists across reconnects) — needs physical power cycle before undocumented-op probe run.
+- [ ] Live probe of ops 0x901a–0x9024 and d0xx–d4xx properties in Astro mode.
+- [ ] Test standard PTP 0x100E InitiateCapture in Astro mode.
+- [ ] K-1 II 0-byte download root cause (pentax_transfer_run publish path, library.c ~6330-6400): collision-preflight gp_filesystem_number fails because candidate name isn't yet in FS listing.
