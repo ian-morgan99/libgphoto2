@@ -387,3 +387,44 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - Fix 2 (secondary, the `-6` delete error): after download the CLI calls gp_camera_file_delete; our delete_file_func issued a real camera DeleteObject for a candidate already removed camera-side via vendor opcode 0x900e. Now "object not found" (`PTP_HANDLER_SPECIAL`) returns GP_OK for this virtual-entry case.
 - Verification (fixed build, live hardware): 4 consecutive captures, each produced a full valid DNG (~44 MB, `file` reports TIFF/RICOH K-1 Mark II), exit code 0, **zero** "Could not delete" errors across all runs and logs. Evidence logs: `/tmp/k1ii-fix-{a,b,c,d}.log`.
 - Outstanding item closed: "K-1 II 0-byte download root cause" from the outstanding-items list above.
+
+### 2026-08-26 — K-3 III stale-session vendor enable (0x9001 → 0x2002): software recovery exhausted, power-cycle required
+
+**Symptom.** After the first connect following a camera power cycle, every subsequent
+connect reports `OpenSession → 0x201e (SessionAlreadyOpened)`, runs the stale-session
+recovery path, and then fails vendor enable with `0x9001 → 0x2002`. This happens even
+when the previous session exited cleanly (vendor disable OK + CloseSession OK).
+
+**What was tried on live hardware (all confirmed executing via debug logs):**
+1. PTP `CloseSession` then reopen — insufficient.
+2. USB class device-reset control request (`bmRequestType` write, req 0x66,
+   `ptp_usb_control_device_reset_request`) before close/reopen — insufficient.
+3. Reordered: `CloseSession` → `gp_port_reset()` (real `libusb_reset_device`,
+   re-enumeration) → sleep(2) → reopen — still insufficient; enable returns 0x2002.
+4. Waiting up to 15 s between attempts — no change.
+
+Request bytes were verified byte-identical between a succeeding run
+(`/tmp/k3iii-postcycle.log`, first connect after power cycle) and failing runs
+(`/tmp/k3iii-r1..r5.log`), confirming this is camera-side state, not a driver bug.
+
+**Conclusion.** The K-3 III does not release its internal session/vendor state through
+any software mechanism available over USB. Only a physical power cycle clears it.
+
+**Code changes kept (best-effort recovery, harmless when unnecessary):**
+- `camlibs/ptp2/library.c` OpenSession retry loop: on `0x201e` for Pentax candidates,
+  the recovery path now closes the PTP session, performs a USB port reset
+  (`gp_port_reset`), waits 2 s, then reopens. This is the correct ordering even though
+  it cannot clear this particular firmware state.
+- `camera_exit`: after a successful vendor-mode disable, send Pentax CameraShutdown
+  (0x9002) as belt-and-braces so the camera tears down its vendor session.
+
+**Operational requirement (junior agents: read this).** For scripted K-3 III test runs:
+- Power cycle the camera **once at the start of the test session**.
+- Run all tests in that one process/session if possible.
+- If you must reconnect repeatedly, expect the first post-power-cycle connect to be
+  the only one with working vendor capture/preview/config; subsequent connects will
+  log `0x2002` on vendor enable and fall back to standard PTP operation.
+- Do NOT treat the 0x2002 as a regression — it is a documented firmware limitation.
+
+Evidence logs retained under `/tmp/k3-fix*.log` (transient); canonical failure trace
+in `/tmp/k3iii-r1.log` lines 144–353.

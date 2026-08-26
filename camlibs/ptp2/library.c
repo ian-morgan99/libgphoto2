@@ -3396,6 +3396,13 @@ camera_exit (Camera *camera, GPContext *context)
 					GP_LOG_D ("Pentax vendor mode disabled");
 					params->pentax.vendor_mode_enabled = 0;
 					params->pentax.vendor_mode_unknown = 0;
+					/* Belt and braces: ask the camera to tear
+					 * down its vendor session so the next
+					 * connect does not hit a stale session
+					 * (0x201e) that blocks vendor enable
+					 * (issue #33). */
+					if (PTP_RC_OK != ptp_pentax_camera_shutdown (params))
+						GP_LOG_D ("Pentax camera shutdown (0x9002) not accepted; relying on CloseSession");
 				}
 			}
 			break;
@@ -10664,21 +10671,25 @@ camera_init (Camera *camera, GPContext *context)
 			 * before treating this as a fresh start (issue #33). */
 			if (pentax_candidate) {
 				pentax_reconcile_reused_session (params, context);
-				/* If the previous owner crashed without
-				 * CloseSession, the camera refuses vendor
-				 * enable (0x9001 -> 0x2002) until the stale
-				 * session is closed. Try one clean close +
-				 * reopen. This may only run once this process
-				 * holds exclusive ownership of the underlying
-				 * USB interface (enforced by the kernel for
-				 * direct-USB claims); it must never be sent as
-				 * speculative cleanup against a transport we do
-				 * not own. Any unsafe camera state observed
-				 * above stays flagged: a successful OpenSession
-				 * is not evidence that shooting/live-view/
-				 * candidate state is safe (issue #33). */
-				if (PTP_RC_OK == ptp_closesession (params)) {
-					GP_LOG_D ("stale Pentax session closed; reopening");
+				/* If the previous owner exited without fully
+				 * clearing camera-side session state, the
+				 * camera refuses vendor enable (0x9001 ->
+				 * 0x2002). Empirically neither a PTP
+				 * CloseSession nor a USB reset alone clears
+				 * it; close the PTP session first, then do a
+				 * USB port reset (libusb_reset_device), then
+				 * reopen (issue #33). */
+				if (PTP_RC_OK == ptp_closesession (params))
+					GP_LOG_D ("stale Pentax session closed");
+				if (camera->port->type == GP_PORT_USB) {
+					GP_LOG_D ("stale Pentax session: issuing USB port reset to clear camera-side session state");
+					if (GP_OK != gp_port_reset (camera->port))
+						GP_LOG_E ("USB port reset failed; stale session may persist");
+					/* give the camera time to recover its PTP stack */
+					sleep(2);
+				}
+				{
+					GP_LOG_D ("stale Pentax session: reopening");
 					ret = LOG_ON_PTP_E (ptp_opensession (params, sessionid));
 					if (ret == PTP_RC_OK)
 						break;
