@@ -488,6 +488,14 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 
 ### 2026-08-26 — Open question: K-1 II smart storage selector
 - During `--storage-info` validation, observed that the K-1 II reports 3 storage IDs but only `store_00010001` contains real files (the DCIM tree). The other two are virtual/empty volumes.
+  - `store_00010001` (SD1): 1095680 KB free, 886474 free images (real).
+  - `store_00030001`: 68719476720 KB total (impossible 64 TB), 0 free images (empty).
+  - `store_00040001`: 68719476720 KB total (impossible 64 TB), 0 free images (empty).
 - A `--capture-image-and-download` run uses whatever storage the camera body is currently configured to write to. The libgphoto2 `ptp_list_folder` init code (camlibs/ptp2/library.c ~L11103) currently walks all storage IDs but does not "prefer" the one with content.
-- A possible improvement: after `ptp_getstorageids`, query each storage's root with `ptp_list_folder`; the storage that contains a `DCIM` association is the active card. Default folder resolution could prefer this storage, eliminating confusion when a camera reports multiple storage IDs.
-- This is a future enhancement, not a regression. The current 4-capture regression test passed because the K-1 II was configured to write to SD1.
+- **Proposed design (future enhancement, not yet implemented):**
+  1. After the existing `ptp_list_folder` init loop at L11103-L11106, add a second pass that inspects `params->objects` and counts root-level children per `StorageID`.
+  2. A storage ID with `> 0` root children that include at least one `PTP_OFC_Association` (the `DCIM` folder) is a "real" card. Empty storages report `MaxCapacity` = 0xFFFFFFFFFFFFF (the 64 TB impossible value observed) and `FreeSpaceInBytes` = 0.
+  3. Record the preferred real-card `StorageID` in a new field, e.g. `params->pentax.preferred_storage_id`, and skip listing the empty virtual volumes in `--storage-info` and `--list-folders`.
+  4. The capture path (commit 8ba60c3e7 era) already reads the new-object `StorageID` from `GetObjectInfo` after each `0x9011` — this is correct; no change needed. The smart selector only affects default-folder resolution and human-visible storage enumeration.
+- **Out of scope for the current PR.** Touching `camera_init` requires a full init+regression pass on both cameras. The K-1 II is operational; the K-3 III is currently wedged (post-cancel) and needs a battery pull before any further testing.
+- **Why it is not a regression:** the 4-capture DNG regression (commit 1340d8bd1) passed because the K-1 II was already configured to write to SD1; the empty virtual volumes never had objects to find, so the file resolution was unambiguous. The smart selector would matter most when a capture reports `StorageID` = an empty volume, which the camera firmware would not do in normal operation.
