@@ -428,3 +428,13 @@ any software mechanism available over USB. Only a physical power cycle clears it
 
 Evidence logs retained under `/tmp/k3-fix*.log` (transient); canonical failure trace
 in `/tmp/k3iii-r1.log` lines 144–353.
+
+### 2026-08-26 — K-3 III post-power-cycle vendor wedge (0x201e + 0x2002), battery-pull needed
+- Commit hash: `8ba60c3e7` (HEAD, clean tree).
+- Operator turned both cameras off, then turned the K-3 III back on (K-1 II not yet enumerated at this entry).
+- Operator: M mode (Manual). K-3 III back LCD responsive, no PTP-mode dialog visible.
+- lsusb at start: only `25fb:0189` (K-3 III) at `usb:001,008`. No `gvfs-gphoto2-volume-monitor` running.
+- First post-power-cycle connect: `OpenSession` returns `0x201e (SessionAlreadyOpened)` — the firmware retains a session entry from a prior connection. Recovery path (Close + `gp_port_reset` + reopen) executes correctly but the camera immediately re-reports the session as opened. Vendor enable (`PTP_OC 0x9001`) then fails with `0x2002` (PTP General Error) — twice in a row, ~3.6 s apart, identical request bytes to a previously-succeeding run.
+- Same finding as 2026-08-26 entry above: this is a **camera-side firmware state, not a driver bug**. The K-3 III does not release its internal session/vendor table through any USB-reachable mechanism. Only a true cold power cycle (battery pull) clears it.
+- Verdict: K-3 III vendor operations **unavailable** for the remainder of this power-on cycle. Defer further K-3 III probing until operator performs a battery-pull cold cycle.
+- Evidence: `docs/pentax/evidence/2026-08-26/k3iii-stale-vendor-wedge-after-on.log` (601 lines, SHA-256 `90161ffcb666b4e5d1be5d3e127effb56c8858cf63132ea2df3fec4292663cc2`).
