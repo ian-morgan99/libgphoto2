@@ -499,3 +499,12 @@ in `/tmp/k3iii-r1.log` lines 144–353.
   4. The capture path (commit 8ba60c3e7 era) already reads the new-object `StorageID` from `GetObjectInfo` after each `0x9011` — this is correct; no change needed. The smart selector only affects default-folder resolution and human-visible storage enumeration.
 - **Out of scope for the current PR.** Touching `camera_init` requires a full init+regression pass on both cameras. The K-1 II is operational; the K-3 III is currently wedged (post-cancel) and needs a battery pull before any further testing.
 - **Why it is not a regression:** the 4-capture DNG regression (commit 1340d8bd1) passed because the K-1 II was already configured to write to SD1; the empty virtual volumes never had objects to find, so the file resolution was unambiguous. The smart selector would matter most when a capture reports `StorageID` = an empty volume, which the camera firmware would not do in normal operation.
+
+### 2026-08-26 — K-3 III vendor wedge recurs after power switch; full battery pull still required
+- Commit hash: `f0f29ffc4` (master = origin/master, clean tree).
+- Operator: "k3iii is back on" (likely a power-switch cycle, not a battery pull — the camera re-enumerated at `usb:001,002` (25fb:0189) shortly after.
+- First post-re-enumeration connect: `OpenSession` returns `0x201e` (SessionAlreadyOpened), stale-session reconciliation fires (Close + `gp_port_reset` + sleep 2 + reopen — correct ordering), but vendor enable `PTP_OC 0x9001` still returns `0x2002` (PTP General Error) within ~1.1 s.
+- Six retry attempts over ~20 minutes (immediate, +20s, +60s, +180s, +300s, +600s) — every one returns the same `0x201e → 0x2002` pattern. The wedge is **not time-decaying** and is **not recoverable by software alone**.
+- This confirms: the K-3 III vendor-wedge firmware state persists across a USB re-enumeration (which is what a power-switch cycle produces) and is only cleared by a true battery pull. A subsequent USB re-enumeration on a different bus/device number does not change the camera's internal vendor-session table.
+- Verdict: K-3 III vendor operations **unavailable** until operator performs a battery-pull cold cycle. Stale-session auto-recovery in `library.c` is doing exactly the right thing; the camera firmware is the blocker.
+- Evidence: `docs/pentax/evidence/2026-08-26/k3iii-conn8.log` (SHA-256 `10d0b871bb19f996bf4006c5e24732870068ab07e0ed14c8514222ffd9d4b56c`), `docs/pentax/evidence/2026-08-26/k3iii-retry6.log` (SHA-256 `d50a088bb6473ccc93c29b66657905a5628d09d5add9cb508484da12fb1ffc0a`).
