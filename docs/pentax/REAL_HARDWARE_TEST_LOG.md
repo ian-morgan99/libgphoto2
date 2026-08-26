@@ -379,3 +379,12 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
   - K-3 III / K-1 II firmware use a newer header layout without this pattern (their PIDs already hardware-confirmed as 0x0189 / 0x0183).
 - Neither PID appears in usb.ids, upstream gphoto2 master, or libmtp — these are first additions.
 - Status: firmware-derived, not yet bench-verified. Runbook model coverage table updated accordingly.
+
+### 2026-08-26 — K-1 II 0-byte DNG download: ROOT CAUSE FOUND AND FIXED (verified on hardware)
+- Port: `usb:001,003`, model `"Pentax:K-1 Mark II (MTP mode)"`.
+- Symptom (intermittent): `--capture-image-and-download` produced a 0-byte DNG on disk despite all seven 0x900d block transfers succeeding (~44.7 MB, every response 0x2001). Frequency depended on wall-clock parity — the gphoto2 CLI picks its save method via `time(NULL) & 1` (`/tmp/gphoto2-2.5.28/gphoto2/main.c`, save_file_to_file), so only the fd-method path exposed the bug.
+- Root cause: in the Pentax capture exit path (`camlibs/ptp2/library.c`, `out:` block) the driver called **`gp_file_free(file)`** after having published the file via `gp_filesystem_set_file_noop()`. The filesystem LRU cache stores that same CameraFile pointer and takes its own reference (`gp_file_ref` in set_file_noop, libgphoto2/gphoto2-filesys.c ~L2183). But `gp_file_free` ignores refcounts: `gp_file_clean` frees `file->data` and zeroes size, then frees the struct. Result: the cached copy was hollowed out, and the CLI's later fd-method download copied 0 bytes from the cache ("LRU cache used for type 1!" in the debug log immediately before the empty write).
+- Fix 1: `gp_file_free(file)` → **`gp_file_unref(file)`** in the capture `out:` block (library.c ~L6543).
+- Fix 2 (secondary, the `-6` delete error): after download the CLI calls gp_camera_file_delete; our delete_file_func issued a real camera DeleteObject for a candidate already removed camera-side via vendor opcode 0x900e. Now "object not found" (`PTP_HANDLER_SPECIAL`) returns GP_OK for this virtual-entry case.
+- Verification (fixed build, live hardware): 4 consecutive captures, each produced a full valid DNG (~44 MB, `file` reports TIFF/RICOH K-1 Mark II), exit code 0, **zero** "Could not delete" errors across all runs and logs. Evidence logs: `/tmp/k1ii-fix-{a,b,c,d}.log`.
+- Outstanding item closed: "K-1 II 0-byte download root cause" from the outstanding-items list above.
