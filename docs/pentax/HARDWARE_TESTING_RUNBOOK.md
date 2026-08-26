@@ -334,8 +334,8 @@ and the vendor download list:
 | K-3              | 0x0165   | Supported (unverified on hw) | Prefix "PENTAX K-3". |
 | GR III           | 0x210f   | Supported (unverified on hw) | Fixed-lens; capture path differs. |
 | 645D             | 0x0130   | Supported (unverified on hw) | ext_version 0 legacy path. |
-| **645Z**         | TBD      | **Best next candidate** | Same-generation medium format as 645D; PID must be confirmed by plugging in or from firmware image before adding. |
-| KF               | unverified | Do not add yet        | PID not observed; add only after hardware/firmware confirmation. |
+| **645Z**         | 0x0167   | Supported (firmware-derived) | PID extracted from fwdc224b.bin v1.30 header (`fb25 6601 6701`); second position = PTP mode per KP precedent (0x017f). Needs bench pass. |
+| KF               | 0x018e   | Supported (firmware-derived) | Same method, fwdc245b.bin v1.33 (`fb25 8d01 8e01`). Needs bench pass. |
 | GR IIIx          | unverified | Do not add yet        | Same — likely prefix variant of GR III entry once confirmed. |
 | K-3 II           | —        | Deliberately excluded   | No IT2 reference implementation; older protocol generation. |
 

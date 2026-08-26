@@ -281,6 +281,24 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		*extension_version = 0;
 		return 1;
 	}
+	/* IT2 Model setter: 645Z = 77840, StartsWith("645Z"), ext version 1,
+	 * isNewTransferMode=false, exp bracket YES, movie NO.  PID from its
+	 * own firmware image (fwdc224b.bin v1.30 header). */
+	if ((usb_product == 0x0167) &&
+	    (!strcmp (device_model, "645Z") ||
+	     !strncmp (device_model, "PENTAX 645Z", strlen ("PENTAX 645Z")))) {
+		*model_no = PENTAX_MODEL_645Z;
+		*extension_version = 1;
+		return 1;
+	}
+	/* IT2 Model setter: KF = 78520.  PID from fwdc245b.bin v1.33 header
+	 * (same fb25 <pid> <pid> pattern as KP/645Z). */
+	if ((usb_product == 0x018e) &&
+	    !strncmp (device_model, "PENTAX KF", strlen ("PENTAX KF"))) {
+		*model_no = PENTAX_MODEL_KF;
+		*extension_version = 1;
+		return 1;
+	}
 	/* K-3 II is NOT in IT2, so we have no normative reference for it.
 	 * Fail-closed: assume the older K-3-generation architecture (old
 	 * transfer, old focus 0x9016) until proven otherwise on hardware or
@@ -326,8 +344,8 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * surfaces as GP_ERROR_CORRUPTED_DATA.  Fail closed instead.
  *
  * Exposure bracketing (0xd014/0xd015): _isExpBracketSupport is set only
- * for K-3 III family and 645Z (MainWindow.xaml.cs:506).  The fork has no
- * 645Z entry yet, so K-3 III family only until one is added.
+ * for K-3 III family and 645Z (MainWindow.xaml.cs:506).  The fork now has
+ * a 645Z entry (PID 0x0167 from its firmware image), so both are covered.
  * Composition adjustment (0xd02a): _isCompositionAdjSupported only for
  * K-3 III family and KP (MtpDevice.cs:96,173).
  * Movie mode setting (0xd039): _isMovieSettingSupported only for the
@@ -346,7 +364,9 @@ pentax_model_is_k3iii_family (uint32_t model_no)
 int
 pentax_model_supports_exp_bracket (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	/* IT2 MainWindow.xaml.cs:506: 645Z also sets _isExpBracketSupport. */
+	return pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_645Z);
 }
 
 int

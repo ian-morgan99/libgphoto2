@@ -2823,6 +2823,13 @@ static struct {
 	 * Generic PTP only: IT2 never supported this body and the legacy SCSI
 	 * path needs MSC mode (0x0130). */
 	{"Pentax:K-01 (PTP Mode)",		0x25fb, 0x0131, 0},
+	/* 645Z PIDs extracted from its own firmware image (fwdc224b.bin v1.30,
+	 * header pattern "fb25 <pid1> <pid2>" — same layout as KP where the
+	 * second PID is the confirmed PTP PID). Hardware confirmation pending. */
+	{"Pentax:645Z (PTP Mode)",		0x25fb, 0x0167, 0},
+	/* KF PIDs extracted from its own firmware image (fwdc245b.bin v1.33),
+	 * same header pattern as KP/645Z. Hardware confirmation pending. */
+	{"Pentax:KF (PTP Mode)",		0x25fb, 0x018e, 0},
 
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */

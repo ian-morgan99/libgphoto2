@@ -369,3 +369,13 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - [ ] Live probe of ops 0x901a–0x9024 and d0xx–d4xx properties in Astro mode.
 - [ ] Test standard PTP 0x100E InitiateCapture in Astro mode.
 - [ ] K-1 II 0-byte download root cause (pentax_transfer_run publish path, library.c ~6330-6400): collision-preflight gp_filesystem_number fails because candidate name isn't yet in FS listing.
+
+### 2026-08-26 — 645Z / KF PIDs extracted from firmware images
+- Question: is the 645Z USB PID in Image Transmitter 2? Answer: **no** — IT2 identifies bodies by WPD model-name strings only (see `IT2_2625_decompile/RemoteAssistant/MtpDevice.cs`); it never reads USB PIDs.
+- Source of truth instead: the camera's own firmware image. Older-generation Pentax firmware headers embed the VID:PID pair as `fb25 <pid1_le> <pid2_le>` immediately after the `PENTAX <model>\0Version X.XX` string. Validated against KP (fwdc232b.bin v1.31 → 0x017e/0x017f; second PID matches the hardware-known KP PID).
+- Findings:
+  - **645Z** (fwdc224b.bin v1.30, offset 0x170): PIDs **0x0166, 0x0167** → PTP PID = **0x0167** (second position per KP precedent). Added to library.c model table + pentax_lookup_model (model_no 77840, ext ver 1, exp bracket YES per IT2 MainWindow.xaml.cs:506).
+  - **KF** (fwdc245b.bin v1.33): PIDs **0x018d, 0x018e** → PTP PID = **0x018e**. Added likewise (model_no 78520).
+  - K-3 III / K-1 II firmware use a newer header layout without this pattern (their PIDs already hardware-confirmed as 0x0189 / 0x0183).
+- Neither PID appears in usb.ids, upstream gphoto2 master, or libmtp — these are first additions.
+- Status: firmware-derived, not yet bench-verified. Runbook model coverage table updated accordingly.

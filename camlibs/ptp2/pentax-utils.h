@@ -35,6 +35,9 @@ typedef struct {
 #define PENTAX_MODEL_K1 77970U
 #define PENTAX_MODEL_GR_III 78350U
 #define PENTAX_MODEL_645D 77320U
+/* From IT2 MtpDevice.cs: 645Z = 77840, KF = 78520. */
+#define PENTAX_MODEL_645Z 77840U
+#define PENTAX_MODEL_KF 78520U
 /* K-3 II (PID 0x017b) is NOT in IT2: fail-closed, vendor mode stays off.
  * Revisit only with hardware proof or a newer IT2 build that lists it. */
 
