@@ -1,0 +1,68 @@
+# Pentax evidence retention policy
+
+Revision: 2026-08-26
+
+This policy governs hardware-capture evidence stored under `docs/pentax/evidence/`.
+
+## Goals
+
+- Keep the upstreamable libgphoto2 diff dominated by source, tests, and
+  documentation rather than large generated debug captures.
+- Preserve reproducible, auditable protocol evidence without inflating
+  repository history.
+- Prevent accidental commits of very large raw traces or host-specific
+  diagnostic content.
+
+## Rules
+
+1. **In-tree evidence** must be small and curated: human-readable traces,
+   session summaries, and cross-check notes that directly prove a protocol
+   fact. Keep individual files well under 1 MB; compress anything larger
+   (`.gz`) and justify it in a commit message.
+2. **Large raw captures** (multi-megabyte logs) must not be committed as
+   plain text. Store them compressed out-of-tree (release/CI artifacts, a
+   dedicated evidence repository, or another durable external archive) and
+   reference them from documentation.
+3. **Provenance**: every retained trace must be accompanied by camera model,
+   firmware version, test command, date, relevant commit SHA, and SHA-256
+   checksum so it remains reproducible and auditable. Record these in the
+   sibling `.md` summary for that capture date.
+4. **Privacy review**: before committing any trace, check it for incidental
+   machine-specific paths, serial numbers, USB topology, or other diagnostic
+   content that should not become permanent project history.
+5. **Size guard**: do not add new `.log` files above 1 MB to git without an
+   explicit decision recorded in this directory. Prefer compressing first.
+
+## Current inventory (2026-08-26)
+
+| File | Size | Status |
+|---|---|---|
+| `k1ii-bulb30s-capture.log` | ~171 MB | **untracked**, local only; never commit |
+| `k1ii-bulb30s-capture.log.gz` | ~7 MB | tracked (compressed, justified) |
+| `k3iii-bulb5s-capture.log` | ~1.1 MB | tracked; borderline — compress before any further growth |
+| other `.log` files | < 200 KB each | tracked, within limits |
+
+The 30-second K-1 II bulb capture was removed from history by an interactive
+rebase (see `k1ii-bulb30s-capture.log.gz` for the retained compressed copy);
+its SHA-256 is recorded below for provenance of the compressed artifact.
+
+## Checksums
+
+SHA-256 of current evidence files (2026-08-26):
+
+```
+205b7facb4b46077bc53b62903a9d8de38711872a584f193d94b698cb0b674e6  firmware-crosscheck-kp-k1ii-k3iii.md
+1b790c6aed79a15ab6523e4fc9c0a27cfccb8735cfe6049859a324740d3a93be  k1ii-bulb30s-capture.log (untracked local copy)
+05ddd838171d2e1fcc771ef5372834e2e71acf0db3d34d7e046513bf5b5ce398  k1ii-bulb30s-capture.log.gz
+bca1930419af4e38bb2ff23d133616ed1ce2ccfa0147d37a89b8ace0404dc16d  k3iii-bulb5s-capture.log
+61bdbb285b6ebcc6c8f3d0d83af0e25a02f3d34c932a7eb6333f88613d72bec1  k3iii-bulb5s-retest.log
+ec7f29ada984adbc09fb2d21a8c1512de73ac1bc88d1cba6207cd6e1a649f7e4  k3iii-fw-astro-analysis.md
+e9ee391bdadb53912f7c9e93c7971c8b0169be7e5e847a6cd66b64cf300da626  k3iii-set-shutter-5s.log
+9e45de258b8ef235e5ac303c41b2156c0d401ef300ade3c9e39f2bf79f50073e  k3iii-stale-session-recovery.log
+a08991678fd7b0a8a42c33478944dd592aa31892de394e695174d862a5b2b6b6  k3iii-vendor-busy-0x2002.log
+```
+
+## Enforcement
+
+A pre-commit style check is recommended upstream; until then, reviewers should
+reject Pentax commits that add multi-megabyte uncompressed traces.
