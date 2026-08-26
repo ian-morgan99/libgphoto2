@@ -39,6 +39,7 @@ This policy governs hardware-capture evidence stored under `docs/pentax/evidence
 |---|---|---|
 | `k1ii-bulb30s-capture.log` | ~171 MB | **untracked**, local only; never commit |
 | `k1ii-bulb30s-capture.log.gz` | ~7 MB | tracked (compressed, justified) |
+| `2026-08-25/k3iii-bulb30s-capture-debug.log.gz` | ~32 MB | tracked (compressed, justified); do not grow further |
 | `k3iii-bulb5s-capture.log` | ~1.1 MB | tracked; borderline — compress before any further growth |
 | other `.log` files | < 200 KB each | tracked, within limits |
 
@@ -60,6 +61,16 @@ ec7f29ada984adbc09fb2d21a8c1512de73ac1bc88d1cba6207cd6e1a649f7e4  k3iii-fw-astro
 e9ee391bdadb53912f7c9e93c7971c8b0169be7e5e847a6cd66b64cf300da626  k3iii-set-shutter-5s.log
 9e45de258b8ef235e5ac303c41b2156c0d401ef300ade3c9e39f2bf79f50073e  k3iii-stale-session-recovery.log
 a08991678fd7b0a8a42c33478944dd592aa31892de394e695174d862a5b2b6b6  k3iii-vendor-busy-0x2002.log
+```
+
+SHA-256 of the 2026-08-25 evidence set:
+
+```
+ff8a67780a8ebab248db4b033e948b2703ca6c3ffed3de1231f81b762c7a7988  k1ii-baseline-live.txt
+8c576a8608aa4b59685adcf4714113fe166d407f83d87f24b5ed3ce6a9f165eb  k1ii-bulb-probe-release-mode-0.log
+179771a30be68153d033b690e4620d845d501ea920043adb679dd014ff3cbf9c  k1ii-bulb-probe-release-mode-2.log
+67f8cd2e834e22dab410114f67896e23ff89d8b72ce2da21b678e28251bb4efc  k3iii-baseline-live.txt
+2428f39d711a6ddd66a9e475b9d9da4985ebab753e0d1454445533f13936db7f  k3iii-bulb30s-capture-debug.log.gz
 ```
 
 ## Enforcement
