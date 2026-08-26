@@ -108,8 +108,11 @@ translate_ptp_result (uint16_t result)
 		int int_res = (int16_t)result;
 		if (-99 <= int_res && int_res <= 0)
 			return int_res;
-		else
-			return GP_ERROR;
+		if (result == PTP_RC_CaptureAlreadyTerminated)
+			return GP_OK;
+		GP_LOG_E ("unmapped PTP result code 0x%04x reported as generic error",
+			result);
+		return GP_ERROR;
 	}
 	}
 }
@@ -6209,7 +6212,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
-	int candidate_delete_attempted = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6224,11 +6226,32 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
 	if (params->pentax.recovery_required) {
-		GP_LOG_E ("capture refused: session reconciliation flagged "
-			"recovery-required (camera busy or conditions unreadable)");
-		gp_context_error (context,
-			_("Camera is in an unreconciled state from a previous session; reconnect or power-cycle it before capturing."));
-		return GP_ERROR_CAMERA_BUSY;
+		/* The flag is set once reconciliation sees the camera busy
+		 * or conditions unreadable. Rather than locking captures out
+		 * until process restart, re-probe: a camera that has gone
+		 * idle with readable conditions is safe to use again. */
+		unsigned char *rdata = NULL;
+		unsigned int rsize = 0;
+		int recovered = 0;
+
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &rdata, &rsize) &&
+		    rsize >= PENTAX_CONDITIONS_MIN_SIZE &&
+		    !(pentax_get_u32le (rdata + 104) & 1) &&
+		    pentax_get_u32le (rdata + 32) != 1) {
+			recovered = 1;
+			params->pentax.recovery_required = 0;
+			GP_LOG_D ("recovery-required cleared: conditions readable "
+				"and camera idle");
+		}
+		free (rdata);
+		if (!recovered) {
+			GP_LOG_E ("capture refused: session reconciliation flagged "
+				"recovery-required and camera is still busy or "
+				"conditions unreadable");
+			gp_context_error (context,
+				_("Camera is in an unreconciled state from a previous session; reconnect or power-cycle it before capturing."));
+			return GP_ERROR_CAMERA_BUSY;
+		}
 	}
 	if (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE)
 		return GP_ERROR_CAMERA_BUSY;
@@ -6251,6 +6274,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		    bsize >= PENTAX_CONDITIONS_MIN_SIZE &&
 		    pentax_get_u32le (bdata + 32) == 1)
 			baseline_candidate = pentax_get_u32le (bdata + 36);
+		else if (bdata || bsize)
+			GP_LOG_D ("stale-candidate pre-probe failed or short "
+				"(%u bytes); proceeding without baseline check",
+				(unsigned)bsize);
 		free (bdata);
 		if (baseline_candidate) {
 			GP_LOG_E ("stale transfer candidate %u pending before "
@@ -6295,13 +6322,15 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &data, &size)) {
 				GP_LOG_E ("conditions probe attempt %d failed after "
 					"InitiateCapture", attempt + 1);
+				usleep (100 * 1000);
 				continue;
 			}
-			if (size < 40 ||
+			if (size < PENTAX_CONDITIONS_MIN_SIZE ||
 			    pentax_parse_conditions (data, size, &conditions) != 0) {
 				GP_LOG_E ("conditions probe attempt %d returned "
 					"short/unparseable data (%u bytes)",
 					attempt + 1, (unsigned)size);
+				usleep (100 * 1000);
 				continue;
 			}
 			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
@@ -6343,9 +6372,22 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			 * number of times so a wedged camera still times
 			 * out with a clear error. */
 			if (++conditions_failures <= 5) {
-				GP_LOG_D ("conditions read failed in-flight "
-					"(ptp 0x%04x, %u bytes); retry %d/5",
-					ptpres, (unsigned)size, conditions_failures);
+				if (ptpres != PTP_RC_OK)
+					GP_LOG_D ("conditions read failed "
+						"in-flight (ptp 0x%04x); "
+						"retry %d/5", ptpres,
+						conditions_failures);
+				else
+					GP_LOG_D ("conditions read returned "
+						"short data (%u bytes) "
+						"in-flight; retry %d/5",
+						(unsigned)size,
+						conditions_failures);
+				/* Back off between retries so a wedged camera
+				 * is not busy-spun; waiting_for_timeout
+				 * still bounds the total wait. */
+				waiting_for_timeout (&back_off_wait, started,
+					capture_timeout_ms);
 				continue;
 			}
 			GP_LOG_E ("conditions unreadable %d times during "
@@ -6462,7 +6504,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * discarded (issue #12). */
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_FINALIZING;
 	ptpres = ptp_pentax_delete_transfer_candidate (params);
-	candidate_delete_attempted = 1;
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
@@ -6507,8 +6548,9 @@ out:
 		 * one camera-side cleanup attempt; retrying a delete whose
 		 * earlier attempt failed is harmless (issues #11 and #20). */
 		if (have_candidate) {
-			candidate_delete_attempted = 1;
-			if (ptp_pentax_delete_transfer_candidate (params) == PTP_RC_OK)
+			uint16_t dres = ptp_pentax_delete_transfer_candidate (params);
+
+			if (dres == PTP_RC_OK)
 				GP_LOG_D ("deleted orphaned transfer candidate %u",
 					candidate_handle);
 			else
@@ -6520,10 +6562,17 @@ out:
 			 * InterruptFunction 0x9013 is characterized only as
 			 * "Green button" and its cancellation semantics are
 			 * unverified. */
-			if (ptp_pentax_terminate_capture (params, 0) == PTP_RC_OK)
+			uint16_t tres = ptp_pentax_terminate_capture (params, 0);
+
+			/* 0x2018 CaptureAlreadyTerminated means the capture
+			 * had already stopped on its own; that is success for
+			 * an abort path. */
+			if (tres == PTP_RC_OK ||
+			    tres == PTP_RC_CaptureAlreadyTerminated)
 				GP_LOG_D ("aborted capture after pre-candidate failure");
 			else
-				GP_LOG_E ("failed to abort capture after pre-candidate failure");
+				GP_LOG_E ("failed to abort capture after pre-candidate failure (ptp 0x%04x)",
+					tres);
 		}
 	}
 	if (ret != GP_OK && initiated && !have_candidate) {
