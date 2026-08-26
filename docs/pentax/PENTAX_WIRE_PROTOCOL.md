@@ -2,8 +2,9 @@
 
 Revision: 2026-08-21
 
-This document distinguishes facts visible in the decompiled IMAGE Transmitter 2
-client from facts that still require a USB trace. It is not a claim that the
+This document distinguishes facts visible in the IMAGE Transmitter 2 client's
+published behaviour (observed from its public interfaces) from facts that still
+require a USB trace. It is not a claim that the
 protocol has passed hardware validation.
 
 ## Evidence labels
@@ -52,7 +53,7 @@ step fails.
 
 ### Power-on readiness and wake-up audit
 
-The decompiled IMAGE Transmitter connection path contains no explicit wake-up
+The observed IMAGE Transmitter connection path contains no explicit wake-up
 operation. `Connect()` calls the Windows portable-device `Open`, immediately
 sets vendor mode with `0x9001`, then reads DeviceInfo, storage IDs, and
 `GetAllConditions`. It has no connection delay, retry loop, standard PTP

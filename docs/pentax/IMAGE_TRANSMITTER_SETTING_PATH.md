@@ -3,7 +3,7 @@
 Revision: 2026-08-21
 
 This document is the normative source audit for Pentax setting writes. It traces
-the decompiled IMAGE Transmitter 2 (IT2) implementation end to end and separates
+the IMAGE Transmitter 2 (IT2) client implementation end to end and separates
 facts from remaining hypotheses. Member names below are stable source anchors;
 line numbers are deliberately not normative.
 

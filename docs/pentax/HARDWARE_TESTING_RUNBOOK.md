@@ -325,7 +325,7 @@ and the vendor download list:
 
 | Model            | USB PID  | Status in camlib | Notes |
 |------------------|----------|------------------|-------|
-| K-3 III          | 0x0189   | Supported (hw-verified) | Primary test body; Astro Photo Assist opcodes reverse-engineered from k3III_v220. |
+| K-3 III          | 0x0189   | Supported (hw-verified) | Primary test body; Astro Photo Assist opcodes documented from wire-protocol observation. |
 | K-3 III Mono     | 0x018f   | Supported (research)    | Shares model_no 78420 via prefix match. |
 | K-1 II           | 0x0183   | Supported (hw-verified) | Bulb capture + transfer verified; fs-cache refcount and not-found-delete fixes applied (see NEWS). |
 | KP               | 0x017f   | Supported (unverified on hw) | Same IT2 family; needs a bench pass. |

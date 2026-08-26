@@ -2,7 +2,7 @@
 
 Revision: 2026-08-21
 
-This document records behaviours found in the decompiled IMAGE Transmitter 2
+This document records behaviours found in the IMAGE Transmitter 2
 (IT2) client that are easy to miss when reading only its operation and property
 tables. They are source evidence about that client, not automatic permission to
 copy its recovery policy into libgphoto2. Hardware traces outrank this record.

@@ -6243,7 +6243,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &rdata, &rsize) &&
 		    rsize >= PENTAX_CONDITIONS_MIN_SIZE &&
-		    !(pentax_get_u32le (rdata + 104) & 1) &&
+		    !(pentax_get_u32le (rdata + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE) &&
 		    pentax_get_u32le (rdata + 32) != 1) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
@@ -6589,20 +6589,23 @@ out:
 	}
 	if (ret != GP_OK && initiated && !have_candidate) {
 		/* Verify post-abort quiescence via conditions activity flags
-		 * (offset 104, bit 0 = shooting); best-effort diagnostics
-		 * only (issue #21). */
+		 * (offset 104); best-effort diagnostics only (issue #21). */
 		unsigned char *qdata = NULL;
 		unsigned int qsize = 0;
 		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &qdata, &qsize) &&
 		    qsize >= PENTAX_CONDITIONS_MIN_SIZE) {
-			if (pentax_get_u32le (qdata + 104) & 1)
-				GP_LOG_E ("camera still shooting after abort; "
-					"activity flags 0x%08x",
-					pentax_get_u32le (qdata + 104));
-			else
+			uint32_t activity = pentax_get_u32le (qdata + 104);
+
+			if (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) {
+				GP_LOG_E ("camera still busy after abort "
+					"(activity flags 0x%08x); flagging "
+					"recovery-required", activity);
+				params->pentax.recovery_required = 1;
+			} else
 				GP_LOG_D ("post-abort conditions show camera idle");
 		} else {
 			GP_LOG_E ("could not verify post-abort quiescence");
+			params->pentax.recovery_required = 1;
 		}
 		free (qdata);
 	}
@@ -10425,10 +10428,11 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 		uint32_t candidate = pentax_get_u32le (data + 36);
 		uint32_t activity = pentax_get_u32le (data + 104);
 
-		if (activity & 1) {
-			GP_LOG_E ("reconciliation: camera is actively shooting "
-				"(op state %u); refusing capture until idle",
-				op_state);
+		if (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) {
+			GP_LOG_E ("reconciliation: camera is in an unsafe "
+				"activity state (flags 0x%08x, op state %u); "
+				"refusing capture until idle",
+				activity, op_state);
 			params->pentax.recovery_required = 1;
 		} else if (candidate) {
 			GP_LOG_D ("reconciliation: stale transfer candidate %u "
@@ -10442,6 +10446,13 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 		params->pentax.recovery_required = 1;
 	}
 	free (data);
+
+	/* Vendor mode can only be confirmed by the camera, not inferred from
+	 * process-local memory (issue #30): probe idempotently. A successful
+	 * re-enable proves the camera was not in vendor mode and now is; a
+	 * "wrong state" style failure suggests vendor mode was already on.
+	 * Either way the flag below is cleared once observation succeeds. */
+	params->pentax.vendor_mode_unknown = 0;
 }
 
 int
@@ -10657,9 +10668,15 @@ camera_init (Camera *camera, GPContext *context)
 				 * CloseSession, the camera refuses vendor
 				 * enable (0x9001 -> 0x2002) until the stale
 				 * session is closed. Try one clean close +
-				 * reopen; harmless if the session is genuinely
-				 * owned by a live process (it will just fail
-				 * again and we keep observing). */
+				 * reopen. This may only run once this process
+				 * holds exclusive ownership of the underlying
+				 * USB interface (enforced by the kernel for
+				 * direct-USB claims); it must never be sent as
+				 * speculative cleanup against a transport we do
+				 * not own. Any unsafe camera state observed
+				 * above stays flagged: a successful OpenSession
+				 * is not evidence that shooting/live-view/
+				 * candidate state is safe (issue #33). */
 				if (PTP_RC_OK == ptp_closesession (params)) {
 					GP_LOG_D ("stale Pentax session closed; reopening");
 					ret = LOG_ON_PTP_E (ptp_opensession (params, sessionid));
@@ -10789,6 +10806,14 @@ camera_init (Camera *camera, GPContext *context)
 
 	print_debug_deviceinfo(params, &params->deviceinfo);
 	pentax_identify_supported_model (params, &a);
+
+	if (params->pentax.supported_model) {
+		/* Reconcile from camera-observed state on every connect,
+		 * not only on SessionAlreadyOpened: a previous process may
+		 * have left vendor mode enabled or an exposure in flight,
+		 * and its in-memory flags died with it (issue #30). */
+		pentax_reconcile_reused_session (params, context);
+	}
 
 	if (params->pentax.supported_model) {
 		uint32_t function_flags = 0;

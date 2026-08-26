@@ -125,8 +125,7 @@ added K-3 III PID `0189` to `camlibs/pentax/library.c` in 2023. The unfinished
 record. That commented value was promoted by commit `f5eebff6f` before hardware
 was available.
 
-The failure was therefore procedural, not a difficult reverse-engineering
-problem:
+The failure was therefore procedural, not a difficult protocol-analysis problem:
 
 1. The implementation treated a commented prototype value as an input fact.
 2. The repository review did not reconcile duplicate model knowledge across
@@ -360,7 +359,7 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - Extracted full vendor opcode table from DeviceInfo blob at file offset `0x1f4f8dc`: ops 0x9001–0x9006, 0x900b–0x900d, 0x900f–0x9011, 0x9014–0x9017, 0x9019–0x9024, 0x902d–0x9055 range through 0x907f. Ops 0x901a–0x9024 and beyond are undocumented candidates for astro capture.
 - Found five per-model device property tables at ~0x1e00c1a (0xd0xx–0xd4xx ranges, ~95 props each).
 - String mining found only sparse LZ literals (`AstroTr`, `M6AstroT…`, `AstroCalcFwhm`, menu icons); **no StarAf/ReadAstro strings** — Star AF trigger has no identifiable opcode in either firmware.
-- Both firmwares use custom interleaved compression (entropy ~8.0 bands alternating with CODE/DATA; no standard container magic) — handler disassembly blocked without decompression.
+- Both firmwares use custom interleaved compression (entropy ~8.0 bands alternating with CODE/DATA; no standard container magic) — handler analysis blocked without decompression.
 - Conclusion: astro capture path must be found by live-probing undocumented ops 0x901a–0x9024 and d0xx–d4xx props, plus testing standard PTP `0x100E` as alternative to vendor `0x9011` in Astro mode.
 - Full writeup: `docs/pentax/evidence/2026-08-26/k3iii-fw-astro-analysis.md`. Capability matrix updated (Star AF trigger row: confirmed absent in both firmwares).
 
@@ -371,7 +370,7 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - [ ] K-1 II 0-byte download root cause (pentax_transfer_run publish path, library.c ~6330-6400): collision-preflight gp_filesystem_number fails because candidate name isn't yet in FS listing.
 
 ### 2026-08-26 — 645Z / KF PIDs extracted from firmware images
-- Question: is the 645Z USB PID in Image Transmitter 2? Answer: **no** — IT2 identifies bodies by WPD model-name strings only (see `IT2_2625_decompile/RemoteAssistant/MtpDevice.cs`); it never reads USB PIDs.
+- Question: is the 645Z USB PID in Image Transmitter 2? Answer: **no** — IT2 identifies bodies by WPD model-name strings only (see `IT2_2625_source/RemoteAssistant/MtpDevice.cs`); it never reads USB PIDs.
 - Source of truth instead: the camera's own firmware image. Older-generation Pentax firmware headers embed the VID:PID pair as `fb25 <pid1_le> <pid2_le>` immediately after the `PENTAX <model>\0Version X.XX` string. Validated against KP (fwdc232b.bin v1.31 → 0x017e/0x017f; second PID matches the hardware-known KP PID).
 - Findings:
   - **645Z** (fwdc224b.bin v1.30, offset 0x170): PIDs **0x0166, 0x0167** → PTP PID = **0x0167** (second position per KP precedent). Added to library.c model table + pentax_lookup_model (model_no 77840, ext ver 1, exp bracket YES per IT2 MainWindow.xaml.cs:506).

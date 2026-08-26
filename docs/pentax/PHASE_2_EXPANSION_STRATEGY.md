@@ -47,7 +47,7 @@ Extend the `IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md` to include:
 
 ### Step 2: IT2 Source Code Verification
 
-From `IT2_2625_decompile/RemoteAssistant/MtpDevice.cs`:
+From `IT2_2625_source/RemoteAssistant/MtpDevice.cs`:
 
 **Composition Adjust Support (`0xd02a` / `0x9018`)**:
 - Line 71, 537, 561, 632, 745: `_isCompositionAdjSupported` flag
@@ -181,5 +181,5 @@ When Phase 1 is complete and hardware for KP/645Z becomes available:
 
 - `libgphoto2/docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md` — Complete IT2 UI-to-wire setting audit and capability matrix
 - `libgphoto2/docs/pentax/HARDWARE_TESTING_RUNBOOK.md` — Governing runbook for hardware testing; §1 governing rules, §8.5 SET verification via conditions poll, §9 queued work
-- `IT2_2625_decompile/RemoteAssistant/MtpDevice.cs` — IT2 source confirming composition adjust support for K-3 III family and KP, bracketing support for K-3 III family and 645Z
+- `IT2_2625_source/RemoteAssistant/MtpDevice.cs` — IT2 source confirming composition adjust support for K-3 III family and KP, bracketing support for K-3 III family and 645Z
 - `libgphoto2/camlibs/ptp2/pentax-utils.c` — Fork implementation of `_isCompositionAdjSupported`, `_isExpBracketSupport`, focus control gates

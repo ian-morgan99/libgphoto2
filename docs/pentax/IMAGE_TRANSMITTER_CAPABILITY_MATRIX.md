@@ -11,7 +11,7 @@ directly requests many omitted vendor codes.
 The complete IT2 UI-to-wire setting audit and its remaining session/WPD
 differential are recorded in `IMAGE_TRANSMITTER_SETTING_PATH.md`.
 
-Status terms: **IT2** means directly present in the decompiled client; **HW-R**
+Status terms: **IT2** means directly present in the IT2 client as observed; **HW-R**
 means read-only hardware-confirmed; **HW-W** means bounded write plus exact
 restoration confirmed; **target** means not yet closed; **withheld** means not
 available through ordinary libgphoto2 APIs. Source anchors are member names in
