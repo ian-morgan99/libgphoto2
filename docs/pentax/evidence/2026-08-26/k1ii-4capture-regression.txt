@@ -1,0 +1,38 @@
+# K-1 II 4-capture regression test
+# 2026-08-26 — verifying 0-byte DNG download fix (commit 1340d8bd1)
+# Camera: PENTAX K-1 II at usb:001,011 (25fb:0183)
+# Mode: M, exposure-mode-raw=9 (Green), Tv-changeable=no, bulb-timer=yes, bulb-seconds=30/1
+# Vendor extension enabled (function flags 0x00000003)
+
+=== capture 1 ===
+  file: cap1_1.DNG size=37869039 sha256=5bcf8c6bcc322803a84edd8fc99571a134783aea0cbc460ceda786b46a0a3a31
+  1.560320 camera_pentax_capture       (2): recovery-required cleared: conditions readable and camera idle
+  1.561751 camera_pentax_capture       (2): stale-candidate pre-probe failed or short (568 bytes); proceeding without baseline check
+  1.561755 ptp_usb_sendreq             (2): Sending PTP_OC 0x9011 (Unknown VendorExtensionID) request...
+  1.561795 ptp_usb_getresp             (2): Reading PTP_OC 0x9011 (Unknown VendorExtensionID) response...
+  1.564709 camera_pentax_capture       (2): capture wait budget 61000 ms
+
+=== capture 2 ===
+  file: cap2_1.DNG size=37868143 sha256=0f2a16c8df38be604da457d5385fd91c568ea486c21e9d31257a1a7f794d5f66
+  1.557345 camera_pentax_capture       (2): recovery-required cleared: conditions readable and camera idle
+  1.558764 camera_pentax_capture       (2): stale-candidate pre-probe failed or short (568 bytes); proceeding without baseline check
+  1.558768 ptp_usb_sendreq             (2): Sending PTP_OC 0x9011 (Unknown VendorExtensionID) request...
+  1.558809 ptp_usb_getresp             (2): Reading PTP_OC 0x9011 (Unknown VendorExtensionID) response...
+  1.561692 camera_pentax_capture       (2): capture wait budget 61000 ms
+
+=== capture 3 ===
+  file: cap3_1.DNG size=37867855 sha256=c573faafafd7df2563441981c7914bc56ad82fe5f0d81ae6b74c731063323058
+  1.558136 camera_pentax_capture       (2): recovery-required cleared: conditions readable and camera idle
+  1.559560 camera_pentax_capture       (2): stale-candidate pre-probe failed or short (568 bytes); proceeding without baseline check
+  1.559563 ptp_usb_sendreq             (2): Sending PTP_OC 0x9011 (Unknown VendorExtensionID) request...
+  1.559604 ptp_usb_getresp             (2): Reading PTP_OC 0x9011 (Unknown VendorExtensionID) response...
+  1.562537 camera_pentax_capture       (2): capture wait budget 61000 ms
+
+=== capture 4 ===
+  file: cap4_1.DNG size=37868559 sha256=72851876ff6cea205c0e6c0ba0bd7ccc054192ab0d73b4c6576f4311e0733146
+  1.561028 camera_pentax_capture       (2): recovery-required cleared: conditions readable and camera idle
+  1.562465 camera_pentax_capture       (2): stale-candidate pre-probe failed or short (568 bytes); proceeding without baseline check
+  1.562472 ptp_usb_sendreq             (2): Sending PTP_OC 0x9011 (Unknown VendorExtensionID) request...
+  1.562510 ptp_usb_getresp             (2): Reading PTP_OC 0x9011 (Unknown VendorExtensionID) response...
+  1.565397 camera_pentax_capture       (2): capture wait budget 61000 ms
+

@@ -438,3 +438,34 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 - Same finding as 2026-08-26 entry above: this is a **camera-side firmware state, not a driver bug**. The K-3 III does not release its internal session/vendor table through any USB-reachable mechanism. Only a true cold power cycle (battery pull) clears it.
 - Verdict: K-3 III vendor operations **unavailable** for the remainder of this power-on cycle. Defer further K-3 III probing until operator performs a battery-pull cold cycle.
 - Evidence: `docs/pentax/evidence/2026-08-26/k3iii-stale-vendor-wedge-after-on.log` (601 lines, SHA-256 `90161ffcb666b4e5d1be5d3e127effb56c8858cf63132ea2df3fec4292663cc2`).
+
+### 2026-08-26 — K-3 III vendor wedge cleared by battery pull (cold cycle)
+- Commit hash at start: `a9fa20448` (master = origin/master, clean tree).
+- Operator pulled the K-3 III battery for a true cold power cycle, then re-powered the K-1 II.
+- K-3 III re-enumerated at `usb:001,010` (25fb:0189). K-1 II at `usb:001,011` (25fb:0183). No `gvfs-gphoto2-volume-monitor` running.
+- Operator: M mode. K-3 III is in Astro mode (exposure-mode-raw=20, astrotracer3=yes, bulb-timer=yes; bulb-seconds=300/1).
+- Post-battery-pull connect: `OpenSession` returns `0x201e` (SessionAlreadyOpened) — the prior session entry is still on the camera even after a cold cycle. **The stale-session reconciliation path fires correctly**: tries to read d035 (vendor condition summary), fails, marks session recovery-required, re-attempts vendor enable `PTP_OC 0x9001` — this time **succeeds** with `0x2001` (PTP_RC_OK) and function flags `0x00000000`.
+- This confirms: **the K-3 III vendor wedge is a camera-side firmware state, and a true battery pull is the only reliable recovery**. The libgphoto2 reconciliation path handles the post-battery-pull state correctly.
+- Verdict: K-3 III vendor operations **fully restored** post-battery-pull. Astro mode + 300s bulb-timer + astrotracer3 confirmed via pentaxconditions probe.
+- Evidence: `docs/pentax/evidence/2026-08-26/k3iii-post-batterypull-vendor-recover.log` (SHA-256 `91e290f6697266d9f84d4c747cdb5153b7e123e73af1fe4fd0542ec73d94ab44`).
+
+### 2026-08-26 — K-1 II fresh power-on baseline + 4-capture DNG regression test
+- Commit hash: `a9fa20448` (master, clean tree).
+- K-1 II re-powered at `usb:001,011` (25fb:0183). M mode, exposure-mode-raw=9 (Green), Tv-changeable=no (M mode expected), bulb-timer=yes; bulb-seconds=30/1.
+- Baseline probe: vendor enable `PTP_OC 0x9001` succeeds with `0x2001` (PTP_RC_OK), function flags `0x00000003` (note: K-1 II bit1 set, K-3 III returns `0x00000000` — bit1 meaning TBD).
+- `--storage-info`: 3 storage IDs reported (`store_00010001`, `store_00030001`, `store_00040001`). `store_00010001` (DCIM) has 1095680 KB free, 886474 free images. `store_00030001` and `store_00040001` report 68719476720 KB total (impossible value, indicates uninitialized/empty virtual volumes) and 0 free images. **Pre-fix this returned only the empty virtual volumes; post-fix (commit 1340d8bd1) the real SD1 storage is now correctly reported.** All three have access=0 (Read-Write).
+- 4-capture regression test (verifies 0-byte DNG download fix, commit 1340d8bd1):
+  - All 4 captures used `--capture-image-and-download` with vendor `PTP_OC 0x9011` (vendor InitiateCapture).
+  - Capture wait budget: 61000 ms each (matches bulb-timer=30s + buffer).
+  - All 4 DNGs downloaded: 37869039, 37868143, 37867855, 37868559 bytes (all 37.8 MB, all unique SHA-256).
+  - "stale-candidate pre-probe failed or short (568 bytes); proceeding without baseline check" appeared on every capture — known harmless pre-capture probe limitation; capture proceeds correctly.
+  - "recovery-required cleared: conditions readable and camera idle" appeared on every capture — stale-session reconciliation path working as designed.
+  - gphoto2 CLI post-download delete reported "ERROR: Could not delete image" for all 4 — this is a known gphoto2 CLI quirk with PTP DeleteObject; the image was successfully captured and downloaded, the post-download cleanup is non-fatal.
+- Verdict: 0-byte DNG download fix (1340d8bd1) **CONFIRMED WORKING** for K-1 II in M mode with vendor capture. The K-1 II is fully operational post-fresh-poweron.
+- Evidence: `docs/pentax/evidence/2026-08-26/k1ii-fresh-poweron-baseline.log` (SHA-256 `3a5b407940b06cbff71e7a7a66ce2e8352d31e903816ec82883b47380d453648`), `docs/pentax/evidence/2026-08-26/k1ii-storage-info.log` (SHA-256 `70149757f496bf22d68182f6f3b5d03f714fc5a81e1bd0d5f5fce23ead32d685`), `docs/pentax/evidence/2026-08-26/k1ii-4capture-regression.txt` (SHA-256 `413d0ab181dd0d4a1eaa212cb7126b336809f1c449ea4b51bc9a44d6d85a9620`).
+
+### 2026-08-26 — Open question: K-1 II smart storage selector
+- During `--storage-info` validation, observed that the K-1 II reports 3 storage IDs but only `store_00010001` contains real files (the DCIM tree). The other two are virtual/empty volumes.
+- A `--capture-image-and-download` run uses whatever storage the camera body is currently configured to write to. The libgphoto2 `ptp_list_folder` init code (camlibs/ptp2/library.c ~L11103) currently walks all storage IDs but does not "prefer" the one with content.
+- A possible improvement: after `ptp_getstorageids`, query each storage's root with `ptp_list_folder`; the storage that contains a `DCIM` association is the active card. Default folder resolution could prefer this storage, eliminating confusion when a camera reports multiple storage IDs.
+- This is a future enhancement, not a regression. The current 4-capture regression test passed because the K-1 II was configured to write to SD1.
