@@ -1,0 +1,6 @@
+libgphoto2/_build/
+libgphoto2/subprojects/
+*.o
+*.so
+.cache/
+.DS_Store
