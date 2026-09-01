@@ -32,3 +32,6 @@ run-entangle.sh
 # Probe binaries (rebuild via tests/build_*.sh)
 bulb_probe
 cardwrite_probe
+
+# IT2 MSI installer
+IT2_262_msi/
