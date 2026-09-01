@@ -4,3 +4,31 @@ libgphoto2/subprojects/
 *.so
 .cache/
 .DS_Store
+
+# IT2 decompile / extraction working dirs (large; sources of record are the
+# specific .cs files cited in NINA_PENTAX_CAPABILITY_MATRIX.md)
+ImageTransmitter2/
+IT2_original_extract/
+IT2_original_iso/
+IT2_261_msi/
+IT2_2625_decompile/
+IT2_262E_extracted/
+IT2Update_262E(Win).exe
+
+# Wine prefix (IT2 test environment) + firmware dumps + vendor app
+it2wine/
+pentax_firmware/
+wificommanderpentax_v176/
+
+# Scratch files and local tooling
+*.txt
+*.log
+!docs/pentax/evidence/**/*.log
+.lmstudio/
+.vscode/
+LibGphoto2.code-workspace
+run-entangle.sh
+
+# Probe binaries (rebuild via tests/build_*.sh)
+bulb_probe
+cardwrite_probe

@@ -1,0 +1,60 @@
+0.000052 main                        (2): ALWAYS INCLUDE THE FOLLOWING LINES WHEN SENDING DEBUG MESSAGES TO THE MAILING LIST:
+0.000087 main                        (2): gphoto2 2.5.28
+0.000093 main                        (2): gphoto2 has been compiled with the following options:
+0.000097 main                        (2):  + gcc (C compiler used)
+0.000101 main                        (2):  + popt (mandatory, for handling command-line parameters)
+0.000104 main                        (2):  + exif (for displaying EXIF information)
+0.000107 main                        (2):  + cdk (for accessing configuration options)
+0.000111 main                        (2):  + aa (for displaying live previews)
+0.000115 main                        (2):  + jpeg (for displaying live previews in JPEG format)
+0.000121 main                        (2):  + readline (for easy navigation in the shell)
+0.000124 main                        (2): libgphoto2 2.5.31
+0.000128 main                        (2): libgphoto2 has been compiled with the following options:
+0.000132 main                        (2):  + standard camlib set (ax203 canon digigr8 dimagev directory docupen jl2005a jl2005c kodak_dc240 lumix mars pentax ptp2 ricoh_g3 sierra sonix sq905 st2205 topfield tp6801)
+0.000140 main                        (2):  + gcc (C compiler used)
+0.000142 main                        (2):  + no ltdl (for portable loading of camlibs)
+0.000145 main                        (2):  + EXIF (for special handling of EXIF files)
+0.000154 main                        (2): libgphoto2_port 0.12.2
+0.000158 main                        (2): libgphoto2_port has been compiled with the following options:
+0.000161 main                        (2):  + iolibs: disk ptpip serial usb1 usbdiskdirect usbscsi
+0.000165 main                        (2):  + gcc (C compiler used)
+0.000168 main                        (2):  + no ltdl (for portable loading of iolibs)
+0.000171 main                        (2):  + EXIF (for vusb)
+0.000174 main                        (2):  + USB (libusb1, for USB cameras)
+0.000177 main                        (2):  + serial (for serial cameras)
+0.000181 main                        (2):  + no resmgr (serial port access and locking)
+0.000184 main                        (2):  + no ttylock (serial port locking)
+0.000188 main                        (2):  + no lockdev (serial port locking)
+0.000191 main                        (2): CAMLIBS = '/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/camlibs'
+0.000197 main                        (2): IOLIBS = '/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/libusb1:/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/usbscsi'
+0.000207 main                        (2): invoked with following arguments:
+0.000209 main                        (2):   --debug
+0.000211 main                        (2):   --debug-logfile=/home/ian/Documents/VSCodeProjects/LibGphoto2/docs/pentax/evidence/2026-08-25/list-config-debug.log
+0.000216 main                        (2):   --camera
+0.000219 main                        (2):   Pentax:K-3 Mark III (MTP mode)
+0.000222 main                        (2):   --port
+0.000226 main                        (2):   usb:001,005
+0.000229 main                        (2):   --list-config
+0.000240 main                        (2): Processing 'model' option ('Pentax:K-3 Mark III (MTP mode)')...
+0.000245 gp_port_init_localedir      (2): localedir has been set to /usr/share/locale (compile-time default)
+0.000249 gp_init_localedir           (2): localedir has been set to /usr/share/locale (compile-time default)
+0.000258 unlocked_gp_abilities_list_load_dir(2): Using ltdl to load camera libraries from '/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/camlibs'...
+0.000287 unlocked_gp_abilities_list_load_dir(2): Found 0 camera drivers.
+0.000320 gp_abilities_list_lookup_model [gphoto2-abilities-list.c:663](0): Could not find any driver for 'Pentax:K-3 Mark III (MTP mode)'
+0.000331 main                        (2): Processing 'port' option ('usb:001,005')...
+0.000334 gp_port_init_localedir      (2): ignoring late call (localedir value NULL)
+0.000339 gp_port_info_list_load      (2): Using ltdl to load io-drivers from '/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/libusb1:/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/usbscsi'...
+0.000353 gp_port_info_list_load [gphoto2-port-info-list.c:328](0): No iolibs found in '/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/libusb1:/home/ian/Documents/VSCodeProjects/LibGphoto2//home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build/libgphoto2_port/usbscsi'
+0.000361 gp_port_info_list_lookup_path [gphoto2-port-info-list.c:387](0): Invalid parameters: 'list && path' is NULL/FALSE.
+0.000368 load_settings               (2): Creating gphoto config directory ('/home/ian/.gphoto')
+0.000385 load_settings               (2): Loading settings from file '/home/ian/.gphoto/settings'.
+0.000415 gp_camera_free              (2): Freeing camera...
+0.000419 gp_port_free                (2): Freeing port...
+0.000422 gp_filesystem_reset         (2): resetting filesystem
+0.000424 gp_filesystem_lru_clear     (2): Clearing fscache LRU list...
+0.000426 gp_filesystem_lru_clear     (2): fscache LRU list already empty
+0.000433 delete_all_folders          (2): Internally deleting all folders from '/'...
+0.000436 lookup_folder               (2): Lookup folder '/'...
+0.000439 lookup_folder               (2): Found! / is 0x631e88f3e860
+0.000443 recurse_delete_folder       (2): Recurse delete folder 0x631e88f3e860//
+0.000446 delete_all_files            (2): Delete all files in folder 0x631e88f3e860//
