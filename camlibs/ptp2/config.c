@@ -10516,6 +10516,76 @@ _put_Pentax_MovieMode (CONFIG_PUT_ARGS)
 	return GP_ERROR_BAD_PARAMETERS;
 }
 
+/* SD card writing mode (0x9004).  IT2 MtpSetCardWritingMode sends a single
+ * uint bitmask at connect-time settings apply: bit 0 = SD1, bit 1 = SD2.
+ * There is no GET opcode, so the get handler reports the session-local cache
+ * (zeroed on identify; updated only after a successful set).  On failure the
+ * cache keeps its last values, mirroring IT2's fail-closed restore semantics
+ * (MtpDevice.cs SDWritingMode setter: restores _sd1/_sd2WritingMode and fires
+ * CardWriteModeFailed).  Gated to dual-slot models per IT2 _isDualSlot. */
+static int
+_get_Pentax_CardWritingMode (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_card_writing_mode (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, _("off"));
+	gp_widget_add_choice (*widget, _("SD1"));
+	gp_widget_add_choice (*widget, _("SD2"));
+	gp_widget_add_choice (*widget, _("both"));
+	{
+		uint8_t mode = params->pentax.sd1_writing_mode |
+			params->pentax.sd2_writing_mode;
+		const char *label;
+		switch (mode) {
+		case 3: label = _("both"); break;
+		case 2: label = _("SD2"); break;
+		case 1: label = _("SD1"); break;
+		default: label = _("off"); break;
+		}
+		gp_widget_set_value (*widget, label);
+	}
+	return GP_OK;
+}
+
+static int
+_put_Pentax_CardWritingMode (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	uint32_t mode;
+	uint16_t rc;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_card_writing_mode (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, _("off")))
+		mode = 0;
+	else if (!strcmp (value, _("SD1")))
+		mode = 1;
+	else if (!strcmp (value, _("SD2")))
+		mode = 2;
+	else if (!strcmp (value, _("both")))
+		mode = 3;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	rc = ptp_pentax_set_card_writing_mode (params, mode);
+	if (rc == PTP_RC_OK) {
+		params->pentax.sd1_writing_mode = mode & 1;
+		params->pentax.sd2_writing_mode = mode & 2;
+		return GP_OK;
+	}
+	/* Fail-closed: on error the cache keeps its last values, mirroring IT2. */
+	return translate_ptp_result (rc);
+}
+
 /* Live-view zoom write (0xd037).  IT2 payload is a 12-byte structure:
  * {4,0,0,0, Xlo,Xhi, Ylo,Yhi, mag,0,0,0}.  Zoom-off is magnification 1 with
  * centred coordinates.  The write is verified by reading the property back;
@@ -13536,6 +13606,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Cross Process Type"), "pentaxcrossprocess", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CrossProcess, _put_Pentax_CrossProcess },
 	{ N_("Pentax Movie Mode"), "pentaxmoviemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_MovieMode, _put_Pentax_MovieMode },
 	{ N_("Pentax Keep Live View"), "pentaxpclvkeep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_KeepLiveView, _put_Pentax_KeepLiveView },
+	{ N_("Pentax Card Writing Mode"), "pentaxcardwritingmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CardWritingMode, _put_Pentax_CardWritingMode },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },

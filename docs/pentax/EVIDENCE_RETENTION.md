@@ -73,6 +73,22 @@ ff8a67780a8ebab248db4b033e948b2703ca6c3ffed3de1231f81b762c7a7988  k1ii-baseline-
 2428f39d711a6ddd66a9e475b9d9da4985ebab753e0d1454445533f13936db7f  k3iii-bulb30s-capture-debug.log.gz
 ```
 
+SHA-256 of the 2026-09-01 evidence set:
+
+```
+54d7265786c8e6e1a766d6b9060c796d06e6fdf93cf0a330f1af4bff67a05305  k1ii-bulb-probe-release-mode-2-rerun.log
+5e4a3c1f446f9e658348a9a34d158624aabe529dec46f153907139c9b981a407  k1ii-cardwrite-probe.log
+64473629aebca14668f190579e5ef313f9de048d099de05064e1bc1f0a87fe8f  k1ii-cardwrite-probe-green.log
+```
+
+Note: the two card-write probe logs live in the spec repo at
+`docs/pentax/evidence/2026-09-01/` (spec-repo evidence tree); they are
+referenced here for provenance. The green-button run
+(`k1ii-cardwrite-probe-green.log`) is the first HW confirmation of the
+PENTAX_Interrupt 0x9013 opcode: raw PTP RC 0x2001 (PTP_RC_OK). All four
+SetCardWritingMode 0x9004 values returned camera-side PTP_RC_DeviceBusy
+(0x2019) in both runs; leading hypothesis under test is the empty SD2 slot.
+
 ## Enforcement
 
 A pre-commit style check is recommended upstream; until then, reviewers should

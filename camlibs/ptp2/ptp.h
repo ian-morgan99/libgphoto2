@@ -4077,6 +4077,11 @@ struct _PTPParams {
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;
+		/* Last successfully applied SD card writing modes (0x9004),
+		 * mirroring IT2's _sd1/_sd2WritingMode cache: on a failed SET the
+		 * last values are restored and reported to the user. */
+		uint8_t sd1_writing_mode;
+		uint8_t sd2_writing_mode;
 		PTPPentaxTransferState transfer_state;
 		uint32_t candidate_handle;
 	} pentax;
@@ -4225,6 +4230,7 @@ uint16_t ptp_pentax_initiate_capture (PTPParams *params, uint32_t release_mode,
 	uint32_t aperture_reset);
 uint16_t ptp_pentax_terminate_capture (PTPParams *params, uint32_t release_mode);
 uint16_t ptp_pentax_interrupt (PTPParams *params);
+uint16_t ptp_pentax_set_card_writing_mode (PTPParams *params, uint32_t mode);
 uint16_t ptp_pentax_focus_control (PTPParams *params, uint32_t amount,
 	uint32_t direction);
 uint16_t ptp_pentax_focus_control_new (PTPParams *params,

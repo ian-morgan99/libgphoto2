@@ -2142,6 +2142,15 @@ ptp_pentax_interrupt (PTPParams *params)
 	return ptp_generic_no_data (params, PTP_OC_PENTAX_InterruptFunction, 0);
 }
 
+/* IT2 MtpSetCardWritingMode: one uint32 parameter, the SD-slot writing-mode
+ * bitmask (bit 0 = SD1, bit 1 = SD2). */
+uint16_t
+ptp_pentax_set_card_writing_mode (PTPParams *params, uint32_t mode)
+{
+	return ptp_generic_no_data (params, PTP_OC_PENTAX_SetCardWritingMode, 1,
+		mode);
+}
+
 uint16_t
 ptp_pentax_focus_control (PTPParams *params, uint32_t amount,
 	uint32_t direction)

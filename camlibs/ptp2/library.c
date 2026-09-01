@@ -7498,6 +7498,19 @@ camera_trigger_capture (Camera *camera, GPContext *context)
 		return GP_OK;
 	}
 
+	if (	(params->deviceinfo.VendorExtensionID == PTP_VENDOR_PENTAX) &&
+		ptp_operation_issupported (params, PTP_OC_PENTAX_InterruptFunction)
+	) {
+#ifdef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+		/* Research builds only: the vendor "Green button" interrupt 0x9013 is
+		 * IT2's capture trigger (MtpDevice.GreenButton, no data phase). */
+		return translate_ptp_result (ptp_pentax_interrupt (params));
+#else
+		GP_LOG_D ("Pentax Green button interrupt available; "
+			 "using generic InitiateCapture in default build");
+#endif
+	}
+
 	if (!ptp_operation_issupported(params,PTP_OC_InitiateCapture)) {
 		gp_context_error(context, _("Sorry, your camera does not support generic capture"));
 		return GP_ERROR_NOT_SUPPORTED;

@@ -388,6 +388,21 @@ pentax_model_supports_pc_live_view (uint32_t model_no)
 	return pentax_model_is_k3iii_family (model_no);
 }
 
+/* Card writing mode (0x9004): IT2's Model property setter sets _isDualSlot
+ * true for the K-1 family, K-3 family and 645D/645Z, and false for KP,
+ * K-70, GR III and G900SE (MtpDevice.cs).  The SD-writing-mode UI is only
+ * reachable on dual-slot bodies; fail closed on the single-slot set. */
+int
+pentax_model_supports_card_writing_mode (uint32_t model_no)
+{
+	return (model_no == PENTAX_MODEL_K1_MARK_II) ||
+	       (model_no == PENTAX_MODEL_K1) ||
+	       (model_no == PENTAX_MODEL_K3) ||
+	       pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_645D) ||
+	       (model_no == PENTAX_MODEL_645Z);
+}
+
 static int
 pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 {

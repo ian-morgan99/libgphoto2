@@ -140,6 +140,7 @@ int pentax_model_supports_exp_bracket (uint32_t model_no);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);
+int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,

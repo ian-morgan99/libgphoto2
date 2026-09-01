@@ -159,3 +159,6 @@ Makefile.in
 
 # raw capture evidence logs are huge; keep gzipped copies only
 docs/pentax/evidence/**/*.log
+
+# local PR kit (push instructions, bodies) - not for upstream
+.pr-artifacts/

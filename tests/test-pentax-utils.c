@@ -506,6 +506,20 @@ main (void)
 	CHECK (pentax_minimum_focus_displacement (0, 1, &displacement) == GP_ERROR_CORRUPTED_DATA);
 	CHECK (pentax_minimum_focus_displacement (35, 0, &displacement) == GP_ERROR_BAD_PARAMETERS);
 
+	/* Card writing mode (0x9004): IT2's _isDualSlot set is the K-1 and
+	 * K-3 families plus 645D/645Z; KP, K-70 and GR III are single-slot. */
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K1_MARK_II));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K1));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3_MARK_III));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_645D));
+	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_645Z));
+	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_KP));
+	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_K70));
+	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_GR_III));
+	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_KF));
+
 	free (buffer.data);
 	return 0;
 }
