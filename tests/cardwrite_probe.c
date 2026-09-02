@@ -1,9 +1,11 @@
 /* Card-writing-mode (0x9004) + Green button (0x9013) probe for Pentax K-1 II.
  *
- * Usage: ./cardwrite_probe [port] [--green]
+ * Usage: ./cardwrite_probe [port] [--green] [--mode N]
  *   - calls ptp_pentax_set_card_writing_mode() for modes 0..3 and prints the
  *     raw PTP RC (distinguishes camera-side rejection from port-layer errors)
  *   - with --green, also fires ptp_pentax_interrupt() (Green button, no params)
+ *   - with --mode N, sets only mode N (used to restore a known state after the
+ *     0..3 sweep, which always leaves the camera at both(3))
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,8 +26,11 @@ static void die(const char *msg, int ret) {
 int main(int argc, char **argv) {
 	const char *port_arg = NULL;
 	int do_green = 0;
+	int only_mode = -1; /* -1 = sweep 0..3 */
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--green") == 0) do_green = 1;
+		else if (strcmp(argv[i], "--mode") == 0 && i + 1 < argc)
+			only_mode = atoi(argv[++i]);
 		else if (!port_arg) port_arg = argv[i];
 	}
 
@@ -79,7 +84,10 @@ int main(int argc, char **argv) {
 	printf("vendor_mode_enabled=%d\n", params->pentax.vendor_mode_enabled);
 
 	static const char *names[4] = { "off(0)", "SD1(1)", "SD2(2)", "both(3)" };
-	for (uint32_t mode = 0; mode <= 3; mode++) {
+	uint32_t lo = (only_mode >= 0) ? (uint32_t)only_mode : 0;
+	uint32_t hi = (only_mode >= 0) ? (uint32_t)only_mode : 3;
+	if (hi > 3) die("--mode out of range", only_mode);
+	for (uint32_t mode = lo; mode <= hi; mode++) {
 		uint16_t rc = ptp_pentax_set_card_writing_mode(params, mode);
 		printf("SET cardwritingmode=%s -> raw PTP RC 0x%04x %s\n",
 		       names[mode], rc, rc == PTP_RC_OK ? "(OK)" : "");
