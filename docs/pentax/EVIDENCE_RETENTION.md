@@ -117,3 +117,22 @@ while the d020 precondition/restore writes succeeded and read back. Both RCs
 map to GP_ERROR (-1) through `translate_ptp_result` (library.c:88). This
 diverges from the session-20 finding on a K-3 III family body, motivating
 the k3iii-family-only `pentax_model_supports_cross_process` gate.
+
+SHA-256 of the 2026-09-02 (late evening) K-3 III + K-01 evidence set:
+
+```
+1de1be74c5f9fa939c0ea3ad30093d3e37a92d468f7d88e780f3f2a3dac3498f  k3iii-cardwrite.log
+f3180f216b1fe800eeb9763222bfd402f3d7d8949adc2d466097c1283b57ce0a  k3iii-d02c.log
+5042dfd357d0f58949bfb09021f472ca5fa7879ce5c79520fcc33339e142282a  k3iii-crossprocess.log
+96bc0be3cd51b992ca1e8a368c04b6be8bf35db9567dba1a218695ef1d27ca17  k3iii-d02c-preset33.log
+4dd867d49b2644256ec39c4ce4ca5efc01228fdfc30dfe541cdd1a6177e6e4a0  k01-cardwrite.log
+b83747a3d157b8f8aa2cfbf65e96111324756087424de6daf9687c19b6fb4527  k01-d02c.log
+573a18f16dc515de2b633fd4ad8aeb9810a3889eb7acf39458dde3e40385807c  k01-crossprocess.log
+```
+
+Note: all seven logs live in the spec repo at `docs/pentax/evidence/2026-09-02/`.
+Highlights: K-3 III card-write sweep → 0x201d ×4 (vs K-1 II's 0x2001); d02c simple
+values 1–4 rejected 0x201c even in cross-process CI mode, while preset value 33 is
+accepted (0x2001 OK, read-back 33) — k3iii-family uses preset-range encoding for
+d02c; K-01 card-write → 0x2005 ×4 with vendor_mode_enabled=0 at probe time, and all
+d02c/d02d GETs → 0x200a (consistent with non-k3iii gating).
