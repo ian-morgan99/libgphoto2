@@ -79,15 +79,22 @@ SHA-256 of the 2026-09-01 evidence set:
 54d7265786c8e6e1a766d6b9060c796d06e6fdf93cf0a330f1af4bff67a05305  k1ii-bulb-probe-release-mode-2-rerun.log
 5e4a3c1f446f9e658348a9a34d158624aabe529dec46f153907139c9b981a407  k1ii-cardwrite-probe.log
 64473629aebca14668f190579e5ef313f9de048d099de05064e1bc1f0a87fe8f  k1ii-cardwrite-probe-green.log
+24596beadc09683ecca14eb3f6c9a05af59719be8ffd2acca0f9d6f247a5f69c  k1ii-cardwrite-probe-rerun.log
+fc7463461a1be47fd2abb8c0f06b2d2c78fbf41b583a149e7f7596894369ba46  k1ii-cardwrite-probe-restore-off.log
 ```
 
-Note: the two card-write probe logs live in the spec repo at
+Note: the card-write probe logs live in the spec repo at
 `docs/pentax/evidence/2026-09-01/` (spec-repo evidence tree); they are
 referenced here for provenance. The green-button run
 (`k1ii-cardwrite-probe-green.log`) is the first HW confirmation of the
-PENTAX_Interrupt 0x9013 opcode: raw PTP RC 0x2001 (PTP_RC_OK). All four
-SetCardWritingMode 0x9004 values returned camera-side PTP_RC_DeviceBusy
-(0x2019) in both runs; leading hypothesis under test is the empty SD2 slot.
+PENTAX_Interrupt 0x9013 opcode: raw PTP RC 0x2001 (PTP_RC_OK). The early
+runs (`k1ii-cardwrite-probe*.log`, `--green` run) returned camera-side
+PTP_RC_DeviceBusy (0x2019) for all four SetCardWritingMode 0x9004 values;
+the later re-run after power-cycle + cable swap
+(`k1ii-cardwrite-probe-rerun.log`) returned PTP_RC_OK (0x2001) for all
+four modes, and the restore run (`k1ii-cardwrite-probe-restore-off.log`)
+verified off(0). The clearing factor (fresh session vs SD card now in SD2)
+is not yet isolated.
 
 ## Enforcement
 
