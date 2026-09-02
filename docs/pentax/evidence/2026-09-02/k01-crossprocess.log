@@ -1,0 +1,12 @@
+
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1015 receiving resp failed: PTP Device Prop Not Supported (0x200a)
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1014 receiving resp failed: PTP Device Prop Not Supported (0x200a)
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1015 receiving resp failed: PTP Device Prop Not Supported (0x200a)
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1014 receiving resp failed: PTP Device Prop Not Supported (0x200a)
+probe pid=412551
+detected: Pentax K-01 (PTP Mode) @ usb:001,009
+vendor_mode_enabled=0
+crossprocess d02c:: GET value -> RC 0x200a
+crossprocess d02c:: GET desc -> RC 0x200a
+userfilter   d02d:: GET value -> RC 0x200a
+userfilter   d02d:: GET desc -> RC 0x200a

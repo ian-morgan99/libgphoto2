@@ -1,0 +1,31 @@
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1015 receiving resp failed: PTP Unknown Vendor Code (0x2017)
+[0] ../camlibs/ptp2/library.c:10343 pentax_reconcile_reused_session: reconciliation: could not read d035
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x900f receiving resp failed: PTP Unknown Vendor Code (0x2017)
+[0] ../camlibs/ptp2/library.c:10373 pentax_reconcile_reused_session: reconciliation: GetAllConditions unreadable; marking session recovery-required
+
+probe pid=429105
+detected: Pentax K-3 Mark III (MTP mode) @ usb:002,002
+vendor_mode_enabled=1
+GET d020 CI mode -> raw PTP RC 0x2001 (OK)
+      d020 CI mode = 0
+GET d02c cross process -> raw PTP RC 0x2001 (OK)
+      d02c cross process = 0
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1016 receiving resp failed: PTP Invalid Device Prop Value (0x201c)
+-- precondition probe: d020 currently 0 (not cross process) --
+SET d02c (precondition probe)=33 -> raw PTP RC 0x201c 
+      precondition write rejected as expected (camera requires CI mode 'cross process' first)
+SET d020 CI mode=10 -> raw PTP RC 0x2001 (OK)
+GET d020 read-back -> raw PTP RC 0x2001 (OK)
+      d020 read-back = 10
+SET d02c=33 -> raw PTP RC 0x2001 (OK)
+GET d02c read-back -> raw PTP RC 0x2001 (OK)
+      d02c read-back = 33
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x1016 receiving resp failed: PTP Invalid Device Prop Value (0x201c)
+SET d02c restore=0 -> raw PTP RC 0x201c 
+SET d020 CI mode restore=0 -> raw PTP RC 0x2001 (OK)
+GET d020 read-back (restored) -> raw PTP RC 0x2001 (OK)
+      d020 read-back (restored) = 0
+GET d02c read-back (restored) -> raw PTP RC 0x2001 (OK)
+      d02c read-back (restored) = 0
+[0] ../camlibs/ptp2/usb.c:495 ptp_usb_getresp: PTP_OC 0x9002 receiving resp failed: PTP Unknown Vendor Code (0x2017)
+RESULT: FAIL

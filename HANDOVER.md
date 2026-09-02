@@ -171,3 +171,12 @@ On **K-3 III**: ISO 3200→1600→3200; aperture f/3.5→f/4→f/3.5; **Bulb tim
 ## 8. IMMEDIATE NEXT STEPS (priority order)
 
 1. ~~Add K-3 III Monochrome + KP + K-70 to pentax_lookup_model()~~ **DONE 2026-08-22** — plus K-3, K-1, GR III, 645D, K-3 II (see §6 additions). Build clean.
+
+### 2026-09-02 (late evening) — K-3 III d02c encoding confirmed on hardware; simple values rejected, presets work
+
+HW probe on the K-3 III (`usb:002,002`, evidence `docs/pentax/evidence/2026-09-02/k3iii-d02c.log` + `k3iii-d02c-preset33.log`):
+- With CI mode set to cross process (d020=10), **simple wire values 1–4 are rejected with 0x201c** — the camera auto-jumps d02c to preset 33 on entering that mode.
+- **Preset-range value 33 is accepted** (`0x2001` OK, read-back = 33). Turning CI mode off auto-resets d02c to 0 (clean restore verified).
+- This confirms the offset encoding already implemented in config.c's `_put_Pentax_CrossProcess` (user v>3 → wire `v - 3 + 32`; user 0–3 → wire 1–4): on k3iii-family bodies, **user values 0–3 are effectively unusable** — only presets (wire 33+) write cleanly. No code change needed; the widget's preset choices are the supported path.
+- K-01 matrix row also completed: card-write all four modes → `0x2005` with `vendor_mode_enabled=0` at probe time (single-slot body, not in the card-writing gate — 0x2005 may be an artifact of the camera's PTP operation table); d02c/d02d GETs all `0x200a`, consistent with non-k3iii gating.
+- Open: re-run K-3 III card-write after a battery pull to rule out session-reuse state as the cause of its `0x201d` (reconciliation noise 0x2017 on d035/GetAllConditions in every probe run).
