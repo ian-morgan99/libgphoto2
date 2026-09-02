@@ -520,6 +520,15 @@ main (void)
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_GR_III));
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_KF));
 
+	/* Cross process (d02c): K-1 II probe (2026-09-02) shows GET/SET
+	 * unsupported even in cross-process mode, so gate on k3iii family. */
+	CHECK (pentax_model_supports_cross_process (PENTAX_MODEL_K3_MARK_III));
+	CHECK (pentax_model_supports_cross_process (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K1));
+	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K3));
+	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_KP));
+
 	free (buffer.data);
 	return 0;
 }

@@ -388,6 +388,17 @@ pentax_model_supports_pc_live_view (uint32_t model_no)
 	return pentax_model_is_k3iii_family (model_no);
 }
 
+/* Cross process (d02c): the HW finding that writes work once CI mode d020 is
+ * set to cross process came from a K-3 III family body.  On a K-1 II the
+ * property GET returns PTP_RC_DevicePropNotSupported and SET returns
+ * PTP_RC_AccessDenied even with d020=10 (evidence: docs/pentax/evidence/
+ * 2026-09-02/k1ii-d02c-probe.log), so fail closed on the k3iii family only. */
+int
+pentax_model_supports_cross_process (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
 /* Card writing mode (0x9004): IT2's Model property setter sets _isDualSlot
  * true for the K-1 family, K-3 family and 645D/645Z, and false for KP,
  * K-70, GR III and G900SE (MtpDevice.cs).  The SD-writing-mode UI is only

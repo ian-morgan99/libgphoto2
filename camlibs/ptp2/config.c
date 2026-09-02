@@ -10391,9 +10391,13 @@ _put_Pentax_CompositionAdjust (CONFIG_PUT_ARGS)
 
 /* Cross process type (0xd02c).  IT2 CICrossProcessType maps user values
  * 0..3 to wire 1..4 and presets >3 to wire+32-3 (offset encoding).
- * HW finding (session 20): the camera rejects writes (error -1) unless
- * CI mode (0xd020) is set to "cross process" first; with that mode
- * active both user values and presets write and read back cleanly. */
+ * HW finding (session 20, K-3 III family): the camera rejects writes
+ * (error -1) unless CI mode (0xd020) is set to "cross process" first;
+ * with that mode active both user values and presets write and read
+ * back cleanly.  On a K-1 II (2026-09-02 probe, evidence:
+ * docs/pentax/evidence/2026-09-02/k1ii-d02c-probe.log) the property GET
+ * returns PTP_RC_DevicePropNotSupported and SET returns
+ * PTP_RC_AccessDenied even with d020=10, so gate on the k3iii family. */
 static int
 _get_Pentax_CrossProcess (CONFIG_GET_ARGS)
 {
@@ -10403,6 +10407,8 @@ _get_Pentax_CrossProcess (CONFIG_GET_ARGS)
 	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_cross_process (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_u8_prop_get (params,
 		PTP_DPC_PENTAX_CustomImageCrossProcess, &mode);
@@ -10430,6 +10436,8 @@ _put_Pentax_CrossProcess (CONFIG_PUT_ARGS)
 	long v;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_cross_process (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	v = strtol (value, NULL, 10);
