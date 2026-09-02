@@ -126,11 +126,21 @@ f3180f216b1fe800eeb9763222bfd402f3d7d8949adc2d466097c1283b57ce0a  k3iii-d02c.log
 5042dfd357d0f58949bfb09021f472ca5fa7879ce5c79520fcc33339e142282a  k3iii-crossprocess.log
 96bc0be3cd51b992ca1e8a368c04b6be8bf35db9567dba1a218695ef1d27ca17  k3iii-d02c-preset33.log
 4dd867d49b2644256ec39c4ce4ca5efc01228fdfc30dfe541cdd1a6177e6e4a0  k01-cardwrite.log
-b83747a3d157b8f8aa2cfbf65e96111324756087424de6daf9687c19b6fb4527  k01-d02c.log
-573a18f16dc515de2b633fd4ad8aeb9810a3889eb7acf39458dde3e40385807c  k01-crossprocess.log
 ```
 
-Note: all seven logs live in the spec repo at `docs/pentax/evidence/2026-09-02/`.
+Note: the K-01 card-write log lives in the spec repo at `docs/pentax/evidence/2026-09-02/`.
+
+SHA-256 of the 2026-09-02 (post-probe) K-01 evidence set:
+
+```
+316c25a8c106fa9e6d7a13bde1b3a1f4969a6f0fcce3422406ed72bb5890dd24  k01-d02c.log
+e5de6cc6a1ad5e5553539b4e9a45228ab574364b592cfafdb85d77fb715b4277  k01-crossprocess.log
+638c08118be2f1862b27c50c098f9450a6bcd52c0b536318290dfdfda96ee86c  k01-baseline-preflight.log
+```
+
+Note: the post-probe K-01 logs live in the spec repo at `docs/pentax/evidence/2026-09-02/`. The d02c and crossprocess files supersede the late-evening copies (same results, but those runs were captured with a broken IOLIBS/CAMLIBS env pointing at a nonexistent workspace-root `_build/` and never detected the camera; corrected env = `libgphoto2/_build`). All runs show `vendor_mode_enabled=0` and every vendor property GET → 0x200a (PTP_RC_DevicePropNotSupported), confirming K-01's fail-closed behaviour. The baseline preflight additionally records 0 pentax widgets in `--list-config`.
+
+Note: all seven late-evening logs live in the spec repo at `docs/pentax/evidence/2026-09-02/`.
 Highlights: K-3 III card-write sweep → 0x201d ×4 (vs K-1 II's 0x2001); d02c simple
 values 1–4 rejected 0x201c even in cross-process CI mode, while preset value 33 is
 accepted (0x2001 OK, read-back 33) — k3iii-family uses preset-range encoding for
