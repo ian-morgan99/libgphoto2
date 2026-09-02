@@ -100,3 +100,20 @@ is not yet isolated.
 
 A pre-commit style check is recommended upstream; until then, reviewers should
 reject Pentax commits that add multi-megabyte uncompressed traces.
+
+SHA-256 of the 2026-09-02 evidence set:
+
+```
+3891373e842656407b80628a027e1486aa5fdaf9b75f22ca0be441b886e14a5a  k1ii-crossprocess-readonly-probe.log
+c5b75a4921935c86bd78417e640eaf700a5a74b47852bbee219e14f9b6e469eb  k1ii-d02c-probe.log
+```
+
+Note: the d02c cross-process probe logs live in the spec repo at
+`docs/pentax/evidence/2026-09-02/`. The read-only run shows GET d02c and
+GET d02d both returning PTP_RC_DevicePropNotSupported (0x200a) on a K-1 II;
+the full SET-sequence run shows SET d02c rejected with
+PTP_RC_AccessDenied (0x200f) in both autoselect and cross-process CI modes,
+while the d020 precondition/restore writes succeeded and read back. Both RCs
+map to GP_ERROR (-1) through `translate_ptp_result` (library.c:88). This
+diverges from the session-20 finding on a K-3 III family body, motivating
+the k3iii-family-only `pentax_model_supports_cross_process` gate.
