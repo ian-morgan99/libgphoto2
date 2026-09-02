@@ -99,7 +99,7 @@ grep -H . /sys/bus/usb/devices/*/idVendor /sys/bus/usb/devices/*/devnum | paste 
 | pentaxbracketstep | d015 UINT8 | ✅ | descriptor enum, display /10; K-3 III HW-verified |
 | pentaxcimode | d020 UINT8 | ✅ | 14 modes via CIModeLUT codes; K-3 III + K-1 II HW-verified |
 | pentaxcompositionadjust | d02a UINT8 | ✅ | on/off; set+get same session (lazy read-back); K-3 III HW-verified |
-| pentaxcrossprocess | d02c UINT8 | ⚠️ | GET ok (wire 255); SET rejected — parked, needs USB trace |
+| pentaxcrossprocess | d02c UINT8 | ⚠️ | K-3 III: writes work once CI mode set to cross process. K-1 II (2026-09-02 probe): GET 0x200a / SET 0x200f even in that mode → gated k3iii-family only (`pentax_model_supports_cross_process`), fails closed on other models |
 | pentaxmoviemode | d039 UINT8 | ✅ | on/off; K-3 III HW-verified |
 | manualfocusdrivenear/far | 0x9017 | K-3 III only | one-shot, no escalation |
 
