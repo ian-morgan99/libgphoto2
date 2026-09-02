@@ -3186,14 +3186,8 @@ pentax_restore_live_view (PTPParams *params, int force_teardown)
 	return ret;
 }
 
-/* Research builds only: the vendor Pentax bodies whose capture flow we
- * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome).
- */
-static int
-pentax_pid_is_research_capable (unsigned int pid)
-{
-	return (pid == 0x0183) || (pid == 0x0189) || (pid == 0x018f);
-}
+/* pentax_pid_is_research_capable() now lives in pentax-utils.[ch] so the R0
+ * containment rule is unit-tested without hardware (issue #43). */
 
 int
 camera_abilities (CameraAbilitiesList *list)
@@ -6033,100 +6027,9 @@ camera_sigma_fp_capture (Camera *camera, CameraCaptureType type, CameraFilePath 
 #endif
 }
 
-#define PENTAX_CAPTURE_TIMEOUT_MS_BASE (60 * 1000)
-/* Long exposures (bulb timer, astrotracer) and multi-shot composites
- * (pixel shift = 4 exposures + in-camera processing) need extra wait. */
-#define PENTAX_CAPTURE_PROCESSING_MARGIN_MS (30 * 1000)
-/* Pixel shift / multi-shot composites require 4x exposure time plus processing margin */
-#define PENTAX_PIXEL_SHIFT_MULTIPLIER 4
-
-/* Camera-reported condition values are untrusted protocol input; compute
- * in 64-bit and clamp so a corrupt value can never wrap the timeout. */
-#define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
-/* Fallback when conditions are unreadable after InitiateCapture: long
- * enough to cover a typical bulb exposure plus processing, but bounded so
- * a wedged camera cannot pin the caller for up to a day (review #3). */
-#define PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK (2U * 60 * 1000)
-/* GetAllConditions payloads must carry the full parse range; offset 504
- * (capability_flags) is the final mandatory field, so >=508 bytes is the
- * single validation floor used everywhere (review #5). */
-#define PENTAX_CONDITIONS_MIN_SIZE 508
-
-static unsigned int
-pentax_clamp_timeout_ms (uint64_t ms, const char *source)
-{
-	if (ms > PENTAX_CAPTURE_TIMEOUT_MS_MAX) {
-		GP_LOG_E ("Pentax capture budget from %s (%llu ms) exceeds "
-			"clamp; using %u ms.", source,
-			(unsigned long long) ms, PENTAX_CAPTURE_TIMEOUT_MS_MAX);
-		return PENTAX_CAPTURE_TIMEOUT_MS_MAX;
-	}
-	return (unsigned int) ms;
-}
-
-/* Compute the capture wait budget from camera conditions: long bulb timers,
- * astrotracer limits, or multi-shot composites (pixel shift/astrotracer) extend
- * the base timeout so slow captures are not aborted while still in progress. */
-static unsigned int
-pentax_capture_timeout_ms (const PentaxConditions *conditions)
-{
-	uint64_t timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-
-	/* Handle astro shift mode with limit */
-	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) {
-		uint64_t limit_ms = conditions->has_astro_limit ?
-			((uint64_t) conditions->astro_limit_seconds + 1) * 1000 : 0;
-		if (limit_ms > timeout)
-			timeout = limit_ms;
-		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		timeout = pentax_clamp_timeout_ms (timeout, "astro limit");
-	}
-
-	/* Handle bulb timer */
-	if (conditions->bulb_timer_seconds > 0) {
-		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000 +
-			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb timer");
-		if (bulb_ms > timeout)
-			timeout = bulb_ms;
-	}
-
-	/* Handle multi-shot composites (pixel shift, astrotracer) */
-	if (conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_MULTI_MODE |
-	    PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
-		/* Pixel shift = 4 exposures + in-camera processing */
-		uint64_t multi_ms = 0;
-
-		/* If bulb timer is active, multiply by 4 for pixel shift */
-		if (conditions->bulb_timer_seconds > 0) {
-			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
-				PENTAX_PIXEL_SHIFT_MULTIPLIER + PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		} else {
-			/* For regular exposures, use base exposure time * 4 + processing margin */
-			/* Base timeout is 60s, so for pixel shift: 60s * 4 + 30s margin = 270s */
-			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE * PENTAX_PIXEL_SHIFT_MULTIPLIER +
-				PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		}
-
-		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot composite");
-		if (multi_ms > timeout)
-			timeout = multi_ms;
-	}
-
-	/* Handle astrotracer mode (without shift limit) */
-	if ((conditions->astro_status_flags & PENTAX_CONDITION_ASTROTRACER3) &&
-	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
-		/* Astrotracer also requires extended processing time */
-		uint64_t astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE +
-			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		if (astro_ms > timeout)
-			timeout = astro_ms;
-	}
-
-	return (unsigned int) timeout;
-}
-#define PENTAX_TRANSFER_TIMEOUT_MS (30 * 60 * 1000)
-#define PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS (60 * 1000)
+/* Capture-wait budget and transfer-timeout constants, plus the
+ * pentax_capture_timeout_ms() helper, now live in pentax-utils.[ch] so they
+ * are unit-tested without hardware (issue #43). */
 #define PENTAX_TRANSFER_BLOCK_SIZE (8U * 1024U * 1024U)
 
 typedef struct {
@@ -6199,16 +6102,18 @@ pentax_camera_transfer_timed_out (void *user_data)
 	/* A stalled camera (no bytes for a while) is a different failure
 	 * from one legitimately streaming a huge image for a long time;
 	 * only the former should trip the short bound (issue #38). */
-	if (idle >= PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS) {
+	switch (pentax_transfer_timeout_reason (total, idle)) {
+	case PENTAX_TRANSFER_TIMEOUT_STALLED:
 		GP_LOG_E ("transfer stalled: %llu bytes so far, no progress "
 			"for %llu ms", transfer->bytes_transferred, idle);
 		return 1;
-	}
-	if (total >= PENTAX_TRANSFER_TIMEOUT_MS) {
+	case PENTAX_TRANSFER_TIMEOUT_CEILING:
 		GP_LOG_E ("transfer exceeded absolute ceiling of %d ms after "
 			"%llu bytes", PENTAX_TRANSFER_TIMEOUT_MS,
 			transfer->bytes_transferred);
 		return 1;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -6249,9 +6154,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		int recovered = 0;
 
 		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &rdata, &rsize) &&
-		    rsize >= PENTAX_CONDITIONS_MIN_SIZE &&
-		    !(pentax_get_u32le (rdata + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE) &&
-		    pentax_get_u32le (rdata + 32) != 1) {
+		    pentax_recovery_probe_ok (rdata, rsize)) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
 			GP_LOG_D ("recovery-required cleared: conditions readable "
@@ -6284,10 +6187,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		unsigned int bsize = 0;
 		uint32_t baseline_candidate = 0;
 
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize) &&
-		    bsize >= PENTAX_CONDITIONS_MIN_SIZE &&
-		    pentax_get_u32le (bdata + 32) == 1)
-			baseline_candidate = pentax_get_u32le (bdata + 36);
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize))
+			baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
 		else if (bdata || bsize)
 			GP_LOG_D ("stale-candidate pre-probe failed or short "
 				"(%u bytes); proceeding without baseline check",
@@ -10442,23 +10343,31 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 		GP_LOG_E ("reconciliation: could not read d035");
 	}
 
-	if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size) &&
-	    size >= PENTAX_CONDITIONS_MIN_SIZE) {
-		uint32_t op_state = pentax_get_u32le (data + 24);
-		uint32_t candidate = pentax_get_u32le (data + 36);
-		uint32_t activity = pentax_get_u32le (data + 104);
+	if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size)) {
+		uint32_t candidate = 0;
 
-		if (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) {
+		switch (pentax_reconcile_conditions (data, size, &candidate)) {
+		case PENTAX_RECONCILE_UNSAFE:
 			GP_LOG_E ("reconciliation: camera is in an unsafe "
 				"activity state (flags 0x%08x, op state %u); "
 				"refusing capture until idle",
-				activity, op_state);
+				pentax_get_u32le (data + 104),
+				pentax_get_u32le (data + 24));
 			params->pentax.recovery_required = 1;
-		} else if (candidate) {
+			break;
+		case PENTAX_RECONCILE_STALE_CANDIDATE:
 			GP_LOG_D ("reconciliation: stale transfer candidate %u "
 				"present; capture will recover or refuse it",
 				candidate);
 			params->pentax.candidate_handle = candidate;
+			break;
+		case PENTAX_RECONCILE_UNREADABLE:
+			GP_LOG_E ("reconciliation: GetAllConditions unreadable; "
+				"marking session recovery-required");
+			params->pentax.recovery_required = 1;
+			break;
+		default: /* IDLE */
+			break;
 		}
 	} else {
 		GP_LOG_E ("reconciliation: GetAllConditions unreadable; "

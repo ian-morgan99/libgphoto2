@@ -181,7 +181,7 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 	if (!data || !conditions)
 		return GP_ERROR_BAD_PARAMETERS;
 	/* capability_flags at 504 is the final mandatory field. */
-	if (size < 508)
+	if (size < PENTAX_CONDITIONS_MIN_SIZE)
 		return GP_ERROR_CORRUPTED_DATA;
 	memset (&parsed, 0, sizeof (parsed));
 	parsed.operation_state = (uint8_t)pentax_get_u32le (data + 24);
@@ -635,4 +635,149 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
 		}
 		return GP_ERROR_NOT_SUPPORTED;
 	}
+}
+
+/* Research builds only: the vendor Pentax bodies whose capture flow we
+ * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome). */
+int
+pentax_pid_is_research_capable (unsigned int pid)
+{
+	return (pid == 0x0183) || (pid == 0x0189) || (pid == 0x018f);
+}
+
+/* A stalled camera (no bytes for a while) is a different failure from one
+ * legitimately streaming a huge image for a long time; only the former should
+ * trip the short bound (issue #38). The stall check must run before the
+ * ceiling so a wedged stream cannot hide behind the absolute budget. */
+int
+pentax_transfer_timeout_reason (unsigned long long total_ms, unsigned long long idle_ms)
+{
+	if (idle_ms >= PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS)
+		return PENTAX_TRANSFER_TIMEOUT_STALLED;
+	if (total_ms >= PENTAX_TRANSFER_TIMEOUT_MS)
+		return PENTAX_TRANSFER_TIMEOUT_CEILING;
+	return PENTAX_TRANSFER_TIMEOUT_OK;
+}
+
+/* A recovery probe is only meaningful when the conditions blob is complete,
+ * no unsafe activity flag is set, and the camera reports it is not in a
+ * capture (field 32 != 1). Short-circuiting on size makes this safe to call
+ * with (NULL, 0) after an unreadable probe. */
+int
+pentax_recovery_probe_ok (const unsigned char *data, size_t size)
+{
+	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
+		return 0;
+	if (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+		return 0;
+	if (pentax_get_u32le (data + 32) == 1)
+		return 0;
+	return 1;
+}
+
+/* The stale-candidate baseline is the transfer candidate handle recorded in a
+ * pre-capture conditions probe: only valid when the blob is complete and the
+ * camera reports an active capture (field 32 == 1). A zero result means "no
+ * usable baseline", which callers treat as "proceed without the check"
+ * (issue #34). */
+uint32_t
+pentax_stale_candidate_baseline (const unsigned char *data, size_t size)
+{
+	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
+		return 0;
+	if (pentax_get_u32le (data + 32) != 1)
+		return 0;
+	return pentax_get_u32le (data + 36);
+}
+
+/* Decision for a reused session whose camera state we can only observe, not
+ * control: unreadable/short blobs and unsafe activity both force recovery;
+ * a non-zero candidate handle means the previous capture's transfer is still
+ * pending and must be recovered or refused before capturing (issue #33). */
+PentaxReconcileDecision
+pentax_reconcile_conditions (const unsigned char *data, size_t size, uint32_t *candidate_out)
+{
+	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
+		return PENTAX_RECONCILE_UNREADABLE;
+	uint32_t activity = pentax_get_u32le (data + 104);
+	uint32_t candidate = pentax_get_u32le (data + 36);
+	if (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+		return PENTAX_RECONCILE_UNSAFE;
+	if (candidate) {
+		if (candidate_out)
+			*candidate_out = candidate;
+		return PENTAX_RECONCILE_STALE_CANDIDATE;
+	}
+	return PENTAX_RECONCILE_IDLE;
+}
+
+/* No capture may exceed the absolute ceiling, whatever the mode math says. */
+static unsigned int
+pentax_clamp_timeout_ms (uint64_t ms, const char *source)
+{
+	if (ms > PENTAX_CAPTURE_TIMEOUT_MS_MAX) {
+		GP_LOG_E ("Pentax capture budget from %s (%llu ms) exceeds clamp; using %u ms.",
+			source, (unsigned long long) ms,
+			(unsigned int) PENTAX_CAPTURE_TIMEOUT_MS_MAX);
+		return (unsigned int) PENTAX_CAPTURE_TIMEOUT_MS_MAX;
+	}
+	return (unsigned int) ms;
+}
+
+/* Capture timeout budget in milliseconds for the current conditions. The base
+ * covers a normal exposure plus processing margin; each special mode widens
+ * it, and every result is clamped to the absolute ceiling so no mode can hang
+ * the caller for 24 hours. */
+unsigned int
+pentax_capture_timeout_ms (const PentaxConditions *conditions)
+{
+	uint64_t timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+
+	/* Astro shift: honour the camera's own limit when it reports one,
+	 * otherwise fall back to base + margin below. */
+	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) {
+		uint64_t limit_ms = conditions->has_astro_limit ?
+			((uint64_t) conditions->astro_limit_seconds + 1) * 1000 : 0;
+		if (limit_ms > timeout)
+			timeout = limit_ms;
+		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		timeout = pentax_clamp_timeout_ms (timeout, "astro limit");
+	}
+
+	/* Bulb: the timer value plus margin. */
+	if (conditions->bulb_timer_seconds > 0) {
+		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
+		bulb_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb timer");
+		if (bulb_ms > timeout)
+			timeout = bulb_ms;
+	}
+
+	/* Multi-shot: each shot needs its own budget. Base timeout is 60s, so
+	 * for pixel shift: 60s * 4 + 30s margin = 270s. */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
+		uint64_t multi_ms;
+		if (conditions->bulb_timer_seconds > 0)
+			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		else
+			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		multi_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot composite");
+		if (multi_ms > timeout)
+			timeout = multi_ms;
+	}
+
+	/* Astrotracer without a shift limit: base + margin. */
+	if ((conditions->astro_status_flags & PENTAX_CONDITION_ASTROTRACER3) &&
+	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
+		uint64_t astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE +
+			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		if (astro_ms > timeout)
+			timeout = astro_ms;
+	}
+
+	return (unsigned int) timeout;
 }

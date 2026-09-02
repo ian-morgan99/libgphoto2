@@ -529,6 +529,116 @@ main (void)
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K3));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_KP));
 
+	/* Research-capable PIDs (issue #19): only the three vendor bodies whose
+	 * capture flow we exercise may enter research paths. K-3 II (0x017b) is
+	 * deliberately absent from IT2, so it must fail closed here too. */
+	CHECK (pentax_pid_is_research_capable (0x0183)); /* K-1 II */
+	CHECK (pentax_pid_is_research_capable (0x0189)); /* K-3 III */
+	CHECK (pentax_pid_is_research_capable (0x018f)); /* K-3 III Mono */
+	CHECK (!pentax_pid_is_research_capable (0x017b));
+	CHECK (!pentax_pid_is_research_capable (0x0185));
+	CHECK (!pentax_pid_is_research_capable (0));
+
+	/* Transfer-timeout ordering (issue #38): a stalled stream must trip the
+	 * short no-progress bound even when the absolute ceiling has not been
+	 * reached, and a legitimately huge stream trips only the ceiling. */
+	CHECK (pentax_transfer_timeout_reason (1000, 60000) ==
+		PENTAX_TRANSFER_TIMEOUT_STALLED);
+	CHECK (pentax_transfer_timeout_reason (1800000, 59999) ==
+		PENTAX_TRANSFER_TIMEOUT_CEILING);
+	CHECK (pentax_transfer_timeout_reason (1799999, 59999) ==
+		PENTAX_TRANSFER_TIMEOUT_OK);
+	CHECK (pentax_transfer_timeout_reason (60000, 60000) ==
+		PENTAX_TRANSFER_TIMEOUT_STALLED);
+
+	/* Capture-wait budget arithmetic: camera-reported values are untrusted
+	 * protocol input, so every branch must stay in 64-bit and clamp to the
+	 * absolute ceiling (issue #43 regression coverage). */
+	memset (&conditions, 0, sizeof (conditions));
+	CHECK (pentax_capture_timeout_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	conditions.bulb_timer_seconds = 120; /* 121s + margin beats the base */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 151000);
+
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 270000); /* 4x + margin */
+
+	conditions.bulb_timer_seconds = 9; /* bulb + multi-shot composite */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 70000);
+
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
+	conditions.has_astro_limit = 1;
+	conditions.astro_limit_seconds = 300; /* 301s + margin */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 331000);
+
+	/* Overflow-safe clamp: a corrupt UINT32_MAX limit must not wrap the
+	 * 64-bit math or exceed the ceiling. */
+	conditions.astro_limit_seconds = UINT32_MAX;
+	CHECK (pentax_capture_timeout_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
+
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 90000); /* base + margin */
+
+	/* Session reconciliation decisions (issue #33): short blobs and unsafe
+	 * activity force recovery, a pending candidate must be surfaced. The
+	 * out-param is only written on STALE_CANDIDATE; sentinel checks pin that. */
+	memset (condition_data, 0, sizeof (condition_data));
+	uint32_t candidate = 99;
+	CHECK (pentax_reconcile_conditions (NULL, 0, &candidate) ==
+		PENTAX_RECONCILE_UNREADABLE);
+	CHECK (pentax_reconcile_conditions (condition_data, 507, &candidate) ==
+		PENTAX_RECONCILE_UNREADABLE);
+
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
+	CHECK (pentax_reconcile_conditions (condition_data, sizeof (condition_data),
+			&candidate) == PENTAX_RECONCILE_UNSAFE);
+	CHECK (candidate == 99); /* untouched on UNSAFE */
+
+	memset (condition_data, 0, sizeof (condition_data));
+	put_u32le (condition_data, 36, 42);
+	candidate = 0;
+	CHECK (pentax_reconcile_conditions (condition_data, sizeof (condition_data),
+			&candidate) == PENTAX_RECONCILE_STALE_CANDIDATE);
+	CHECK (candidate == 42);
+
+	memset (condition_data, 0, sizeof (condition_data));
+	candidate = 99;
+	CHECK (pentax_reconcile_conditions (condition_data, sizeof (condition_data),
+			&candidate) == PENTAX_RECONCILE_IDLE);
+	CHECK (candidate == 99); /* untouched on IDLE */
+
+	put_u32le (condition_data, 36, 7);
+	CHECK (pentax_reconcile_conditions (condition_data, sizeof (condition_data),
+			NULL) == PENTAX_RECONCILE_STALE_CANDIDATE);
+
+	/* Recovery re-probe predicate: only a complete, idle, non-capturing
+	 * blob is acceptable; field 32 == 1 means capture in progress. */
+	CHECK (!pentax_recovery_probe_ok (NULL, 0));
+	memset (condition_data, 0, sizeof (condition_data));
+	CHECK (!pentax_recovery_probe_ok (condition_data, 507));
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_PROCESSING);
+	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+	memset (condition_data, 0, sizeof (condition_data));
+	put_u32le (condition_data, 32, 1);
+	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+	put_u32le (condition_data, 32, 5);
+	CHECK (pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+
+	/* Stale-candidate baseline (issue #34): the pending transfer handle is
+	 * only valid when the blob is complete and field 32 flags an active
+	 * capture; otherwise callers proceed without the check. */
+	CHECK (pentax_stale_candidate_baseline (NULL, 0) == 0);
+	memset (condition_data, 0, sizeof (condition_data));
+	put_u32le (condition_data, 36, 77);
+	CHECK (pentax_stale_candidate_baseline (condition_data, sizeof (condition_data)) == 0);
+	put_u32le (condition_data, 32, 1);
+	CHECK (pentax_stale_candidate_baseline (condition_data, sizeof (condition_data)) == 77);
+
 	free (buffer.data);
 	return 0;
 }

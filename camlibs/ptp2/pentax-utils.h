@@ -115,6 +115,72 @@ typedef struct {
 #define PENTAX_CONDITION_GPS_STATE_MASK           0x00000180U
 #define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
 
+/* Capture-wait budget and transfer-timeout constants. Camera-reported condition
+ * values are untrusted protocol input; the timeout is computed in 64-bit and
+ * clamped so a corrupt value can never wrap (issue #43 regression coverage). */
+#define PENTAX_CAPTURE_TIMEOUT_MS_BASE (60 * 1000)
+/* Long exposures (bulb timer, astrotracer) and multi-shot composites
+ * (pixel shift = 4 exposures + in-camera processing) need extra wait. */
+#define PENTAX_CAPTURE_PROCESSING_MARGIN_MS (30 * 1000)
+/* Pixel shift / multi-shot composites require 4x exposure time plus margin. */
+#define PENTAX_PIXEL_SHIFT_MULTIPLIER 4
+#define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
+/* Fallback when conditions are unreadable after InitiateCapture: bounded so a
+ * wedged camera cannot pin the caller for up to a day (review #3). */
+#define PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK (2U * 60 * 1000)
+/* Absolute transfer ceiling and no-progress stall bound (issue #38): a stalled
+ * camera trips the short bound, a legitimately huge stream trips the ceiling. */
+#define PENTAX_TRANSFER_TIMEOUT_MS (30 * 60 * 1000)
+#define PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS (60 * 1000)
+/* GetAllConditions payloads must carry the full parse range; offset 504
+ * (capability_flags) is the final mandatory field, so >=508 bytes is the
+ * single validation floor used everywhere (review #5). */
+#define PENTAX_CONDITIONS_MIN_SIZE 508
+
+/* Reconciliation decisions for a session that was already open when we
+ * connected (issue #33); see pentax_reconcile_conditions(). */
+typedef enum PentaxReconcileDecision {
+	PENTAX_RECONCILE_IDLE = 0,		/* camera idle; capture may proceed */
+	PENTAX_RECONCILE_STALE_CANDIDATE,	/* a prior transfer candidate is pending */
+	PENTAX_RECONCILE_UNSAFE,		/* unsafe activity state; refuse capture */
+	PENTAX_RECONCILE_UNREADABLE	/* conditions payload unreadable/short */
+} PentaxReconcileDecision;
+
+/* Research builds only: the vendor Pentax bodies whose capture flow we
+ * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome). */
+int pentax_pid_is_research_capable (unsigned int pid);
+
+/* Transfer-timeout decision for the in-flight transfer callback (issue #38):
+ * a stalled camera (no bytes for a while) is a different failure from one
+ * legitimately streaming a huge image; only the former trips the short bound. */
+enum PentaxTransferTimeoutReason {
+	PENTAX_TRANSFER_TIMEOUT_OK = 0,	/* within both bounds */
+	PENTAX_TRANSFER_TIMEOUT_STALLED,	/* no progress for too long */
+	PENTAX_TRANSFER_TIMEOUT_CEILING	/* absolute ceiling exceeded */
+};
+int pentax_transfer_timeout_reason (unsigned long long total_ms,
+	unsigned long long idle_ms);
+
+/* Recovery re-probe predicate: conditions readable and camera idle with no
+ * pending candidate; the caller has already checked the PTP result code. */
+int pentax_recovery_probe_ok (const unsigned char *data, size_t size);
+
+/* Stale-candidate baseline for the pre-capture probe (issue #34): returns
+ * the pending transfer handle when one is flagged, else 0. */
+uint32_t pentax_stale_candidate_baseline (const unsigned char *data,
+	size_t size);
+
+/* Session reconciliation decision tree (issue #33). On STALE_CANDIDATE the
+ * pending handle is recorded in *candidate_out; on UNREADABLE it is left
+ * untouched. */
+PentaxReconcileDecision pentax_reconcile_conditions (const unsigned char *data,
+	size_t size, uint32_t *candidate_out);
+
+/* Capture wait budget from camera conditions: long bulb timers, astrotracer
+ * limits, or multi-shot composites extend the base timeout so slow captures
+ * are not aborted while still in progress. */
+unsigned int pentax_capture_timeout_ms (const PentaxConditions *conditions);
+
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 	PentaxLiveViewGeometry *geometry);
