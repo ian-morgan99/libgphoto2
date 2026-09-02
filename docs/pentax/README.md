@@ -6,6 +6,27 @@ opcodes and properties the cameras expose over PTP (cross-checked against
 publicly observable behaviour of Ricoh's tethering software) and verified
 against real hardware. It is rebased onto upstream **libgphoto2 v2.5.34**.
 
+## Branch status (canonical branch)
+
+`master` is the single active branch for all Pentax work in this fork. The
+five legacy branches that predate the ptp2/pentax integration were reviewed
+for issue #40 and classified **superseded**: their unique commits are
+integrated-equivalent on master (e.g. the extra model IDs from the old
+`pentaxmodern` camlib — 645D, K-3, 645Z, K-1, K-70, KP, Ricoh G900SE, GR III
+— now live in `camlibs/ptp2/pentax-utils.h`). Each is archived as an
+annotated tag at its 2026-08-27 tip:
+
+| Legacy branch | Archive tag | Tip (2026-08-27) |
+|---|---|---|
+| `pentax-modern-integration` | `archive/pentax-modern-integration` | 173d9848e |
+| `fix-pentax-deps` | `archive/fix-pentax-deps` | 023322793 |
+| `c99-compliance-pentax` | `archive/c99-compliance-pentax` | 8567b212a |
+| `copilot/add-failed-print-detection` | `archive/copilot-add-failed-print-detection` | 6dc3819ac |
+| `copilot/explore-documentation-fork` | `archive/copilot-explore-documentation-fork` | 358dc7080 |
+
+The origin branches are left in place until the final submission gate (#46);
+they may be deleted at any time — everything is recoverable from these tags.
+
 ## What was there before
 
 Upstream libgphoto2 has carried a minimal Pentax PTP layer for years:
@@ -130,9 +151,9 @@ physical camera.
 - **Old-focus transport** remains the shared `0x9016` path used by pre-K-3
   bodies; only the *gate* was relaxed, the wire format is unchanged.
 - **The archived `pentaxmodern` prototype** survives in git history
-  (pre-rebase branch `backup/pre-rebase-2026-08-24` and earlier tags) as
-  reference material for anyone studying the protocol; nothing builds
-  against it.
+  (pre-rebase branch `backup/pre-rebase-2026-08-24`, and the `archive/*`
+  tags listed above) as reference material for anyone studying the
+  protocol; nothing builds against it.
 - **Mass-storage personalities**: some bodies switch to MSC mode when a card
   is inserted; that behaviour is documented
   ([REAL_HARDWARE_TEST_LOG.md](REAL_HARDWARE_TEST_LOG.md)) but intentionally
