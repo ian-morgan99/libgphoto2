@@ -2831,6 +2831,10 @@ static struct {
 	 * same header pattern as KP/645Z. Hardware confirmation pending. */
 	{"Pentax:KF (PTP Mode)",		0x25fb, 0x018e, 0},
 
+	/* Implemented by Ian Morgan github@morgan-multinational.co.uk
+	{ "Pentax:K-1 Mark II (PTP mode)", 0x25fb, 0x0183, "pentaxmodern" },
+	{ "Pentax:K-3 Mark III (PTP mode)", 0x25fb, 0x018c, "pentaxmodern" },
+	
 	{"Sanyo:VPC-C5 (PTP mode)",             0x0474, 0x0230, 0},
 	/* https://github.com/gphoto/libgphoto2/issues/497 */
 	{"Sanyo:VPC-FH1 (PTP mode)",            0x0474, 0x02e5, 0},
