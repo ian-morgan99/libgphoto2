@@ -3541,7 +3541,11 @@ append_folder_from_handle (Camera *camera, uint32_t storage, uint32_t handle, ch
 	PTPParams 	*params = &camera->pl->params;
 
 	GP_LOG_D ("(%x,%x,%s)", storage, handle, folder);
-	if (handle == PTP_HANDLER_ROOT)
+	/* MTP responders use 0xffffffff for an object's storage-root parent,
+	 * while plain PTP commonly uses 0x00000000.  Both terminate the folder
+	 * chain; attempting GetObjectInfo(0xffffffff) loses freshly captured
+	 * objects even though the capture itself succeeded. */
+	if ((handle == PTP_HANDLER_ROOT) || (handle == PTP_HANDLER_SPECIAL))
 		return GP_OK;
 
 	C_PTP (ptp_object_want (params, handle, PTPOBJECT_PARENTOBJECT_LOADED|PTPOBJECT_OBJECTINFO_LOADED, &ob)); // refresh
@@ -6344,8 +6348,19 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * filename collision must be resolved while the candidate still
 	 * exists (issue #37). */
 	{
-		int existing = gp_filesystem_number (camera->fs, path->folder,
-			path->name, context);
+		/* A missing name is expected here.  Use a callback-free context so
+		 * the filesystem probe cannot surface that expected miss as a CLI
+		 * error before a successful capture. */
+		GPContext *probe_context = gp_context_new ();
+		int existing;
+
+		if (!probe_context) {
+			ret = GP_ERROR_NO_MEMORY;
+			goto out;
+		}
+		existing = gp_filesystem_number (camera->fs, path->folder,
+			path->name, probe_context);
+		gp_context_unref (probe_context);
 		if (existing >= GP_OK) {
 			char stem[sizeof (path->name)];
 			const char *dot;
@@ -6414,6 +6429,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		goto out;
 	}
 	capture.data = NULL;
+	/* The virtual root file has no camera ObjectInfo lookup path.  Give the
+	 * cache a capture timestamp so set_file_noop does not try to obtain one
+	 * through the physical /store_xxxxxxxxx/ resolver. */
+	gp_file_set_mtime (file, time (NULL));
 	/* Finalize the camera-side candidate before publishing the file so the
 	 * host filesystem never advertises an image the camera has already
 	 * discarded (issue #12). */
@@ -9931,6 +9950,14 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 
 	if (!strcmp (folder, "/special"))
 		return GP_ERROR_NOT_SUPPORTED;
+
+	/* Pentax research capture publishes the transferred candidate as a
+	 * virtual file in "/" after deleting it camera-side with 0x900e.
+	 * A caller deleting that virtual entry (for example gphoto2 after
+	 * --capture-image-and-download) must not be routed through the real
+	 * storage-path resolver, which only accepts /store_xxxxxxxxx/. */
+	if (params->pentax.vendor_mode_enabled && !strcmp (folder, "/"))
+		return GP_OK;
 
 	/* virtual file created by Nikon special capture */
 	if (	((params->deviceinfo.VendorExtensionID == PTP_VENDOR_NIKON) ||

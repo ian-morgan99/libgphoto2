@@ -9680,7 +9680,7 @@ _pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
 
 /* Bounded live-conditions verification after an exposure-property write.
  * Compares the parsed conditions against the expected numerator/denominator
- * pair for up to five 100 ms attempts, mirroring IT2's asynchronous polling. */
+ * pair for up to ten 100 ms attempts, mirroring IT2's asynchronous polling. */
 static int
 _pentax_verify_rational_in_conditions (PTPParams *params,
 	uint32_t expect_num, uint32_t expect_den,
@@ -9695,7 +9695,11 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 	int result;
 
 	result = GP_ERROR;
-	for (attempt = 1; attempt <= 5; attempt++) {
+	/* Increased from 5 to 10 attempts (500ms -> 1s) to accommodate
+	 * slower condition updates on some camera models (issue #49).
+	 * The PTP write succeeds but conditions may take longer to reflect
+	 * the new value, especially for WB and aperture. */
+	for (attempt = 1; attempt <= 10; attempt++) {
 		if (gp_context_cancel (((PTPData *)params->data)->context) ==
 			GP_CONTEXT_FEEDBACK_CANCEL) {
 			return GP_ERROR_CANCEL;
@@ -9726,7 +9730,7 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 	}
 	if (result == GP_ERROR)
 		GP_LOG_E ("Pentax write was acknowledged but conditions retained "
-			"%u/%u after 500 ms (requested %u/%u).",
+			"%u/%u after 1000 ms (requested %u/%u).",
 			get_num (&conditions), get_den (&conditions),
 			expect_num, expect_den);
 	return result;
@@ -9740,6 +9744,35 @@ static uint32_t _pentax_cond_ev_num (const PentaxConditions *c)
 	{ return (uint32_t)c->exposure_comp_numerator; }
 static uint32_t _pentax_cond_ev_den (const PentaxConditions *c)
 	{ return c->exposure_comp_denominator; }
+
+static int
+_pentax_verify_u16_property (PTPParams *params, uint32_t property,
+	uint16_t expected)
+{
+	PTPPropValue actual;
+	unsigned int attempt;
+	uint16_t ret;
+
+	for (attempt = 1; attempt <= 10; attempt++) {
+		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+			GP_CONTEXT_FEEDBACK_CANCEL)
+			return GP_ERROR_CANCEL;
+		usleep (100000);
+		memset (&actual, 0, sizeof (actual));
+		ret = ptp_getdevicepropvalue (params, property, &actual,
+			PTP_DTC_UINT16);
+		if (ret != PTP_RC_OK)
+			return translate_ptp_result (ret);
+		GP_LOG_D ("Pentax property 0x%04x verification attempt %u: "
+			"expected=0x%04x, actual=0x%04x", property, attempt,
+			expected, actual.u16);
+		if (actual.u16 == expected)
+			return GP_OK;
+	}
+	GP_LOG_E ("Pentax property 0x%04x retained 0x%04x after 1000 ms "
+		"(requested 0x%04x).", property, actual.u16, expected);
+	return GP_ERROR;
+}
 
 static int
 _get_Pentax_DirectAperture (CONFIG_GET_ARGS)
@@ -9788,7 +9821,9 @@ _put_Pentax_DirectAperture (CONFIG_PUT_ARGS)
 		result = translate_ptp_result (ret);
 		if (result == GP_OK)
 			result = _pentax_verify_rational_in_conditions (params,
-				value.u16, 10,
+				/* PTP FNumber is hundredths (400 == f/4), while
+				 * Pentax conditions store a tenths numerator over 10. */
+				value.u16 / 10, 10,
 				_pentax_cond_aperture_num,
 				_pentax_cond_aperture_den);
 		if (alreadyset)
@@ -10744,8 +10779,6 @@ static uint32_t _pentax_cond_drive_mode (const PentaxConditions *c)
 	{ return c->drive_mode; }
 static uint32_t _pentax_cond_drive_mode_none (const PentaxConditions *c)
 	{ return 0; }
-static uint32_t _pentax_cond_white_balance (const PentaxConditions *c)
-	{ return c->white_balance; }
 
 static int
 _get_Pentax_DirectDriveMode (CONFIG_GET_ARGS)
@@ -11008,13 +11041,12 @@ _put_Pentax_DirectWB (CONFIG_PUT_ARGS)
 	ret = ptp_setdevicepropvalue (params, PTP_DPC_WhiteBalance,
 		&value, PTP_DTC_UINT16);
 	result = translate_ptp_result (ret);
-	if (result == GP_OK) {
-		/* Verify via fresh conditions sample at offset 120, mirroring
-		 * the drive-mode verification path (issue #27). */
-		result = _pentax_verify_rational_in_conditions (params,
-			target, 0, _pentax_cond_white_balance,
-			_pentax_cond_drive_mode_none);
-	}
+	if (result == GP_OK)
+		/* Conditions offset 120 is a UI enum domain (for example wire
+		 * 0x800f is conditions value 17), so verify against the actual
+		 * 0x5005 wire property rather than comparing unlike values. */
+		result = _pentax_verify_u16_property (params,
+			PTP_DPC_WhiteBalance, (uint16_t)target);
 	ptp_free_devicepropdesc (&desc);
 	if (result == GP_OK && alreadyset)
 		*alreadyset = 1;

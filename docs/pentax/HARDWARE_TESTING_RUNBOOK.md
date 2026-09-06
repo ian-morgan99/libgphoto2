@@ -94,9 +94,9 @@ build.
 ltdl cannot find camlibs in meson subdirectories:
 
 ```bash
-ln -sf _build/camlibs/ptp2/ptp2.so _build/camlibs/ptp2.so
-ln -sf _build/camlibs/pentax/pentax.so _build/camlibs/pentax.so
-ln -sf _build/camlibs/directory/directory.so _build/camlibs/directory.so
+ln -sfn ptp2/ptp2.so _build/camlibs/ptp2.so
+ln -sfn pentax/pentax.so _build/camlibs/pentax.so
+ln -sfn directory/directory.so _build/camlibs/directory.so
 ```
 
 ### 3.5 Verify the library under test is actually the built one
