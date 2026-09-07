@@ -37,6 +37,75 @@ property, payload, model gate, state transition, retry, or cleanup path:
 - Fail closed when vendor enable, parsing, ownership, verification, or cleanup
   fails. Do not hide a failure with a later successful cleanup response.
 
+## Source-repository ownership rule
+
+A failure observed through Benro Polaris, OpenPolaris, another appliance, or another
+consumer is **discovery/integration evidence only** until it reproduces at this
+repository's own boundary.
+
+Before changing libgphoto2 for a consumer-discovered failure:
+
+1. build an exact clean libgphoto2 SHA in an isolated prefix;
+2. attach the affected camera directly to the host;
+3. prove the running `gphoto2`/test harness loads that exact library and camlib;
+4. reproduce from a fresh camera/session;
+5. capture `gphoto2 --debug` or the smallest repository-local harness trace;
+6. identify the first failing PTP operation/state transition, not just the final GP error;
+7. add a deterministic regression test where practical.
+
+Interpretation:
+
+```text
+direct libgphoto2 FAIL + consumer FAIL at same lower-level operation
+  -> candidate libgphoto2 defect
+
+direct libgphoto2 PASS + Polaris/runtime FAIL
+  -> consumer/runtime/integration defect; do not change libgphoto2
+direct libgphoto2 PASS + Polaris PASS + OpenPolaris FAIL
+  -> OpenPolaris/client defect
+```
+
+A consumer PASS does not by itself prove or close a libgphoto2 issue, and a
+consumer FAIL does not justify a library workaround.
+
+## Generic PTP2 and other-camera regression gate
+
+Pentax work must not regress cameras already supported by libgphoto2 or by known
+consumers. Any change that touches generic PTP2 code, port/session lifecycle,
+shared config helpers, transfer logic, timeouts, error handling, filesystem
+state, or model-independent behavior requires an explicit impact statement:
+
+```text
+Pentax-only path? yes/no
+Generic PTP2 path changed? yes/no
+Other vendors potentially affected? list
+Why model/vendor gating is sufficient, or why behavior is genuinely generic
+Automated regression coverage added
+Physical/non-Pentax evidence available
+```
+
+Rules:
+
+- Prefer vendor/model/capability gating for Pentax-specific recovery/workarounds.
+- Do not alter generic semantics merely because a Polaris integration requires it.
+- Preserve the previous code path for non-Pentax cameras unless a generic fix is
+  independently justified and tested.
+- If a generic path changes, run the normal upstream suite and targeted tests for
+  representative non-Pentax behavior before hardware qualification.
+- Consumer projects must rerun their own previously-qualified camera matrices
+  before adopting a new libgphoto2 SHA. For the Benro Polaris consumer, the
+  normative appliance process is `docs/LIBGPHOTO2-UPGRADE-PROCESS.md` in
+  `ian-morgan99/benro-polaris-firmware-patcher`.
+
+## Current Polaris integration lesson (2026-09-07)
+
+The K-3 III preview case is a reference ownership example: the same exact
+libgphoto2 SHA produced a valid preview through direct `gphoto2` on the Polaris,
+while the packaged `pgphoto` / Stage-2 path failed. That differential points to
+packaging/runtime integration until proven otherwise. Do not introduce a Pentax
+library change for that symptom unless a clean direct libgphoto2 reproducer is
+subsequently obtained.
+
 ## Current K-1 Mark II setting finding
 
 On firmware 1.02 in PC-P Manual mode, conditions reported raw mode 8, idle, and
