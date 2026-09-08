@@ -14,7 +14,13 @@ This file exists to let parallel agents work overnight without duplicating or co
 - #53 — `aperture`
 - #54 — `imageformat`
 - #55 — `imagequality`
-- follow-on child issues: `autofocus`, `autofocusdrive`, `manualfocus`, `manualfocusdrive`, `capturetarget`
+- #56 — `autofocus` capture policy
+- #57 — `autofocusdrive` immediate AF action
+- #58 — `manualfocus` AF/MF mode semantics
+- #59 — `manualfocusdrive` model-aware lens movement
+- #60 — `capturetarget` semantics / graceful absence
+
+Issues #61–#65 are closed duplicates; do not use them.
 
 ## Rules for every agent
 
