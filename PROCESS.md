@@ -64,3 +64,17 @@ Before implementation, validate against real hardware:
 - Requires working libgphoto2 build environment (meson/autotools)
 - Requires access to Pentax K-3 III and/or K-1 II hardware for validation
 - Benefits from user's existing Benro Polaris patcher pipeline for end-to-end firmware testing
+
+## FwPkt provenance handoff (binding on this repo too)
+
+When a libgphoto2 commit is used to build a Polaris `FwPkt.zip` (via the
+BenroPolarisPatcher pipeline), that commit SHA must be recorded in the patcher's
+canonical registry:
+[`benro-polaris-firmware-patcher/docs/FWPKT-PROVENANCE-CONTRACT.md`](https://github.com/ian-morgan99/benro-polaris-firmware-patcher/blob/main/docs/FWPKT-PROVENANCE-CONTRACT.md).
+
+This repo provides the **commit SHA** a build is pinned to; it does not track
+FwPkt zips itself. Any agent session in this repo that hands off a built FwPkt
+artifact (zip or extracted tree) must pass all four handoff values — registry id,
+zip MD5 + SHA-256, payload appfs MD5, and both commit links — so the receiving
+side can verify before staging on a device.
+
