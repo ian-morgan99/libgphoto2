@@ -16,6 +16,21 @@ test(
   env: gp_test_env,
 )
 
+# Regression test for the Pentax `aperture` compatibility alias (issue #53).
+# dlopens the built ptp2 camlib via CAMLIBS and checks the exported
+# ptp2_pentax_aperture_alias_present() introspection hook.
+test_pentax_aperture_alias_exe = executable(
+  'test-pentax-aperture-alias',
+  'test-pentax-aperture-alias.c',
+  dependencies: [ libgphoto2_dep ],
+)
+
+test(
+  'test-pentax-aperture-alias',
+  test_pentax_aperture_alias_exe,
+  env: gp_test_env,
+)
+
 test_i18n_exe = executable(
   'test-i18n',
   'test-i18n.c',

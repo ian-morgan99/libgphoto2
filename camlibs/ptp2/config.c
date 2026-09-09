@@ -13947,6 +13947,11 @@ static struct submenu capture_settings_menu[] = {
 	{ N_("Shutterspeed"),                   "shutterspeed2",            PTP_DPC_NIKON_1_ShutterSpeed,           PTP_VENDOR_NIKON,   PTP_DTC_INT8,   _get_Nikon_1_ShutterSpeedI,         _put_Nikon_1_ShutterSpeedI },
 	{ N_("Shutterspeed"),                   "shutterspeed2",            PTP_DPC_NIKON_1_ShutterSpeed,           PTP_VENDOR_NIKON,   PTP_DTC_UINT8,  _get_Nikon_1_ShutterSpeedU,         _put_Nikon_1_ShutterSpeedU },
 	{ N_("Aperture 2"),                     "aperture2",                PTP_DPC_NIKON_1_FNumber2,               PTP_VENDOR_NIKON,   PTP_DTC_UINT8,  _get_Nikon_1_Aperture,              _put_Nikon_1_Aperture },
+	/* Pentax generic `aperture` compatibility alias (issue #53). Reuses the
+	 * same safe handlers as `pentaxdirectaperture`, which gate on
+	 * supported_model && vendor_mode_enabled and target PTP_DPC_FNumber.
+	 * The existing `f-number` / `pentaxdirectaperture` names are preserved. */
+	{ N_("Aperture"),                       "aperture",                 0,                                      PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },
 	{ N_("Focusing Point"),                 "focusingpoint",            PTP_DPC_CANON_FocusingPoint,            PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_FocusingPoint,           _put_Canon_FocusingPoint },
 	{ N_("Sharpness"),                      "sharpness",                PTP_DPC_Sharpness,                      0,                  PTP_DTC_UINT8,  _get_Sharpness,                     _put_Sharpness },
 	{ N_("Capture Delay"),                  "capturedelay",             PTP_DPC_CaptureDelay,                   0,                  PTP_DTC_UINT32, _get_Milliseconds,                  _put_Milliseconds },
@@ -14729,6 +14734,29 @@ _get_config (Camera *camera, const char *confname, CameraWidget **outwidget, Cam
 		return GP_ERROR_BAD_PARAMETERS;
 	}
 	return GP_OK;
+}
+
+/* Test hook for the Pentax `aperture` compatibility alias (issue #53).
+ * Returns 1 when a capture_settings_menu entry named "aperture" is registered
+ * for PTP_VENDOR_PENTAX and reuses the exact same get/put handlers as
+ * `pentaxdirectaperture`, proving the alias is wired to the safe FNumber path
+ * rather than being a name-only stub. Exported (non-static) so a regression
+ * test can dlopen ptp2.so and call it via dlsym. */
+int
+ptp2_pentax_aperture_alias_present (void)
+{
+	unsigned int i;
+
+	for (i = 0; capture_settings_menu[i].name ; i++) {
+		struct submenu *cursub = &capture_settings_menu[i];
+
+		if (!strcmp (cursub->name, "aperture") &&
+		    cursub->vendorid == PTP_VENDOR_PENTAX) {
+			return (cursub->getfunc == _get_Pentax_DirectAperture &&
+				cursub->putfunc == _put_Pentax_DirectAperture);
+		}
+	}
+	return 0;
 }
 
 int
