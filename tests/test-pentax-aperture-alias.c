@@ -74,7 +74,7 @@ load_ptp2 (void)
 
 /* Seed a PTPParams block for the fixture. */
 static void
-seed_pentax_params (PTPParams *params, int pentax)
+seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 {
 	memset (params, 0, sizeof (*params));
 	params->byteorder = PTP_DL_LE;
@@ -90,13 +90,16 @@ seed_pentax_params (PTPParams *params, int pentax)
 		params->pentax.vendor_mode_enabled = 0;
 	}
 
-	/* The generic GetDevicePropDesc opcode must be advertised so the
-	 * opcode-based menu entry passes have_prop(). */
-	uint16_t *ops = malloc (sizeof (*ops));
-	if (ops) {
-		*ops = PTP_OC_GetDevicePropDesc;
-		params->deviceinfo.Operations = ops;
-		params->deviceinfo.Operations_len = 1;
+	/* The generic property opcodes must be advertised so the opcode-based
+	 * menu entries pass have_prop(). */
+	if (advertise_ops) {
+		uint16_t *ops = malloc (2 * sizeof (*ops));
+		if (ops) {
+			ops[0] = PTP_OC_GetDevicePropDesc;
+			ops[1] = PTP_OC_GetDevicePropValue;
+			params->deviceinfo.Operations = ops;
+			params->deviceinfo.Operations_len = 2;
+		}
 	}
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
@@ -120,7 +123,7 @@ seed_pentax_params (PTPParams *params, int pentax)
 
 /* Build a Camera fixture with the given PTP state attached as private data. */
 static int
-build_fixture (Camera **out, GPContext *context, int pentax)
+build_fixture (Camera **out, GPContext *context, int pentax, int advertise_ops)
 {
 	Camera *camera;
 	int ret = gp_camera_new (&camera);
@@ -141,7 +144,7 @@ build_fixture (Camera **out, GPContext *context, int pentax)
 		fprintf (stderr, "out of memory for pl\n");
 		return 1;
 	}
-	seed_pentax_params (&camera->pl->params, pentax);
+	seed_pentax_params (&camera->pl->params, pentax, advertise_ops);
 
 	/* Wire the context into the PTP data block as ptp2 expects. */
 	camera->pl->params.data = calloc (1, sizeof (PTPData));
@@ -179,7 +182,7 @@ main (void)
 
 	/* --- Positive: Pentax fixture resolves "aperture" via public API. --- */
 	Camera *cam = NULL;
-	CHECK (!build_fixture (&cam, context, /*pentax=*/1));
+	CHECK (!build_fixture (&cam, context, /*pentax=*/1, /*advertise_ops=*/1));
 	CameraWidget *widget = NULL;
 	int ret = get_single (cam, "aperture", &widget, context);
 	CHECK (ret == GP_OK);
@@ -201,9 +204,12 @@ main (void)
 		return 1;
 	}
 
-	/* --- Negative: non-Pentax fixture stays fail-closed. --- */
+	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
+	 * fail-closed. Without the vendor match and without the advertised ops,
+	 * have_prop() rejects every PENTAX-gated entry, so "aperture" is not even
+	 * considered and the lookup misses. --- */
 	Camera *cam2 = NULL;
-	CHECK (!build_fixture (&cam2, context, /*pentax=*/0));
+	CHECK (!build_fixture (&cam2, context, /*pentax=*/0, /*advertise_ops=*/0));
 	CameraWidget *widget2 = NULL;
 	int ret2 = get_single (cam2, "aperture", &widget2, context);
 	/* The direct-aperture handler refuses when vendor mode is off, so the
@@ -213,8 +219,54 @@ main (void)
 		return 1;
 	}
 
+	/* --- #69: menu-name uniqueness via the public list-config path. A
+	 * duplicate registration would surface as two identical names in the
+	 * camera_list_config output; assert exactly one occurrence on Pentax and
+	 * none on a non-Pentax fixture (no new production export needed). */
+	typedef int (*cam_list_config_fn)(Camera *camera, CameraList *list,
+	                                  GPContext *context);
+	{
+		union { void *p; cam_list_config_fn f; } u;
+		u.p = dlsym (handle, "camera_list_config");
+		if (!u.f) {
+			fprintf (stderr, "FAIL: camera_list_config not exported (%s)\n",
+				 dlerror());
+			return 1;
+		}
+
+		CameraList *list = NULL;
+		CHECK (gp_list_new (&list) == GP_OK);
+		CHECK (u.f (cam, list, context) == GP_OK);
+		int count = gp_list_count (list);
+		int occurrences = 0;
+		for (int i = 0; i < count; i++) {
+			const char *nm = NULL;
+			if (gp_list_get_name (list, i, &nm) == GP_OK &&
+			    nm && !strcmp (nm, "pentaxliveviewafposition"))
+				occurrences++;
+		}
+		CHECK (occurrences == 1);
+		gp_list_free (list);
+
+		/* A non-Pentax fixture must not surface the entry at all: vendor
+		 * matching fails, so have_prop() rejects the PENTAX-gated entry.
+		 */
+		CHECK (gp_list_new (&list) == GP_OK);
+		CHECK (u.f (cam2, list, context) == GP_OK);
+		count = gp_list_count (list);
+		occurrences = 0;
+		for (int i = 0; i < count; i++) {
+			const char *nm = NULL;
+			if (gp_list_get_name (list, i, &nm) == GP_OK &&
+			    nm && !strcmp (nm, "pentaxliveviewafposition"))
+				occurrences++;
+		}
+		CHECK (occurrences == 0);
+		gp_list_free (list);
+	}
+
 	printf ("OK: public camera_get_single_config(\"aperture\") resolves a RANGE "
-	       "widget with seeded FNumber value for Pentax, and stays fail-closed "
-	       "for non-Pentax\n");
+	       "widget with seeded FNumber value for Pentax, stays fail-closed for "
+	       "non-Pentax, and pentaxliveviewafposition is registered exactly once (#69)\n");
 	return 0;
 }

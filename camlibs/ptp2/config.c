@@ -13655,7 +13655,6 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Live View Zoom"), "pentaxliveviewzoom", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewZoom, _put_Pentax_LiveViewZoom },
 	{ N_("Pentax Drive Mode"), "pentaxdrivemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_DirectDriveMode, _put_Pentax_DirectDriveMode },
 	{ N_("Pentax White Balance"), "pentaxdirectwb", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectWB, _put_Pentax_DirectWB },
-	{ N_("Pentax Live View AF Position"), "pentaxliveviewafposition", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewAFPosition, _put_Pentax_LiveViewAFPosition },
 
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_CameraModel,              PTP_VENDOR_CANON,   PTP_DTC_STR,    _get_STR,                       _put_None },
 	{ N_("Camera Model"),           "model",            PTP_DPC_CANON_EOS_ModelID,              PTP_VENDOR_CANON,   PTP_DTC_UINT32, _get_INT,                       _put_None },
