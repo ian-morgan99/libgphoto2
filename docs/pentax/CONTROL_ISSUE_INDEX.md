@@ -1,9 +1,10 @@
-# Pentax/Ricoh generic-control issue index
+# Pentax/Ricoh control and IT2-parity issue index
 
 Umbrella: #52
 Discovery: #51
 
-Canonical child issues:
+## Generic-control compatibility children
+
 - #53 `aperture`
 - #54 `imageformat`
 - #55 `imagequality`
@@ -14,6 +15,20 @@ Canonical child issues:
 - #60 `capturetarget` semantics / graceful absence
 
 Issues #61–#65 were accidentally created during the same setup window after #56–#60 already existed; they are closed as duplicates and must not be used for implementation.
+
+## Full IT2-parity / model-reconciliation work
+
+- #66 authoritative model × USB-personality × capability reconciliation; consumes firmware findings from `benro-polaris-firmware-patcher#48`
+- #67 detailed Custom Image controls (`0xd021`–`0xd029`, `0xd02d`)
+- #68 composition-offset movement via `0x9018` (distinct from the existing `0xd02a` enable switch)
+- #69 duplicate `pentaxliveviewafposition` config registration cleanup
+
+## Reopened evidence / upstream-readiness issues relevant to this programme
+
+- #8 K-1 II `0xd036` live-view AF-position write qualification: parser/GET verification exists, but retained hardware evidence is still read-only; do not claim K-1 II write semantics until explicitly qualified
+- #45 research-build gating: reopened because the `0x9013` Green-button branch must be classified separately from true `0x9011`/`0x9012` capture semantics before upstream promotion
+- #42 upstream coding-conventions / maintainability audit
+- #44 hardware validation matrix
 
 A child closes only when its own model gates, semantic tests and hardware acceptance criteria are met. Closing one control never implies the rest of #52 is complete.
 
