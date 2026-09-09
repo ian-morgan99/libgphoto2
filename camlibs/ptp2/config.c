@@ -14736,29 +14736,6 @@ _get_config (Camera *camera, const char *confname, CameraWidget **outwidget, Cam
 	return GP_OK;
 }
 
-/* Test hook for the Pentax `aperture` compatibility alias (issue #53).
- * Returns 1 when a capture_settings_menu entry named "aperture" is registered
- * for PTP_VENDOR_PENTAX and reuses the exact same get/put handlers as
- * `pentaxdirectaperture`, proving the alias is wired to the safe FNumber path
- * rather than being a name-only stub. Exported (non-static) so a regression
- * test can dlopen ptp2.so and call it via dlsym. */
-int
-ptp2_pentax_aperture_alias_present (void)
-{
-	unsigned int i;
-
-	for (i = 0; capture_settings_menu[i].name ; i++) {
-		struct submenu *cursub = &capture_settings_menu[i];
-
-		if (!strcmp (cursub->name, "aperture") &&
-		    cursub->vendorid == PTP_VENDOR_PENTAX) {
-			return (cursub->getfunc == _get_Pentax_DirectAperture &&
-				cursub->putfunc == _put_Pentax_DirectAperture);
-		}
-	}
-	return 0;
-}
-
 int
 camera_get_config (Camera *camera, CameraWidget **window, GPContext *context)
 {

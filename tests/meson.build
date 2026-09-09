@@ -17,11 +17,16 @@ test(
 )
 
 # Regression test for the Pentax `aperture` compatibility alias (issue #53).
-# dlopens the built ptp2 camlib via CAMLIBS and checks the exported
-# ptp2_pentax_aperture_alias_present() introspection hook.
+# Drives the real public config-lookup path: dlopens the built ptp2 camlib via
+# CAMLIBS and calls its exported camera_get_single_config("aperture") with a
+# hand-built Camera fixture whose PTP state is pre-seeded (Pentax vendor mode +
+# FNumber descriptor in the property cache), so no wire IO happens. Needs the
+# ptp2 camlib headers for the private-data layout; '..' provides the build root
+# for the generated libgphoto2/gphoto2-endian.h that ptp.h includes.
 test_pentax_aperture_alias_exe = executable(
   'test-pentax-aperture-alias',
   'test-pentax-aperture-alias.c',
+  include_directories: [include_directories('../camlibs/ptp2'), include_directories('..')],
   dependencies: [ libgphoto2_dep ],
 )
 
