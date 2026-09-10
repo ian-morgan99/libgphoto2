@@ -16,8 +16,12 @@
  *   6. finally-style baseline restoration: once the non-baseline write is
  *      accepted, EVERY exit path (success, failed read-back, failed preview,
  *      any error) attempts exact baseline restoration before cleanup/reconnect;
- *      a restore failure is reported separately without hiding the original
- *      test result.
+ *      a restore failure makes an otherwise-passing run FAIL (a qualification
+ *      harness must not print pass while admitting the AF spot was left moved),
+ *      and is reported separately when the main test already failed.  A
+ *      post-restore GET proves the property still honours structurally valid
+ *      responses after restoration, so retained evidence shows the restore
+ *      rather than only SET acceptance.
  * A `lvaf_roundtrip=pass` is transport + session-persistence qualification;
  * closing #8's HW-W gate additionally needs an independent observable AF-area
  * effect or a source-faithful trace (see issue comment).
@@ -243,8 +247,33 @@ out:
 			fprintf (stderr, "stage=restore-baseline FAILED: %s (%d) -- "
 				"AF spot may be left at the non-baseline coordinate\n",
 				gp_result_as_string (rret), rret);
+			/* TA review: a qualification harness must not print pass / exit 0
+			 * while admitting the AF spot was left moved.  Fold the restore
+			 * failure into the final status ONLY when the main test path
+			 * succeeded; an already-failed run keeps its original error so
+			 * the restoration problem is reported separately, not as THE
+			 * cause. */
+			if (result >= GP_OK)
+				result = rret;
 		} else {
 			printf ("stage=restore-baseline %s\n", baseline);
+			/* Retained-evidence GET: prove the property still honours a
+			 * structurally valid response AFTER restoration (the K-1 II
+			 * reports the geometry centre rather than echoing coordinates,
+			 * so structural validity is the model-correct criterion).  A
+			 * failed post-restore GET means the session may be wedged even
+			 * though the SET was accepted -- report it distinctly. */
+			char *restored = NULL;
+			int gret = read_lvaf (camera, context, &restored);
+			if (gret < GP_OK) {
+				fprintf (stderr, "stage=post-restore-read FAILED: %s (%d)\n",
+					gp_result_as_string (gret), gret);
+				if (result >= GP_OK)
+					result = gret;
+			} else {
+				printf ("stage=post-restore-read position=%s\n", restored);
+				free (restored);
+			}
 		}
 	}
 
