@@ -42,9 +42,9 @@
 #else
 #ifdef LIBGPHOTO
 #include <gphoto2/gphoto2-log.h>
-#define DPRINT(x...) gp_log (GP_LOG_DEBUG, "pentax", x)
+#define DPRINT(...) gp_log (GP_LOG_DEBUG, "pentax", __VA_ARGS__)
 #else
-#define DPRINT(x...) pslr_write_log(PSLR_DEBUG, x)
+#define DPRINT(...) pslr_write_log(PSLR_DEBUG, __VA_ARGS__)
 #endif
 #endif
 
