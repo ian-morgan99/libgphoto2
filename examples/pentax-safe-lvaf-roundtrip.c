@@ -13,7 +13,11 @@
  *   4. a post-write GET that must remain structurally valid,
  *   5. a POST-WRITE preview frame -- proving PC-LV stayed alive ACROSS the d036
  *      call (the persistence question the no-op version could not answer),
- *   6. restore the baseline coordinate before exit.
+ *   6. finally-style baseline restoration: once the non-baseline write is
+ *      accepted, EVERY exit path (success, failed read-back, failed preview,
+ *      any error) attempts exact baseline restoration before cleanup/reconnect;
+ *      a restore failure is reported separately without hiding the original
+ *      test result.
  * A `lvaf_roundtrip=pass` is transport + session-persistence qualification;
  * closing #8's HW-W gate additionally needs an independent observable AF-area
  * effect or a source-faithful trace (see issue comment).
@@ -92,6 +96,12 @@ main (int argc, char **argv)
 	char *baseline = NULL, *after = NULL;
 	int initialized = 0;
 	int result = GP_OK, exit_result;
+	/* TA review: once the baseline has been changed by a non-baseline write,
+	 * EVERY subsequent exit path must attempt exact restoration before
+	 * cleanup/reconnect.  Set as soon as that write is accepted; consumed in
+	 * the out: block so no failure path (read-back, preview, cancel) can leave
+	 * the AF spot moved. */
+	int baseline_changed = 0;
 
 	if ((argc != 3) || strcmp (argv[1], "Pentax:K-1 Mark II (PTP mode)")) {
 		fprintf (stderr,
@@ -175,6 +185,7 @@ main (int argc, char **argv)
 				gp_result_as_string (result), result);
 			goto out;
 		}
+		baseline_changed = 1;                 /* every later exit path restores */
 		printf ("stage=write-nonbaseline %s accepted\n", target);
 
 		result = read_lvaf (camera, context, &after);
@@ -216,18 +227,27 @@ main (int argc, char **argv)
 			printf ("stage=post-write-preview ok bytes=%lu\n", fsize);
 		}
 
-		/* Restore the baseline coordinate so the test leaves the AF spot
-		 * where it found it. */
-		result = write_lvaf (camera, context, baseline);
-		if (result < GP_OK) {
-			fprintf (stderr, "stage=restore-baseline error=%s (%d)\n",
-				gp_result_as_string (result), result);
-			goto out;
-		}
-		printf ("stage=restore-baseline %s\n", baseline);
 	}
 
 out:
+	/* Finally-style restoration (TA review): if the non-baseline write was
+	 * accepted, attempt exact baseline restoration on EVERY exit path --
+	 * success, failed read-back, failed preview, or any other error.  A
+	 * restoration failure is reported separately and does NOT hide the
+	 * original test result; it only adds a distinct restore-failed marker so
+	 * retained evidence can distinguish "test passed but AF spot left moved"
+	 * from a clean pass. */
+	if (baseline_changed && camera) {
+		int rret = write_lvaf (camera, context, baseline);
+		if (rret < GP_OK) {
+			fprintf (stderr, "stage=restore-baseline FAILED: %s (%d) -- "
+				"AF spot may be left at the non-baseline coordinate\n",
+				gp_result_as_string (rret), rret);
+		} else {
+			printf ("stage=restore-baseline %s\n", baseline);
+		}
+	}
+
 	if (initialized) {
 		exit_result = gp_camera_exit (camera, context);
 		if ((result >= GP_OK) && (exit_result < GP_OK))
