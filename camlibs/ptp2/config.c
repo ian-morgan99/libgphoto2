@@ -11508,6 +11508,228 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 	return translate_ptp_result (ret);
 }
 
+/* Generic `manualfocusdrive` wrapper for Pentax (issue #59).
+ * Dispatches to the correct focus-control opcode by model family:
+ *   - new-focus models (K-3 III, etc.) -> 0x9017 via ptp_pentax_focus_control_new
+ *   - old-focus models (K-1 II, etc.)  -> 0x9016 via ptp_pentax_focus_control
+ * The widget value is a signed step: positive = near, negative = far.
+ * A single bounded movement per invocation; no retry escalation. */
+static int
+_get_Pentax_GenericManualFocusDrive (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int val = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_RANGE, _(menu->label), widget);
+	gp_widget_set_range (*widget, -7.0, 7.0, 1.0);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	float val;
+	int direction;
+	uint16_t ret;
+
+	CR (gp_widget_get_value (widget, &val));
+	if (val == 0.0)
+		return GP_OK;
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+
+	/* Direction: positive = near, negative = far (matches Nikon/Canon convention). */
+	direction = (val > 0.0) ? 1 : -1;
+
+	if (pentax_model_uses_new_focus (params->pentax.model_no)) {
+		/* New-focus family: 0x9017 with displacement computed from openAvNum. */
+		unsigned char *data = NULL;
+		unsigned int size = 0;
+		uint32_t open_av_num;
+		int32_t displacement;
+
+		ret = ptp_pentax_get_all_conditions (params, &data, &size);
+		if (ret != PTP_RC_OK) {
+			free (data);
+			return translate_ptp_result (ret);
+		}
+		if (size < 332) {
+			free (data);
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax GetAllConditions returned only %u bytes; at least 332 are required."),
+				size);
+			return GP_ERROR_CORRUPTED_DATA;
+		}
+		open_av_num = pentax_get_u32le (data + 328);
+		free (data);
+		CR (pentax_minimum_focus_displacement (open_av_num, direction,
+			&displacement));
+		GP_LOG_D ("Pentax generic manual focus drive (new): openAvNum=%u displacement=%d",
+			open_av_num, displacement);
+		ret = ptp_pentax_focus_control_new (params, (uint32_t)displacement);
+		if (ret != PTP_RC_OK)
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax manual focus drive (new) failed with response 0x%04x."), ret);
+		else
+			gp_context_status (((PTPData *)params->data)->context,
+				_("Pentax manual focus drive (new) returned response 0x%04x."), ret);
+	} else {
+		/* Old-focus family (K-1 II): 0x9016 with amount=5, direction 0=near/1=far. */
+		uint32_t amount = 5U;
+		uint32_t old_direction = (direction > 0) ? 0 : 1;
+
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax manual focus drive (old): amount=%u, direction=%u (%s), opcode=0x9016."),
+			amount, old_direction, direction > 0 ? "Near" : "Far");
+		ret = ptp_pentax_focus_control (params, amount, old_direction);
+		if (ret != PTP_RC_OK)
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax manual focus drive (old) failed with response 0x%04x."), ret);
+		else
+			gp_context_status (((PTPData *)params->data)->context,
+				_("Pentax manual focus drive (old) returned response 0x%04x."), ret);
+	}
+	return translate_ptp_result (ret);
+}
+
+/* Generic `autofocusdrive` for Pentax (issue #57).
+ * Triggers a bounded autofocus action. For new-focus models this uses the
+ * 0x9017 focus-control with a zero displacement (AF trigger). For old-focus
+ * models it uses 0x9016 with amount=0 as an AF nudge. The camera's AF mode
+ * must be active; if the body is in MF mode the operation fails closed.
+ * Does NOT trigger capture. */
+static int
+_get_Pentax_AutofocusDrive (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int val = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int val;
+	uint16_t ret;
+
+	CR (gp_widget_get_value (widget, &val));
+	if (!val)
+		return GP_OK;
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+
+	/* Verify the body is in an AF mode before driving focus. */
+	{
+		PentaxConditions conditions;
+		unsigned char *condition_data = NULL;
+		unsigned int condition_size = 0;
+		uint16_t cret;
+		int cresult;
+
+		cret = ptp_pentax_get_all_conditions (params, &condition_data,
+			&condition_size);
+		if (cret != PTP_RC_OK) {
+			free (condition_data);
+			return translate_ptp_result (cret);
+		}
+		cresult = pentax_parse_conditions (condition_data,
+			condition_size, &conditions);
+		free (condition_data);
+		if (cresult < GP_OK)
+			return cresult;
+		if (conditions.af_mode == 0) {
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax autofocus drive requires the body to be "
+				"in an AF mode (AF/MF switch set to AF)."));
+			return GP_ERROR_NOT_SUPPORTED;
+		}
+	}
+
+	if (pentax_model_uses_new_focus (params->pentax.model_no)) {
+		/* New-focus: 0x9017 with zero displacement = AF trigger. */
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax autofocus drive (new): opcode=0x9017, displacement=0."));
+		ret = ptp_pentax_focus_control_new (params, 0);
+	} else {
+		/* Old-focus: 0x9016 with amount=0 = AF nudge. */
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax autofocus drive (old): opcode=0x9016, amount=0."));
+		ret = ptp_pentax_focus_control (params, 0, 0);
+	}
+	if (ret != PTP_RC_OK)
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax autofocus drive failed with response 0x%04x."), ret);
+	else
+		gp_context_status (((PTPData *)params->data)->context,
+			_("Pentax autofocus drive returned response 0x%04x."), ret);
+	return translate_ptp_result (ret);
+}
+
+/* Generic `imageformat` alias for Pentax (issue #54).
+ * Maps to the PTP_DPC_PENTAX_WritingFileFormat property (0xd01b) which
+ * controls whether the camera writes JPEG, RAW, or both to the SD card.
+ * This is distinct from `pentaxcardwritingmode` (0x9004) which controls
+ * whether the card is writable at all. */
+static int
+_get_Pentax_ImageFormat (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_WritingFileFormat,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _get_STR (camera, widget, menu, &desc);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_WritingFileFormat,
+		&desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _put_STR (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_WritingFileFormat,
+			&value, PTP_DTC_UINT16);
+		result = translate_ptp_result (ret);
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
 static int
 _get_Sony_ManualFocus(CONFIG_GET_ARGS) {
 	int val;
@@ -13568,6 +13790,17 @@ static struct submenu camera_actions_menu[] = {
 	{ N_("Drive Pentax old-focus far (K-1 II)"), "oldfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
 	{ N_("Drive Pentax focus near"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
 	{ N_("Drive Pentax focus far"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
+	/* Generic `manualfocusdrive` for Pentax (issue #59): model-family dispatch
+	 * to 0x9017 (new-focus) or 0x9016 (old-focus). Positive value = near,
+	 * negative = far. Single bounded step per invocation. */
+	{ N_("Drive Pentax Manual focus"), "manualfocusdrive", 0, PTP_VENDOR_PENTAX, 0, _get_Pentax_GenericManualFocusDrive, _put_Pentax_GenericManualFocusDrive },
+	/* Generic `autofocusdrive` for Pentax (issue #57): triggers a bounded AF
+	 * action without capture. Requires the body to be in an AF mode. */
+	{ N_("Drive Pentax Autofocus"), "autofocusdrive", 0, PTP_VENDOR_PENTAX, 0, _get_Pentax_AutofocusDrive, _put_Pentax_AutofocusDrive },
+	/* Generic `imageformat` alias for Pentax (issue #54): maps to the
+	 * PTP_DPC_PENTAX_WritingFileFormat property (0xd01b) controlling JPEG/RAW
+	 * write mode. Distinct from `pentaxcardwritingmode` (0x9004). */
+	{ N_("Image Format"), "imageformat", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_ImageFormat, _put_Pentax_ImageFormat },
 	{ N_("Capture"),                        "capture",          PTP_DPC_SONY_ShutterRelease,PTP_VENDOR_SONY,PTP_DTC_UINT16, _get_Sony_Capture,              _put_Sony_Capture },
 	{ N_("Power Down"),                     "powerdown",        0,  0,                  PTP_OC_PowerDown,                   _get_PowerDown,                 _put_PowerDown },
 	{ N_("Focus Lock"),                     "focuslock",        0,  PTP_VENDOR_CANON,   PTP_OC_CANON_FocusLock,             _get_Canon_FocusLock,           _put_Canon_FocusLock },
