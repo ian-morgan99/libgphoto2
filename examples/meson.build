@@ -91,6 +91,15 @@ executable(
 )
 
 executable(
+  'pentax-safe-lvaf-roundtrip',
+  'pentax-safe-lvaf-roundtrip.c',
+  'samples.h',
+  'autodetect.c',
+  'context.c',
+  dependencies: libgphoto2_dep,
+)
+
+executable(
   'sample-tether',
   'sample-tether.c',
   'samples.h',
