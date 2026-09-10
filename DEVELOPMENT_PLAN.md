@@ -765,3 +765,25 @@ provenance/static report, install/revert/flashed recovery results, limitations,
 and an upstreamable commit series.
 
 Only then may documentation say “supported” or “complete.”
+
+## 2026-09-10 hardware checkpoint
+
+Direct testing at `38780d88` added current K-3 III and K-01 evidence to
+`docs/pentax/REAL_HARDWARE_TEST_LOG.md`. K-3 III preview and repeated basic
+reconnect pass; K-01 basic reconnect passes while vendor controls remain
+correctly absent. K-3 III minimum near/far focus fails safely with `0xa00c`, and
+an advertised 2x live-view zoom write fails with `0x201c` while leaving the
+original off state intact. Both failed writes occurred after reused-session
+reconciliation, so the next hardware gate is a physical cold/fresh-session
+focus and zoom discriminator. Do not count widget enumeration as support and do
+not change focus displacement, retries, or zoom encoding before that gate.
+
+The same-day source-faithful follow-up resolved the focus discriminator without
+a cold cycle: Image Transmitter 2 gates Near/Far on active PC live view. With
+one valid preview held open in the same session, minimum Near (`+23`) and Far
+(`-23`) each returned `0x2001` on their first and only `0x9017` request; cleanup
+and four surrounding preview frames passed. One preflighted normal shutter and
+download also passed with a valid 6192x4128 JPEG, followed by a successful fresh
+summary. The next K-3 III gate is therefore downstream sequencing and physical
+direction observation, not opcode/displacement experimentation. The zoom test
+still needs the same active-LV retest before its encoding can be judged.

@@ -623,3 +623,63 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 - Capture-path fixes verified by this matrix: accept MTP parent `0xffffffff` as a root terminator, suppress the expected collision-probe callback, seed virtual-file mtime, and treat deletion of an already-finalized Pentax virtual-root capture as successful.
 - Offline gates: build passed; `test-pentax-utils` and `test-camera-list` passed. The complete Meson run passed 8/10; the two failures are both tagged `no-ci` (`test-gp-port` selected an unrelated empty USB entry, and baseline `test-filesys` SIGSEGV), outside the Pentax candidate paths.
 - Correction to the preceding bulb entry: normal release-mode-0 capture plus file transfer is now hardware-verified twice. Release mode 2 remains rejected and must not be used for K-3 III bulb control.
+
+### 2026-09-10 — K-3 III preview/focus/zoom and K-01 direct reconnect qualification
+
+- Build: fork `38780d88bbb0d937f87a03677b990942dd3c6c09`; Meson reported all selected
+  harnesses current. `ldd` proved `pentax-safe-preview` loaded both core and port
+  libraries from this checkout's `_build`. Existing untracked JPEG artifacts
+  were not used or modified.
+- Bodies: K-3 III `25fb:0189`, firmware 2.20, `usb:002,007`, reported MTP mode;
+  K-01 `25fb:0131`, firmware 1.05, `usb:001,043`, reported PTP Mode.
+- K-3 III preview: 5/5 valid in-memory JPEGs, 81,202--87,058 bytes, one attempt
+  each, 16--31 ms. A post-focus health run passed 2/2, 83,168--86,444 bytes at
+  15--16 ms. Cleanup passed.
+- K-3 III focus: init-only passed. One minimum near (`+23`) and one minimum far
+  (`-23`) `0x9017` request each returned `0xa00c`; the harness made zero retries
+  and did not escalate. Subsequent preview remained healthy. Directional focus
+  is FAIL/UNQUALIFIED in this session state, not a widget-presence PASS.
+- K-3 III live-view zoom: baseline off/raw 1; one advertised 2x write failed at
+  `SetDevicePropValue(0xd037)` with `0x201c InvalidDevicePropValue`. Immediate
+  read-back stayed off; unconditional restore-to-off was attempted; a fresh
+  read stayed off. No state was left changed. The camera reported an already-open
+  Pentax session, with initial reconciliation reads returning `0x2017`; repeat
+  from a physical cold/fresh session before assigning an encoding defect.
+- K-01: detect/summary passed and ten independent open/read/exit cycles passed,
+  but only the minimal standard PTP/MTP status tree was present. The Pentax
+  preview harness rejected this unsupported model before sending vendor I/O.
+  This reconfirms fail-closed behavior for PID `0131`.
+- Reconnect timing: K-3 III 10/10 at 97--106 ms; K-01 10/10 at 40--53 ms. Both
+  remained enumerated after testing. K-3 battery reported 33%; K-01 67%.
+- Public evidence: libgphoto2 issues [#44](https://github.com/ian-morgan99/libgphoto2/issues/44),
+  [#50](https://github.com/ian-morgan99/libgphoto2/issues/50), and
+  [#59](https://github.com/ian-morgan99/libgphoto2/issues/59); downstream
+  qualification is cross-linked from OpenPolaris #63 and patcher #36/#54.
+
+### 2026-09-10 — K-3 III source-faithful live-view focus and shutter follow-up
+
+- Same body, port, firmware, and exact build `38780d88bbb0d937f87a03677b990942dd3c6c09`
+  as the preceding checkpoint. Image Transmitter 2 was re-checked before the
+  write: its Near/Far controls are available only while its PC live-view loop is
+  active. A bounded harness extension therefore enabled `pentaxpclvkeep`,
+  obtained one valid in-memory preview, sent exactly one minimum `0x9017`
+  direction command, then unconditionally attempted d035=off and keep=off.
+- Near in active live view: valid 83,787-byte JPEG followed by displacement
+  `+23`; `0x9017` returned `0x2001`, zero retries. Far in a separate active
+  live-view session: valid 83,053-byte JPEG followed by displacement `-23`;
+  `0x9017` returned `0x2001`, zero retries. Cleanup passed after both.
+- Health checks around Far returned four further valid JPEGs (80,712--82,187
+  bytes), each on its first frame attempt in 15--33 ms. This supersedes the
+  off-live-view `0xa00c` result above: that response identified a missing
+  live-view precondition, not a focus opcode or displacement defect. Physical
+  observation of direction remains separate from protocol acceptance.
+- Shutter preflight read idle conditions (`state=0`, Manual raw mode 8,
+  shooting/processing/task-changing all no, 1/4000). One normal
+  `--capture-image-and-download` produced `IMGP3470.JPG`; the downloaded file
+  was a valid 6192x4128 K-3 III JPEG with SHA-256
+  `d732880ae440f066760493b0144ab5407fe39407eb850acc6b90169627179581`.
+  Virtual-root transfer cleanup completed and a fresh summary passed.
+- Direct-camera verdict at this SHA: preview PASS, minimum Near/Far protocol
+  acceptance PASS when PC-LV is active, normal shutter/download PASS, and
+  reconnect remains healthy. Downstream focus must sequence the same live-view
+  prerequisite; it must not retry/escalate `0xa00c` from an off-LV session.

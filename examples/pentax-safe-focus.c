@@ -5,11 +5,29 @@
 #include <string.h>
 
 #include <gphoto2/gphoto2-camera.h>
+#include <gphoto2/gphoto2-file.h>
 #include <gphoto2/gphoto2-widget.h>
 
 #include "samples.h"
 
 #define PENTAX_MODEL "Pentax:K-3 Mark III (MTP mode)"
+
+static int
+set_named_value (Camera *camera, GPContext *context, const char *name,
+	const void *value)
+{
+	CameraWidget *widget = NULL;
+	int result;
+
+	result = gp_camera_get_single_config (camera, name, &widget, context);
+	if (result >= GP_OK)
+		result = gp_widget_set_value (widget, value);
+	if (result >= GP_OK)
+		result = gp_camera_set_single_config (camera, name, widget, context);
+	if (widget)
+		gp_widget_free (widget);
+	return result;
+}
 
 int
 main (int argc, char **argv)
@@ -19,15 +37,18 @@ main (int argc, char **argv)
 	GPContext *context = NULL;
 	const char *action;
 	const char *stage = "create-context";
-	int initialized = 0, enabled = 1;
-	int result = GP_OK, exit_result;
+	int initialized = 0, enabled = 1, live_view_requested = 0;
+	int result = GP_OK, exit_result, cleanup_result = GP_OK;
 
 	if ((argc != 3) || (strcmp (argv[2], "init") &&
-	    strcmp (argv[2], "near") && strcmp (argv[2], "far"))) {
-		fprintf (stderr, "usage: %s usb:BUS,DEVICE init|near|far\n", argv[0]);
+	    strcmp (argv[2], "near") && strcmp (argv[2], "far") &&
+	    strcmp (argv[2], "near-lv") && strcmp (argv[2], "far-lv"))) {
+		fprintf (stderr,
+			"usage: %s usb:BUS,DEVICE init|near|far|near-lv|far-lv\n",
+			argv[0]);
 		return 2;
 	}
-	action = !strcmp (argv[2], "near") ?
+	action = (!strcmp (argv[2], "near") || !strcmp (argv[2], "near-lv")) ?
 		"manualfocusdrivenear" : "manualfocusdrivefar";
 	context = sample_create_context ();
 	if (!context)
@@ -45,6 +66,37 @@ main (int argc, char **argv)
 		stage = "init-only-complete";
 		goto out;
 	}
+	if (strstr (argv[2], "-lv")) {
+		CameraFile *file = NULL;
+		const char *data = NULL, *mime = NULL;
+		unsigned long size = 0;
+
+		stage = "enable-keep-live-view";
+		result = set_named_value (camera, context, "pentaxpclvkeep", &enabled);
+		if (result < GP_OK)
+			goto out;
+		live_view_requested = 1;
+		stage = "start-live-view";
+		result = gp_file_new (&file);
+		if (result >= GP_OK)
+			result = gp_camera_capture_preview (camera, file, context);
+		if (result >= GP_OK)
+			result = gp_file_get_data_and_size (file, &data, &size);
+		if (result >= GP_OK)
+			result = gp_file_get_mime_type (file, &mime);
+		if ((result >= GP_OK) &&
+		    (!data || size < 4 || !mime || strcmp (mime, GP_MIME_JPEG) ||
+		     (unsigned char)data[0] != 0xff ||
+		     (unsigned char)data[1] != 0xd8 ||
+		     (unsigned char)data[size - 2] != 0xff ||
+		     (unsigned char)data[size - 1] != 0xd9))
+			result = GP_ERROR_CORRUPTED_DATA;
+		if (file)
+			gp_file_unref (file);
+		if (result < GP_OK)
+			goto out;
+		printf ("live_view=ready bytes=%lu\n", size);
+	}
 	stage = "get-focus-action";
 	result = gp_camera_get_single_config (camera, action, &widget, context);
 	if (result < GP_OK)
@@ -58,11 +110,27 @@ main (int argc, char **argv)
 out:
 	if (widget)
 		gp_widget_free (widget);
+	if (live_view_requested && camera) {
+		int disabled = 0;
+		int off_result;
+
+		off_result = set_named_value (camera, context, "pentaxpclvmode", "off");
+		if (off_result < GP_OK) {
+			fprintf (stderr, "cleanup=live-view-off-failed error=%s (%d)\n",
+				gp_result_as_string (off_result), off_result);
+			cleanup_result = off_result;
+		}
+		off_result = set_named_value (camera, context, "pentaxpclvkeep", &disabled);
+		if ((off_result < GP_OK) && (cleanup_result >= GP_OK))
+			cleanup_result = off_result;
+	}
 	if (initialized) {
 		exit_result = gp_camera_exit (camera, context);
 		if ((result >= GP_OK) && (exit_result < GP_OK))
 			result = exit_result;
 	}
+	if ((result >= GP_OK) && (cleanup_result < GP_OK))
+		result = cleanup_result;
 	if (camera)
 		gp_camera_unref (camera);
 	gp_context_unref (context);
