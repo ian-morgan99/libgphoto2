@@ -11615,9 +11615,12 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 			gp_context_status (((PTPData *)params->data)->context,
 				_("Pentax manual focus drive (new) returned response 0x%04x."), ret);
 	} else {
-		/* Old-focus family (K-1 II): 0x9016 with amount=5, direction 0=near/1=far. */
+		/* Old-focus family (K-1 II): 0x9016 with amount=5 and the
+		 * source-backed protocol direction mapping. */
 		uint32_t amount = 5U;
-		uint32_t old_direction = (direction > 0) ? 0 : 1;
+		uint32_t old_direction;
+
+		CR (pentax_old_focus_protocol_direction (direction, &old_direction));
 
 		gp_context_status (((PTPData *)params->data)->context,
 			_("Pentax manual focus drive (old): amount=%u, direction=%u (%s), opcode=0x9016."),
@@ -11631,6 +11634,90 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 				_("Pentax manual focus drive (old) returned response 0x%04x."), ret);
 	}
 	return translate_ptp_result (ret);
+}
+
+/* IMAGE Transmitter 2 CamAutoFocus: one Pentax InitiateCapture (0x9011)
+ * with focus_mode=1. This is an AF-only action, not still capture and not a
+ * zero-distance manual-focus command. Initially gate it to the K-3 III family,
+ * whose PC-live-view/touch-AF contract is source-backed and field-testable. */
+static int
+_get_Pentax_AutofocusDrive (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	int val = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
+	    !pentax_model_supports_pc_live_view (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPPropValue live_view;
+	PentaxConditions conditions;
+	unsigned char *data = NULL;
+	unsigned int size = 0, attempt;
+	uint16_t ptpres;
+	int val, result;
+
+	CR (gp_widget_get_value (widget, &val));
+	if (!val)
+		return GP_OK;
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
+	    !pentax_model_supports_pc_live_view (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	result = _pentax_readiness_preflight (params, &conditions);
+	if (result < GP_OK)
+		return result;
+	memset (&live_view, 0, sizeof (live_view));
+	ptpres = ptp_getdevicepropvalue (params,
+		PTP_DPC_PENTAX_UsbLiveViewMode, &live_view, PTP_DTC_UINT8);
+	if (ptpres != PTP_RC_OK)
+		return translate_ptp_result (ptpres);
+	if (live_view.u8 != 1) {
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax autofocus drive requires active PC live view."));
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	ptpres = ptp_pentax_initiate_capture (params, 0, 1, 0, 0, 0);
+	if (ptpres != PTP_RC_OK)
+		return translate_ptp_result (ptpres);
+	/* Bounded proof that AF settles without creating a still-transfer
+	 * candidate. Never delete a candidate here: that would risk user data. */
+	for (attempt = 1; attempt <= 20; attempt++) {
+		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+		    GP_CONTEXT_FEEDBACK_CANCEL)
+			return GP_ERROR_CANCEL;
+		usleep (100000);
+		free (data); data = NULL; size = 0;
+		ptpres = ptp_pentax_get_all_conditions (params, &data, &size);
+		if (ptpres != PTP_RC_OK)
+			continue;
+		result = pentax_parse_conditions (data, size, &conditions);
+		if (result < GP_OK)
+			continue;
+		if (pentax_get_u32le (data + 36) != 0) {
+			free (data);
+			gp_context_error (((PTPData *)params->data)->context,
+				_("Pentax autofocus unexpectedly created a transfer candidate; refusing to discard it."));
+			return GP_ERROR_CAMERA_BUSY;
+		}
+		if (!(conditions.activity_flags &
+		    (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		     PENTAX_CONDITION_ACTIVITY_PROCESSING))) {
+			free (data);
+			if (alreadyset) *alreadyset = 1;
+			return GP_OK;
+		}
+	}
+	free (data);
+	return GP_ERROR_TIMEOUT;
 }
 
 static int
@@ -13695,6 +13782,7 @@ static struct submenu camera_actions_menu[] = {
 	 * to 0x9017 (new-focus) or 0x9016 (old-focus). Positive value = near,
 	 * negative = far. Single bounded step per invocation. */
 	{ N_("Drive Pentax Manual focus"), "manualfocusdrive", 0, PTP_VENDOR_PENTAX, 0, _get_Pentax_GenericManualFocusDrive, _put_Pentax_GenericManualFocusDrive },
+	{ N_("Drive Pentax Autofocus"), "autofocusdrive", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_InitiateCapture, _get_Pentax_AutofocusDrive, _put_Pentax_AutofocusDrive },
 	{ N_("Capture"),                        "capture",          PTP_DPC_SONY_ShutterRelease,PTP_VENDOR_SONY,PTP_DTC_UINT16, _get_Sony_Capture,              _put_Sony_Capture },
 	{ N_("Power Down"),                     "powerdown",        0,  0,                  PTP_OC_PowerDown,                   _get_PowerDown,                 _put_PowerDown },
 	{ N_("Focus Lock"),                     "focuslock",        0,  PTP_VENDOR_CANON,   PTP_OC_CANON_FocusLock,             _get_Canon_FocusLock,           _put_Canon_FocusLock },

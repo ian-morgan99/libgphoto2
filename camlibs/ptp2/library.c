@@ -6442,6 +6442,29 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
+	/* Dual-format diagnostics (#73): after finalizing the selected member,
+	 * identify (but never delete) any immediately pending extra candidate.
+	 * This supplies the ownership/format evidence required before automatic
+	 * reconciliation can safely be implemented. */
+	{
+		unsigned char *cdata = NULL, *cinfo = NULL;
+		unsigned int csize = 0, cisize = 0;
+		uint32_t extra = 0;
+		char extra_name[128] = {0};
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &cdata, &csize))
+			extra = pentax_stale_candidate_baseline (cdata, csize);
+		free (cdata);
+		if (extra && PTP_RC_OK == ptp_pentax_get_transfer_candidate_info (
+		    params, 0, &cinfo, &cisize)) {
+			int nret = pentax_candidate_filename (cinfo, cisize,
+				extra_name, sizeof (extra_name));
+			GP_LOG_D ("post-capture extra candidate: handle=%u info-bytes=%u filename=%s parse=%d (preserved)",
+				extra, cisize, nret == GP_OK ? extra_name : "unavailable", nret);
+		} else if (extra) {
+			GP_LOG_D ("post-capture extra candidate: handle=%u info unavailable (preserved)", extra);
+		}
+		free (cinfo);
+	}
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
 		goto out;
