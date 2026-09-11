@@ -1341,6 +1341,40 @@ gp_camera_capture (Camera *camera, CameraCaptureType type,
 }
 
 /**
+ * Report the extra files published by the last dual-format capture.
+ *
+ * @param camera a #Camera
+ * @param paths an array of #CameraFilePath to fill in (may be NULL when
+ *        max_count is 0, in which case only the count is reported)
+ * @param max_count the number of entries available in \c paths
+ * @param count on return, the number of extra files from the last capture
+ * @return a gphoto2 error code
+ *
+ * After gp_camera_capture() on a dual-format exposure (e.g. RAW+JPEG),
+ * the primary file is reported through the capture path and any
+ * additional members of the same exposure are published here.  The list
+ * is reset at the start of every capture, so it always describes the
+ * most recent one.  Cameras without dual-format support report a count
+ * of zero; camlibs that do not implement this function return
+ * GP_ERROR_NOT_SUPPORTED.
+ **/
+int
+gp_camera_get_extra_capture_files (Camera *camera, CameraFilePath *paths,
+				      int max_count, int *count)
+{
+	C_PARAMS (camera);
+	CHECK_INIT (camera, NULL);
+
+	if (!camera->functions->get_extra_capture_files) {
+		if (count)
+			*count = 0;
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	return camera->functions->get_extra_capture_files (camera, paths,
+		max_count, count);
+}
+
+/**
  * Triggers capture of one or more images.
  *
  * @param camera a #Camera

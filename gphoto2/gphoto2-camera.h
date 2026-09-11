@@ -242,6 +242,9 @@ typedef int (*CameraCaptureFunc)   (Camera *camera, CameraCaptureType type,
 typedef int (*CameraTriggerCaptureFunc)   (Camera *camera, GPContext *context);
 typedef int (*CameraCapturePreviewFunc) (Camera *camera, CameraFile *file,
 					 GPContext *context);
+typedef int (*CameraGetExtraCaptureFilesFunc) (Camera *camera,
+						       CameraFilePath *paths,
+						       int max_count, int *count);
 typedef int (*CameraSummaryFunc)   (Camera *camera, CameraText *text,
 				    GPContext *context);
 typedef int (*CameraManualFunc)    (Camera *camera, CameraText *text,
@@ -308,8 +311,13 @@ typedef struct _CameraFunctions {
 
 	/* Event Interface */
 	CameraWaitForEvent wait_for_event;	/**< \brief Wait for a specific event from the camera */
+
+	/* Dual-format capture (issue #73): report the extra files published
+	 * by the last capture.  Occupies the former reserved1 slot, so the
+	 * struct layout is unchanged for existing camlibs. */
+	CameraGetExtraCaptureFilesFunc get_extra_capture_files;
+	/**< \brief Report extra files from the last dual-format capture */
 	/* Reserved space to use in the future without changing the struct size */
-	void *reserved1;			/**< \brief reserved for future use */
 	void *reserved2;			/**< \brief reserved for future use */
 	void *reserved3;			/**< \brief reserved for future use */
 	void *reserved4;			/**< \brief reserved for future use */
@@ -401,6 +409,27 @@ int gp_camera_get_about		 (Camera *camera, CameraText *about,
 				  GPContext *context);
 int gp_camera_capture 		 (Camera *camera, CameraCaptureType type,
 				  CameraFilePath *path, GPContext *context);
+/**
+ * \brief Report the extra files published by the last dual-format capture.
+ *
+ * @param camera a #Camera
+ * @param paths an array of #CameraFilePath to fill in (may be NULL when
+ *        max_count is 0, in which case only the count is reported)
+ * @param max_count the number of entries available in \c paths
+ * @param count on return, the number of extra files from the last capture
+ *        (clamped to max_count when \c paths is non-NULL)
+ * @return a gphoto2 error code
+ *
+ * After gp_camera_capture() on a dual-format exposure (e.g. RAW+JPEG),
+ * the primary file is reported through the capture path and any
+ * additional members of the same exposure are published here.  The list
+ * is reset at the start of every capture, so it always describes the
+ * most recent one.  Cameras without dual-format support report a count
+ * of zero; camlibs that do not implement this function return
+ * GP_ERROR_NOT_SUPPORTED.
+ **/
+int gp_camera_get_extra_capture_files (Camera *camera, CameraFilePath *paths,
+				      int max_count, int *count);
 int gp_camera_trigger_capture 	 (Camera *camera, GPContext *context);
 int gp_camera_capture_preview 	 (Camera *camera, CameraFile *file,
 				  GPContext *context);

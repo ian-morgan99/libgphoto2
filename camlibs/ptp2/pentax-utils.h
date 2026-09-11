@@ -210,6 +210,7 @@ int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);
 int pentax_model_supports_cross_process (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
+int pentax_model_supports_writing_file_format (uint32_t model_no);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,
@@ -220,5 +221,47 @@ int pentax_jpeg_bounds (const unsigned char *data, size_t size,
 		size_t *offset, size_t *length);
 int pentax_transfer_run (PentaxCaptureBuffer *buffer,
 	const PentaxTransferOps *operations);
+
+/* Bounded reconciliation of extra transfer candidates from a dual-format
+ * exposure (issue #73).  After the primary candidate has been transferred
+ * and finalized, this loop detects and consumes any remaining candidates
+ * belonging to the same already-initiated exposure so the camera is left
+ * ready for the next shutter.
+ *
+ * The loop is bounded by max_count (number of extra candidates to consume)
+ * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
+ *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
+ *      set (offset 32 == 0) the loop terminates with success.
+ *   2. Transfers the pending candidate into a fresh buffer via
+ *      transfer_candidate.
+ *   3. Finalizes it via delete_candidate.
+ *   4. Records the candidate filename (from get_candidate_info +
+ *      pentax_candidate_filename) in names[reconciled_count].
+ *
+ * On success *reconciled_count is set to the number of extras consumed
+ * (0 when none were pending).  On failure the count reflects how many
+ * were completed before the error.  The pre-capture stale-candidate
+ * barrier (issue #34) is NOT weakened: this function only runs AFTER a
+ * successful primary transfer+finalize within the same exposure.
+ */
+typedef struct {
+	void *user_data;
+	/* Read GetAllConditions; caller frees *data on GP_OK. */
+	int (*get_conditions) (void *user_data, unsigned char **data,
+		size_t *size);
+	/* Get transfer candidate info (type 0); caller frees *data. */
+	int (*get_candidate_info) (void *user_data, unsigned char **data,
+		size_t *size);
+	/* Transfer the current pending candidate into buffer. */
+	int (*transfer_candidate) (void *user_data, PentaxCaptureBuffer *buffer);
+	/* Finalize (delete) the current candidate on the camera. */
+	int (*delete_candidate) (void *user_data);
+	/* Cancellation check; return non-zero to stop. */
+	int (*is_cancelled) (void *user_data);
+} PentaxReconcileOps;
+
+int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
+	int max_count, unsigned int max_ms,
+	char (*names)[128], int *reconciled_count);
 
 #endif

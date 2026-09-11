@@ -31,6 +31,7 @@
 #include <iconv.h>
 #endif
 #include "libgphoto2/gphoto2-endian.h"
+#include <gphoto2/gphoto2-camera.h>
 #include <gphoto2/gphoto2-port-log.h>
 #include <gphoto2/gphoto2-port-result.h>
 #include "array.h"
@@ -4084,6 +4085,14 @@ struct _PTPParams {
 		uint8_t sd2_writing_mode;
 		PTPPentaxTransferState transfer_state;
 		uint32_t candidate_handle;
+		/* Extra files published by dual-format exposure reconciliation
+		 * (issue #73): after the primary capture file, any additional
+		 * transfer candidates belonging to the same exposure are
+		 * transferred, finalized and published here so the caller can
+		 * retrieve them via gp_camera_get_pentax_extra_capture_files().
+		 * Cleared at the start of every capture. */
+		CameraFilePath extra_capture_files[4];
+		int extra_capture_count;
 	} pentax;
 
 	/* PTP: caching time for properties, default 2 */

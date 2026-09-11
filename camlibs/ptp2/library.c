@@ -6122,6 +6122,201 @@ pentax_camera_transfer_timed_out (void *user_data)
 	return 0;
 }
 
+/* Dual-format exposure reconciliation (issue #73): after the primary
+ * candidate has been transferred and finalized, any additional candidates
+ * belonging to the same exposure are consumed through the bounded
+ * pentax_reconcile_extra_candidates() loop.  Each extra is transferred,
+ * published into the camera filesystem under a collision-free name and
+ * recorded in params->pentax.extra_capture_files so the caller can
+ * retrieve it via gp_camera_get_extra_capture_files().  The RAW/DNG member
+ * also remains on the camera SD when card writing is enabled (issue #53);
+ * publishing here only makes the tether copy available. */
+typedef struct {
+	PTPParams *params;
+	GPContext *context;
+	Camera *camera;
+} PentaxReconcileContext;
+
+static int
+pentax_reconcile_get_conditions (void *user_data, unsigned char **data,
+	size_t *size)
+{
+	PentaxReconcileContext *rc = user_data;
+	unsigned int usize = 0;
+	uint16_t ptpres;
+
+	ptpres = ptp_pentax_get_all_conditions (rc->params, data, &usize);
+	*size = usize;
+	return ptpres == PTP_RC_OK ? GP_OK : translate_ptp_result (ptpres);
+}
+
+static int
+pentax_reconcile_get_candidate_info (void *user_data, unsigned char **data,
+	size_t *size)
+{
+	PentaxReconcileContext *rc = user_data;
+	unsigned int usize = 0;
+	uint16_t ptpres;
+
+	ptpres = ptp_pentax_get_transfer_candidate_info (rc->params, 0, data,
+		&usize);
+	*size = usize;
+	return ptpres == PTP_RC_OK ? GP_OK : translate_ptp_result (ptpres);
+}
+
+static int
+pentax_reconcile_delete_candidate (void *user_data)
+{
+	PentaxReconcileContext *rc = user_data;
+	uint16_t ptpres = ptp_pentax_delete_transfer_candidate (rc->params);
+
+	return ptpres == PTP_RC_OK ? GP_OK : translate_ptp_result (ptpres);
+}
+
+static int
+pentax_reconcile_cancelled (void *user_data)
+{
+	PentaxReconcileContext *rc = user_data;
+
+	return gp_context_cancel (rc->context) == GP_CONTEXT_FEEDBACK_CANCEL;
+}
+
+/* Transfer the pending extra candidate and publish it into the camera
+ * filesystem.  The candidate still exists at this point (the delete runs
+ * afterwards), so its filename can be read for the publication name. */
+static int
+pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffer)
+{
+	PentaxReconcileContext *rc = user_data;
+	PTPParams *params = rc->params;
+	PentaxCameraTransferContext transfer = {params, rc->context, {0, 0}};
+	PentaxTransferOps transfer_operations = {
+		&transfer,
+		PENTAX_TRANSFER_BLOCK_SIZE,
+		pentax_camera_get_transfer_command,
+		pentax_camera_get_transfer_block,
+		pentax_camera_transfer_cancelled,
+		pentax_camera_transfer_timed_out
+	};
+	unsigned char *cinfo = NULL;
+	unsigned int cisize = 0;
+	char name[128] = {0};
+	CameraFile *file = NULL;
+	int ret;
+
+	transfer.started = time_now ();
+	transfer.last_progress = transfer.started;
+	ret = pentax_transfer_run (buffer, &transfer_operations);
+	if (ret < GP_OK)
+		return ret;
+
+	/* Read the candidate filename while it still exists. */
+	if (PTP_RC_OK == ptp_pentax_get_transfer_candidate_info (params, 0,
+		    &cinfo, &cisize)) {
+		if (pentax_candidate_filename (cinfo, cisize, name, sizeof (name)) != GP_OK)
+			name[0] = '\0';
+	}
+	free (cinfo);
+
+	/* Publish into the camera filesystem so the extra member is
+	 * retrievable without re-downloading from the SD card. */
+	if (rc->camera && name[0]) {
+		CameraFilePath extra;
+		int slot = params->pentax.extra_capture_count;
+		GPContext *probe_context = gp_context_new ();
+		int existing;
+
+		memset (&extra, 0, sizeof (extra));
+		strcpy (extra.folder, "/");
+		strcpy (extra.name, name);
+		if (probe_context) {
+			existing = gp_filesystem_number (rc->camera->fs, extra.folder,
+				extra.name, probe_context);
+			gp_context_unref (probe_context);
+			if (existing >= GP_OK) {
+				char stem[sizeof (extra.name)];
+				const char *dot = strrchr (extra.name, '.');
+				int suffix = 1;
+
+				if (dot)
+					snprintf (stem, sizeof (stem), "%.*s",
+						(int)(dot - extra.name), extra.name);
+				else
+					snprintf (stem, sizeof (stem), "%s", extra.name);
+				do {
+					if (dot)
+						snprintf (extra.name, sizeof (extra.name),
+							"%s_%d%s", stem, suffix, dot);
+					else
+						snprintf (extra.name, sizeof (extra.name),
+							"%s_%d", stem, suffix);
+					suffix++;
+					existing = gp_filesystem_number (rc->camera->fs,
+						extra.folder, extra.name, rc->context);
+				} while (existing >= GP_OK && suffix < 1000);
+			}
+		}
+
+		ret = gp_file_new (&file);
+		if (ret == GP_OK)
+			ret = gp_file_set_data_and_size (file, (char *)buffer->data,
+				buffer->size);
+		if (ret == GP_OK) {
+			gp_file_set_mtime (file, time (NULL));
+			ret = gp_filesystem_append (rc->camera->fs, extra.folder,
+				extra.name, rc->context);
+		}
+		if (ret == GP_OK)
+			ret = gp_filesystem_set_file_noop (rc->camera->fs, extra.folder,
+				extra.name, GP_FILE_TYPE_NORMAL, file, rc->context);
+		if (ret < GP_OK) {
+			GP_LOG_E ("failed to publish extra capture file %s/%s (%d)",
+				extra.folder, extra.name, ret);
+			/* The transfer itself succeeded; the camera-side
+			 * candidate is still finalized below, so the exposure
+			 * does not block the next shutter. */
+			ret = GP_OK;
+		} else if (slot < (int)(sizeof (params->pentax.extra_capture_files)
+			/ sizeof (params->pentax.extra_capture_files[0]))) {
+			params->pentax.extra_capture_files[slot] = extra;
+			params->pentax.extra_capture_count = slot + 1;
+			GP_LOG_D ("published extra capture file %s/%s (%u bytes)",
+				extra.folder, extra.name, (unsigned)buffer->size);
+		}
+	} else if (rc->camera && !name[0]) {
+		GP_LOG_D ("extra candidate has no parseable filename; "
+			"transferred but not published");
+	}
+
+	if (file)
+		gp_file_unref (file);
+	return GP_OK;
+}
+
+/* Dual-format exposure support (issue #73): report the extra files
+ * published by the last capture.  The list is reset at the start of every
+ * capture, so it always describes the most recent exposure. */
+static int
+camera_get_extra_capture_files (Camera *camera, CameraFilePath *paths,
+	int max_count, int *count)
+{
+	PTPParams *params = &camera->pl->params;
+	int n, i;
+
+	if (!params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	n = params->pentax.extra_capture_count;
+	if (paths && max_count > 0) {
+		if (max_count < n)
+			n = max_count;
+		for (i = 0; i < n; i++)
+			paths[i] = params->pentax.extra_capture_files[i];
+	}
+	if (count)
+		*count = params->pentax.extra_capture_count;
+	return GP_OK;
+}
+
 static int
 camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 {
@@ -6148,6 +6343,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* Every capture starts with an empty extra-file list (issue #73):
+	 * the list always describes the most recent exposure only. */
+	params->pentax.extra_capture_count = 0;
 	if (params->pentax.recovery_required) {
 		/* The flag is set once reconciliation sees the camera busy
 		 * or conditions unreadable. Rather than locking captures out
@@ -6442,28 +6640,40 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
-	/* Dual-format diagnostics (#73): after finalizing the selected member,
-	 * identify (but never delete) any immediately pending extra candidate.
-	 * This supplies the ownership/format evidence required before automatic
-	 * reconciliation can safely be implemented. */
+	/* Dual-format exposure reconciliation (#73): after finalizing the
+	 * selected member, consume any additional candidates belonging to the
+	 * same already-initiated exposure so the camera is left ready for the
+	 * next shutter.  The loop is bounded in both candidate count and wall
+	 * clock; a leftover candidate (bound exhausted) still trips the
+	 * pre-capture stale-candidate barrier on the NEXT capture, which is
+	 * the intended fail-safe.  Each extra is published into the camera
+	 * filesystem and recorded in params->pentax.extra_capture_files.
+	 * A reconciliation failure never fails the primary capture: the main
+	 * file is already finalized above, so the error is logged and the
+	 * next-capture barrier handles the remainder. */
 	{
-		unsigned char *cdata = NULL, *cinfo = NULL;
-		unsigned int csize = 0, cisize = 0;
-		uint32_t extra = 0;
-		char extra_name[128] = {0};
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &cdata, &csize))
-			extra = pentax_stale_candidate_baseline (cdata, csize);
-		free (cdata);
-		if (extra && PTP_RC_OK == ptp_pentax_get_transfer_candidate_info (
-		    params, 0, &cinfo, &cisize)) {
-			int nret = pentax_candidate_filename (cinfo, cisize,
-				extra_name, sizeof (extra_name));
-			GP_LOG_D ("post-capture extra candidate: handle=%u info-bytes=%u filename=%s parse=%d (preserved)",
-				extra, cisize, nret == GP_OK ? extra_name : "unavailable", nret);
-		} else if (extra) {
-			GP_LOG_D ("post-capture extra candidate: handle=%u info unavailable (preserved)", extra);
-		}
-		free (cinfo);
+		PentaxReconcileContext reconcile_context = {params, context, camera};
+		PentaxReconcileOps reconcile_ops = {
+			&reconcile_context,
+			pentax_reconcile_get_conditions,
+			pentax_reconcile_get_candidate_info,
+			pentax_reconcile_transfer_candidate,
+			pentax_reconcile_delete_candidate,
+			pentax_reconcile_cancelled
+		};
+		char extra_names[4][128];
+		int reconciled = 0;
+		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
+			4, 60 * 1000, extra_names, &reconciled);
+
+		if (rret < GP_OK)
+			GP_LOG_E ("dual-format reconciliation stopped early (%d); "
+				"%d extra candidate(s) consumed; the next-capture "
+				"stale-candidate barrier covers any remainder", rret,
+				reconciled);
+		else if (reconciled)
+			GP_LOG_D ("dual-format reconciliation: %d extra candidate(s) "
+				"consumed and published", reconciled);
 	}
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
@@ -10472,8 +10682,7 @@ camera_init (Camera *camera, GPContext *context)
 	camera->functions->set_config = camera_set_config;
 	camera->functions->list_config = camera_list_config;
 	camera->functions->wait_for_event = camera_wait_for_event;
-
-	/* We need some data that we pass around */
+  camera->functions->get_extra_capture_files = camera_get_extra_capture_files;
 	C_MEM (camera->pl = calloc (1, sizeof (CameraPrivateLibrary)));
 	params = &camera->pl->params;
 	params->debug_func = ptp_debug_func;

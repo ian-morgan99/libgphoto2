@@ -10629,6 +10629,204 @@ _put_Pentax_CardWritingMode (CONFIG_PUT_ARGS)
 	return translate_ptp_result (rc);
 }
 
+/* Writing file format (0xd01b) — generic imageformat / imagequality widgets
+ * for modern Pentax ptp2 bodies (issues #54 and #55).
+ *
+ * IT2 (MtpDevice.cs _camWritingFileFormatCopy) uses a 10-byte payload on the
+ * K-3 III / K-1 II family:
+ *   byte 0  = 6 (payload length marker)
+ *   bytes 4,5 = writing file format (JPEG=0, RAW=1, RAW+JPEG=2, TIFF=3;
+ *               IT2 writes the same value to both bytes)
+ *   byte 6  = image size code
+ *   byte 7  = JPEG quality (IT2: 2 - stars, so 0=fine/3-star, 1=normal,
+ *               2=basic/1-star)
+ *   byte 8  = RAW kind (PEF/DNG selection; IT2 RawKind)
+ *   byte 9  = card slot setting (1-based; 0 on single-slot bodies)
+ * The SET path must preserve every unrelated byte, so the current property
+ * value is read first and only the target bytes are modified.  The GET path
+ * reads the live camera state from GetAllConditions instead: offset 524
+ * carries the writing-format setting (IT2 _camWritingFormatSetting) and
+ * offset 140 the JPEG quality (IT2 _jpegQuality), which is what the camera
+ * UI actually shows.  Gated to the k3iii family (fail-closed elsewhere);
+ * card-writing mode (0x9004, pentaxcardwritingmode) remains a separate
+ * widget and is never aliased to file format. */
+#define PENTAX_WFF_PAYLOAD_SIZE 10
+#define PENTAX_WFF_FORMAT_OFFSET 4
+#define PENTAX_WFF_QUALITY_OFFSET 7
+
+static int
+_pentax_wff_read_payload (PTPParams *params, unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE])
+{
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	uint16_t ret;
+
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_WritingFileFormat, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	/* A short or missing payload is not an error: zero-fill so the caller
+	 * can still write a well-formed payload with only the target bytes set. */
+	memset (payload, 0, sizeof (payload));
+	if (size >= PENTAX_WFF_PAYLOAD_SIZE) {
+		memcpy (payload, data, PENTAX_WFF_PAYLOAD_SIZE);
+	} else if (size > 0) {
+		memcpy (payload, data, size);
+	}
+	free (data);
+	return GP_OK;
+}
+
+static int
+_get_Pentax_ImageFormat (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *cdata = NULL;
+	unsigned int csize = 0;
+	uint32_t format;
+	const char *label;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	/* Live camera state from GetAllConditions offset 524 (IT2
+	 * _camWritingFormatSetting); the property itself has no reliable GET. */
+	if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &cdata, &csize) ||
+	    csize < PENTAX_CONDITIONS_MIN_SIZE + 20) {
+		free (cdata);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	format = pentax_get_u32le (cdata + 524);
+	free (cdata);
+	switch (format) {
+	case 1: label = "RAW"; break;
+	case 2: label = "RAW+JPEG"; break;
+	case 3: label = "TIFF"; break;
+	default: label = "JPEG"; break;
+	}
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "JPEG");
+	gp_widget_add_choice (*widget, "RAW");
+	gp_widget_add_choice (*widget, "RAW+JPEG");
+	gp_widget_add_choice (*widget, "TIFF");
+	gp_widget_set_value (*widget, label);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE];
+	const char *value;
+	uint8_t format;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, "JPEG"))
+		format = 0;
+	else if (!strcmp (value, "RAW"))
+		format = 1;
+	else if (!strcmp (value, "RAW+JPEG"))
+		format = 2;
+	else if (!strcmp (value, "TIFF"))
+		format = 3;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	CR (_pentax_wff_read_payload (params, payload));
+	/* IT2 writes the format to both bytes 4 and 5. */
+	payload[PENTAX_WFF_FORMAT_OFFSET] = format;
+	payload[PENTAX_WFF_FORMAT_OFFSET + 1] = format;
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_WritingFileFormat, payload, sizeof (payload));
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if (alreadyset)
+		*alreadyset = 1;
+	return GP_OK;
+}
+
+static int
+_get_Pentax_ImageQuality (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char *cdata = NULL;
+	unsigned int csize = 0;
+	uint32_t quality;
+	const char *label;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	/* Live JPEG quality from GetAllConditions offset 140 (IT2
+	 * _jpegQuality, star count: 3=fine, 2=normal, 1=basic). */
+	if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &cdata, &csize) ||
+	    csize < PENTAX_CONDITIONS_MIN_SIZE) {
+		free (cdata);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	quality = pentax_get_u32le (cdata + 140);
+	free (cdata);
+	switch (quality) {
+	case 2: label = "fine"; break;
+	case 1: label = "normal"; break;
+	default: label = "basic"; break;
+	}
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "fine");
+	gp_widget_add_choice (*widget, "normal");
+	gp_widget_add_choice (*widget, "basic");
+	gp_widget_set_value (*widget, label);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_ImageQuality (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE];
+	const char *value;
+	uint8_t stars, quality_byte;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	/* IT2 star scale: 3=fine, 2=normal, 1=basic. */
+	if (!strcmp (value, "fine"))
+		stars = 3;
+	else if (!strcmp (value, "normal"))
+		stars = 2;
+	else if (!strcmp (value, "basic"))
+		stars = 1;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	/* IT2 encodes the payload byte as (2 - stars): 0=fine, 1=normal,
+	 * 2=basic. */
+	quality_byte = (uint8_t)(2 - stars);
+	CR (_pentax_wff_read_payload (params, payload));
+	payload[PENTAX_WFF_QUALITY_OFFSET] = quality_byte;
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_WritingFileFormat, payload, sizeof (payload));
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if (alreadyset)
+		*alreadyset = 1;
+	return GP_OK;
+}
+
 /* Live-view zoom write (0xd037).  IT2 payload is a 12-byte structure:
  * {4,0,0,0, Xlo,Xhi, Ylo,Yhi, mag,0,0,0}.  Zoom-off is magnification 1 with
  * centred coordinates.  The write is verified by reading the property back;
@@ -13862,6 +14060,8 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Movie Mode"), "pentaxmoviemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_MovieMode, _put_Pentax_MovieMode },
 	{ N_("Pentax Keep Live View"), "pentaxpclvkeep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_KeepLiveView, _put_Pentax_KeepLiveView },
 	{ N_("Pentax Card Writing Mode"), "pentaxcardwritingmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CardWritingMode, _put_Pentax_CardWritingMode },
+	{ N_("Image Format"),           "imageformat",    0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_ImageFormat, _put_Pentax_ImageFormat },
+	{ N_("Image Quality"),          "imagequality",   0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_ImageQuality, _put_Pentax_ImageQuality },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },

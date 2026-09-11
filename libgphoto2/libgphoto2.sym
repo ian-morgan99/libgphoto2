@@ -32,6 +32,7 @@ gp_camera_free
 gp_camera_get_abilities
 gp_camera_get_about
 gp_camera_get_config
+gp_camera_get_extra_capture_files
 gp_camera_get_single_config
 gp_camera_get_manual
 gp_camera_get_port_info

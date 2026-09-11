@@ -16,6 +16,24 @@ test(
   env: gp_test_env,
 )
 
+# Deterministic tests for the dual-format exposure reconciliation loop
+# (issue #73): pentax_reconcile_extra_candidates() with mocked camera
+# behaviour, covering one/two candidates, transfer/delete failures,
+# transient conditions failures, bound exhaustion and cancellation.
+test_pentax_reconcile_exe = executable(
+  'test-pentax-reconcile',
+  'test-pentax-reconcile.c',
+  '../camlibs/ptp2/pentax-utils.c',
+  include_directories: include_directories('../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+
+test(
+  'test-pentax-reconcile',
+  test_pentax_reconcile_exe,
+  env: gp_test_env,
+)
+
 # Regression test for the Pentax `aperture` compatibility alias (issue #53).
 # Drives the real public config-lookup path: dlopens the built ptp2 camlib via
 # CAMLIBS and calls its exported camera_get_single_config("aperture") with a

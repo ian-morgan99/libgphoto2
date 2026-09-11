@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include <gphoto2/gphoto2-result.h>
 #include <gphoto2/gphoto2-port-log.h>
@@ -428,6 +430,17 @@ pentax_model_supports_card_writing_mode (uint32_t model_no)
 	       (model_no == PENTAX_MODEL_645Z);
 }
 
+/* Writing file format (0xd01b): the IT2 payload layout for the K-3 III /
+ * K-1 II family is the 10-byte form (byte 0 = 6, bytes 4/5 = file format,
+ * byte 7 = JPEG quality, byte 8 = RAW kind, byte 9 = card slot).  The KP
+ * uses a different 11-byte layout and the K-3 II is not in IT2 at all, so
+ * fail closed on the k3iii family only (issues #54 and #55). */
+int
+pentax_model_supports_writing_file_format (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
 static int
 pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 {
@@ -794,4 +807,159 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 	}
 
 	return (unsigned int) timeout;
+}
+
+/* Bounded reconciliation of extra transfer candidates from a dual-format
+ * exposure (issue #73).  After the primary candidate has been transferred
+ * and finalized, this loop detects and consumes any remaining candidates
+ * belonging to the same already-initiated exposure so the camera is left
+ * ready for the next shutter.
+ *
+ * The loop is bounded by max_count (number of extra candidates to consume)
+ * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
+ *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
+ *      set (offset 32 == 0) the loop terminates with success.
+ *   2. Transfers the pending candidate into a fresh buffer via
+ *      transfer_candidate.
+ *   3. Finalizes it via delete_candidate.
+ *   4. Records the candidate filename in names[reconciled_count].
+ *
+ * On success *reconciled_count is set to the number of extras consumed
+ * (0 when none were pending).  On failure the count reflects how many
+ * were completed before the error.  The pre-capture stale-candidate
+ * barrier (issue #34) is NOT weakened: this function only runs AFTER a
+ * successful primary transfer+finalize within the same exposure.
+ */
+int
+pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
+	int max_count, unsigned int max_ms,
+	char (*names)[128], int *reconciled_count)
+{
+	struct timespec start, now;
+	int count = 0;
+	int ret = GP_OK;
+
+	if (!ops || !reconciled_count) {
+		if (reconciled_count)
+			*reconciled_count = 0;
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	if (max_count < 1)
+		max_count = 4; /* default bound: at most 4 extras */
+	if (max_ms == 0)
+		max_ms = 60000; /* default: 60 s total budget */
+
+	*reconciled_count = 0;
+	clock_gettime (CLOCK_MONOTONIC, &start);
+
+	for (;;) {
+		unsigned char *cdata = NULL, *cinfo = NULL;
+		size_t csize = 0, cisize = 0;
+		PentaxCaptureBuffer extra = {0};
+		uint32_t handle;
+		int iteration_error = GP_OK;
+		int done = 0;
+
+		/* Check cancellation. */
+		if (ops->is_cancelled && ops->is_cancelled (ops->user_data)) {
+			ret = GP_ERROR_CANCEL;
+			goto out;
+		}
+
+		/* Read conditions to check if a candidate is still pending. */
+		ret = ops->get_conditions (ops->user_data, &cdata, &csize);
+		if (ret < GP_OK) {
+			/* Transient failure: bounded retry within the time budget. */
+			clock_gettime (CLOCK_MONOTONIC, &now);
+			if ((now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+				ret = GP_ERROR_TIMEOUT;
+				goto out;
+			}
+			usleep (200 * 1000);
+			continue;
+		}
+
+		handle = 0;
+		if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
+		    pentax_get_u32le (cdata + 32) == 1)
+			handle = pentax_get_u32le (cdata + 36);
+		free (cdata);
+		cdata = NULL;
+
+		if (!handle) {
+			/* No more candidates: reconciliation complete. */
+			done = 1;
+			goto out;
+		}
+
+		/* Bound on candidate count. */
+		if (count >= max_count) {
+			GP_LOG_D ("reconciliation bound reached (%d extras); "
+				"leaving candidate %u for next capture", max_count, handle);
+			done = 1;
+			goto out;
+		}
+
+		/* Check time budget. */
+		clock_gettime (CLOCK_MONOTONIC, &now);
+		if ((now.tv_sec - start.tv_sec) * 1000 +
+		    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+			GP_LOG_D ("reconciliation time budget (%u ms) exhausted; "
+				"leaving candidate %u", max_ms, handle);
+			done = 1;
+			goto out;
+		}
+
+		/* Get the candidate filename for diagnostics. */
+		if (names && ops->get_candidate_info) {
+			iteration_error = ops->get_candidate_info (ops->user_data, &cinfo, &cisize);
+			if (iteration_error == GP_OK && cisize > 0) {
+				int nret = pentax_candidate_filename (cinfo, cisize,
+					names[count], 128);
+				if (nret != GP_OK)
+					names[count][0] = '\0';
+			} else {
+				names[count][0] = '\0';
+			}
+			free (cinfo);
+			cinfo = NULL;
+			/* A failed info read is diagnostic-only; the transfer
+			 * still proceeds. */
+			iteration_error = GP_OK;
+		}
+
+		/* Transfer the extra candidate. */
+		iteration_error = ops->transfer_candidate (ops->user_data, &extra);
+		if (iteration_error < GP_OK) {
+			GP_LOG_E ("reconciliation transfer of extra candidate %u "
+				"failed (%d)", handle, iteration_error);
+			ret = iteration_error;
+			goto out;
+		}
+
+		/* Finalize (delete) the candidate on the camera. */
+		iteration_error = ops->delete_candidate (ops->user_data);
+		if (iteration_error < GP_OK) {
+			GP_LOG_E ("reconciliation delete of extra candidate %u "
+				"failed (%d)", handle, iteration_error);
+			ret = iteration_error;
+			goto out;
+		}
+
+		count++;
+		*reconciled_count = count;
+		GP_LOG_D ("reconciled extra candidate %u (%s) [%d/%d]",
+			handle, names ? names[count - 1] : "?", count, max_count);
+
+out:
+		free (cdata);
+		free (cinfo);
+		free (extra.data);
+		if (done || ret < GP_OK)
+			break;
+	}
+
+	*reconciled_count = count;
+	return ret;
 }
