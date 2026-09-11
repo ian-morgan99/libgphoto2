@@ -1,0 +1,24 @@
+=== K1II focus init ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+focus_init=command-accepted cleanup=ok retries=0
+=== K1II ISO roundtrip ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+ISO round trip failed: Bad parameters (-2); changed=0; restore_result=0
+stage=initial conditions_iso=100
+=== K1II shutter roundtrip ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+shutter round trip failed: Bad parameters (-2); changed=0; restore_result=0
+stage=initial conditions_shutter=1/5000
+=== K1II LVAF roundtrip ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (77980 bytes, 1 attempts, 15 ms).
+stage=write-nonbaseline error=Unspecified error (-1)
+LV AF round trip failed: Unspecified error (-1)
+stage=keep-live-view on
+stage=start-lv ok
+stage=baseline position=540,360

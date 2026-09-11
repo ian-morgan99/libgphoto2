@@ -1,0 +1,12 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (77473 bytes, 1 attempts, 19 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (63176 bytes, 1 attempts, 21 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (63180 bytes, 1 attempts, 22 ms).
+frame=1 bytes=77473 valid_jpeg=yes
+frame=2 bytes=63176 valid_jpeg=yes
+frame=3 bytes=63180 valid_jpeg=yes
+completed_frames=3 cleanup=ok

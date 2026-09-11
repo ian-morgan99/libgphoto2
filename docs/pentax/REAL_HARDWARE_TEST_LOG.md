@@ -683,3 +683,26 @@ in `/tmp/k3iii-r1.log` lines 144–353.
   acceptance PASS when PC-LV is active, normal shutter/download PASS, and
   reconnect remains healthy. Downstream focus must sequence the same live-view
   prerequisite; it must not retry/escalate `0xa00c` from an off-LV session.
+### 2026-09-11 — dual-camera exact-selection audit and model-aware focus alias fix
+
+- Bodies simultaneously attached: K-1 II `25fb:0183` on `usb:001,047` and
+  K-3 III `25fb:0189` on `usb:002,009`. Final runs pinned the freshly built
+  camlib and iolib explicitly.
+- Probe audit found all Pentax examples used colon-form ability names while the
+  public ability lookup expects `Pentax K-...`. `sample_open_camera()` then
+  returned a stale non-error result for the failed lookup, so earlier
+  simultaneous-body probes could silently select the wrong camera. It now
+  returns the actual lookup error, and affected probes use the verified names.
+- Driver audit found duplicate `manualfocusdrivenear`/`manualfocusdrivefar`
+  menu keys. The first entries always selected new-focus `0x9017`; the later
+  old-focus entries were unreachable. One model-aware registration per name now
+  dispatches only after exact identification (issue #71).
+- Final preview: K-1 II 5/5 valid JPEGs (25,397--32,647 bytes, 9--13 warm-up
+  polls); K-3 III 5/5 (57,839--80,772 bytes, one poll each); cleanup passed.
+- Final focus dispatch: K-1 II model 78400 used one bounded `0x9016` command in
+  each direction, both rejected with `0xa00c`; no movement claimed. K-3 III
+  model 78420 used `0x9017`; near passed, far passed on a bounded retry after
+  one intervening `0xa008` live-view timeout. Cleanup passed.
+- Evidence: `docs/evidence/pc-dual-camera-final-2026-09-11/README.md` and its
+  linked raw logs. ISO/shutter/LVAF results from the initial run are invalidated
+  by the masked model-lookup failure and are not hardware evidence.

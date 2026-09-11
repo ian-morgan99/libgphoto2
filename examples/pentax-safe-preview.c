@@ -25,8 +25,8 @@ main (int argc, char **argv)
 		fprintf (stderr, "usage: %s MODEL usb:BUS,DEVICE FRAME_COUNT\n", argv[0]);
 		return 2;
 	}
-	if (strcmp (argv[1], "Pentax:K-3 Mark III (MTP mode)") &&
-	    strcmp (argv[1], "Pentax:K-1 Mark II (PTP mode)")) {
+	if (strcmp (argv[1], "Pentax K-3 Mark III (MTP mode)") &&
+	    strcmp (argv[1], "Pentax K-1 Mark II (PTP mode)")) {
 		fprintf (stderr, "MODEL is not an explicitly supported Pentax body\n");
 		return 2;
 	}

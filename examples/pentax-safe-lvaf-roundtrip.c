@@ -107,9 +107,9 @@ main (int argc, char **argv)
 	 * the AF spot moved. */
 	int baseline_changed = 0;
 
-	if ((argc != 3) || strcmp (argv[1], "Pentax:K-1 Mark II (PTP mode)")) {
+	if ((argc != 3) || strcmp (argv[1], "Pentax K-1 Mark II (PTP mode)")) {
 		fprintf (stderr,
-			"usage: %s 'Pentax:K-1 Mark II (PTP mode)' usb:BUS,DEVICE\n",
+			"usage: %s 'Pentax K-1 Mark II (PTP mode)' usb:BUS,DEVICE\n",
 			argv[0]);
 		return 2;
 	}

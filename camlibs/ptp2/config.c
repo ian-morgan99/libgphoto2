@@ -11508,6 +11508,40 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 	return translate_ptp_result (ret);
 }
 
+/* The public near/far action names are shared by both Pentax focus families.
+ * Keep one menu registration for each name and select the already-bounded
+ * implementation only after exact model identification.  Duplicate menu keys
+ * previously made the first (0x9017) entry win even on old-focus bodies. */
+static int
+_get_Pentax_ModelAwareFocusDrive (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (pentax_model_uses_new_focus (params->pentax.model_no))
+		return _get_Pentax_MinimumFocusDrive (camera, widget, menu, dpd);
+	return _get_Pentax_OldFocusDrive (camera, widget, menu, dpd);
+}
+
+static int
+_put_Pentax_ModelAwareFocusDrive (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_context_status (((PTPData *)params->data)->context,
+		_("Pentax model-aware focus dispatch: model=%u, family=%s."),
+		params->pentax.model_no,
+		pentax_model_uses_new_focus (params->pentax.model_no) ? "new" : "old");
+	if (pentax_model_uses_new_focus (params->pentax.model_no))
+		return _put_Pentax_MinimumFocusDrive (camera, widget, propval, dpd,
+			alreadyset);
+	return _put_Pentax_OldFocusDrive (camera, widget, propval, dpd,
+		alreadyset);
+}
+
 /* Generic `manualfocusdrive` wrapper for Pentax (issue #59).
  * Dispatches to the correct focus-control opcode by model family:
  *   - new-focus models (K-3 III, etc.) -> 0x9017 via ptp_pentax_focus_control_new
@@ -13651,12 +13685,10 @@ static struct submenu camera_actions_menu[] = {
 
 	{ N_("Auto-Focus"),                     "autofocus",        PTP_DPC_SONY_ShutterHalfRelease, PTP_VENDOR_SONY, PTP_DTC_UINT16, _get_Sony_Autofocus,      _put_Sony_Autofocus },
 	{ N_("Manual-Focus"),                   "manualfocus",      PTP_DPC_SONY_ManualFocusAdjust,  PTP_VENDOR_SONY, PTP_DTC_INT16,  _get_Sony_ManualFocus,    _put_Sony_ManualFocus },
-	{ N_("Drive Pentax focus near (minimum)"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
-	{ N_("Drive Pentax focus far (minimum)"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControlNew, _get_Pentax_MinimumFocusDrive, _put_Pentax_MinimumFocusDrive },
+	{ N_("Drive Pentax focus near (minimum)"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, 0, _get_Pentax_ModelAwareFocusDrive, _put_Pentax_ModelAwareFocusDrive },
+	{ N_("Drive Pentax focus far (minimum)"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, 0, _get_Pentax_ModelAwareFocusDrive, _put_Pentax_ModelAwareFocusDrive },
 	{ N_("Drive Pentax old-focus near (K-1 II)"), "oldfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
 	{ N_("Drive Pentax old-focus far (K-1 II)"), "oldfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
-	{ N_("Drive Pentax focus near"), "manualfocusdrivenear", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
-	{ N_("Drive Pentax focus far"), "manualfocusdrivefar", 0, PTP_VENDOR_PENTAX, PTP_OC_PENTAX_FocusControl, _get_Pentax_OldFocusDrive, _put_Pentax_OldFocusDrive },
 	/* Generic `manualfocusdrive` for Pentax (issue #59): model-family dispatch
 	 * to 0x9017 (new-focus) or 0x9016 (old-focus). Positive value = near,
 	 * negative = far. Single bounded step per invocation. */

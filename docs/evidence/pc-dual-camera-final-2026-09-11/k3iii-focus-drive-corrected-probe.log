@@ -1,0 +1,15 @@
+=== K3III new-focus near with LV ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (62565 bytes, 1 attempts, 12 ms).
+Pentax minimum focus drive: openAvNum=28, displacement=23, opcode=0x9017, retries=0.
+Pentax minimum focus drive returned response 0x2001.
+live_view=ready bytes=62565
+focus_near-lv=command-accepted cleanup=ok retries=0
+=== K3III new-focus far with LV ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage get-frame returned 0xa008 (0 bytes, 30 attempts, 1229 ms).
+Pentax preview stage restore-after-frame returned 0x2001.
+focus_usb:002,009=failed stage=start-live-view error=Timeout reading from or writing to the port (-10) cleanup=attempted

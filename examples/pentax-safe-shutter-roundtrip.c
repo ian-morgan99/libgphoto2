@@ -61,8 +61,8 @@ main (int argc, char **argv)
 	int initialized = 0, changed = 0;
 	int result = GP_OK, set_result, restore_result = GP_OK, exit_result;
 
-	if ((argc != 3) || strcmp (argv[1], "Pentax:K-1 Mark II (PTP mode)")) {
-		fprintf (stderr, "usage: %s 'Pentax:K-1 Mark II (PTP mode)' usb:BUS,DEVICE\n",
+	if ((argc != 3) || strcmp (argv[1], "Pentax K-1 Mark II (PTP mode)")) {
+		fprintf (stderr, "usage: %s 'Pentax K-1 Mark II (PTP mode)' usb:BUS,DEVICE\n",
 			argv[0]);
 		return 2;
 	}

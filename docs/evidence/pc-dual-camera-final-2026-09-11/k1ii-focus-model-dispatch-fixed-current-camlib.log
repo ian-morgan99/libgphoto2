@@ -1,0 +1,16 @@
+=== K1II old-focus near fixed/current camlib ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax minimum focus drive: openAvNum=28, displacement=23, opcode=0x9017, retries=0.
+
+*** Contexterror ***              
+Pentax minimum focus drive (23) failed with response 0xa00c.
+focus_near=failed stage=send-minimum-focus error=Unspecified error (-1) cleanup=attempted
+=== K1II old-focus far fixed/current camlib ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax minimum focus drive: openAvNum=28, displacement=-23, opcode=0x9017, retries=0.
+
+*** Contexterror ***              
+Pentax minimum focus drive (-23) failed with response 0xa00c.
+focus_far=failed stage=send-minimum-focus error=Unspecified error (-1) cleanup=attempted

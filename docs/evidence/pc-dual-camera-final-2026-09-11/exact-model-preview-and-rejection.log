@@ -1,0 +1,45 @@
+=== invalid model must fail ===
+focus_init=failed stage=open-explicit-camera error=Unknown model (-105) cleanup=attempted
+=== K1II preview exact ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (25397 bytes, 13 attempts, 403 ms).
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (32647 bytes, 10 attempts, 305 ms).
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (31528 bytes, 11 attempts, 342 ms).
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (32231 bytes, 9 attempts, 281 ms).
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (30860 bytes, 9 attempts, 269 ms).
+frame=1 bytes=25397 valid_jpeg=yes
+frame=2 bytes=32647 valid_jpeg=yes
+frame=3 bytes=31528 valid_jpeg=yes
+frame=4 bytes=32231 valid_jpeg=yes
+frame=5 bytes=30860 valid_jpeg=yes
+completed_frames=5 cleanup=ok
+=== K3III preview exact ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (80772 bytes, 1 attempts, 23 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (60015 bytes, 1 attempts, 23 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (59297 bytes, 1 attempts, 14 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (57839 bytes, 1 attempts, 20 ms).
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (72249 bytes, 1 attempts, 20 ms).
+frame=1 bytes=80772 valid_jpeg=yes
+frame=2 bytes=60015 valid_jpeg=yes
+frame=3 bytes=59297 valid_jpeg=yes
+frame=4 bytes=57839 valid_jpeg=yes
+frame=5 bytes=72249 valid_jpeg=yes
+completed_frames=5 cleanup=ok

@@ -1,0 +1,20 @@
+=== K1II old-focus near corrected probe ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax model-aware focus dispatch: model=78400, family=old.
+Pentax old focus drive: amount=5, direction=0 (Near), opcode=0x9016, retries=0.
+
+*** Contexterror ***              
+Pentax old focus drive failed with response 0xa00c.
+focus_near=failed stage=send-minimum-focus error=Unspecified error (-1) cleanup=attempted
+selected_model=Pentax K-1 Mark II (PTP mode) usb=25fb:0183 port=usb:001,047
+=== K1II old-focus far corrected probe ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax model-aware focus dispatch: model=78400, family=old.
+Pentax old focus drive: amount=5, direction=1 (Far), opcode=0x9016, retries=0.
+
+*** Contexterror ***              
+Pentax old focus drive failed with response 0xa00c.
+focus_far=failed stage=send-minimum-focus error=Unspecified error (-1) cleanup=attempted
+selected_model=Pentax K-1 Mark II (PTP mode) usb=25fb:0183 port=usb:001,047

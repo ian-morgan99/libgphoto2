@@ -1,0 +1,6 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage get-frame returned 0xa008 (0 bytes, 30 attempts, 1248 ms).
+Pentax preview stage restore-after-frame returned 0x2001.
+frame=1 stage=capture-preview error=Timeout reading from or writing to the port (-10)
+safe preview failed: Timeout reading from or writing to the port (-10)

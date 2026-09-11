@@ -1,0 +1,10 @@
+=== K3III focus init ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+focus_init=command-accepted cleanup=ok retries=0
+=== K3III ISO roundtrip ===
+usage: _build/examples/pentax-safe-iso-roundtrip 'Pentax:K-1 Mark II (PTP mode)' usb:BUS,DEVICE
+=== K3III shutter roundtrip ===
+usage: _build/examples/pentax-safe-shutter-roundtrip 'Pentax:K-1 Mark II (PTP mode)' usb:BUS,DEVICE
+=== K3III LVAF roundtrip ===
+usage: _build/examples/pentax-safe-lvaf-roundtrip 'Pentax:K-1 Mark II (PTP mode)' usb:BUS,DEVICE

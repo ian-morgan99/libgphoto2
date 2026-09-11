@@ -1,4 +1,4 @@
-/* One-command Pentax K-3 III minimum focus-drive hardware probe. */
+/* One-command exact-model Pentax minimum focus-drive hardware probe. */
 #include "config.h"
 
 #include <stdio.h>
@@ -9,8 +9,6 @@
 #include <gphoto2/gphoto2-widget.h>
 
 #include "samples.h"
-
-#define PENTAX_MODEL "Pentax:K-3 Mark III (MTP mode)"
 
 static int
 set_named_value (Camera *camera, GPContext *context, const char *name,
@@ -40,33 +38,42 @@ main (int argc, char **argv)
 	int initialized = 0, enabled = 1, live_view_requested = 0;
 	int result = GP_OK, exit_result, cleanup_result = GP_OK;
 
-	if ((argc != 3) || (strcmp (argv[2], "init") &&
-	    strcmp (argv[2], "near") && strcmp (argv[2], "far") &&
-	    strcmp (argv[2], "near-lv") && strcmp (argv[2], "far-lv"))) {
+	if ((argc != 4) || (strcmp (argv[3], "init") &&
+	    strcmp (argv[3], "near") && strcmp (argv[3], "far") &&
+	    strcmp (argv[3], "near-lv") && strcmp (argv[3], "far-lv"))) {
 		fprintf (stderr,
-			"usage: %s usb:BUS,DEVICE init|near|far|near-lv|far-lv\n",
+			"usage: %s MODEL usb:BUS,DEVICE init|near|far|near-lv|far-lv\n",
 			argv[0]);
 		return 2;
 	}
-	action = (!strcmp (argv[2], "near") || !strcmp (argv[2], "near-lv")) ?
+	action = (!strcmp (argv[3], "near") || !strcmp (argv[3], "near-lv")) ?
 		"manualfocusdrivenear" : "manualfocusdrivefar";
 	context = sample_create_context ();
 	if (!context)
 		return 1;
 	stage = "open-explicit-camera";
-	result = sample_open_camera (&camera, PENTAX_MODEL, argv[1], context);
+	result = sample_open_camera (&camera, argv[1], argv[2], context);
 	if (result < GP_OK)
 		goto out;
+	{
+		CameraAbilities abilities;
+		result = gp_camera_get_abilities (camera, &abilities);
+		if (result < GP_OK)
+			goto out;
+		printf ("selected_model=%s usb=%04x:%04x port=%s\n",
+			abilities.model, abilities.usb_vendor, abilities.usb_product,
+			argv[2]);
+	}
 	stage = "camera-init";
 	result = gp_camera_init (camera, context);
 	if (result < GP_OK)
 		goto out;
 	initialized = 1;
-	if (!strcmp (argv[2], "init")) {
+	if (!strcmp (argv[3], "init")) {
 		stage = "init-only-complete";
 		goto out;
 	}
-	if (strstr (argv[2], "-lv")) {
+	if (strstr (argv[3], "-lv")) {
 		CameraFile *file = NULL;
 		const char *data = NULL, *mime = NULL;
 		unsigned long size = 0;
@@ -136,9 +143,9 @@ out:
 	gp_context_unref (context);
 	if (result < GP_OK) {
 		fprintf (stderr, "focus_%s=failed stage=%s error=%s (%d) cleanup=attempted\n",
-			argv[2], stage, gp_result_as_string (result), result);
+			argv[3], stage, gp_result_as_string (result), result);
 		return 1;
 	}
-	printf ("focus_%s=command-accepted cleanup=ok retries=0\n", argv[2]);
+	printf ("focus_%s=command-accepted cleanup=ok retries=0\n", argv[3]);
 	return 0;
 }

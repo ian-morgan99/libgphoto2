@@ -42,7 +42,7 @@ sample_open_camera (Camera ** camera, const char *model, const char *port, GPCon
 
 	/* First lookup the model / driver */
 	m = gp_abilities_list_lookup_model (abilities, model);
-	if (m < GP_OK) return ret;
+	if (m < GP_OK) return m;
 	ret = gp_abilities_list_get_abilities (abilities, m, &a);
 	if (ret < GP_OK) return ret;
 	ret = gp_camera_set_abilities (*camera, a);
