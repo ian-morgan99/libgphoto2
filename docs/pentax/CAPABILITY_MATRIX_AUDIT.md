@@ -2,6 +2,17 @@
 
 Revision: 2026-08-21
 
+> **Historical snapshot — not current support status.** This 2026-08-21
+> retrospective is preserved unchanged below as provenance, so several findings
+> have since been superseded. Use
+> [`IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`](IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md)
+> for the normative protocol target,
+> [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md) for chronological
+> hardware evidence, [issue #66](https://github.com/ian-morgan99/libgphoto2/issues/66)
+> for the current model-by-capability reconciliation, and
+> [`CONTROL_ISSUE_INDEX.md`](CONTROL_ISSUE_INDEX.md) with
+> [`AGENT_WORK_QUEUE.md`](AGENT_WORK_QUEUE.md) for current ownership and work.
+
 This audits all Pentax work completed before and during consolidation of
 `IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`. A successful isolated test remains
 valid evidence, but it does not close a matrix tier when an earlier prerequisite

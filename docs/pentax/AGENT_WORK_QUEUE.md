@@ -28,7 +28,7 @@ Issues #61–#65 are closed duplicates; do not use them.
 - #67 — detailed Custom Image controls `0xd021`–`0xd029` and structured `0xd02d`
 - #68 — composition-offset movement via `0x9018`; do not confuse with the existing `0xd02a` enable switch
 - #69 — remove duplicate `pentaxliveviewafposition` config registration
-- #70 — mark the 2026-08-21 `CAPABILITY_MATRIX_AUDIT.md` as historical/superseded for current status; preserve it for provenance
+- #70 — historical-status correction completed; `CAPABILITY_MATRIX_AUDIT.md` is provenance only, while #66 owns current reconciliation
 - #8 — **reopened**: K-1 II `0xd036` write semantics are not yet backed by retained write hardware evidence; do not treat a SET ACK plus centre GET as proof of application until qualified or trace-proven
 - #45 — **reopened**: separate research `0x9013` Green-button semantics from real `0x9011`/`0x9012` capture before upstream promotion
 
@@ -39,7 +39,7 @@ Issues #61–#65 are closed duplicates; do not use them.
 
 ## Rules for every agent
 
-1. Read `docs/pentax/GENERIC_CONTROL_COMPATIBILITY_AUDIT.md`, `IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`, and this queue before coding. Treat `CAPABILITY_MATRIX_AUDIT.md` as a historical snapshot, not current status, until #70 is complete.
+1. Read `docs/pentax/GENERIC_CONTROL_COMPATIBILITY_AUDIT.md`, `IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`, and this queue before coding. `CAPABILITY_MATRIX_AUDIT.md` is a historical snapshot, never live support status.
 2. Preserve existing Pentax-specific controls; add compatibility wrappers rather than destructive renames.
 3. Do not assume K-3 III semantics apply to K-1 II or K-01.
 4. Keep K-01 `25fb:0130` USB-SCSI and `25fb:0131` PTP/MTP as separate capability rows; likewise K-1 II `0182` MSC and `0183` PTP.

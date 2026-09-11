@@ -166,4 +166,4 @@ physical camera.
 - [`PENTAX_WIRE_PROTOCOL.md`](PENTAX_WIRE_PROTOCOL.md) — vendor opcode/property reference
 - [`PENTAX_CONFIGURATION.md`](PENTAX_CONFIGURATION.md) — configuration-engine integration rules
 - [`IMAGE_TRANSMITTER_ERROR_RECOVERY.md`](IMAGE_TRANSMITTER_ERROR_RECOVERY.md) — session recovery sequences
-- [`CAPABILITY_MATRIX_AUDIT.md`](CAPABILITY_MATRIX_AUDIT.md) — audit trail for the matrix
+- [`CAPABILITY_MATRIX_AUDIT.md`](CAPABILITY_MATRIX_AUDIT.md) — historical 2026-08-21 audit trail (provenance only, not current status)
