@@ -787,3 +787,13 @@ download also passed with a valid 6192x4128 JPEG, followed by a successful fresh
 summary. The next K-3 III gate is therefore downstream sequencing and physical
 direction observation, not opcode/displacement experimentation. The zoom test
 still needs the same active-LV retest before its encoding can be judged.
+
+The later K-1 II operator-observation gate corrected a protocol-only false
+positive: old-focus `0x9016` returned `0x2001` in both directions and preview
+continued, but the lens did not visibly move even after five minimum requests
+per direction. The source audit also found Near/Far reversed in the old-family
+widget mapping (IT2 direction 0 is Far; direction 1 is Near); that narrow defect
+is unit-tested and corrected. K-1 II physical manual focus remains FAIL, not
+supported, until a retained-PC-LV test proves lens motion. Do not increase the
+magnitude or add retries without a separately documented source and hardware
+gate.

@@ -741,3 +741,25 @@ in `/tmp/k3iii-r1.log` lines 144–353.
   `pentaxpclvmode`. Tracked in downstream issues #72 and #59.
 - Raw outputs are in
   `docs/pentax/evidence/2026-09-11-final-controls/README.md` and adjacent files.
+
+### 2026-09-11 — K-1 II physical focus correction
+
+- Direct K-1 II testing at `25fb:0183` (firmware 1.02) supersedes the preceding
+  protocol-only focus classification. With PC-LV active, repeated old-family
+  `0x9016` requests returned `0x2001` and valid JPEGs before and after, but the
+  operator observed no physical lens movement in either protocol direction.
+  Five minimum amount-5 requests were tried in each direction without a move.
+  Physical manual focus is therefore **FAIL**, while transport acknowledgement,
+  preview continuity, cleanup, and camera enumeration remain PASS.
+- The audible shutter/mirror cycles came from starting and stopping DSLR live
+  view in each isolated harness process. The focus harness never invoked still
+  capture; future observation uses one retained PC-LV session to avoid that
+  ambiguity.
+- A normative-source re-audit found the diagnostic labels reversed: IT2 Far
+  sends amount 5/direction 0, while Near sends amount 5/direction 1. The
+  old-family mapping is corrected and unit-tested. This deterministic label
+  defect does not itself explain the lack of movement after both raw directions
+  were exercised, so no physical-support claim is restored by that fix.
+- No larger magnitude, retry, or speculative precondition was sent. Issue #59
+  records the exact failure and remains open pending a source-faithful retained
+  PC-LV discriminator and physical observation.

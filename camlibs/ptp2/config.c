@@ -11420,7 +11420,7 @@ _put_Sony_Autofocus(CONFIG_PUT_ARGS)
 /* K-1 Mark II (old-focus) manual focus drive via 0x9016.  Image Transmitter
  * 2's FocusFineTune for old-focus models multiplies the UI step by 5 and
  * splits the sign: amount is absolute, direction is parameter 2 with
- * 0 = Near, 1 = Far.  One command per activation, no retries. */
+ * 0 = Far, 1 = Near.  One command per activation, no retries. */
 static int
 _get_Pentax_OldFocusDrive (CONFIG_GET_ARGS)
 {
@@ -11442,8 +11442,8 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
 	const char *name;
-	int val, direction;
-	uint32_t amount;
+	int val, semantic_direction;
+	uint32_t amount, protocol_direction;
 	uint16_t ret;
 
 	CR (gp_widget_get_value (widget, &val));
@@ -11484,21 +11484,23 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 	}
 	if (!strcmp (name, "oldfocusdrivenear") ||
 	    !strcmp (name, "manualfocusdrivenear"))
-		direction = 0;
+		semantic_direction = 1;
 	else if (!strcmp (name, "oldfocusdrivefar") ||
 		 !strcmp (name, "manualfocusdrivefar"))
-		direction = 1;
+		semantic_direction = -1;
 	else
 		return GP_ERROR_BAD_PARAMETERS;
+	CR (pentax_old_focus_protocol_direction (semantic_direction,
+		&protocol_direction));
 	/* IT2 FocusFineTune: old-path amount = |UI value| * 5; the buttons
 	 * use a single step, so the minimum command is 5. */
 	amount = 5U;
 	gp_context_status (((PTPData *)params->data)->context,
 		_("Pentax old focus drive: amount=%u, direction=%u (%s), opcode=0x9016, retries=0."),
-		amount, (unsigned)direction,
-		direction ? "Far" : "Near");
+		amount, (unsigned)protocol_direction,
+		semantic_direction > 0 ? "Near" : "Far");
 	ret = ptp_pentax_focus_control (params, amount,
-		(uint32_t)direction);
+		protocol_direction);
 	if (ret != PTP_RC_OK)
 		gp_context_error (((PTPData *)params->data)->context,
 			_("Pentax old focus drive failed with response 0x%04x."), ret);

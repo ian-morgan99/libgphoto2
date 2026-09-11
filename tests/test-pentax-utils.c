@@ -505,6 +505,20 @@ main (void)
 	CHECK (displacement == -29);
 	CHECK (pentax_minimum_focus_displacement (0, 1, &displacement) == GP_ERROR_CORRUPTED_DATA);
 	CHECK (pentax_minimum_focus_displacement (35, 0, &displacement) == GP_ERROR_BAD_PARAMETERS);
+	{
+		uint32_t protocol_direction = 99;
+
+		CHECK (pentax_old_focus_protocol_direction (1,
+			&protocol_direction) == GP_OK);
+		CHECK (protocol_direction == 1); /* IT2 Near */
+		CHECK (pentax_old_focus_protocol_direction (-1,
+			&protocol_direction) == GP_OK);
+		CHECK (protocol_direction == 0); /* IT2 Far */
+		CHECK (pentax_old_focus_protocol_direction (0,
+			&protocol_direction) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_old_focus_protocol_direction (1, NULL) ==
+			GP_ERROR_BAD_PARAMETERS);
+	}
 
 	/* Card writing mode (0x9004): IT2's _isDualSlot set is the K-1 and
 	 * K-3 families plus 645D/645Z; KP, K-70 and GR III are single-slot. */

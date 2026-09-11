@@ -199,6 +199,8 @@ int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
+int pentax_old_focus_protocol_direction (int direction,
+	uint32_t *protocol_direction);
 int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_model_uses_new_focus (uint32_t model_no);

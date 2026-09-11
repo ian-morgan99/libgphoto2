@@ -229,6 +229,20 @@ pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 }
 
 int
+pentax_old_focus_protocol_direction (int direction,
+		uint32_t *protocol_direction)
+{
+	if (!protocol_direction || ((direction != -1) && (direction != 1)))
+		return GP_ERROR_BAD_PARAMETERS;
+	/* IT2 FocusFineTune uses positive UI values for Far and sends protocol
+	 * direction 0; negative UI values are Near and send direction 1.  The
+	 * public helper follows the newer focus helper's semantic convention:
+	 * +1 is Near and -1 is Far. */
+	*protocol_direction = direction > 0 ? 1U : 0U;
+	return GP_OK;
+}
+
+int
 pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		const char *device_model, uint32_t *model_no, uint32_t *extension_version)
 {
