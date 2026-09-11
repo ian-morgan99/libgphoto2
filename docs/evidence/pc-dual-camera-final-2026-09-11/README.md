@@ -18,6 +18,9 @@ Bodies: K-1 II `25fb:0183` at `usb:001,047`; K-3 III `25fb:0189` at
   transient `0xa008` preview state.
 - `k3iii-preview-far-retry-exact.log`: the bounded retry started live view and
   the far `0x9017` command passed with cleanup.
+- `k1ii-current-config-readonly.log` and `k3iii-current-config-readonly.log`:
+  exact-model conditions and complete config inventories from the current
+  camlib. Both bodies were idle in Manual mode at ISO 100; no writes were made.
 
 ## Invalid/superseded diagnostic runs
 
@@ -27,4 +30,3 @@ returned a stale success value after lookup failure, leaving abilities unset;
 with two bodies attached, a different body could then be selected. They are
 retained to document discovery of the probe defect and must not be cited as
 body-specific hardware evidence.
-

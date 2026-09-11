@@ -1,0 +1,53 @@
+=== K1II conditions ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Label: Pentax Conditions
+Readonly: 1
+Type: TEXT
+Current: state=0; astro-phase=inactive/other; exposure-mode-raw=8; user-mode-raw=0; drive-mode-raw=0; ISO=100; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=1/100; aperture=25/10; exposure-comp=0/10; astrotracer3=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+END
+=== K1II config inventory ===
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+/main/actions/manualfocusdrivenear
+/main/actions/manualfocusdrivefar
+/main/actions/oldfocusdrivenear
+/main/actions/oldfocusdrivefar
+/main/actions/manualfocusdrive
+/main/actions/opcode
+/main/settings/datetime
+/main/status/serialnumber
+/main/status/manufacturer
+/main/status/cameramodel
+/main/status/deviceversion
+/main/status/vendorextension
+/main/status/pentaxconditions
+/main/status/pentaxliveviewcontrols
+/main/status/pentaxpropd00f
+/main/status/pentaxprop5007
+/main/status/pentaxpropd01e
+/main/status/pentaxprop5010
+/main/status/pentaxprop5008
+/main/status/pentaxprop5005
+/main/status/pentaxpropd013
+/main/status/pentaxpropd02b
+/main/status/pentaxpropd035
+/main/status/pentaxfocuspeaking
+/main/status/pentaxcimode
+/main/status/pentaxpclvkeep
+/main/status/pentaxcardwritingmode
+/main/status/pentaxdirectshutter
+/main/status/pentaxdirectiso
+/main/status/pentaxdirectaperture
+/main/status/pentaxdirectev
+/main/status/pentaxliveviewafposition
+/main/status/pentaxliveviewzoom
+/main/status/pentaxdrivemode
+/main/status/pentaxdirectwb
+/main/status/batterylevel
+/main/capturesettings/aperture
+/main/other/5001
+/main/other/5011
+/main/other/d406
+/main/other/d407
+/main/other/d303

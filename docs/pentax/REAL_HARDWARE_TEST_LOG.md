@@ -706,3 +706,8 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 - Evidence: `docs/evidence/pc-dual-camera-final-2026-09-11/README.md` and its
   linked raw logs. ISO/shutter/LVAF results from the initial run are invalidated
   by the masked model-lookup failure and are not hardware evidence.
+- Final exact-model read-only inventories passed on both bodies. Both were idle
+  (`state=0`) in Manual mode at ISO 100. K-1 II reported vendor flags 3 and the
+  old-focus plus generic focus controls; K-3 III reported flags 0 and only the
+  model-aware generic/new-family focus controls. No configuration writes were
+  made in this inventory pass.
