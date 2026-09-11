@@ -1,0 +1,7 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+selected_model=Pentax K-3 Mark III (MTP mode) usb=25fb:0189 port=usb:002,009
+stage=initial widget=1/5000 conditions_shutter=1/5000
+stage=target widget=1/8000 set_result=0 conditions_shutter=1/8000
+stage=restore widget=1/5000 set_result=0 conditions_shutter=1/5000
+shutter_roundtrip=pass cleanup=ok

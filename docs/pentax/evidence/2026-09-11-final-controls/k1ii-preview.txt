@@ -1,0 +1,6 @@
+frame=1 bytes=27007 valid_jpeg=yes
+frame=2 bytes=26030 valid_jpeg=yes
+frame=3 bytes=27098 valid_jpeg=yes
+frame=4 bytes=27710 valid_jpeg=yes
+frame=5 bytes=27885 valid_jpeg=yes
+completed_frames=5 cleanup=ok

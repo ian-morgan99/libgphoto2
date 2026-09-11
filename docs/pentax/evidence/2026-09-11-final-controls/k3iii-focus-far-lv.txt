@@ -1,0 +1,12 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (58003 bytes, 1 attempts, 11 ms).
+Pentax model-aware focus dispatch: model=78420, family=new.
+Pentax minimum focus drive: openAvNum=28, displacement=-23, opcode=0x9017, retries=0.
+Pentax minimum focus drive returned response 0x2001.
+Pentax preview stage get-frame returned 0x2001 (67440 bytes, 1 attempts, 21 ms).
+selected_model=Pentax K-3 Mark III (MTP mode) usb=25fb:0189 port=usb:002,009
+live_view=ready bytes=58003
+post_focus_live_view=ready bytes=67440
+focus_far-lv=command-accepted cleanup=ok retries=0

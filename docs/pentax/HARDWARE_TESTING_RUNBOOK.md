@@ -119,13 +119,19 @@ false "fix didn't work" result earlier in the project — always check mtimes.
 ```bash
 B=/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build
 export LD_LIBRARY_PATH=$B/libgphoto2:$B/libgphoto2_port/libgphoto2_port
-export CAMLIBS=$B/camlibs
+export CAMLIBS=$B/camlibs/ptp2
 export IOLIBS=$B/libgphoto2_port/libusb1:$B/libgphoto2_port/usbscsi
 ```
 
 Use the **system** `gphoto2` binary (`/usr/bin/gphoto2`) — it picks up the fork
 libraries purely through these variables. Do NOT install the fork over the
 system copy.
+
+`CAMLIBS` must name the directory containing `ptp2.so`, not its parent. Use the
+public exact-model spelling from `gphoto2 --list-cameras` (`Pentax K-...`, no
+colon), an explicit `usb:BUS,DEVICE`, and verify the selected abilities'
+VID:PID before any write. A failed exact-model lookup is fatal when more than
+one camera is attached; never allow an implicit autodetect fallback.
 
 ### 4.2 Standalone probe harnesses (e.g. `tests/bulb_probe`) — staged IOLIBS
 

@@ -27,6 +27,32 @@ set_named_value (Camera *camera, GPContext *context, const char *name,
 	return result;
 }
 
+static int
+capture_valid_preview (Camera *camera, GPContext *context, unsigned long *size)
+{
+	CameraFile *file = NULL;
+	const char *data = NULL, *mime = NULL;
+	int result;
+
+	*size = 0;
+	result = gp_file_new (&file);
+	if (result >= GP_OK)
+		result = gp_camera_capture_preview (camera, file, context);
+	if (result >= GP_OK)
+		result = gp_file_get_data_and_size (file, &data, size);
+	if (result >= GP_OK)
+		result = gp_file_get_mime_type (file, &mime);
+	if ((result >= GP_OK) &&
+	    (!data || *size < 4 || !mime || strcmp (mime, GP_MIME_JPEG) ||
+	     (unsigned char)data[0] != 0xff || (unsigned char)data[1] != 0xd8 ||
+	     (unsigned char)data[*size - 2] != 0xff ||
+	     (unsigned char)data[*size - 1] != 0xd9))
+		result = GP_ERROR_CORRUPTED_DATA;
+	if (file)
+		gp_file_unref (file);
+	return result;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -74,8 +100,6 @@ main (int argc, char **argv)
 		goto out;
 	}
 	if (strstr (argv[3], "-lv")) {
-		CameraFile *file = NULL;
-		const char *data = NULL, *mime = NULL;
 		unsigned long size = 0;
 
 		stage = "enable-keep-live-view";
@@ -84,22 +108,7 @@ main (int argc, char **argv)
 			goto out;
 		live_view_requested = 1;
 		stage = "start-live-view";
-		result = gp_file_new (&file);
-		if (result >= GP_OK)
-			result = gp_camera_capture_preview (camera, file, context);
-		if (result >= GP_OK)
-			result = gp_file_get_data_and_size (file, &data, &size);
-		if (result >= GP_OK)
-			result = gp_file_get_mime_type (file, &mime);
-		if ((result >= GP_OK) &&
-		    (!data || size < 4 || !mime || strcmp (mime, GP_MIME_JPEG) ||
-		     (unsigned char)data[0] != 0xff ||
-		     (unsigned char)data[1] != 0xd8 ||
-		     (unsigned char)data[size - 2] != 0xff ||
-		     (unsigned char)data[size - 1] != 0xd9))
-			result = GP_ERROR_CORRUPTED_DATA;
-		if (file)
-			gp_file_unref (file);
+		result = capture_valid_preview (camera, context, &size);
 		if (result < GP_OK)
 			goto out;
 		printf ("live_view=ready bytes=%lu\n", size);
@@ -113,6 +122,14 @@ main (int argc, char **argv)
 		goto out;
 	stage = "send-minimum-focus";
 	result = gp_camera_set_single_config (camera, action, widget, context);
+	if ((result >= GP_OK) && live_view_requested) {
+		unsigned long size = 0;
+
+		stage = "post-focus-live-view";
+		result = capture_valid_preview (camera, context, &size);
+		if (result >= GP_OK)
+			printf ("post_focus_live_view=ready bytes=%lu\n", size);
+	}
 
 out:
 	if (widget)
@@ -121,15 +138,12 @@ out:
 		int disabled = 0;
 		int off_result;
 
-		off_result = set_named_value (camera, context, "pentaxpclvmode", "off");
+		off_result = set_named_value (camera, context, "pentaxpclvkeep", &disabled);
 		if (off_result < GP_OK) {
-			fprintf (stderr, "cleanup=live-view-off-failed error=%s (%d)\n",
+			fprintf (stderr, "cleanup=keep-live-view-disable-failed error=%s (%d)\n",
 				gp_result_as_string (off_result), off_result);
 			cleanup_result = off_result;
 		}
-		off_result = set_named_value (camera, context, "pentaxpclvkeep", &disabled);
-		if ((off_result < GP_OK) && (cleanup_result >= GP_OK))
-			cleanup_result = off_result;
 	}
 	if (initialized) {
 		exit_result = gp_camera_exit (camera, context);

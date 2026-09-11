@@ -1,0 +1,13 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax preview stage read-PC-LV returned 0x02ff.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (28546 bytes, 10 attempts, 312 ms).
+Pentax model-aware focus dispatch: model=78400, family=old.
+Pentax old focus drive: amount=5, direction=0 (Near), opcode=0x9016, retries=0.
+Pentax old focus drive returned response 0x2001.
+Pentax preview stage get-frame returned 0x2001 (28439 bytes, 2 attempts, 34 ms).
+selected_model=Pentax K-1 Mark II (PTP mode) usb=25fb:0183 port=usb:001,047
+live_view=ready bytes=28546
+post_focus_live_view=ready bytes=28439
+focus_near-lv=command-accepted cleanup=ok retries=0

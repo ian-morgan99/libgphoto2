@@ -1,0 +1,7 @@
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+selected_model=Pentax K-1 Mark II (PTP mode) usb=25fb:0183 port=usb:001,047
+stage=initial widget=1/100 conditions_shutter=1/100
+stage=target widget=1/30 set_result=0 conditions_shutter=1/30
+stage=restore widget=1/100 set_result=0 conditions_shutter=1/100
+shutter_roundtrip=pass cleanup=ok

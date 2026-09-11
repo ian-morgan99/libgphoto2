@@ -711,3 +711,33 @@ in `/tmp/k3iii-r1.log` lines 144–353.
   old-focus plus generic focus controls; K-3 III reported flags 0 and only the
   model-aware generic/new-family focus controls. No configuration writes were
   made in this inventory pass.
+
+### 2026-09-11 — final LV-gated focus and live-baseline shutter qualification
+
+- Exact build-tree core, `ptp2.so`, libusb1 and usbscsi paths were pinned. The
+  attached K-1 II remained `25fb:0183` at `usb:001,047`; K-3 III remained
+  `25fb:0189` at `usb:002,009`. Every harness printed the selected abilities,
+  VID:PID and explicit port before a write.
+- Live view PASS: both bodies delivered 5/5 complete in-memory JPEGs. K-1 II
+  frames were 26,030--27,885 bytes after 9--11 bounded warm-up polls; K-3 III
+  frames were 56,325--75,751 bytes on the first poll.
+- Focus PASS at protocol level with the required PC-LV precondition. K-1 II
+  Near and Far each dispatched once to old-family `0x9016`, returned `0x2001`,
+  and were followed by valid 28,439/27,720-byte JPEGs. K-3 III Near and Far
+  each dispatched once to new-family `0x9017`, returned `0x2001`, and were
+  followed by valid 68,069/67,440-byte JPEGs. All four sessions cleaned up;
+  there were no retries. This supersedes the off-LV K-1 II `0xa00c` result in
+  the preceding entry. Visible direction/movement was not operator-observed,
+  so that separate physical assertion remains NOT TESTED.
+- Shutter-control round trips PASS with verified restoration. K-1 II changed
+  `1/100` to the advertised bounded target `1/30` and restored `1/100`; K-3 III
+  changed `1/5000` to `1/8000` and restored `1/5000`. Each stage was read back
+  through `pentaxconditions` in the same explicit session.
+- Robustness fixes: the shutter harness now derives and preserves the live
+  baseline, supports both exact bodies, excludes Bulb and exposures longer
+  than 1/30 s, and restores after every possible write. The focus harness now
+  requires a valid post-command JPEG and disables the supported keep-LV flag;
+  it no longer reports false cleanup failure by writing unsupported text to
+  `pentaxpclvmode`. Tracked in downstream issues #72 and #59.
+- Raw outputs are in
+  `docs/pentax/evidence/2026-09-11-final-controls/README.md` and adjacent files.
