@@ -1,6 +1,6 @@
 /* test-pentax-aperture-alias.c
  *
- * Regression test for the Pentax generic `aperture` compatibility alias
+ * Regression test for Pentax generic exposure compatibility aliases
  * (issue #53, umbrella #52). Drives the REAL public config-lookup path:
  * it dlopens the built ptp2 camlib and calls its exported
  * camera_get_single_config("aperture"), which routes through _get_config ->
@@ -104,7 +104,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
 	 * resolves from this value with no wire IO (cache-hit path). */
-	PTPDevicePropDesc *dpd = malloc (sizeof (*dpd));
+	PTPDevicePropDesc *dpd = calloc (2, sizeof (*dpd));
 	if (dpd) {
 		memset (dpd, 0, sizeof (*dpd));
 		dpd->DevicePropCode = PTP_DPC_FNumber;
@@ -116,8 +116,20 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		dpd->FORM.Range.StepSize.u16   = 100;
 		dpd->CurrentValue.u16          = 800;   /* f/8.0 */
 		dpd->timestamp                = time (NULL);
+		dpd[1].DevicePropCode = PTP_DPC_PENTAX_ShutterSpeed;
+		dpd[1].DataType       = PTP_DTC_UINT64;
+		dpd[1].GetSet         = PTP_DPGS_GetSet;
+		dpd[1].FormFlag       = PTP_DPFF_Enumeration;
+		dpd[1].FORM.Enum.NumberOfValues = 2;
+		dpd[1].FORM.Enum.SupportedValue = calloc (2, sizeof (PTPPropValue));
+		if (dpd[1].FORM.Enum.SupportedValue) {
+			dpd[1].FORM.Enum.SupportedValue[0].u64 = ((uint64_t)125 << 32) | 1;
+			dpd[1].FORM.Enum.SupportedValue[1].u64 = ((uint64_t)500 << 32) | 1;
+		}
+		dpd[1].CurrentValue.u64 = ((uint64_t)125 << 32) | 1;
+		dpd[1].timestamp = time (NULL);
 		params->dpd_cache.val = dpd;
-		params->dpd_cache.len = 1;
+		params->dpd_cache.len = 2;
 	}
 }
 
@@ -204,6 +216,20 @@ main (void)
 		return 1;
 	}
 
+	/* The generic shutter name must resolve through the Pentax direct
+	 * descriptor path even though the property is absent from DeviceInfo. */
+	CameraWidget *shutter = NULL;
+	ret = get_single (cam, "shutterspeed", &shutter, context);
+	CHECK (ret == GP_OK);
+	CHECK (shutter != NULL);
+	CHECK (gp_widget_get_name (shutter, &name) == GP_OK);
+	CHECK (name && !strcmp (name, "shutterspeed"));
+	CHECK (gp_widget_get_type (shutter, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	char *shutter_value = NULL;
+	CHECK (gp_widget_get_value (shutter, &shutter_value) == GP_OK);
+	CHECK (shutter_value && !strcmp (shutter_value, "1/125"));
+
 	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
 	 * fail-closed. Without the vendor match and without the advertised ops,
 	 * have_prop() rejects every PENTAX-gated entry, so "aperture" is not even
@@ -265,8 +291,8 @@ main (void)
 		gp_list_free (list);
 	}
 
-	printf ("OK: public camera_get_single_config(\"aperture\") resolves a RANGE "
-	       "widget with seeded FNumber value for Pentax, stays fail-closed for "
+	printf ("OK: public generic aperture and shutter aliases resolve seeded "
+	       "Pentax descriptors, stay fail-closed for "
 	       "non-Pentax, and pentaxliveviewafposition is registered exactly once (#69)\n");
 	return 0;
 }

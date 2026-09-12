@@ -34,7 +34,7 @@ test(
   env: gp_test_env,
 )
 
-# Regression test for the Pentax `aperture` compatibility alias (issue #53).
+# Regression test for Pentax generic exposure compatibility aliases.
 # Drives the real public config-lookup path: dlopens the built ptp2 camlib via
 # CAMLIBS and calls its exported camera_get_single_config("aperture") with a
 # hand-built Camera fixture whose PTP state is pre-seeded (Pentax vendor mode +
