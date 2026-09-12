@@ -14204,7 +14204,10 @@ static struct submenu image_settings_menu[] = {
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_CANON_ISOSpeed,                 PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_ISO,                 _put_Canon_ISO },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_ExposureIndex,                  PTP_VENDOR_FUJI,    PTP_DTC_INT32,  _get_INT,                       _put_INT },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_ExposureIndex,                  0,                  PTP_DTC_UINT16, _get_INT,                       _put_INT },
-	{ N_("ISO Speed"),              "iso",                  PTP_DPC_PENTAX_ExtendedISO,             PTP_VENDOR_PENTAX,  PTP_DTC_UINT32, _get_Pentax_DirectISO,          _put_Pentax_DirectISO },
+	/* ExtendedISO is queryable in vendor mode but omitted from DeviceInfo on
+	 * modern Pentax bodies; expose the generic name through the guarded direct
+	 * handler so callers do not need a Pentax-only config key. */
+	{ N_("ISO Speed"),              "iso",                  0,                                      PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
 	{ N_("Movie ISO Speed"),        "movieiso",             PTP_DPC_NIKON_MovieISO,                 PTP_VENDOR_NIKON,   PTP_DTC_UINT32, _get_INT,                       _put_INT },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_CANON_EOS_ISOSpeed,             PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_ISO,                 _put_Canon_ISO },
 	{ N_("ISO Speed"),              "iso",                  PTP_DPC_SONY_QX_ISO,                    PTP_VENDOR_SONY,    PTP_DTC_UINT32, _get_Sony_ISO,                  _put_Sony_QX_ISO },

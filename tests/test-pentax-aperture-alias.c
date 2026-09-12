@@ -104,7 +104,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
 	 * resolves from this value with no wire IO (cache-hit path). */
-	PTPDevicePropDesc *dpd = calloc (2, sizeof (*dpd));
+	PTPDevicePropDesc *dpd = calloc (3, sizeof (*dpd));
 	if (dpd) {
 		memset (dpd, 0, sizeof (*dpd));
 		dpd->DevicePropCode = PTP_DPC_FNumber;
@@ -128,8 +128,20 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		}
 		dpd[1].CurrentValue.u64 = ((uint64_t)125 << 32) | 1;
 		dpd[1].timestamp = time (NULL);
+		dpd[2].DevicePropCode = PTP_DPC_PENTAX_ExtendedISO;
+		dpd[2].DataType       = PTP_DTC_UINT32;
+		dpd[2].GetSet         = PTP_DPGS_GetSet;
+		dpd[2].FormFlag       = PTP_DPFF_Enumeration;
+		dpd[2].FORM.Enum.NumberOfValues = 2;
+		dpd[2].FORM.Enum.SupportedValue = calloc (2, sizeof (PTPPropValue));
+		if (dpd[2].FORM.Enum.SupportedValue) {
+			dpd[2].FORM.Enum.SupportedValue[0].u32 = 200;
+			dpd[2].FORM.Enum.SupportedValue[1].u32 = 400;
+		}
+		dpd[2].CurrentValue.u32 = 200;
+		dpd[2].timestamp = time (NULL);
 		params->dpd_cache.val = dpd;
-		params->dpd_cache.len = 2;
+		params->dpd_cache.len = 3;
 	}
 }
 
@@ -230,6 +242,20 @@ main (void)
 	CHECK (gp_widget_get_value (shutter, &shutter_value) == GP_OK);
 	CHECK (shutter_value && !strcmp (shutter_value, "1/125"));
 
+	/* ExtendedISO has the same discovery characteristic: the generic name
+	 * must reach the direct descriptor handler without a DeviceInfo entry. */
+	CameraWidget *iso = NULL;
+	ret = get_single (cam, "iso", &iso, context);
+	CHECK (ret == GP_OK);
+	CHECK (iso != NULL);
+	CHECK (gp_widget_get_name (iso, &name) == GP_OK);
+	CHECK (name && !strcmp (name, "iso"));
+	CHECK (gp_widget_get_type (iso, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	char *iso_value = NULL;
+	CHECK (gp_widget_get_value (iso, &iso_value) == GP_OK);
+	CHECK (iso_value && !strcmp (iso_value, "200"));
+
 	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
 	 * fail-closed. Without the vendor match and without the advertised ops,
 	 * have_prop() rejects every PENTAX-gated entry, so "aperture" is not even
@@ -291,7 +317,7 @@ main (void)
 		gp_list_free (list);
 	}
 
-	printf ("OK: public generic aperture and shutter aliases resolve seeded "
+	printf ("OK: public generic aperture, shutter and ISO aliases resolve seeded "
 	       "Pentax descriptors, stay fail-closed for "
 	       "non-Pentax, and pentaxliveviewafposition is registered exactly once (#69)\n");
 	return 0;
