@@ -29,6 +29,7 @@
 /* ptp2 camlib private layout: PTPParams + the FNumber descriptor we seed. */
 #include "ptp.h"
 #include "ptp-private.h"
+#include "pentax-utils.h"
 
 typedef int (*cam_get_single_config_fn)(Camera *camera, const char *confname,
                                        CameraWidget **widget, GPContext *context);
@@ -255,6 +256,24 @@ main (void)
 	char *iso_value = NULL;
 	CHECK (gp_widget_get_value (iso, &iso_value) == GP_OK);
 	CHECK (iso_value && !strcmp (iso_value, "200"));
+
+	/* The generic capturetarget name must resolve on a Pentax dual-slot
+	 * model (issue #59): the Polaris app polls it every ~5 s and mapped
+	 * GP_ERROR_NOT_SUPPORTED to a dead control.  Seed the K-1 II model so
+	 * the card-writing-mode gate passes; with an empty session cache the
+	 * widget must report "Internal RAM". */
+	cam->pl->params.pentax.model_no = PENTAX_MODEL_K1_MARK_II;
+	CameraWidget *capturetarget = NULL;
+	ret = get_single (cam, "capturetarget", &capturetarget, context);
+	CHECK (ret == GP_OK);
+	CHECK (capturetarget != NULL);
+	CHECK (gp_widget_get_name (capturetarget, &name) == GP_OK);
+	CHECK (name && !strcmp (name, "capturetarget"));
+	CHECK (gp_widget_get_type (capturetarget, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	char *ct_value = NULL;
+	CHECK (gp_widget_get_value (capturetarget, &ct_value) == GP_OK);
+	CHECK (ct_value && !strcmp (ct_value, "Internal RAM"));
 
 	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
 	 * fail-closed. Without the vendor match and without the advertised ops,

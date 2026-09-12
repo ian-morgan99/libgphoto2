@@ -10629,6 +10629,74 @@ _put_Pentax_CardWritingMode (CONFIG_PUT_ARGS)
 	return translate_ptp_result (rc);
 }
 
+/* Generic "capturetarget" compatibility alias for Pentax (issue #59).
+ *
+ * The Polaris app polls get_single_config("capturetarget") every ~5 s and
+ * maps a GP_ERROR_NOT_SUPPORTED (-2) to a dead control.  Canon/Nikon/
+ * Panasonic/Sony all register a "capturetarget" entry, but Pentax had none,
+ * so on a K-1 II / K-3 III the poll failed forever.  Pentax has no PTP
+ * property for the capture destination; the closest control is the SD-card
+ * writing mode (0x9004): "Memory card" enables writing to the first slot,
+ * "Internal RAM" disables it (the camera always writes to its internal
+ * buffer when tethered).  The get handler reports the session-local cache
+ * exactly like pentaxcardwritingmode; the put handler maps the two generic
+ * choices onto the 0x9004 bitmask.  Gated to the same dual-slot models as
+ * the card-writing-mode control, so single-slot bodies stay fail-closed. */
+static int
+_get_Pentax_CaptureTarget (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_card_writing_mode (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, N_("Internal RAM"));
+	gp_widget_add_choice (*widget, N_("Memory card"));
+	{
+		uint8_t mode = params->pentax.sd1_writing_mode |
+			params->pentax.sd2_writing_mode;
+		const char *label;
+		if (mode)
+			label = N_("Memory card");
+		else
+			label = N_("Internal RAM");
+		gp_widget_set_value (*widget, label);
+	}
+	return GP_OK;
+}
+
+static int
+_put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	const char *value;
+	uint32_t mode;
+	uint16_t rc;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_card_writing_mode (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (!strcmp (value, N_("Memory card")))
+		mode = 1; /* SD1 */
+	else if (!strcmp (value, N_("Internal RAM")))
+		mode = 0;
+	else
+		return GP_ERROR_BAD_PARAMETERS;
+	rc = ptp_pentax_set_card_writing_mode (params, mode);
+	if (rc == PTP_RC_OK) {
+		params->pentax.sd1_writing_mode = mode & 1;
+		params->pentax.sd2_writing_mode = mode & 2;
+		return GP_OK;
+	}
+	/* Fail-closed: on error the cache keeps its last values, mirroring IT2. */
+	return translate_ptp_result (rc);
+}
+
 /* Writing file format (0xd01b) — generic imageformat / imagequality widgets
  * for modern Pentax ptp2 bodies (issues #54 and #55).
  *
@@ -14176,6 +14244,7 @@ static struct submenu camera_settings_menu[] = {
 	{ N_("Capture Target"),         "capturetarget",0,  PTP_VENDOR_CANON,   0,  _get_CaptureTarget,     _put_CaptureTarget },
 	{ N_("Capture Target"),         "capturetarget",0,  PTP_VENDOR_PANASONIC,0, _get_CaptureTarget,     _put_CaptureTarget },
 	{ N_("Capture Target"),         "capturetarget",PTP_DPC_SONY_StillImageStoreDestination,  PTP_VENDOR_SONY,0, _get_Sony_CaptureTarget, _put_Sony_CaptureTarget },
+	{ N_("Capture Target"),         "capturetarget",0,  PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropValue, _get_Pentax_CaptureTarget, _put_Pentax_CaptureTarget },
 	{ N_("CHDK"),                   "chdk",         PTP_OC_CHDK,  PTP_VENDOR_CANON, 0, _get_CHDK,       _put_CHDK },
 	{ N_("Capture"),                "capture",      0,  PTP_VENDOR_CANON,   0,  _get_Canon_CaptureMode, _put_Canon_CaptureMode },
 	{ N_("Remote Mode"),            "remotemode",   PTP_OC_CANON_EOS_SetRemoteMode, PTP_VENDOR_CANON, 0, _get_Canon_RemoteMode, _put_Canon_RemoteMode },
