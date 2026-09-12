@@ -150,6 +150,19 @@ main (void)
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
+
+	/* Regression: v9g imagequality 0xd01b byte-7 encoding (issue #71 / #55).
+	 * The old code computed (uint8_t)(2 - stars), which produced 0xff for
+	 * "fine" and was off-by-one for the other two. The encoder must map to
+	 * the documented IT2 values: 0=fine, 1=normal, 2=basic, and fail closed
+	 * (return -1) on any unknown label so a bogus byte is never written. */
+	CHECK (pentax_wff_quality_byte ("fine") == 0);
+	CHECK (pentax_wff_quality_byte ("normal") == 1);
+	CHECK (pentax_wff_quality_byte ("basic") == 2);
+	CHECK (pentax_wff_quality_byte ("") == -1);
+	CHECK (pentax_wff_quality_byte ("FINE") == -1);   /* case-sensitive */
+	CHECK (pentax_wff_quality_byte (NULL) == -1);
+
 	put_u32le (geometry_data, 4, 480U << 16 | 720U);
 	put_u32le (geometry_data, 8, 400U << 16 | 640U);
 	put_u32le (geometry_data, 12, 360U << 16 | 600U);

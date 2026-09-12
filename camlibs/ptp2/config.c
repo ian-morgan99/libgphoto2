@@ -10735,14 +10735,16 @@ _pentax_wff_read_payload (PTPParams *params, unsigned char payload[PENTAX_WFF_PA
 		free (data);
 		return translate_ptp_result (ret);
 	}
-	/* A short or missing payload is not an error: zero-fill so the caller
-	 * can still write a well-formed payload with only the target bytes set. */
-	memset (payload, 0, sizeof (payload));
-	if (size >= PENTAX_WFF_PAYLOAD_SIZE) {
-		memcpy (payload, data, PENTAX_WFF_PAYLOAD_SIZE);
-	} else if (size > 0) {
-		memcpy (payload, data, size);
+	/* Fail closed: the 0xd01b payload is a compound property whose unrelated
+	 * bytes (image size, RAW kind, card slot, length marker) must be preserved.
+	 * A short or missing payload cannot be safely zero-filled, because that
+	 * would erase those bytes and turn a failed read into a syntactically
+	 * complete but semantically malformed SET (issue #71 / #55). */
+	if (size < PENTAX_WFF_PAYLOAD_SIZE) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
 	}
+	memcpy (payload, data, PENTAX_WFF_PAYLOAD_SIZE);
 	free (data);
 	return GP_OK;
 }
@@ -10864,7 +10866,7 @@ _put_Pentax_ImageQuality (CONFIG_PUT_ARGS)
 	PTPParams *params = &camera->pl->params;
 	unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE];
 	const char *value;
-	uint8_t stars, quality_byte;
+	int quality_byte;
 	uint16_t ret;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
@@ -10872,20 +10874,13 @@ _put_Pentax_ImageQuality (CONFIG_PUT_ARGS)
 	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
-	/* IT2 star scale: 3=fine, 2=normal, 1=basic. */
-	if (!strcmp (value, "fine"))
-		stars = 3;
-	else if (!strcmp (value, "normal"))
-		stars = 2;
-	else if (!strcmp (value, "basic"))
-		stars = 1;
-	else
+	/* IT2 0xd01b byte-7 encoding: 0=fine, 1=normal, 2=basic.  Unknown labels
+	 * fail closed rather than writing a bogus quality byte (issue #71). */
+	quality_byte = pentax_wff_quality_byte (value);
+	if (quality_byte < 0)
 		return GP_ERROR_BAD_PARAMETERS;
-	/* IT2 encodes the payload byte as (2 - stars): 0=fine, 1=normal,
-	 * 2=basic. */
-	quality_byte = (uint8_t)(2 - stars);
 	CR (_pentax_wff_read_payload (params, payload));
-	payload[PENTAX_WFF_QUALITY_OFFSET] = quality_byte;
+	payload[PENTAX_WFF_QUALITY_OFFSET] = (uint8_t)quality_byte;
 	ret = ptp_pentax_set_device_prop_raw (params,
 		PTP_DPC_PENTAX_WritingFileFormat, payload, sizeof (payload));
 	if (ret != PTP_RC_OK)

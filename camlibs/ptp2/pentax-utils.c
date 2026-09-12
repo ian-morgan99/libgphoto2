@@ -441,6 +441,26 @@ pentax_model_supports_writing_file_format (uint32_t model_no)
 	return pentax_model_is_k3iii_family (model_no);
 }
 
+/* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
+ * used by IT2 (MtpDevice.cs _camWritingFileFormatCopy):
+ *   0 = fine (3-star), 1 = normal (2-star), 2 = basic (1-star).
+ * Returns -1 for an unknown label so callers can fail closed.  Centralised
+ * here (rather than inlined in config.c) so the encoding is unit-testable and
+ * cannot drift from the documented intent (issue #71 / #55). */
+int
+pentax_wff_quality_byte (const char *value)
+{
+	if (!value)
+		return -1;
+	if (!strcmp (value, "fine"))
+		return 0;
+	if (!strcmp (value, "normal"))
+		return 1;
+	if (!strcmp (value, "basic"))
+		return 2;
+	return -1;
+}
+
 static int
 pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
 {
