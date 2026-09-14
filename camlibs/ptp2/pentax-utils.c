@@ -236,11 +236,13 @@ pentax_old_focus_protocol_direction (int direction,
 {
 	if (!protocol_direction || ((direction != -1) && (direction != 1)))
 		return GP_ERROR_BAD_PARAMETERS;
-	/* IT2 FocusFineTune uses positive UI values for Far and sends protocol
-	 * direction 0; negative UI values are Near and send direction 1.  The
-	 * public helper follows the newer focus helper's semantic convention:
-	 * +1 is Near and -1 is Far. */
-	*protocol_direction = direction > 0 ? 1U : 0U;
+	/* IT2 FocusFineTune (old-focus, opcode 0x9016): protocol direction 0
+	 * drives the lens toward Near and 1 toward Far.  The public helper
+	 * follows the newer focus helper's semantic convention: +1 is Near and
+	 * -1 is Far.  (Re-verified on real hardware 2026-09-14: the 5e5585002
+	 * mapping had the two reversed, so MF moved in the wrong sense while AF
+	 * was unaffected.) */
+	*protocol_direction = direction > 0 ? 0U : 1U;
 	return GP_OK;
 }
 

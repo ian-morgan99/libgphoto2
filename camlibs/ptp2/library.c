@@ -6383,7 +6383,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * pending: without a generation ID the first observed handle after
 	 * InitiateCapture could be that stale image, mislabelling exposure
 	 * N-1 as N (issue #34).  This must run BEFORE InitiateCapture so
-	 * the shutter is never triggered on a busy camera. */
+	 * the shutter is never triggered on a busy camera.
+	 *
+	 * Dual-format (RAW+ / RAW+JPEG) exposures leave a second transfer
+	 * candidate pending after the primary member is finalized (issue #73).
+	 * If that leftover is not consumed, the NEXT capture's pre-probe sees it
+	 * and hard-refuses with CAMERA_BUSY — the "second RAW+ shot crashes"
+	 * symptom.  So instead of refusing outright, we DRAIN any pending
+	 * candidate (transfer to a throwaway buffer + finalize) in a bounded
+	 * loop, then wait for the camera to report idle before firing.  The
+	 * drain is bounded in both candidate count and wall clock; if it cannot
+	 * clear the camera we still fall back to the original CAMERA_BUSY
+	 * refusal so a genuinely wedged camera never triggers a shutter. */
 	{
 		unsigned char *bdata = NULL;
 		unsigned int bsize = 0;
@@ -6396,14 +6407,118 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				"(%u bytes); proceeding without baseline check",
 				(unsigned)bsize);
 		free (bdata);
+
 		if (baseline_candidate) {
-			GP_LOG_E ("stale transfer candidate %u pending before "
-				"capture; refusing new exposure", baseline_candidate);
-			gp_context_error (context,
-				_("A previous capture's transfer candidate (%u) is still pending; resolve it before capturing."),
-				baseline_candidate);
-			ret = GP_ERROR_CAMERA_BUSY;
-			goto out;
+			/* Bounded drain: consume up to 4 pending candidates, each
+			 * transferred to a throwaway buffer and finalized, within a
+			 * 30 s wall-clock budget.  This clears the leftover dual-format
+			 * member so the next shutter can fire cleanly. */
+			const unsigned int DRAIN_MAX_MS = 30 * 1000;
+			const int DRAIN_MAX_COUNT = 4;
+			struct timespec dstart, dnow;
+			int drained = 0;
+			int drain_ok = 1;
+
+			clock_gettime (CLOCK_MONOTONIC, &dstart);
+			for (;;) {
+				unsigned char *cdata = NULL;
+				unsigned int csize = 0;
+				uint32_t handle = 0;
+				PentaxCaptureBuffer extra = {0};
+				int iteration_error = GP_OK;
+
+				if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+					drain_ok = 0;
+					break;
+				}
+				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &cdata, &csize)) {
+					clock_gettime (CLOCK_MONOTONIC, &dnow);
+					if ((long)((dnow.tv_sec - dstart.tv_sec) * 1000 +
+						(dnow.tv_nsec - dstart.tv_nsec) / 1000000) >= (long)DRAIN_MAX_MS) {
+						drain_ok = 0;
+					}
+					free (cdata);
+					if (!drain_ok)
+						break;
+					usleep (200 * 1000);
+					continue;
+				}
+				if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
+				    pentax_get_u32le (cdata + 32) == 1)
+					handle = pentax_get_u32le (cdata + 36);
+				free (cdata);
+				cdata = NULL;
+
+				if (!handle) {
+					/* No more pending candidates: drain complete. */
+					break;
+				}
+				if (drained >= DRAIN_MAX_COUNT) {
+					GP_LOG_D ("pre-capture drain bound reached (%d); "
+						"leaving candidate %u", DRAIN_MAX_COUNT, handle);
+					drain_ok = 0;
+					break;
+				}
+				clock_gettime (CLOCK_MONOTONIC, &dnow);
+				if ((long)((dnow.tv_sec - dstart.tv_sec) * 1000 +
+					(dnow.tv_nsec - dstart.tv_nsec) / 1000000) >= (long)DRAIN_MAX_MS) {
+					GP_LOG_D ("pre-capture drain time budget (%u ms) exhausted; "
+						"leaving candidate %u", DRAIN_MAX_MS, handle);
+					drain_ok = 0;
+					break;
+				}
+
+				/* Transfer the pending candidate to a throwaway buffer. */
+				iteration_error = pentax_transfer_run (&extra, &transfer_operations);
+				if (iteration_error < GP_OK) {
+					GP_LOG_E ("pre-capture drain transfer of candidate %u "
+						"failed (%d)", handle, iteration_error);
+					free (extra.data);
+					drain_ok = 0;
+					break;
+				}
+				free (extra.data);
+				extra.data = NULL;
+
+				/* Finalize (delete) the candidate on the camera. */
+				if (PTP_RC_OK != ptp_pentax_delete_transfer_candidate (params)) {
+					GP_LOG_E ("pre-capture drain delete of candidate %u "
+						"failed", handle);
+					drain_ok = 0;
+					break;
+				}
+				drained++;
+				GP_LOG_D ("pre-capture drain: consumed stale candidate %u [%d/%d]",
+					handle, drained, DRAIN_MAX_COUNT);
+			}
+
+			if (drain_ok && drained) {
+				/* Wait (bounded) for the camera to report idle before firing. */
+				int wait_attempt;
+				for (wait_attempt = 0; wait_attempt < 50; wait_attempt++) {
+					unsigned char *wdata = NULL;
+					unsigned int wsize = 0;
+					uint32_t activity = 0, wcandidate = 0;
+
+					if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &wdata, &wsize) &&
+					    wsize >= PENTAX_CONDITIONS_MIN_SIZE) {
+						activity = pentax_get_u32le (wdata + 104);
+						wcandidate = pentax_get_u32le (wdata + 36);
+					}
+					free (wdata);
+					if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !wcandidate)
+						break;
+					usleep (200 * 1000);
+				}
+				GP_LOG_D ("pre-capture drain complete: %d stale candidate(s) consumed", drained);
+			} else if (drained) {
+				GP_LOG_E ("stale transfer candidate still pending after "
+					"bounded drain (%d consumed); refusing new exposure", drained);
+				gp_context_error (context,
+					_("A previous capture's transfer candidate is still pending; resolve it before capturing."));
+				ret = GP_ERROR_CAMERA_BUSY;
+				goto out;
+			}
 		}
 	}
 

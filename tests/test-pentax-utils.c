@@ -523,10 +523,10 @@ main (void)
 
 		CHECK (pentax_old_focus_protocol_direction (1,
 			&protocol_direction) == GP_OK);
-		CHECK (protocol_direction == 1); /* IT2 Near */
+		CHECK (protocol_direction == 0); /* IT2 Near */
 		CHECK (pentax_old_focus_protocol_direction (-1,
 			&protocol_direction) == GP_OK);
-		CHECK (protocol_direction == 0); /* IT2 Far */
+		CHECK (protocol_direction == 1); /* IT2 Far */
 		CHECK (pentax_old_focus_protocol_direction (0,
 			&protocol_direction) == GP_ERROR_BAD_PARAMETERS);
 		CHECK (pentax_old_focus_protocol_direction (1, NULL) ==
