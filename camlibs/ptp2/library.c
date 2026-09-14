@@ -6798,6 +6798,43 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			GP_LOG_D ("dual-format reconciliation: %d extra candidate(s) "
 				"consumed and published", reconciled);
 	}
+
+	/* Wait for the camera to report idle before returning success.
+	 * In astro pixel-shift mode (and other multi-shot modes), the camera
+	 * may still be processing even after all candidates are consumed.
+	 * Without this wait, Benro Connect fires the next shutter release
+	 * while the camera is busy → InitiateCapture fails with CAMERA_BUSY.
+	 * Bounded to 60 s so a wedged camera cannot hang the caller forever. */
+	{
+		int idle_wait_ms = 0;
+		const int IDLE_WAIT_MAX_MS = 60 * 1000;
+
+		while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
+			unsigned char *idata = NULL;
+			unsigned int isize = 0;
+			uint32_t activity = 0, icandidate = 0;
+
+			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
+				break;
+			if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &idata, &isize) &&
+			    isize >= PENTAX_CONDITIONS_MIN_SIZE) {
+				activity = pentax_get_u32le (idata + 104);
+				icandidate = pentax_get_u32le (idata + 36);
+			}
+			free (idata);
+			if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !icandidate) {
+				GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
+				break;
+			}
+			usleep (500 * 1000);
+			idle_wait_ms += 500;
+		}
+		if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
+			GP_LOG_E ("camera still busy after %d ms post-capture wait; "
+				"proceeding — next capture's pre-probe will handle it",
+				idle_wait_ms);
+	}
+
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
 		goto out;
