@@ -222,11 +222,15 @@ pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 
 	if (!displacement || ((direction != -1) && (direction != 1)))
 		return GP_ERROR_BAD_PARAMETERS;
-	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0). */
+	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0).  The
+	 * protocol sign convention is inverted relative to the UI: positive
+	 * displacement drives the lens toward Far, negative toward Near.
+	 * (Re-verified on K-3 III real hardware 2026-09-14: the original
+	 * mapping had Near/Far swapped.) */
 	magnitude = ((uint64_t)open_av_num * 5U) / 6U;
 	if (!magnitude || (magnitude > INT32_MAX))
 		return GP_ERROR_CORRUPTED_DATA;
-	*displacement = direction > 0 ? (int32_t)magnitude : -(int32_t)magnitude;
+	*displacement = direction > 0 ? -(int32_t)magnitude : (int32_t)magnitude;
 	return GP_OK;
 }
 

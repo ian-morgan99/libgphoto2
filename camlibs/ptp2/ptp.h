@@ -4090,8 +4090,11 @@ struct _PTPParams {
 		 * transfer candidates belonging to the same exposure are
 		 * transferred, finalized and published here so the caller can
 		 * retrieve them via gp_camera_get_pentax_extra_capture_files().
-		 * Cleared at the start of every capture. */
-		CameraFilePath extra_capture_files[4];
+		 * Sized for the worst case: astro pixel-shift (4 shots) in a
+		 * dual-format mode (RAW+JPEG) yields 8 candidates, i.e. up to
+		 * 7 extras beyond the primary.  Cleared at the start of every
+		 * capture. */
+		CameraFilePath extra_capture_files[8];
 		int extra_capture_count;
 	} pentax;
 

@@ -512,10 +512,13 @@ main (void)
 
 	CHECK (pentax_transfer_run (NULL, &transfer_operations) ==
 		GP_ERROR_BAD_PARAMETERS);
+	/* New-focus (0x9017): positive UI direction (Near) sends a negative
+	 * image-plane displacement; Far sends positive (re-verified on K-3 III
+	 * real hardware 2026-09-14). */
 	CHECK (pentax_minimum_focus_displacement (35, 1, &displacement) == GP_OK);
-	CHECK (displacement == 29);
-	CHECK (pentax_minimum_focus_displacement (35, -1, &displacement) == GP_OK);
 	CHECK (displacement == -29);
+	CHECK (pentax_minimum_focus_displacement (35, -1, &displacement) == GP_OK);
+	CHECK (displacement == 29);
 	CHECK (pentax_minimum_focus_displacement (0, 1, &displacement) == GP_ERROR_CORRUPTED_DATA);
 	CHECK (pentax_minimum_focus_displacement (35, 0, &displacement) == GP_ERROR_BAD_PARAMETERS);
 	{

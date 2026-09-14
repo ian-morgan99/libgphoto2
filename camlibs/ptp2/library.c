@@ -6409,12 +6409,15 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		free (bdata);
 
 		if (baseline_candidate) {
-			/* Bounded drain: consume up to 4 pending candidates, each
+			/* Bounded drain: consume up to 8 pending candidates, each
 			 * transferred to a throwaway buffer and finalized, within a
-			 * 30 s wall-clock budget.  This clears the leftover dual-format
-			 * member so the next shutter can fire cleanly. */
-			const unsigned int DRAIN_MAX_MS = 30 * 1000;
-			const int DRAIN_MAX_COUNT = 4;
+			 * 60 s wall-clock budget.  This clears the leftover dual-format
+			 * members so the next shutter can fire cleanly.  The bound
+			 * covers the worst case: astro pixel-shift (4 shots) in a
+			 * dual-format mode (RAW+JPEG) leaves up to 7 stale candidates
+			 * after the primary is finalized (issue #73). */
+			const unsigned int DRAIN_MAX_MS = 60 * 1000;
+			const int DRAIN_MAX_COUNT = 8;
 			struct timespec dstart, dnow;
 			int drained = 0;
 			int drain_ok = 1;
@@ -6776,10 +6779,15 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			pentax_reconcile_delete_candidate,
 			pentax_reconcile_cancelled
 		};
-		char extra_names[4][128];
+		char extra_names[8][128];
 		int reconciled = 0;
+		/* Bounded for the worst case: astro pixel-shift (4 shots) in a
+		 * dual-format mode produces up to 7 extras beyond the primary.
+		 * The wall-clock budget is widened accordingly so a full
+		 * pixel-shift + RAW+ set can be drained without leaving stale
+		 * candidates behind (issue #73). */
 		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
-			4, 60 * 1000, extra_names, &reconciled);
+			8, 120 * 1000, extra_names, &reconciled);
 
 		if (rret < GP_OK)
 			GP_LOG_E ("dual-format reconciliation stopped early (%d); "
