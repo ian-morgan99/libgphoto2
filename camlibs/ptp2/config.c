@@ -5240,7 +5240,6 @@ static int
 _get_Ricoh_ShutterSpeed(CONFIG_GET_ARGS) {
 	int i, valset = 0;
 	char buf[200];
-	int x,y;
 
 	if (dpd->DataType != PTP_DTC_UINT64)
 		return GP_ERROR;
@@ -5251,18 +5250,9 @@ _get_Ricoh_ShutterSpeed(CONFIG_GET_ARGS) {
 	gp_widget_set_name (*widget, menu->name);
 
 	for (i = 0; i<dpd->FORM.Enum.NumberOfValues; i++) {
-		if (dpd->FORM.Enum.SupportedValue[i].u64 == 0) {
-			sprintf(buf,_("Auto"));
-			goto choicefound;
-		}
-		x = dpd->FORM.Enum.SupportedValue[i].u64>>32;
-		y = dpd->FORM.Enum.SupportedValue[i].u64&0xffffffff;
-		if (y == 1) {
-			sprintf (buf, "1/%d", x);
-		} else {
-			sprintf (buf, "%d/%d",y,x);
-		}
-choicefound:
+		if (pentax_format_shutter_speed (dpd->FORM.Enum.SupportedValue[i].u64,
+					buf, sizeof (buf)))
+			return GP_ERROR;
 		gp_widget_add_choice (*widget,buf);
 		if (dpd->CurrentValue.u64 == dpd->FORM.Enum.SupportedValue[i].u64) {
 			gp_widget_set_value (*widget, buf);
@@ -5270,13 +5260,9 @@ choicefound:
 		}
 	}
 	if (!valset) {
-		x = dpd->CurrentValue.u64>>32;
-		y = dpd->CurrentValue.u64&0xffffffff;
-		if (y == 1) {
-			sprintf (buf, "1/%d",x);
-		} else {
-			sprintf (buf, "%d/%d",y,x);
-		}
+		if (pentax_format_shutter_speed (dpd->CurrentValue.u64,
+					buf, sizeof (buf)))
+			return GP_ERROR;
 		gp_widget_set_value (*widget, buf);
 	}
 	return GP_OK;
@@ -5297,11 +5283,19 @@ _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 	if (strchr(value_str, '/')) {
 		if (2 != sscanf (value_str, "%d/%d", &y, &x))
 			return GP_ERROR;
-	} else {
-		if (!sscanf (value_str, "%d", &x))
-			return GP_ERROR;
-		y = 1;
+		propval->u64 = ((uint64_t)x<<32) | y;
+		return GP_OK;
 	}
+	if (sscanf (value_str, "%ds", &x) == 1) {
+		/* Whole-second timer value ("120s" for a 2-minute Bulb): the wire
+		 * layout is numerator in the low 32 bits, denominator in the high
+		 * 32 bits, so seconds map to (1 << 32) | seconds. */
+		propval->u64 = ((uint64_t)1<<32) | (uint32_t)x;
+		return GP_OK;
+	}
+	if (!sscanf (value_str, "%d", &x))
+		return GP_ERROR;
+	y = 1;
 	propval->u64 = ((uint64_t)x<<32) | y;
 	return GP_OK;
 }

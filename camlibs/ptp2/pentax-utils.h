@@ -208,6 +208,10 @@ int pentax_model_supports_exp_bracket (uint32_t model_no);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);
+/* Format a shutter-speed UINT64 wire value (high 32 = denominator, low 32 =
+ * numerator) for display: "Auto", "<n>s" for whole-second timer values
+ * (Bulb timer), "1/<n>" and "<a>/<b>" for fractions.  Returns 0 on success. */
+int pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen);
 int pentax_model_supports_cross_process (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);

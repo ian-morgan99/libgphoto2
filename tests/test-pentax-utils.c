@@ -669,6 +669,32 @@ main (void)
 	put_u32le (condition_data, 32, 1);
 	CHECK (pentax_stale_candidate_baseline (condition_data, sizeof (condition_data)) == 77);
 
+	/* Shutter-speed display formatting: whole-second timer values (Bulb
+	 * timer, denominator 1) must render as integer seconds, not as the
+	 * fraction "1/<n>" that made a 2-minute Bulb read like a minute. */
+	{
+		char fmt[64];
+		CHECK (pentax_format_shutter_speed (0, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "Auto"));
+		/* 120 s Bulb timer: low 32 = 120, high 32 = 1. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "120s"));
+		/* 30 s Bulb timer. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 30ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "30s"));
+		/* 1/60 s: low 32 = 1, high 32 = 60. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)60 << 32) | 1ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1/60"));
+		/* 1/2 s: low 32 = 1, high 32 = 2. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)2 << 32) | 1ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1/2"));
+		/* 2/3 s: low 32 = 2, high 32 = 3. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)3 << 32) | 2ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "2/3"));
+		/* Too-small buffer is rejected. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, 3) == -1);
+	}
+
 	free (buffer.data);
 	return 0;
 }

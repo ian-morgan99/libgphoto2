@@ -6589,6 +6589,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			conditions_known ? "" : " (fallback)");
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_WAITING;
+	/* Raise the USB port timeout to match the capture wait budget so that
+	 * individual PTP condition reads do not time out at the default 20 s
+	 * during a long Bulb exposure (e.g. 2 min + margin = ~150 s).  Without
+	 * this, each poll times out after 20 s and five consecutive failures
+	 * abort the capture even though the camera is still exposing.  The
+	 * Canon/Nikon paths do the same thing with their own capture_timeout.
+	 * A failure to raise the timeout must not abort a live exposure: the
+	 * wait budget below still bounds the total wait, so log and continue. */
+	if (gp_port_set_timeout (camera->port, (int)capture_timeout_ms))
+		GP_LOG_E ("failed to raise port timeout to %u ms for the capture "
+			"wait; continuing with the previous timeout",
+			capture_timeout_ms);
 	{
 		int conditions_failures = 0;
 	do {
@@ -6636,6 +6648,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				break;
 		}
 	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
+	/* Restore the normal port timeout now that the exposure wait is done. */
+	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
 		ret = GP_ERROR_TIMEOUT;

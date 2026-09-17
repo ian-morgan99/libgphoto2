@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -988,4 +989,34 @@ out:
 
 	*reconciled_count = count;
 	return ret;
+}
+
+/* Format a Pentax/Ricoh shutter-speed UINT64 wire value for display.
+ * Wire layout: high 32 bits = denominator, low 32 bits = numerator.
+ * A zero value is the "Auto" sentinel.  When the denominator is 1 the
+ * value is a whole-second timer (Bulb timer or 1 s shutter speed) and is
+ * rendered as "<n>s" rather than the fraction "1/<n>" (issue: Bulb
+ * enumeration showed minutes-style fractions instead of integer seconds).
+ * Returns 0 on success, -1 if buf is too small. */
+int
+pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
+{
+	if (!buf || buflen < 4)
+		return -1;
+	if (value == 0) {
+		snprintf (buf, buflen, "Auto");
+		return 0;
+	}
+	uint32_t denominator = (uint32_t)(value >> 32);
+	uint32_t numerator = (uint32_t)value;
+	if (denominator == 1) {
+		snprintf (buf, buflen, "%us", numerator);
+		return 0;
+	}
+	if (numerator == 1) {
+		snprintf (buf, buflen, "1/%u", denominator);
+		return 0;
+	}
+	snprintf (buf, buflen, "%u/%u", numerator, denominator);
+	return 0;
 }
