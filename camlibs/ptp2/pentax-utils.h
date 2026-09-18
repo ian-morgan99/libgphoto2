@@ -216,6 +216,13 @@ int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_model_uses_new_focus (uint32_t model_no);
 int pentax_model_supports_exp_bracket (uint32_t model_no);
+/* The K-3 III family PTP descriptor advertises a limited ISO enumeration
+ * (observed: 15 values, live-view domain), but the shutter/exposure path
+ * accepts substantially higher ISO values for actual exposure.  Bodies in
+ * this family support ISO up to 1600000 (12800..1600000 doubling steps
+ * above the advertised range).  Returns non-zero when the model's ISO
+ * choices should be extended beyond the camera-advertised enumeration. */
+int pentax_model_supports_high_iso (uint32_t model_no);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);

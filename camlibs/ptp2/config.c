@@ -11483,6 +11483,50 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
 	result = _get_INT (camera, widget, menu, &desc);
+	/* The K-3 III family advertises a limited ISO enumeration in the
+	 * 0xd01e descriptor (live-view domain), but the shutter/exposure path
+	 * accepts ISO up to 1600000.  Extend the exposed choices with the
+	 * doubling steps above the advertised range so high-ISO targeting is
+	 * possible without inventing values the body cannot accept (issue #77 /
+	 * #109).  The write path (_put_Pentax_DirectISO) already accepts any
+	 * UINT32 and verifies via conditions read-back, so only the GET side
+	 * needs extending.  Values already present in the camera-advertised
+	 * enumeration are not duplicated. */
+	CameraWidgetType wtype;
+
+	/* _get_INT created a RADIO widget only when the descriptor is an
+	 * enumeration; extend choices in that case. */
+	if (result == GP_OK &&
+	    pentax_model_supports_high_iso (params->pentax.model_no) &&
+	    (gp_widget_get_type (*widget, &wtype) == GP_OK) &&
+	    (wtype == GP_WIDGET_RADIO)) {
+		static const unsigned int high_iso_values[] = {
+			12800, 25600, 51200, 102400,
+			204800, 409600, 819200, 1600000
+		};
+		unsigned int i;
+		char hbuf[32];
+		int existing_count = gp_widget_count_choices (*widget);
+		for (i = 0; i < sizeof (high_iso_values) / sizeof (high_iso_values[0]); i++) {
+			int j, present = 0;
+			snprintf (hbuf, sizeof (hbuf), "%u", high_iso_values[i]);
+			for (j = 0; j < existing_count; j++) {
+				const char *choice;
+				if (gp_widget_get_choice (*widget, j, &choice) == GP_OK &&
+				    choice && strcmp (choice, hbuf) == 0) {
+					present = 1;
+					break;
+				}
+			}
+			if (!present) {
+				gp_widget_add_choice (*widget, hbuf);
+				existing_count++;
+				GP_LOG_D ("Pentax ISO: extended K-3 III family choices "
+					 "with %s (beyond camera-advertised enumeration)",
+					 hbuf);
+			}
+		}
+	}
 	ptp_free_devicepropdesc (&desc);
 	return result;
 }

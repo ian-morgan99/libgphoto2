@@ -393,6 +393,18 @@ pentax_model_supports_exp_bracket (uint32_t model_no)
 }
 
 int
+pentax_model_supports_high_iso (uint32_t model_no)
+{
+	/* K-3 III family: the 0xd01e descriptor advertises a limited ISO
+	 * enumeration (live-view domain, observed 15 values), but the
+	 * shutter/exposure path accepts ISO up to 1600000.  Extend the
+	 * exposed choices with the doubling steps above the advertised
+	 * range so high-ISO targeting/framing is possible without
+	 * inventing values the body cannot accept. */
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+int
 pentax_model_supports_composition_adjust (uint32_t model_no)
 {
 	return pentax_model_is_k3iii_family (model_no) ||
