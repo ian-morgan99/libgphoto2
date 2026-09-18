@@ -216,6 +216,11 @@ int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_model_uses_new_focus (uint32_t model_no);
 int pentax_model_supports_exp_bracket (uint32_t model_no);
+/* Star AF / AF Active Area (0xd038): K-3 III family only, firmware >= 2.20.
+ * The model gate is necessary but NOT sufficient — the descriptor must also
+ * advertise the enum at runtime (issue #76). */
+int pentax_model_supports_star_af (uint32_t model_no);
+
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);

@@ -11976,6 +11976,153 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	return GP_ERROR_TIMEOUT;
 }
 
+/* Star AF / AF Active Area (issue #76).  The K-3 III family (firmware >= 2.20)
+ * carries the AF Active Area selection in 0xd038, handled by the body in the
+ * same LV property group as 0xd035/0xd036/0xd037/0xd039 (verified by
+ * decompiling the v2.20 firmware).  The Star AF enum value is advertised in
+ * the descriptor ONLY when the body's Astrophoto Assist is activated, so the
+ * getter exposes exactly what the camera advertises and never invents a
+ * "Star AF" choice for a non-activated body (a setter is not a capability
+ * detector).  Unknown current values are preserved as an extra choice rather
+ * than mislabelled. */
+static int
+_get_Pentax_LiveViewAFActiveArea (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
+	    !pentax_model_supports_star_af (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_LiveViewAFActiveArea,
+		&desc);
+	if (ret != PTP_RC_OK) {
+		GP_LOG_D ("Pentax AF Active Area: 0xd038 descriptor not advertised "
+			 "(body firmware predates Star AF or property unsupported)");
+		return translate_ptp_result (ret);
+	}
+	result = _get_INT (camera, widget, menu, &desc);
+	if (result == GP_OK) {
+		CameraWidgetType wtype;
+		const char *current;
+
+		/* Preserve an unknown current value: if the body reports a value
+		 * outside its own advertised enumeration (e.g. a Star AF state on
+		 * a descriptor that does not list it), expose it as an extra
+		 * choice instead of dropping or mislabelling it. */
+		if ((gp_widget_get_type (*widget, &wtype) == GP_OK) &&
+		    (wtype == GP_WIDGET_RADIO) &&
+		    (gp_widget_get_value (*widget, &current) == GP_OK) &&
+		    current) {
+			int i, present = 0;
+			for (i = 0; i < gp_widget_count_choices (*widget); i++) {
+				const char *choice;
+				if (gp_widget_get_choice (*widget, i, &choice) == GP_OK &&
+				    choice && strcmp (choice, current) == 0) {
+					present = 1;
+					break;
+				}
+			}
+			if (!present) {
+				gp_widget_add_choice (*widget, current);
+				GP_LOG_D ("Pentax AF Active Area: preserving unadvertised "
+					 "current value %s as an extra choice", current);
+			}
+		}
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_put_Pentax_LiveViewAFActiveArea (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	PTPPropValue live_view;
+	const char *strval;
+	unsigned long requested;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
+	    !pentax_model_supports_star_af (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &strval));
+	/* Star AF runs in PC live view; require it active, like the AF drive. */
+	memset (&live_view, 0, sizeof (live_view));
+	ret = ptp_getdevicepropvalue (params, PTP_DPC_PENTAX_UsbLiveViewMode,
+		&live_view, PTP_DTC_UINT8);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if (live_view.u8 != 1) {
+		gp_context_error (((PTPData *)params->data)->context,
+			_("Pentax AF Active Area selection requires active PC live view."));
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	if ((sscanf (strval, "%lu", &requested) != 1) || (requested > 0xffffffffUL))
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (&desc, 0, sizeof (desc));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params, PTP_DPC_PENTAX_LiveViewAFActiveArea,
+		&desc);
+	if (ret != PTP_RC_OK) {
+		GP_LOG_D ("Pentax AF Active Area: 0xd038 descriptor not advertised; "
+			 "refusing to write an unadvertised value");
+		return translate_ptp_result (ret);
+	}
+	/* Fail closed: only write values the camera's current descriptor
+	 * advertises.  A non-activated body omits the Star AF enum, so a
+	 * caller requesting it gets NOT_SUPPORTED rather than a blind SET. */
+	if (desc.FormFlag == PTP_DPFF_Enumeration) {
+		int i;
+		int found = 0;
+		for (i = 0; i < desc.FORM.Enum.NumberOfValues; i++) {
+			if ((unsigned long)desc.FORM.Enum.SupportedValue[i].u32 == requested) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found) {
+			GP_LOG_D ("Pentax AF Active Area: value %lu not in the "
+				 "advertised enumeration (Star AF not activated?)", requested);
+			ptp_free_devicepropdesc (&desc);
+			return GP_ERROR_NOT_SUPPORTED;
+		}
+	}
+	result = _put_INT (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_LiveViewAFActiveArea,
+			&value, desc.DataType);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK) {
+			/* Read-back verification: re-read the descriptor and require the
+			 * current value to match what we wrote. */
+			PTPDevicePropDesc verify;
+			memset (&verify, 0, sizeof (verify));
+			ret = ptp_generic_getdevicepropdesc (params,
+				PTP_DPC_PENTAX_LiveViewAFActiveArea, &verify);
+			if (ret != PTP_RC_OK) {
+				result = translate_ptp_result (ret);
+			} else if ((unsigned long)verify.CurrentValue.u32 != requested) {
+				GP_LOG_E ("Pentax AF Active Area write acknowledged but "
+					 "read-back retained %lu (requested %lu).",
+					 (unsigned long)verify.CurrentValue.u32, requested);
+				result = GP_ERROR;
+			}
+			ptp_free_devicepropdesc (&verify);
+		}
+		if (alreadyset)
+			*alreadyset = 1;
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
 static int
 _get_Sony_ManualFocus(CONFIG_GET_ARGS) {
 	int val;
@@ -14125,6 +14272,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Direct Aperture"), "pentaxdirectaperture", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },
 	{ N_("Pentax Direct Exposure Compensation"), "pentaxdirectev", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectEV, _put_Pentax_DirectEV },
 	{ N_("Pentax Live View AF Position"), "pentaxliveviewafposition", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewAFPosition, _put_Pentax_LiveViewAFPosition },
+	{ N_("Pentax Live View AF Active Area"), "pentaxliveviewafarea", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_LiveViewAFActiveArea, _put_Pentax_LiveViewAFActiveArea },
 	{ N_("Pentax Live View Zoom"), "pentaxliveviewzoom", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_LiveViewZoom, _put_Pentax_LiveViewZoom },
 	{ N_("Pentax Drive Mode"), "pentaxdrivemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_DirectDriveMode, _put_Pentax_DirectDriveMode },
 	{ N_("Pentax White Balance"), "pentaxdirectwb", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectWB, _put_Pentax_DirectWB },
