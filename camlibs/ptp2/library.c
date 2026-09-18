@@ -6603,8 +6603,33 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * abort the capture even though the camera is still exposing.  The
 	 * Canon/Nikon paths do the same thing with their own capture_timeout.
 	 * A failure to raise the timeout must not abort a live exposure: the
-	 * wait budget below still bounds the total wait, so log and continue. */
-	if (gp_port_set_timeout (camera->port, (int)capture_timeout_ms))
+	 * wait budget below still bounds the total wait, so log and continue.
+	 * The restore happens on the common cleanup path (out:) because the
+	 * cancel / conditions-abort exits jump straight there; restoring only
+	 * after the polling loop would leave the shared port timeout at the
+	 * capture budget (up to 24 h) on those paths, so every later PTP read
+	/* Raise the USB port timeout to match the capture wait budget so that
+	 * individual PTP condition reads do not time out at the default 20 s
+	 * during a long Bulb exposure (e.g. 2 min + margin = ~150 s).  Without
+	 * this, each poll times out after 20 s and five consecutive failures
+	 * abort the capture even though the camera is still exposing.  The
+	 * Canon/Nikon paths do the same thing with their own capture_timeout.
+	 * A failure to raise the timeout must not abort a live exposure: the
+	 * wait budget below still bounds the total wait, so log and continue.
+	 * The restore happens on the common cleanup path (out:) because the
+	 * cancel / conditions-abort exits jump straight there; restoring only
+	 * after the polling loop would leave the shared port timeout at the
+	 * capture budget (up to 24 h) on those paths, so every later PTP read
+	 * could block for that duration (PR #78 P1). */
+	int port_timeout_raised = 0;
+	/* Last activity flags observed during the wait loop.  A zero
+	 * candidate_handle at timeout only means publication has not occurred,
+	 * so the phase must be attributed from the camera's own shooting/
+	 * processing state, not from the handle (PR #78 P2). */
+	uint32_t last_activity_flags = 0;
+	if (gp_port_set_timeout (camera->port, (int)capture_timeout_ms) == GP_OK)
+		port_timeout_raised = 1;
+	else
 		GP_LOG_E ("failed to raise port timeout to %u ms for the capture "
 			"wait; continuing with the previous timeout",
 			capture_timeout_ms);
@@ -6649,31 +6674,36 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			ret = translate_ptp_result (ptpres);
 			goto out;
 		}
+		last_activity_flags = pentax_get_u32le (data + 104);
 		if (pentax_get_u32le (data + 32) == 1) {
 			candidate_handle = pentax_get_u32le (data + 36);
 			if (candidate_handle)
 				break;
 		}
 	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
-	/* Restore the normal port timeout now that the exposure wait is done. */
-	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
-		/* Attribute the timeout to the first failing boundary (issue #111):
-		 * a non-zero candidate_handle means the camera published a
-		 * transfer candidate before the budget ran out, so the wait was
-		 * spent in the post-exposure processing phase; a zero handle
-		 * means the exposure phase itself never published a candidate
-		 * within its budget. */
-		if (candidate_handle)
+		/* Attribute the timeout to the phase the camera was actually in
+		 * when the budget ran out (issue #111).  A zero candidate_handle
+		 * only means publication has not occurred, so use the last
+		 * observed activity flags: PROCESSING means the exposure finished
+		 * and the wait was spent in post-exposure processing; SHOOTING
+		 * means the exposure itself never completed within its budget.
+		 * Neither flag set means no usable state was observed. */
+		if (last_activity_flags & PENTAX_CONDITION_ACTIVITY_PROCESSING)
 			GP_LOG_E ("capture wait timed out in the post-exposure "
-				"processing phase (candidate observed, transfer not "
-				"finalized within %u ms)", capture_timeout_ms);
-		else
+				"processing phase (camera reported processing, transfer "
+				"not finalized within %u ms)", capture_timeout_ms);
+		else if (last_activity_flags & PENTAX_CONDITION_ACTIVITY_SHOOTING)
 			GP_LOG_E ("capture wait timed out in the exposure phase "
-				"(no transfer candidate observed within %u ms; "
-				"exposure budget was %u ms)", capture_timeout_ms,
-				exposure_phase_ms);
+				"(camera still shooting; no transfer candidate published "
+				"within %u ms; exposure budget was %u ms)",
+				capture_timeout_ms, exposure_phase_ms);
+		else
+			GP_LOG_E ("capture wait timed out with no usable camera state "
+				"(no transfer candidate and no shooting/processing flags "
+				"observed within %u ms; exposure budget was %u ms)",
+				capture_timeout_ms, exposure_phase_ms);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}
@@ -6897,6 +6927,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	ret = GP_OK;
 
 out:
+	/* Restore the normal port timeout on every exit path (cancel, conditions
+	 * abort, timeout, success) so a raised capture budget cannot linger on the
+	 * shared port and make later PTP reads block for hours (PR #78 P1). */
+	if (port_timeout_raised)
+		gp_port_set_timeout (camera->port, normal_timeout);
 	free (data);
 	free (capture.data);
 	/* The filesystem cache (set_file_noop above) holds its own

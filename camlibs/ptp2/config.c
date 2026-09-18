@@ -11495,7 +11495,15 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 	CameraWidgetType wtype;
 
 	/* _get_INT created a RADIO widget only when the descriptor is an
-	 * enumeration; extend choices in that case. */
+	 * enumeration; extend choices in that case.  The 0xd01e descriptor is
+	 * mode-dependent: some modes already advertise the full high-ISO range
+	 * and some advertise no enumeration at all, so only extend when the
+	 * current enumeration is non-empty AND its maximum is below the first
+	 * synthetic value (PR #78 P1 - do not offer values the camera's current
+	 * mode does not accept; an empty enumeration is left untouched rather
+	 * than filled with synthetic choices).  This mirrors ImageTransmitter2
+	 * RefreshSensitivityList(), which appends model-specific extra ISO steps
+	 * only after reading the descriptor and gating on the current step. */
 	if (result == GP_OK &&
 	    pentax_model_supports_high_iso (params->pentax.model_no) &&
 	    (gp_widget_get_type (*widget, &wtype) == GP_OK) &&
@@ -11507,24 +11515,42 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 		unsigned int i;
 		char hbuf[32];
 		int existing_count = gp_widget_count_choices (*widget);
-		for (i = 0; i < sizeof (high_iso_values) / sizeof (high_iso_values[0]); i++) {
-			int j, present = 0;
-			snprintf (hbuf, sizeof (hbuf), "%u", high_iso_values[i]);
-			for (j = 0; j < existing_count; j++) {
-				const char *choice;
-				if (gp_widget_get_choice (*widget, j, &choice) == GP_OK &&
-				    choice && strcmp (choice, hbuf) == 0) {
-					present = 1;
-					break;
+		unsigned int advertised_max = 0;
+
+		for (i = 0; i < (unsigned int)existing_count; i++) {
+			const char *choice;
+			if (gp_widget_get_choice (*widget, i, &choice) == GP_OK &&
+			    choice) {
+				unsigned long v = strtoul (choice, NULL, 10);
+				if (v > advertised_max)
+					advertised_max = (unsigned int)v;
+			}
+		}
+
+		if (existing_count > 0 && advertised_max < high_iso_values[0]) {
+			for (i = 0; i < sizeof (high_iso_values) / sizeof (high_iso_values[0]); i++) {
+				int j, present = 0;
+				snprintf (hbuf, sizeof (hbuf), "%u", high_iso_values[i]);
+				for (j = 0; j < existing_count; j++) {
+					const char *choice;
+					if (gp_widget_get_choice (*widget, j, &choice) == GP_OK &&
+					    choice && strcmp (choice, hbuf) == 0) {
+						present = 1;
+						break;
+					}
+				}
+				if (!present) {
+					gp_widget_add_choice (*widget, hbuf);
+					existing_count++;
+					GP_LOG_D ("Pentax ISO: extended K-3 III family choices "
+						 "with %s (beyond camera-advertised enumeration)",
+						hbuf);
 				}
 			}
-			if (!present) {
-				gp_widget_add_choice (*widget, hbuf);
-				existing_count++;
-				GP_LOG_D ("Pentax ISO: extended K-3 III family choices "
-					 "with %s (beyond camera-advertised enumeration)",
-					 hbuf);
-			}
+		} else {
+			GP_LOG_D ("Pentax ISO: current mode advertises %d choices (max %u); "
+				 "no high-ISO extension applied",
+				 existing_count, advertised_max);
 		}
 	}
 	ptp_free_devicepropdesc (&desc);
