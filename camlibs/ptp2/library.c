@@ -6608,18 +6608,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * cancel / conditions-abort exits jump straight there; restoring only
 	 * after the polling loop would leave the shared port timeout at the
 	 * capture budget (up to 24 h) on those paths, so every later PTP read
-	/* Raise the USB port timeout to match the capture wait budget so that
-	 * individual PTP condition reads do not time out at the default 20 s
-	 * during a long Bulb exposure (e.g. 2 min + margin = ~150 s).  Without
-	 * this, each poll times out after 20 s and five consecutive failures
-	 * abort the capture even though the camera is still exposing.  The
-	 * Canon/Nikon paths do the same thing with their own capture_timeout.
-	 * A failure to raise the timeout must not abort a live exposure: the
-	 * wait budget below still bounds the total wait, so log and continue.
-	 * The restore happens on the common cleanup path (out:) because the
-	 * cancel / conditions-abort exits jump straight there; restoring only
-	 * after the polling loop would leave the shared port timeout at the
-	 * capture budget (up to 24 h) on those paths, so every later PTP read
 	 * could block for that duration (PR #78 P1). */
 	int port_timeout_raised = 0;
 	/* Last activity flags observed during the wait loop.  A zero
