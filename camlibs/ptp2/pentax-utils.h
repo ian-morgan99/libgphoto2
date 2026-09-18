@@ -181,6 +181,17 @@ PentaxReconcileDecision pentax_reconcile_conditions (const unsigned char *data,
  * are not aborted while still in progress. */
 unsigned int pentax_capture_timeout_ms (const PentaxConditions *conditions);
 
+/* Phase-specific exposure-duration budget (issue #111): the time the camera
+ * needs to complete the exposure itself, before any post-exposure processing
+ * or transfer-candidate publication.  For a Bulb timer this is the timer
+ * value plus a small settle margin; for multi-shot composites it is the
+ * per-shot budget times the shot count.  The result is clamped to the
+ * absolute ceiling so a corrupt camera-reported value cannot wrap.  This is
+ * deliberately separate from pentax_capture_timeout_ms() which also covers
+ * post-exposure processing: a 120 s Bulb must not consume its entire 151 s
+ * all-in budget before RAW processing even starts. */
+unsigned int pentax_exposure_phase_ms (const PentaxConditions *conditions);
+
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 	PentaxLiveViewGeometry *geometry);

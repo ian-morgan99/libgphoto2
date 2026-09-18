@@ -836,6 +836,52 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 	return (unsigned int) timeout;
 }
 
+/* Exposure-phase budget in milliseconds (issue #111): how long the camera
+ * needs to complete the exposure itself, before any post-exposure processing
+ * or transfer-candidate publication.  This is deliberately separate from
+ * pentax_capture_timeout_ms(), which also budgets the post-exposure
+ * processing margin: a 120 s Bulb must not spend its entire all-in budget
+ * before RAW processing even starts.  The result is clamped to the absolute
+ * ceiling so a corrupt camera-reported value cannot wrap. */
+unsigned int
+pentax_exposure_phase_ms (const PentaxConditions *conditions)
+{
+	uint64_t exposure_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+
+	/* Bulb: the timer value is the exposure duration itself.  Add one
+	 * second of settle so the candidate is not polled before the shutter
+	 * has actually closed.  This is the exposure phase only — post-exposure
+	 * processing (RAW conversion, candidate publication) is budgeted
+	 * separately by pentax_capture_timeout_ms(). */
+	if (conditions->bulb_timer_seconds > 0) {
+		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
+
+		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb exposure");
+		if (bulb_ms > exposure_ms)
+			exposure_ms = bulb_ms;
+	}
+
+	/* Multi-shot: each shot needs its own exposure budget.  Pixel shift is
+	 * 4 shots, so the exposure phase is the per-shot budget times the shot
+	 * count.  Post-exposure processing is budgeted separately. */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
+		uint64_t multi_ms;
+
+		if (conditions->bulb_timer_seconds > 0)
+			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		else
+			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot exposure");
+		if (multi_ms > exposure_ms)
+			exposure_ms = multi_ms;
+	}
+
+	return (unsigned int) exposure_ms;
+}
+
 /* Bounded reconciliation of extra transfer candidates from a dual-format
  * exposure (issue #73).  After the primary candidate has been transferred
  * and finalized, this loop detects and consumes any remaining candidates

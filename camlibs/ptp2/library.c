@@ -6540,6 +6540,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * initiated we must never silently fall back to the short base
 	 * timeout and abort a valid long exposure (issue #32). */
 	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	unsigned int exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 	int conditions_known = 0;
 	{
 		PentaxConditions conditions;
@@ -6569,6 +6570,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				continue;
 			}
 			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
+			exposure_phase_ms = pentax_exposure_phase_ms (&conditions);
+			/* The exposure phase must not exceed the total budget. */
+			if (exposure_phase_ms > capture_timeout_ms)
+				exposure_phase_ms = capture_timeout_ms;
 			conditions_known = 1;
 		}
 		free (data);
@@ -6576,6 +6581,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		size = 0;
 		if (!conditions_known) {
 			capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK;
+			exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 			GP_LOG_E ("conditions unreadable after %d attempts; using "
 				"bounded wait budget of %u ms instead of the "
 				"%d ms base so a wedged camera cannot hang the "
@@ -6585,7 +6591,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				_("Camera conditions unreadable; using a bounded capture wait budget of %u ms."),
 				capture_timeout_ms);
 		}
-		GP_LOG_D ("capture wait budget %u ms%s", capture_timeout_ms,
+		GP_LOG_D ("capture wait budget %u ms (exposure phase %u ms)%s",
+			capture_timeout_ms, exposure_phase_ms,
 			conditions_known ? "" : " (fallback)");
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_WAITING;
@@ -6652,6 +6659,21 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
+		/* Attribute the timeout to the first failing boundary (issue #111):
+		 * a non-zero candidate_handle means the camera published a
+		 * transfer candidate before the budget ran out, so the wait was
+		 * spent in the post-exposure processing phase; a zero handle
+		 * means the exposure phase itself never published a candidate
+		 * within its budget. */
+		if (candidate_handle)
+			GP_LOG_E ("capture wait timed out in the post-exposure "
+				"processing phase (candidate observed, transfer not "
+				"finalized within %u ms)", capture_timeout_ms);
+		else
+			GP_LOG_E ("capture wait timed out in the exposure phase "
+				"(no transfer candidate observed within %u ms; "
+				"exposure budget was %u ms)", capture_timeout_ms,
+				exposure_phase_ms);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}

@@ -614,6 +614,37 @@ main (void)
 	conditions.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
 	CHECK (pentax_capture_timeout_ms (&conditions) == 90000); /* base + margin */
 
+	/* Exposure-phase budget (issue #111): the time the camera needs to
+	 * complete the exposure itself, before post-exposure processing.  This is
+	 * deliberately separate from pentax_capture_timeout_ms() so a long Bulb
+	 * does not consume its entire all-in budget before RAW processing starts. */
+	memset (&conditions, 0, sizeof (conditions));
+	CHECK (pentax_exposure_phase_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	conditions.bulb_timer_seconds = 120; /* 121s exposure phase, no margin */
+	CHECK (pentax_exposure_phase_ms (&conditions) == 121000);
+
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
+	CHECK (pentax_exposure_phase_ms (&conditions) == 240000); /* 4x base */
+
+	conditions.bulb_timer_seconds = 9; /* bulb + multi-shot composite:
+	 * 10s*4=40s < base 60s, so the base dominates */
+	CHECK (pentax_exposure_phase_ms (&conditions) == 60000);
+
+	/* A long enough bulb timer that the multi-shot composite exceeds the
+	 * base: 30s bulb * 4 = 120s > 60s base. */
+	conditions.bulb_timer_seconds = 30;
+	CHECK (pentax_exposure_phase_ms (&conditions) == 124000); /* 31s*4 */
+
+	/* Overflow-safe clamp: a corrupt UINT32_MAX bulb timer must not wrap the
+	 * 64-bit math or exceed the ceiling. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = UINT32_MAX;
+	CHECK (pentax_exposure_phase_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
+
 	/* Session reconciliation decisions (issue #33): short blobs and unsafe
 	 * activity force recovery, a pending candidate must be surfaced. The
 	 * out-param is only written on STALE_CANDIDATE; sentinel checks pin that. */

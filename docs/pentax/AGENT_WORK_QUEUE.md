@@ -32,6 +32,17 @@ Issues #61–#65 are closed duplicates; do not use them.
 - #8 — **reopened**: K-1 II `0xd036` write semantics are not yet backed by retained write hardware evidence; do not treat a SET ACK plus centre GET as proof of application until qualified or trace-proven
 - #45 — **reopened**: separate research `0x9013` Green-button semantics from real `0x9011`/`0x9012` capture before upstream promotion
 
+## K-3 III capture-mode ownership findings (o-v9q-bulb-timeout)
+
+- `K3III-CAPTURE-MODE-DIAGNOSTICS.md` — ownership findings for the K-3 III
+  capture-mode defects reported on Polaris `o-v9q-bulb-timeout`:
+  - #112 — Astro Bulb 180 s cap is camera-reported (`AstroTracerTimeLimit`,
+    conditions offset 528); first-shot delay is a Polaris workflow concern.
+  - #113 — Bulb duration ownership: two distinct mechanisms (camera Bulb timer
+    vs app `TSBulbTime`); trace 261/268/298/299 before editing the shutter setter.
+  - #115 — Panorama is dedicated firmware workflow command 271 (`SP_PANORAMIC`),
+    not ordinary capture; stay above libgphoto2 until the trace crosses in.
+
 ## Upstream / hardware gates
 
 - #42 — upstream conventions and maintainability audit
