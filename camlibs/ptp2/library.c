@@ -474,7 +474,9 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 	 * do that and merge it into the generic PTP deviceinfo. */
 	if (di->VendorExtensionID == PTP_VENDOR_NIKON) {
 		unsigned int i;
-		unsigned int nikond;
+		/* Initialise so a failed parse (sscanf returns 0 or EOF) leaves a
+		 * value outside every D3xxx/D32xx/D33xx range check below. */
+		unsigned int nikond = 0;
 
 		/* Nikon V* and J* advertise the new Nikon stuff, but only do the generic
 		 * PTP capture. FIXME: could use flags. */
@@ -565,7 +567,7 @@ fixup_cached_deviceinfo (Camera *camera, PTPDeviceInfo *di) {
 				di->Operations_len += 10;
 			}
 		}
-		if (params->deviceinfo.Model && (sscanf(params->deviceinfo.Model,"D%d", &nikond)))
+		if (params->deviceinfo.Model && (sscanf(params->deviceinfo.Model,"D%d", &nikond) == 1))
 		{
 			if ((nikond >= 3000) && (nikond < 3199)) {
 				GP_LOG_D("The D3xxx series hides commands from us ... ");
