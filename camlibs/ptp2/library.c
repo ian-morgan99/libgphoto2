@@ -6604,6 +6604,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		if (!conditions_known) {
 			capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK;
 			exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+			/* Fail closed on the idle wait too: with conditions unreadable we
+			 * cannot prove the capture is a plain single-shot, so assume it may
+			 * still be processing (multi-shot / astro / bulb) and keep the
+			 * post-capture readiness wait.  Skipping it here was the fail-open
+			 * path that let Benro fire the next shutter into a busy camera
+			 * (issue #122). */
+			needs_idle_wait = 1;
 			GP_LOG_E ("conditions unreadable after %d attempts; using "
 				"bounded wait budget of %u ms instead of the "
 				"%d ms base so a wedged camera cannot hang the "
@@ -6862,48 +6869,53 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * may still be processing even after all candidates are consumed.
 	 * Without this wait, Benro Connect fires the next shutter release
 	 * while the camera is busy → InitiateCapture fails with CAMERA_BUSY.
-	 * Bounded to 60 s so a wedged camera cannot hang the caller forever. */
+	 * Bounded so a wedged camera cannot hang the caller forever.
+	 *
+	 * Issue #122 (single-shot wedge): an ordinary single-shot capture was
+	 * previously returned to Benro immediately after reconciliation, even
+	 * though the camera can still be finishing internal processing (RAW
+	 * conversion, card write) for a short window.  Benro then fired the next
+	 * command into a busy camera and wedged until a mode toggle + USB reset.
+	 * Panorama / time-lapse did not reproduce it because their multi-shot
+	 * path already ran the long idle wait.  We therefore now run a SHORT
+	 * bounded readiness check for single-shot too: it proves the camera is
+	 * idle before control returns (the common case settles in well under the
+	 * bound), and only proceeds with a warning if the bound is exhausted —
+	 * never firing Benro into an unproven-busy camera.  Multi-shot / astro /
+	 * bulb keep the long bound because they can genuinely process for minutes. */
 	{
 		int idle_wait_ms = 0;
-		const int IDLE_WAIT_MAX_MS = 60 * 1000;
+		const int IDLE_WAIT_MAX_MS = needs_idle_wait ?
+			60 * 1000 : 15 * 1000;
 
-		/* Issue #122: only multi-shot / astro / bulb captures can still be
-		 * processing after all candidates are consumed.  Ordinary single-shot
-		 * captures return through the normal completion path so Benro regains
-		 * control immediately — an unconditional wait here is exactly what
-		 * wedged the camera until a mode toggle + USB reset. */
-		if (needs_idle_wait) {
-			while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
-				unsigned char *idata = NULL;
-				unsigned int isize = 0;
-				PentaxReadiness readiness;
+		while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
+			unsigned char *idata = NULL;
+			unsigned int isize = 0;
+			PentaxReadiness readiness;
 
-				if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
-					break;
-				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &idata, &isize)) {
-					/* A failed read is UNKNOWN, never IDLE: keep polling. */
-					free (idata);
-					usleep (500 * 1000);
-					idle_wait_ms += 500;
-					continue;
-				}
-				readiness = pentax_camera_readiness (idata, isize);
+			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
+				break;
+			if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &idata, &isize)) {
+				/* A failed read is UNKNOWN, never IDLE: keep polling. */
 				free (idata);
-				if (readiness == PENTAX_READINESS_IDLE) {
-					GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
-					break;
-				}
-				/* BUSY or UNKNOWN: keep polling within the bound. */
 				usleep (500 * 1000);
 				idle_wait_ms += 500;
+				continue;
 			}
-			if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
-				GP_LOG_E ("camera still busy after %d ms post-capture wait; "
-					"proceeding — next capture's pre-probe will handle it",
-					idle_wait_ms);
-		} else {
-			GP_LOG_D ("single-shot capture: skipping post-capture idle wait");
+			readiness = pentax_camera_readiness (idata, isize);
+			free (idata);
+			if (readiness == PENTAX_READINESS_IDLE) {
+				GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
+				break;
+			}
+			/* BUSY or UNKNOWN: keep polling within the bound. */
+			usleep (500 * 1000);
+			idle_wait_ms += 500;
 		}
+		if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
+			GP_LOG_E ("camera still busy after %d ms post-capture wait%s; "
+				"proceeding — next capture's pre-probe will handle it",
+				idle_wait_ms, needs_idle_wait ? "" : " (single-shot short bound)");
 	}
 
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
