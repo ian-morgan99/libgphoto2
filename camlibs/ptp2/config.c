@@ -11493,25 +11493,30 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 	 * needs extending.  Values already present in the camera-advertised
 	 * enumeration are not duplicated. */
 	CameraWidgetType wtype;
+	PentaxConditions conditions;
+	unsigned char *condition_data = NULL;
+	unsigned int condition_size = 0;
 
 	/* _get_INT created a RADIO widget only when the descriptor is an
 	 * enumeration; extend choices in that case.  The 0xd01e descriptor is
-	 * mode-dependent: some modes already advertise the full high-ISO range
-	 * and some advertise no enumeration at all, so only extend when the
-	 * current enumeration is non-empty AND its maximum is below the first
-	 * synthetic value (PR #78 P1 - do not offer values the camera's current
-	 * mode does not accept; an empty enumeration is left untouched rather
-	 * than filled with synthetic choices).  This mirrors ImageTransmitter2
-	 * RefreshSensitivityList(), which appends model-specific extra ISO steps
-	 * only after reading the descriptor and gating on the current step. */
+	 * mode-dependent, so only extend when the current enumeration is
+	 * non-empty AND its maximum is below the first synthetic value (an empty
+	 * enumeration is left untouched rather than filled with synthetic
+	 * choices).
+	 *
+	 * PR #78 P1: which values to append is gated on the camera's CURRENT
+	 * sensitivity/exposure step, exactly as ImageTransmitter2
+	 * RefreshSensitivityList() does — NOT on "the descriptor is restricted"
+	 * (max < 12800) alone.  A restricted enumeration proves only that the
+	 * descriptor is limited, not that this camera/mode accepts the omitted
+	 * values; the step mapping is the authority for which extra steps are
+	 * valid in the current mode. */
 	if (result == GP_OK &&
 	    pentax_model_supports_high_iso (params->pentax.model_no) &&
 	    (gp_widget_get_type (*widget, &wtype) == GP_OK) &&
 	    (wtype == GP_WIDGET_RADIO)) {
-		static const unsigned int high_iso_values[] = {
-			12800, 25600, 51200, 102400,
-			204800, 409600, 819200, 1600000
-		};
+		unsigned int high_iso_values[6];
+		int high_iso_count;
 		unsigned int i;
 		char hbuf[32];
 		int existing_count = gp_widget_count_choices (*widget);
@@ -11527,8 +11532,26 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 			}
 		}
 
-		if (existing_count > 0 && advertised_max < high_iso_values[0]) {
-			for (i = 0; i < sizeof (high_iso_values) / sizeof (high_iso_values[0]); i++) {
+		if (existing_count > 0 && advertised_max < 256000) {
+			/* Read the current sensitivity/exposure step to select the
+			 * IT2-mirrored value set.  A conditions read failure is not
+			 * fatal: fall back to the auto-sensitivity set (the most
+			 * conservative, lowest values). */
+			uint32_t sensitivity_step = 0;
+			uint32_t exposure_step = 0;
+			if (ptp_pentax_get_all_conditions (params, &condition_data,
+					&condition_size) == PTP_RC_OK &&
+			    pentax_parse_conditions (condition_data, condition_size,
+				    &conditions) == GP_OK) {
+				sensitivity_step = conditions.sensitivity_step;
+				exposure_step = conditions.exposure_step;
+			}
+			free (condition_data);
+			condition_data = NULL;
+
+			high_iso_count = pentax_high_iso_synthetic_values (
+				sensitivity_step, exposure_step, high_iso_values);
+			for (i = 0; i < (unsigned int)high_iso_count; i++) {
 				int j, present = 0;
 				snprintf (hbuf, sizeof (hbuf), "%u", high_iso_values[i]);
 				for (j = 0; j < existing_count; j++) {
@@ -11543,7 +11566,7 @@ _get_Pentax_DirectISO (CONFIG_GET_ARGS)
 					gp_widget_add_choice (*widget, hbuf);
 					existing_count++;
 					GP_LOG_D ("Pentax ISO: extended K-3 III family choices "
-						 "with %s (beyond camera-advertised enumeration)",
+						 "with %s (step-gated, beyond camera-advertised enumeration)",
 						hbuf);
 				}
 			}

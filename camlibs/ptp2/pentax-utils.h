@@ -49,6 +49,10 @@ typedef struct {
 	uint32_t exposure_mode;
 	uint32_t user_mode;
 	uint32_t exposure_step;
+	/* IT2 offset 172: current sensitivity (ISO) step. 0 = auto/continuous,
+	 * >0 = a fixed ISO step. Used to gate model-specific high-ISO synthesis
+	 * exactly as ImageTransmitter2 RefreshSensitivityList() does (PR #78 P1). */
+	uint32_t sensitivity_step;
 	uint32_t bulb_timer_seconds;
 	uint32_t bulb_timer_denominator;
 	uint32_t aperture_numerator;
@@ -219,10 +223,19 @@ int pentax_model_supports_exp_bracket (uint32_t model_no);
 /* The K-3 III family PTP descriptor advertises a limited ISO enumeration
  * (observed: 15 values, live-view domain), but the shutter/exposure path
  * accepts substantially higher ISO values for actual exposure.  Bodies in
- * this family support ISO up to 1600000 (12800..1600000 doubling steps
- * above the advertised range).  Returns non-zero when the model's ISO
- * choices should be extended beyond the camera-advertised enumeration. */
+ * this family support ISO up to 1600000.  Returns non-zero when the model's
+ * ISO choices MAY be extended beyond the camera-advertised enumeration; the
+ * actual extension is still gated on the current sensitivity/exposure step via
+ * pentax_high_iso_synthetic_values() (PR #78 P1). */
 int pentax_model_supports_high_iso (uint32_t model_no);
+/* Step-dependent synthetic high-ISO values to append, mirroring IT2
+ * RefreshSensitivityList().  Returns the count written to `values` (capacity
+ * >= 6): sensitivity_step==0 -> {409600,819200}; else exposure_step==0 ->
+ * {288000,409600,576000,819200}; else -> {256000,320000,409600,512000,
+ * 640000,819200}. */
+int pentax_high_iso_synthetic_values (uint32_t sensitivity_step,
+                                      uint32_t exposure_step,
+                                      unsigned int *values);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);

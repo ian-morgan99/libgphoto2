@@ -726,6 +726,32 @@ main (void)
 		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, 3) == -1);
 	}
 
+	/* High-ISO synthetic value selection (PR #78 P1): mirrors IT2
+	 * RefreshSensitivityList() step gating — the extra ISO choices depend on
+	 * the current sensitivity/exposure step, not on whether the descriptor is
+	 * "restricted". */
+	{
+		unsigned int vals[6];
+		int n;
+
+		/* sensitivity_step == 0 (auto/continuous sensitivity) -> {409600, 819200}. */
+		n = pentax_high_iso_synthetic_values (0, 2, vals);
+		CHECK (n == 2);
+		CHECK (vals[0] == 409600 && vals[1] == 819200);
+
+		/* sensitivity_step != 0, exposure_step == 0 -> {288000,409600,576000,819200}. */
+		n = pentax_high_iso_synthetic_values (100, 0, vals);
+		CHECK (n == 4);
+		CHECK (vals[0] == 288000 && vals[1] == 409600 &&
+		       vals[2] == 576000 && vals[3] == 819200);
+
+		/* both fixed steps -> {256000,320000,409600,512000,640000,819200}. */
+		n = pentax_high_iso_synthetic_values (100, 2, vals);
+		CHECK (n == 6);
+		CHECK (vals[0] == 256000 && vals[1] == 320000 && vals[2] == 409600 &&
+		       vals[3] == 512000 && vals[4] == 640000 && vals[5] == 819200);
+	}
+
 	free (buffer.data);
 	return 0;
 }

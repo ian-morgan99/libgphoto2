@@ -190,6 +190,8 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 	parsed.operation_state = (uint8_t)pentax_get_u32le (data + 24);
 	parsed.activity_flags = pentax_get_u32le (data + 104);
 	parsed.exposure_step = pentax_get_u32le (data + 168);
+	/* IT2 offset 172: current sensitivity step (0 = auto/continuous). */
+	parsed.sensitivity_step = pentax_get_u32le (data + 172);
 	parsed.exposure_mode = pentax_get_u32le (data + 184);
 	parsed.user_mode = pentax_get_u32le (data + 40);
 	parsed.bulb_timer_seconds = pentax_get_u32le (data + 272);
@@ -402,6 +404,52 @@ pentax_model_supports_high_iso (uint32_t model_no)
 	 * range so high-ISO targeting/framing is possible without
 	 * inventing values the body cannot accept. */
 	return pentax_model_is_k3iii_family (model_no);
+}
+
+/* Which synthetic high-ISO values to append, given the camera's current
+ * sensitivity/exposure step.  Mirrors ImageTransmitter2
+ * RefreshSensitivityList() exactly (MtpDevice.cs): the extra ISO choices are
+ * model-specific AND step-dependent — they are appended only after reading the
+ * descriptor and gated on the current step, not on whether the advertised
+ * enumeration is "restricted" (PR #78 P1: `max < 12800` proves the descriptor
+ * is restricted, not that the camera/mode accepts the omitted values).
+ *
+ *   sensitivity_step == 0            -> {409600, 819200}
+ *   else exposure_step == 0         -> {288000, 409600, 576000, 819200}
+ *   else (both fixed steps)         -> {256000, 320000, 409600, 512000,
+ *                                       640000, 819200}
+ *
+ * Returns the number of values written to `values` (capacity >= 6).  The caller
+ * still de-duplicates against the camera-advertised enumeration and only offers
+ * a value the body can actually accept. */
+int
+pentax_high_iso_synthetic_values (uint32_t sensitivity_step,
+                                  uint32_t exposure_step,
+                                  unsigned int *values)
+{
+	static const unsigned int auto_sensitivity[] = { 409600, 819200 };
+	static const unsigned int auto_exposure[] = {
+		288000, 409600, 576000, 819200
+	};
+	static const unsigned int fixed_steps[] = {
+		256000, 320000, 409600, 512000, 640000, 819200
+	};
+	const unsigned int *set;
+	unsigned int count, i;
+
+	if (sensitivity_step == 0) {
+		set = auto_sensitivity;
+		count = sizeof (auto_sensitivity) / sizeof (auto_sensitivity[0]);
+	} else if (exposure_step == 0) {
+		set = auto_exposure;
+		count = sizeof (auto_exposure) / sizeof (auto_exposure[0]);
+	} else {
+		set = fixed_steps;
+		count = sizeof (fixed_steps) / sizeof (fixed_steps[0]);
+	}
+	for (i = 0; i < count && i < 6; i++)
+		values[i] = set[i];
+	return (int)count;
 }
 
 int
