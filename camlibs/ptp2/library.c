@@ -6498,6 +6498,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			if (drain_ok && drained) {
 				/* Wait (bounded) for the camera to report idle before firing. */
 				int wait_attempt;
+				int reached_idle = 0;
 			for (wait_attempt = 0; wait_attempt < 50; wait_attempt++) {
 				unsigned char *wdata = NULL;
 				unsigned int wsize = 0;
@@ -6510,12 +6511,26 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				}
 				if (pentax_camera_readiness (wdata, wsize) == PENTAX_READINESS_IDLE) {
 					free (wdata);
+					reached_idle = 1;
 					break;
 				}
 				free (wdata);
 				usleep (200 * 1000);
 			}
-				GP_LOG_D ("pre-capture drain complete: %d stale candidate(s) consumed", drained);
+				if (reached_idle) {
+					GP_LOG_D ("pre-capture drain complete: %d stale candidate(s) consumed", drained);
+				} else {
+					/* Issue #122 (TA follow-up): fail closed on bound exhaustion.
+					 * If the camera is still BUSY/UNKNOWN after draining, firing
+					 * InitiateCapture anyway can wedge it — refuse this exposure
+					 * instead of proceeding unproven-ready. */
+					GP_LOG_E ("pre-capture drain consumed %d candidate(s) but camera "
+						"still busy/unknown after bounded wait; refusing new exposure", drained);
+					gp_context_error (context,
+						_("The camera is still processing a previous capture; try again shortly."));
+					ret = GP_ERROR_CAMERA_BUSY;
+					goto out;
+				}
 			} else if (drained) {
 				GP_LOG_E ("stale transfer candidate still pending after "
 					"bounded drain (%d consumed); refusing new exposure", drained);
