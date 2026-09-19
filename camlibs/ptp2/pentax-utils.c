@@ -824,11 +824,25 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 			timeout = multi_ms;
 	}
 
-	/* Astrotracer without a shift limit: base + margin. */
-	if ((conditions->astro_status_flags & PENTAX_CONDITION_ASTROTRACER3) &&
+	/* Astro Tracer without a shift limit: honour the camera's own
+	 * AstroTracerTimeLimit when it reports one, otherwise base + margin.
+	 *
+	 * IT2 parity (MtpDevice.cs / MainWindow.xaml.cs): the "in astro mode"
+	 * signal is the exposure-mode dial value (offset 184) == ExpMode.AstroTracer
+	 * (20), and the long-exposure budget comes from AstroTracerTimeLimit
+	 * (offset 528).  The offset-504 capability bit (PENTAX_CONDITION_ASTROTRACER3)
+	 * only says the body CAN do astro; it is not a live-mode indicator, so it
+	 * must not gate this budget.  This is model-agnostic and therefore covers
+	 * the K-1 II (old-focus) as well as the K-3 III. */
+	if (pentax_conditions_in_astro_mode (conditions) &&
 	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
-		uint64_t astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE +
-			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		uint64_t astro_ms;
+		if (conditions->has_astro_limit)
+			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
+		else
+			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		astro_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer");
 		if (astro_ms > timeout)
 			timeout = astro_ms;
 	}
@@ -887,6 +901,22 @@ pentax_exposure_phase_ms (const PentaxConditions *conditions)
 			exposure_ms = multi_ms;
 	}
 
+	/* Astro Tracer: the exposure itself can run up to the camera's own
+	 * AstroTracerTimeLimit (offset 528), which IT2 caps the bulb timer at.
+	 * Honour that limit so a long astro exposure is not aborted before the
+	 * shutter closes.  Model-agnostic (K-1 II and K-3 III alike). */
+	if (pentax_conditions_in_astro_mode (conditions)) {
+		uint64_t astro_ms;
+
+		if (conditions->has_astro_limit)
+			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
+		else
+			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer exposure");
+		if (astro_ms > exposure_ms)
+			exposure_ms = astro_ms;
+	}
+
 	return (unsigned int) exposure_ms;
 }
 
@@ -905,6 +935,23 @@ pentax_camera_readiness (const unsigned char *data, unsigned int size)
 }
 
 int
+pentax_conditions_in_astro_mode (const PentaxConditions *conditions)
+{
+	if (conditions == NULL)
+		return 0;
+	/* IT2's authoritative "in astro mode" signal is the exposure-mode dial
+	 * value (offset 184) == ExpMode.AstroTracer (20).  The offset-320 shift
+	 * sub-state bit is also a live indicator of an in-progress astro pixel-shift,
+	 * so treat either as "in astro mode".  The offset-504 capability bit is
+	 * deliberately NOT used here: it only says the body CAN do astro. */
+	if (conditions->exposure_mode == PENTAX_EXP_MODE_ASTROTRACER)
+		return 1;
+	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)
+		return 1;
+	return 0;
+}
+
+int
 pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
 {
 	if (conditions == NULL)
@@ -915,8 +962,7 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
 	if (conditions->activity_flags &
 	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE))
 		return 1;
-	if (conditions->astro_status_flags &
-	    (PENTAX_CONDITION_ASTRO_SHIFT_MODE | PENTAX_CONDITION_ASTROTRACER3))
+	if (pentax_conditions_in_astro_mode (conditions))
 		return 1;
 	if (conditions->bulb_timer_seconds > 0)
 		return 1;

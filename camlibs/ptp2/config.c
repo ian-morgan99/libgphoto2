@@ -9388,7 +9388,7 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 	unsigned char *data = NULL;
 	unsigned int size = 0;
 	const char *phase;
-	char value[768];
+	char value[1024];
 	int parse_ret;
 	uint16_t ret;
 
@@ -9411,14 +9411,16 @@ _get_Pentax_Conditions (CONFIG_GET_ARGS)
 	else
 		phase = "inactive/other";
 	snprintf (value, sizeof (value),
-		"state=%u; astro-phase=%s; exposure-mode-raw=%u; user-mode-raw=%u; "
+		"state=%u; astro-phase=%s; exposure-mode-raw=%u; astro-mode=%s; "
+		"user-mode-raw=%u; "
 		"drive-mode-raw=%u; ISO=%u; exposure-step=%u; open-av-num=%u; "
 		"shooting=%s; processing=%s; task-changing=%s; Tv-changeable=%s; "
 		"bulb-timer=%s; bulb-seconds=%u/%u; aperture=%u/%u; "
-		"exposure-comp=%d/%u; astrotracer3=%s; "
+		"exposure-comp=%d/%u; astrotracer3-capable=%s; "
 		"astro-shift=%s; astro-movement-failed=%s; astro-time-too-long=%s; "
 		"astro-limit=%s%u; gps-state=%u",
 		conditions.operation_state, phase, conditions.exposure_mode,
+		pentax_conditions_in_astro_mode (&conditions) ? "yes" : "no",
 		conditions.user_mode, conditions.drive_mode, conditions.iso,
 		conditions.exposure_step, conditions.open_av_num,
 		(conditions.activity_flags & PENTAX_CONDITION_ACTIVITY_SHOOTING) ? "yes" : "no",

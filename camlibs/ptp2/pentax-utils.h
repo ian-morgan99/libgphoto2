@@ -113,7 +113,16 @@ typedef struct {
 #define PENTAX_CONDITION_TASK_CHANGING            0x00000020U
 #define PENTAX_CONDITION_BULB_TIMER               0x00000040U
 #define PENTAX_CONDITION_GPS_STATE_MASK           0x00000180U
+/* IT2 ModeEnableInfo.AstroTracer3 (MtpDevice.cs:5926): a CAPABILITY bit in the
+ * offset-504 field (capability_flags), NOT an offset-320 astro status bit.  It
+ * says "this body can do Astro Tracer", not "it is currently exposing". */
 #define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
+
+/* IT2 ExpMode.AstroTracer (ExpMode.cs): the exposure-mode-dial value that
+ * selects Astro Tracer.  Read from conditions offset 184 (exposure_mode).  This
+ * is the signal IT2 uses to switch to the long-exposure / bulb-timer path and is
+ * model-agnostic, so it works for the K-1 II (old-focus) as well as the K-3 III. */
+#define PENTAX_EXP_MODE_ASTROTRACER 20U
 
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
@@ -215,6 +224,14 @@ PentaxReadiness pentax_camera_readiness (const unsigned char *data,
  * captures return immediately — Benro regains control through the normal
  * completion path without an invented readiness state machine. */
 int pentax_capture_needs_idle_wait (const PentaxConditions *conditions);
+
+/* Whether the camera is currently in Astro Tracer mode, per IT2's own signal:
+ * the exposure-mode dial value (offset 184) equals ExpMode.AstroTracer (20).
+ * This is the authoritative "in astro mode" test — the offset-504 capability
+ * bit (PENTAX_CONDITION_ASTROTRACER3) only says the body CAN do it, and the
+ * offset-320 status bits describe shift/aperture sub-states, not the mode.
+ * Model-agnostic, so it covers the K-1 II as well as the K-3 III. */
+int pentax_conditions_in_astro_mode (const PentaxConditions *conditions);
 
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,

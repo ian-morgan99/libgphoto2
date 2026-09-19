@@ -610,9 +610,26 @@ main (void)
 	CHECK (pentax_capture_timeout_ms (&conditions) ==
 		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
 
+	/* Astro Tracer live mode is signalled by the exposure-mode dial value
+	 * (offset 184) == ExpMode.AstroTracer (20), NOT by the offset-504
+	 * capability bit.  The capability bit alone must not widen the budget:
+	 * a body that CAN do astro but is currently in P mode stays at base. */
 	memset (&conditions, 0, sizeof (conditions));
-	conditions.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
+	conditions.capability_flags = PENTAX_CONDITION_ASTROTRACER3;
+	CHECK (pentax_capture_timeout_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	/* In astro mode with no reported limit: base + margin. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
 	CHECK (pentax_capture_timeout_ms (&conditions) == 90000); /* base + margin */
+
+	/* In astro mode with a reported AstroTracerTimeLimit: honour the limit. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+	conditions.has_astro_limit = 1;
+	conditions.astro_limit_seconds = 300; /* 301s + margin */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 331000);
 
 	/* Exposure-phase budget (issue #111): the time the camera needs to
 	 * complete the exposure itself, before post-exposure processing.  This is
@@ -637,6 +654,26 @@ main (void)
 	 * base: 30s bulb * 4 = 120s > 60s base. */
 	conditions.bulb_timer_seconds = 30;
 	CHECK (pentax_exposure_phase_ms (&conditions) == 124000); /* 31s*4 */
+
+	/* Astro Tracer exposure phase: honour the camera's own AstroTracerTimeLimit
+	 * so a long astro exposure is not aborted before the shutter closes.  The
+	 * capability bit alone (body CAN do astro) must not widen the phase. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.capability_flags = PENTAX_CONDITION_ASTROTRACER3;
+	CHECK (pentax_exposure_phase_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+	conditions.has_astro_limit = 1;
+	conditions.astro_limit_seconds = 300; /* 301s exposure phase */
+	CHECK (pentax_exposure_phase_ms (&conditions) == 301000);
+
+	/* In astro mode with no reported limit: the base dominates. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+	CHECK (pentax_exposure_phase_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
 
 	/* Overflow-safe clamp: a corrupt UINT32_MAX bulb timer must not wrap the
 	 * 64-bit math or exceed the ceiling. */
@@ -748,24 +785,45 @@ main (void)
         CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
                == PENTAX_READINESS_BUSY);
 
-        /* Idle-wait gate (issue #122): ordinary single-shot captures skip the
-         * post-capture wait; multi-shot / astro / bulb keep it. */
-        {
-                PentaxConditions g;
-                memset (&g, 0, sizeof (g));
-                CHECK (!pentax_capture_needs_idle_wait (&g));
-                CHECK (!pentax_capture_needs_idle_wait (NULL));
-                g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
-                CHECK (pentax_capture_needs_idle_wait (&g));
-                memset (&g, 0, sizeof (g));
-                g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE;
-                CHECK (pentax_capture_needs_idle_wait (&g));
-                memset (&g, 0, sizeof (g));
-                g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
-                CHECK (pentax_capture_needs_idle_wait (&g));
-                memset (&g, 0, sizeof (g));
-                g.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
-                CHECK (pentax_capture_needs_idle_wait (&g));
+/* Astro-mode detection (IT2 parity): the live signal is the exposure-mode
+	 * dial value == ExpMode.AstroTracer (20) or an in-progress astro shift.  The
+	 * offset-504 capability bit alone must NOT count as "in astro mode". */
+	{
+		PentaxConditions g;
+		memset (&g, 0, sizeof (g));
+		CHECK (!pentax_conditions_in_astro_mode (&g));
+		CHECK (!pentax_conditions_in_astro_mode (NULL));
+		g.capability_flags = PENTAX_CONDITION_ASTROTRACER3; /* can do astro */
+		CHECK (!pentax_conditions_in_astro_mode (&g));
+		memset (&g, 0, sizeof (g));
+		g.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+		CHECK (pentax_conditions_in_astro_mode (&g));
+		memset (&g, 0, sizeof (g));
+		g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
+		CHECK (pentax_conditions_in_astro_mode (&g));
+	}
+
+	/* Idle-wait gate (issue #122): ordinary single-shot captures skip the
+	 * post-capture wait; multi-shot / astro / bulb keep it. */
+	{
+		PentaxConditions g;
+		memset (&g, 0, sizeof (g));
+		CHECK (!pentax_capture_needs_idle_wait (&g));
+		CHECK (!pentax_capture_needs_idle_wait (NULL));
+		g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
+		CHECK (pentax_capture_needs_idle_wait (&g));
+		memset (&g, 0, sizeof (g));
+		g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE;
+		CHECK (pentax_capture_needs_idle_wait (&g));
+		memset (&g, 0, sizeof (g));
+		g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
+		CHECK (pentax_capture_needs_idle_wait (&g));
+		memset (&g, 0, sizeof (g));
+		g.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER; /* live astro mode */
+		CHECK (pentax_capture_needs_idle_wait (&g));
+		memset (&g, 0, sizeof (g));
+		g.capability_flags = PENTAX_CONDITION_ASTROTRACER3; /* can, not in */
+		CHECK (!pentax_capture_needs_idle_wait (&g));
                 memset (&g, 0, sizeof (g));
                 g.bulb_timer_seconds = 120;
                 CHECK (pentax_capture_needs_idle_wait (&g));
