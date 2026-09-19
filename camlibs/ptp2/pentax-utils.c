@@ -882,6 +882,39 @@ pentax_exposure_phase_ms (const PentaxConditions *conditions)
 	return (unsigned int) exposure_ms;
 }
 
+PentaxReadiness
+pentax_camera_readiness (const unsigned char *data, unsigned int size)
+{
+	if ((data == NULL) || (size < PENTAX_CONDITIONS_MIN_SIZE))
+		return PENTAX_READINESS_UNKNOWN;
+	{
+		uint32_t activity = pentax_get_u32le (data + 104);
+		uint32_t candidate = pentax_get_u32le (data + 36);
+		if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !candidate)
+			return PENTAX_READINESS_IDLE;
+		return PENTAX_READINESS_BUSY;
+	}
+}
+
+int
+pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
+{
+	if (conditions == NULL)
+		return 0;
+	/* Multi-shot composites (pixel shift, DNR) and astro modes keep processing
+	 * after the last candidate is consumed; bulb exposures run a long timer.
+	 * Ordinary single-shot captures do not need the wait (issue #122). */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE))
+		return 1;
+	if (conditions->astro_status_flags &
+	    (PENTAX_CONDITION_ASTRO_SHIFT_MODE | PENTAX_CONDITION_ASTROTRACER3))
+		return 1;
+	if (conditions->bulb_timer_seconds > 0)
+		return 1;
+	return 0;
+}
+
 /* Bounded reconciliation of extra transfer candidates from a dual-format
  * exposure (issue #73).  After the primary candidate has been transferred
  * and finalized, this loop detects and consumes any remaining candidates

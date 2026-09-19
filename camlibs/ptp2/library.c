@@ -6498,21 +6498,23 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			if (drain_ok && drained) {
 				/* Wait (bounded) for the camera to report idle before firing. */
 				int wait_attempt;
-				for (wait_attempt = 0; wait_attempt < 50; wait_attempt++) {
-					unsigned char *wdata = NULL;
-					unsigned int wsize = 0;
-					uint32_t activity = 0, wcandidate = 0;
+			for (wait_attempt = 0; wait_attempt < 50; wait_attempt++) {
+				unsigned char *wdata = NULL;
+				unsigned int wsize = 0;
 
-					if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &wdata, &wsize) &&
-					    wsize >= PENTAX_CONDITIONS_MIN_SIZE) {
-						activity = pentax_get_u32le (wdata + 104);
-						wcandidate = pentax_get_u32le (wdata + 36);
-					}
+				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &wdata, &wsize)) {
+					/* Issue #122: a failed/short read is UNKNOWN, never IDLE. */
 					free (wdata);
-					if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !wcandidate)
-						break;
 					usleep (200 * 1000);
+					continue;
 				}
+				if (pentax_camera_readiness (wdata, wsize) == PENTAX_READINESS_IDLE) {
+					free (wdata);
+					break;
+				}
+				free (wdata);
+				usleep (200 * 1000);
+			}
 				GP_LOG_D ("pre-capture drain complete: %d stale candidate(s) consumed", drained);
 			} else if (drained) {
 				GP_LOG_E ("stale transfer candidate still pending after "
@@ -6542,6 +6544,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 	unsigned int exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 	int conditions_known = 0;
+	int needs_idle_wait = 0;
 	{
 		PentaxConditions conditions;
 		int attempt;
@@ -6575,6 +6578,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			if (exposure_phase_ms > capture_timeout_ms)
 				exposure_phase_ms = capture_timeout_ms;
 			conditions_known = 1;
+		if (pentax_capture_needs_idle_wait (&conditions))
+			needs_idle_wait = 1;
 		}
 		free (data);
 		data = NULL;
@@ -6845,30 +6850,43 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		int idle_wait_ms = 0;
 		const int IDLE_WAIT_MAX_MS = 60 * 1000;
 
-		while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
-			unsigned char *idata = NULL;
-			unsigned int isize = 0;
-			uint32_t activity = 0, icandidate = 0;
+		/* Issue #122: only multi-shot / astro / bulb captures can still be
+		 * processing after all candidates are consumed.  Ordinary single-shot
+		 * captures return through the normal completion path so Benro regains
+		 * control immediately — an unconditional wait here is exactly what
+		 * wedged the camera until a mode toggle + USB reset. */
+		if (needs_idle_wait) {
+			while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
+				unsigned char *idata = NULL;
+				unsigned int isize = 0;
+				PentaxReadiness readiness;
 
-			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
-				break;
-			if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &idata, &isize) &&
-			    isize >= PENTAX_CONDITIONS_MIN_SIZE) {
-				activity = pentax_get_u32le (idata + 104);
-				icandidate = pentax_get_u32le (idata + 36);
+				if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
+					break;
+				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &idata, &isize)) {
+					/* A failed read is UNKNOWN, never IDLE: keep polling. */
+					free (idata);
+					usleep (500 * 1000);
+					idle_wait_ms += 500;
+					continue;
+				}
+				readiness = pentax_camera_readiness (idata, isize);
+				free (idata);
+				if (readiness == PENTAX_READINESS_IDLE) {
+					GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
+					break;
+				}
+				/* BUSY or UNKNOWN: keep polling within the bound. */
+				usleep (500 * 1000);
+				idle_wait_ms += 500;
 			}
-			free (idata);
-			if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !icandidate) {
-				GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
-				break;
-			}
-			usleep (500 * 1000);
-			idle_wait_ms += 500;
+			if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
+				GP_LOG_E ("camera still busy after %d ms post-capture wait; "
+					"proceeding — next capture's pre-probe will handle it",
+					idle_wait_ms);
+		} else {
+			GP_LOG_D ("single-shot capture: skipping post-capture idle wait");
 		}
-		if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
-			GP_LOG_E ("camera still busy after %d ms post-capture wait; "
-				"proceeding — next capture's pre-probe will handle it",
-				idle_wait_ms);
 	}
 
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);

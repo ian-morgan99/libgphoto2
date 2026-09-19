@@ -726,6 +726,51 @@ main (void)
 		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, 3) == -1);
 	}
 
+
+        /* Post-capture readiness tri-state (issue #122): only a VALID frame may
+         * prove idle.  A failed/short read must classify as UNKNOWN, never IDLE
+         * - treating it as idle let Benro fire the next shutter while the camera
+         * was still busy and wedge it until a mode toggle + USB reset. */
+        CHECK (pentax_camera_readiness (NULL, 0) == PENTAX_READINESS_UNKNOWN);
+        CHECK (pentax_camera_readiness (condition_data, PENTAX_CONDITIONS_MIN_SIZE - 1)
+               == PENTAX_READINESS_UNKNOWN);
+        memset (condition_data, 0, sizeof (condition_data));
+        /* Valid frame, no activity, no pending candidate -> IDLE. */
+        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
+               == PENTAX_READINESS_IDLE);
+        /* Busy: unsafe activity flag set. */
+        put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
+        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
+               == PENTAX_READINESS_BUSY);
+        memset (condition_data, 0, sizeof (condition_data));
+        /* Busy: pending transfer candidate. */
+        put_u32le (condition_data, 36, 77);
+        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
+               == PENTAX_READINESS_BUSY);
+
+        /* Idle-wait gate (issue #122): ordinary single-shot captures skip the
+         * post-capture wait; multi-shot / astro / bulb keep it. */
+        {
+                PentaxConditions g;
+                memset (&g, 0, sizeof (g));
+                CHECK (!pentax_capture_needs_idle_wait (&g));
+                CHECK (!pentax_capture_needs_idle_wait (NULL));
+                g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
+                CHECK (pentax_capture_needs_idle_wait (&g));
+                memset (&g, 0, sizeof (g));
+                g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE;
+                CHECK (pentax_capture_needs_idle_wait (&g));
+                memset (&g, 0, sizeof (g));
+                g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
+                CHECK (pentax_capture_needs_idle_wait (&g));
+                memset (&g, 0, sizeof (g));
+                g.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
+                CHECK (pentax_capture_needs_idle_wait (&g));
+                memset (&g, 0, sizeof (g));
+                g.bulb_timer_seconds = 120;
+                CHECK (pentax_capture_needs_idle_wait (&g));
+        }
+
 	free (buffer.data);
 	return 0;
 }

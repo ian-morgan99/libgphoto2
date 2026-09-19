@@ -192,6 +192,30 @@ unsigned int pentax_capture_timeout_ms (const PentaxConditions *conditions);
  * all-in budget before RAW processing even starts. */
 unsigned int pentax_exposure_phase_ms (const PentaxConditions *conditions);
 
+/* Post-capture readiness tri-state (issue #122 / libgphoto2 #73): only a VALID
+ * conditions frame may prove the camera idle.  A failed or short read is
+ * UNKNOWN, never IDLE — treating it as idle let Benro fire the next shutter
+ * while the camera was still busy, wedging it until a mode toggle + USB reset. */
+typedef enum {
+	PENTAX_READINESS_IDLE = 0,	/* valid frame: no unsafe activity, no candidate */
+	PENTAX_READINESS_BUSY = 1,	/* valid frame: unsafe activity or pending candidate */
+	PENTAX_READINESS_UNKNOWN = 2 /* read failed or frame too short to trust */
+} PentaxReadiness;
+
+/* Classify a raw conditions frame.  data/size are the GetAllConditions payload
+ * (may be NULL/0).  Returns IDLE only when the frame is valid AND proves idle;
+ * BUSY when the frame is valid and shows activity or a pending candidate;
+ * UNKNOWN when the read failed or the frame is shorter than MIN_SIZE. */
+PentaxReadiness pentax_camera_readiness (const unsigned char *data,
+		   unsigned int size);
+
+/* Whether the post-capture idle wait applies to this capture (issue #122):
+ * multi-shot composites, astro shift/tracer and bulb exposures can still be
+ * processing after all candidates are consumed.  Ordinary single-shot JPEG/RAW
+ * captures return immediately — Benro regains control through the normal
+ * completion path without an invented readiness state machine. */
+int pentax_capture_needs_idle_wait (const PentaxConditions *conditions);
+
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 	PentaxLiveViewGeometry *geometry);
