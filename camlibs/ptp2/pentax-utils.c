@@ -852,7 +852,15 @@ pentax_exposure_phase_ms (const PentaxConditions *conditions)
 	 * second of settle so the candidate is not polled before the shutter
 	 * has actually closed.  This is the exposure phase only — post-exposure
 	 * processing (RAW conversion, candidate publication) is budgeted
-	 * separately by pentax_capture_timeout_ms(). */
+	 * separately by pentax_capture_timeout_ms().
+	 *
+	 * Issue #120: the camera's own conditions report bulb_timer_seconds as the
+	 * exposure duration (offset 272, whole seconds; offset 276 is the TV
+	 * denominator, not a timer fraction — confirmed against IT2 which builds a
+	 * TimeSpan from offset 272 directly).  The observed "countdown then a short
+	 * exposure" symptom in some modes is the camera/app treating the value as a
+	 * pre-shot delay; that is firmware behaviour outside this wait budget, so
+	 * the budget here correctly sizes to the full timer value. */
 	if (conditions->bulb_timer_seconds > 0) {
 		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
 
