@@ -253,6 +253,14 @@ main (void)
 	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499));
 	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0));
 	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500));
+	/* Issue #86: the K-1 II empty-frame transition returns 0x2002 with a
+	 * zero-byte data phase; it must be retried within the same bounded window
+	 * so a transient empty frame does not tear down live view and take the
+	 * camera off USB. */
+	CHECK (pentax_live_view_frame_should_retry (0x2002, 1, 0));
+	CHECK (pentax_live_view_frame_should_retry (0x2002, 29, 1499));
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 30, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 1500));
 	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0));
 	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));

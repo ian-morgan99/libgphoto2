@@ -171,8 +171,18 @@ pentax_live_view_frame_should_retry (uint16_t response,
 		unsigned int attempts, unsigned int elapsed_ms)
 {
 	/* IT2 identifies 0xa008 as NoUpdateImage.  Thirty attempts at its 33 ms
-	 * cadence are permitted, with an independent 1.5 second wall-time cap. */
-	return (response == 0xa008) && (attempts < 30) && (elapsed_ms < 1500);
+	 * cadence are permitted, with an independent 1.5 second wall-time cap.
+	 *
+	 * Issue #86: the K-1 II also returns PTP_RC_GeneralError (0x2002) with a
+	 * zero-byte data phase when PC live view has no fresh frame to hand over
+	 * (the observed "valid 0x2001 frames -> 0x2002 with 0 bytes" transition).
+	 * Treating that as terminal tore the live view down immediately, which is
+	 * what took the camera off USB.  Retry it within the same bounded window so
+	 * a transient empty frame does not poison the session; a genuinely stuck
+	 * stream still times out at the 30-attempt / 1.5 s bound and only then is
+	 * the live view restored. */
+	return ((response == 0xa008) || (response == 0x2002)) &&
+		(attempts < 30) && (elapsed_ms < 1500);
 }
 
 int
