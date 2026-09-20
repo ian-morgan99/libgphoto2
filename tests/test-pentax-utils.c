@@ -249,19 +249,23 @@ main (void)
 	fallback = 99;
 	CHECK (pentax_live_view_zoom_fallback (10, 0x201c, &fallback) == 0);
 	CHECK (fallback == 99);
-	CHECK (pentax_live_view_frame_should_retry (0xa008, 1, 0));
-	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499));
-	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500));
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 1, 0, 0));
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500, 0));
 	/* Issue #86: the K-1 II empty-frame transition returns 0x2002 with a
 	 * zero-byte data phase; it must be retried within the same bounded window
 	 * so a transient empty frame does not tear down live view and take the
 	 * camera off USB. */
-	CHECK (pentax_live_view_frame_should_retry (0x2002, 1, 0));
-	CHECK (pentax_live_view_frame_should_retry (0x2002, 29, 1499));
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 30, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 1500));
-	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0));
+	/* Zero-byte 0x2002 (the K-1 II empty-frame transition) is retried. */
+	CHECK (pentax_live_view_frame_should_retry (0x2002, 1, 0, 0));
+	CHECK (pentax_live_view_frame_should_retry (0x2002, 29, 1499, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 30, 0, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 1500, 0));
+	/* Non-empty 0x2002 (genuine GeneralError with a data phase) is NOT retried. */
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 0, 64));
+	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 0, 1));
+	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0, 0));
 	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78420) && (extension_version == 1));
@@ -792,6 +796,45 @@ main (void)
         put_u32le (condition_data, 36, 77);
         CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
                == PENTAX_READINESS_BUSY);
+
+        /* Issue #122 (TA follow-up): fail-closed readiness wait.  Only a
+         * POSITIVE IDLE transition may complete; bound exhaustion on BUSY or
+         * UNKNOWN must report "not idle" so the caller returns CAMERA_BUSY
+         * instead of claiming a successful capture. */
+        {
+                struct mock_reader {
+                        unsigned char frame[532];
+                        int fail_read;
+                        int calls;
+                } mr;
+
+                int
+                mock_read_conditions (void *user_data, unsigned char **data,
+                                      unsigned int *size)
+                {
+                        struct mock_reader *m = user_data;
+                        m->calls++;
+                        if (m->fail_read)
+                                return 1;            /* non-PTP_RC_OK -> UNKNOWN */
+                        *data = malloc (sizeof (m->frame));
+                        if (*data)
+                                memcpy (*data, m->frame, sizeof (m->frame));
+                        *size = sizeof (m->frame);
+                        return 0;                   /* PTP_RC_OK */
+                }
+
+                memset (&mr, 0, sizeof (mr));
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 1);
+                CHECK (mr.calls >= 1);
+
+                memset (&mr, 0, sizeof (mr));
+                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 0);
+
+                memset (&mr, 0, sizeof (mr));
+                mr.fail_read = 1;
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 0);
+        }
 
 /* Astro-mode detection (IT2 parity): the live signal is the exposure-mode
 	 * dial value == ExpMode.AstroTracer (20) or an in-progress astro shift.  The

@@ -225,6 +225,17 @@ PentaxReadiness pentax_camera_readiness (const unsigned char *data,
  * completion path without an invented readiness state machine. */
 int pentax_capture_needs_idle_wait (const PentaxConditions *conditions);
 
+/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.  Polls
+ * read_cb (a conditions reader returning 0/PTP_RC_OK on success) until
+ * pentax_camera_readiness() reports a POSITIVE IDLE transition, bounded by
+ * max_ms.  Returns 1 only when IDLE was actually observed; returns 0 when the
+ * bound is exhausted while the camera is still BUSY or UNKNOWN - in which case
+ * the caller must treat the capture as not-ready (GP_ERROR_CAMERA_BUSY), never
+ * as a successful completion.  A failed read is UNKNOWN, never IDLE. */
+int pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
+                      unsigned int *size),
+              void *user_data, int max_ms);
+
 /* Whether the camera is currently in Astro Tracer mode, per IT2's own signal:
  * the exposure-mode dial value (offset 184) equals ExpMode.AstroTracer (20).
  * This is the authoritative "in astro mode" test — the offset-504 capability
@@ -245,8 +256,13 @@ int pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
 int pentax_live_view_stop_response_ok (uint16_t response);
 int pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 	uint8_t *fallback);
+/* Issue #86: should the preview frame fetch be retried?  0xa008 (NoUpdateImage)
+ * is always retried within the bounded window.  0x2002 (GeneralError) is retried
+ * ONLY when the data phase was zero bytes (the K-1 II empty-frame transition);
+ * a non-empty 0x2002 carries a genuine failure context and remains terminal. */
 int pentax_live_view_frame_should_retry (uint16_t response,
-	unsigned int attempts, unsigned int elapsed_ms);
+	unsigned int attempts, unsigned int elapsed_ms,
+	unsigned int data_size);
 int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,

@@ -3796,9 +3796,9 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			clock_gettime (CLOCK_MONOTONIC, &preview_now);
 			elapsed_ms = (unsigned int)((preview_now.tv_sec - preview_start.tv_sec) * 1000 +
 				(preview_now.tv_nsec - preview_start.tv_nsec) / 1000000);
-			if (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms))
+			if (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms, size))
 				usleep (33000);
-		} while (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms));
+		} while (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms, size));
 		gp_context_status (context,
 			_("Pentax preview stage get-frame returned 0x%04x (%u bytes, %u attempts, %u ms)."),
 			ret, size, attempts, elapsed_ms);
@@ -6319,6 +6319,19 @@ camera_get_extra_capture_files (Camera *camera, CameraFilePath *paths,
 	return GP_OK;
 }
 
+/* Issue #122: conditions reader for the fail-closed post-capture readiness wait.
+ * Returns 0 (PTP_RC_OK) on a successful read so pentax_wait_for_idle() can
+ * classify the frame; any other value is treated as UNKNOWN, never IDLE. */
+static int
+pentax_capture_read_conditions (void *user_data, unsigned char **data,
+                                unsigned int *size)
+{
+        PTPParams *params = user_data;
+
+        return ptp_pentax_get_all_conditions (params, data, size);
+}
+
+
 static int
 camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 {
@@ -6884,24 +6897,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * never firing Benro into an unproven-busy camera.  Multi-shot / astro /
 	 * bulb keep the long bound because they can genuinely process for minutes. */
 	{
-		int idle_wait_ms = 0;
+		/* Issue #122 (TA follow-up): fail-closed readiness gate.  Only a POSITIVE
+		 * IDLE transition may complete the capture successfully.  If the bound is
+		 * exhausted while the camera is still BUSY or UNKNOWN, return
+		 * GP_ERROR_CAMERA_BUSY instead of claiming normal completion - a timer
+		 * expiring is not equivalent to an observed IDLE transition. */
 		const int IDLE_WAIT_MAX_MS = needs_idle_wait ?
 			60 * 1000 : 15 * 1000;
 
-		while (idle_wait_ms < IDLE_WAIT_MAX_MS) {
-			unsigned char *idata = NULL;
-			unsigned int isize = 0;
-			PentaxReadiness readiness;
-
-			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
-				break;
-			if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &idata, &isize)) {
-				/* A failed read is UNKNOWN, never IDLE: keep polling. */
-				free (idata);
-				usleep (500 * 1000);
-				idle_wait_ms += 500;
-				continue;
-			}
+		if (!pentax_wait_for_idle (pentax_capture_read_conditions, params,
+					 IDLE_WAIT_MAX_MS)) {
+			GP_LOG_E ("camera not proven idle after %d ms post-capture wait%s; "
+				"returning CAMERA_BUSY instead of claiming completion",
+				IDLE_WAIT_MAX_MS, needs_idle_wait ? "" : " (single-shot short bound)");
+			gp_context_error (context,
+				_("The camera is still processing the capture; try again shortly."));
+			ret = GP_ERROR_CAMERA_BUSY;
+			goto out;
+		}
+	}
 			readiness = pentax_camera_readiness (idata, isize);
 			free (idata);
 			if (readiness == PENTAX_READINESS_IDLE) {

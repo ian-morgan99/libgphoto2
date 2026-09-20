@@ -168,7 +168,8 @@ pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 
 int
 pentax_live_view_frame_should_retry (uint16_t response,
-		unsigned int attempts, unsigned int elapsed_ms)
+		unsigned int attempts, unsigned int elapsed_ms,
+		unsigned int data_size)
 {
 	/* IT2 identifies 0xa008 as NoUpdateImage.  Thirty attempts at its 33 ms
 	 * cadence are permitted, with an independent 1.5 second wall-time cap.
@@ -181,8 +182,12 @@ pentax_live_view_frame_should_retry (uint16_t response,
 	 * a transient empty frame does not poison the session; a genuinely stuck
 	 * stream still times out at the 30-attempt / 1.5 s bound and only then is
 	 * the live view restored. */
-	return ((response == 0xa008) || (response == 0x2002)) &&
-		(attempts < 30) && (elapsed_ms < 1500);
+	if ((response == 0xa008) ||
+	    ((response == 0x2002) && (data_size == 0)))
+		return (attempts < 30) && (elapsed_ms < 1500);
+	/* A non-empty 0x2002 (genuine GeneralError with a data phase) is NOT
+	 * the K-1 II empty-frame transition; it remains terminal. */
+	return 0;
 }
 
 int
@@ -1162,4 +1167,48 @@ pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
 	}
 	snprintf (buf, buflen, "%u/%u", numerator, denominator);
 	return 0;
+}
+
+/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.
+ *
+ * The capture path must only return success when the camera has POSITIVELY
+ * reported IDLE.  A timer expiring while the camera is still BUSY or UNKNOWN
+ * is NOT equivalent to an observed IDLE transition, so the caller must treat
+ * exhaustion as "camera busy" (GP_ERROR_CAMERA_BUSY), not as a successful
+ * completion.  This helper centralises that policy so it is deterministic and
+ * unit-testable: it polls read_cb until pentax_camera_readiness() returns
+ * IDLE, and reports whether that positive transition was observed before the
+ * bound.  read_cb returns 0 (PTP_RC_OK) on a successful conditions read and
+ * non-zero otherwise; a failed read is UNKNOWN, never IDLE. */
+int
+pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
+                                      unsigned int *size),
+                      void *user_data, int max_ms)
+{
+        int waited_ms = 0;
+
+        while (waited_ms < max_ms) {
+                unsigned char *idata = NULL;
+                unsigned int isize = 0;
+                PentaxReadiness readiness;
+
+                if (read_cb (user_data, &idata, &isize) != 0) {
+                        /* A failed/short read is UNKNOWN, never IDLE: keep polling. */
+                        free (idata);
+                        usleep (500 * 1000);
+                        waited_ms += 500;
+                        continue;
+                }
+                readiness = pentax_camera_readiness (idata, isize);
+                free (idata);
+                if (readiness == PENTAX_READINESS_IDLE) {
+                        GP_LOG_D ("camera idle after capture (waited %d ms)", waited_ms);
+                        return 1;        /* positive IDLE observed */
+                }
+                /* BUSY or UNKNOWN: keep polling within the bound. */
+                usleep (500 * 1000);
+                waited_ms += 500;
+        }
+        GP_LOG_E ("camera still busy/unknown after %d ms post-capture wait", waited_ms);
+        return 0;        /* bound exhausted without a positive IDLE */
 }
