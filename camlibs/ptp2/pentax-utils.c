@@ -1179,11 +1179,23 @@ pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
  * unit-testable: it polls read_cb until pentax_camera_readiness() returns
  * IDLE, and reports whether that positive transition was observed before the
  * bound.  read_cb returns 0 (PTP_RC_OK) on a successful conditions read and
- * non-zero otherwise; a failed read is UNKNOWN, never IDLE. */
+ * non-zero otherwise; a failed read is UNKNOWN, never IDLE.
+ *
+ * Cancellation (issue #122 follow-up): the pre-refactor inline loop checked
+ * gp_context_cancel() on every iteration so a user/app cancel could not be
+ * swallowed by the full 15 s / 60 s bound.  This helper preserves that: if
+ * cancel_cb is non-NULL it is polled at the top of each iteration and, when it
+ * reports a cancel, the wait returns -1 promptly (without consuming the
+ * remaining bound) so the caller propagates GP_ERROR_CANCEL.  Cancellation is
+ * distinct from "not idle": a cancel exits immediately, whereas bound
+ * exhaustion on BUSY/UNKNOWN still returns 0 (camera busy). */
 int
 pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
                                       unsigned int *size),
-                      void *user_data, int max_ms)
+                      void *user_data,
+                      int (*cancel_cb) (void *cancel_user_data),
+                      void *cancel_user_data,
+                      int max_ms)
 {
         int waited_ms = 0;
 
@@ -1191,6 +1203,11 @@ pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
                 unsigned char *idata = NULL;
                 unsigned int isize = 0;
                 PentaxReadiness readiness;
+
+                if (cancel_cb && cancel_cb (cancel_user_data)) {
+                        GP_LOG_D ("post-capture idle wait cancelled after %d ms", waited_ms);
+                        return -1;       /* cancelled: exit promptly, do not consume the bound */
+                }
 
                 if (read_cb (user_data, &idata, &isize) != 0) {
                         /* A failed/short read is UNKNOWN, never IDLE: keep polling. */

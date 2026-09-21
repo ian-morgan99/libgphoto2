@@ -824,16 +824,79 @@ main (void)
                 }
 
                 memset (&mr, 0, sizeof (mr));
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 1);
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 1);
                 CHECK (mr.calls >= 1);
 
                 memset (&mr, 0, sizeof (mr));
                 put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 0);
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
 
                 memset (&mr, 0, sizeof (mr));
                 mr.fail_read = 1;
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, 1000) == 0);
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
+        }
+
+        /* Issue #122 (TA follow-up): cancellation must be preserved across the
+         * refactor to pentax_wait_for_idle().  A cancel during BUSY/UNKNOWN polling
+         * must exit promptly (return -1) without consuming the remaining bound, and
+         * be distinct from "not idle" (which returns 0). */
+        {
+                struct mock_reader {
+                        unsigned char frame[532];
+                        int fail_read;
+                        int calls;
+                } mr;
+                struct mock_cancel {
+                        int cancel_after_calls;   /* report cancel once calls reach this */
+                        int calls;
+                } mc;
+
+                int
+                mock_read_conditions (void *user_data, unsigned char **data,
+                                      unsigned int *size)
+                {
+                        struct mock_reader *m = user_data;
+                        m->calls++;
+                        *data = malloc (sizeof (m->frame));
+                        if (*data)
+                                memcpy (*data, m->frame, sizeof (m->frame));
+                        *size = sizeof (m->frame);
+                        return 0;                   /* PTP_RC_OK */
+                }
+
+                int
+                mock_cancel (void *user_data)
+                {
+                        struct mock_cancel *m = user_data;
+                        m->calls++;
+                        return m->calls >= m->cancel_after_calls;
+                }
+
+                /* Cancel on the 2nd poll while the camera is BUSY: the wait must
+                 * return -1 promptly, well before the large bound would exhaust.
+                 * The cancel probe runs at the top of each iteration, so with
+                 * cancel_after_calls=2 it fires before the 2nd read -> only 1 read. */
+                memset (&mr, 0, sizeof (mr));
+                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING); /* BUSY */
+                memset (&mc, 0, sizeof (mc));
+                mc.cancel_after_calls = 2;
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr,
+                                             mock_cancel, &mc, 60 * 1000) == -1);
+                CHECK (mr.calls == 1);            /* exited promptly, not the full 60 s bound */
+
+                /* No cancel callback: same BUSY camera still exhausts the (small) bound
+                 * and reports "not idle" (0), proving cancellation is distinct from it. */
+                memset (&mr, 0, sizeof (mr));
+                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
+
+                /* Cancel on the very first poll: exits before any conditions read. */
+                memset (&mr, 0, sizeof (mr));
+                memset (&mc, 0, sizeof (mc));
+                mc.cancel_after_calls = 1;
+                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr,
+                                             mock_cancel, &mc, 60 * 1000) == -1);
+                CHECK (mr.calls == 0);            /* cancelled before the first read */
         }
 
 /* Astro-mode detection (IT2 parity): the live signal is the exposure-mode

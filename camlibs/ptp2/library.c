@@ -6331,6 +6331,20 @@ pentax_capture_read_conditions (void *user_data, unsigned char **data,
         return ptp_pentax_get_all_conditions (params, data, size);
 }
 
+/* Issue #122 (TA follow-up): cancellation probe for the post-capture readiness
+ * wait.  The pre-refactor inline loop checked gp_context_cancel() on every
+ * iteration so a user/app cancel could not be swallowed by the full 15 s / 60 s
+ * bound; this helper restores that across the refactor to pentax_wait_idle().
+ * Returns non-zero when the operation has been cancelled, which makes the wait
+ * exit promptly (returning -1) so the caller propagates GP_ERROR_CANCEL. */
+static int
+pentax_capture_cancel (void *user_data)
+{
+        GPContext *context = user_data;
+
+        return gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL;
+}
+
 
 static int
 camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
@@ -6905,8 +6919,21 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		const int IDLE_WAIT_MAX_MS = needs_idle_wait ?
 			60 * 1000 : 15 * 1000;
 
-		if (!pentax_wait_for_idle (pentax_capture_read_conditions, params,
-					 IDLE_WAIT_MAX_MS)) {
+		/* Issue #122 (TA follow-up): pass a cancellation probe so a user/app cancel
+		 * during the wait exits promptly (return -1) instead of blocking for the full
+		 * 15 s / 60 s bound.  Cancellation is distinct from "not idle": it propagates
+		 * GP_ERROR_CANCEL, whereas bound exhaustion on BUSY/UNKNOWN returns CAMERA_BUSY. */
+		int idle_result = pentax_wait_for_idle (pentax_capture_read_conditions, params,
+						  pentax_capture_cancel, context, IDLE_WAIT_MAX_MS);
+		if (idle_result == -1) {
+			GP_LOG_D ("post-capture idle wait cancelled; returning CANCEL");
+			ret = GP_ERROR_CANCEL;
+			goto out;
+		}
+		if (idle_result == 0) {
+			/* Bound exhausted while the camera is still BUSY or UNKNOWN: a timer
+			 * expiring is not equivalent to an observed IDLE transition, so return
+			 * CAMERA_BUSY instead of claiming normal completion. */
 			GP_LOG_E ("camera not proven idle after %d ms post-capture wait%s; "
 				"returning CAMERA_BUSY instead of claiming completion",
 				IDLE_WAIT_MAX_MS, needs_idle_wait ? "" : " (single-shot short bound)");
@@ -6915,21 +6942,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			ret = GP_ERROR_CAMERA_BUSY;
 			goto out;
 		}
-	}
-			readiness = pentax_camera_readiness (idata, isize);
-			free (idata);
-			if (readiness == PENTAX_READINESS_IDLE) {
-				GP_LOG_D ("camera idle after capture (waited %d ms)", idle_wait_ms);
-				break;
-			}
-			/* BUSY or UNKNOWN: keep polling within the bound. */
-			usleep (500 * 1000);
-			idle_wait_ms += 500;
-		}
-		if (idle_wait_ms >= IDLE_WAIT_MAX_MS)
-			GP_LOG_E ("camera still busy after %d ms post-capture wait%s; "
-				"proceeding — next capture's pre-probe will handle it",
-				idle_wait_ms, needs_idle_wait ? "" : " (single-shot short bound)");
 	}
 
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);

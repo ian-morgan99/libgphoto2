@@ -228,13 +228,26 @@ int pentax_capture_needs_idle_wait (const PentaxConditions *conditions);
 /* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.  Polls
  * read_cb (a conditions reader returning 0/PTP_RC_OK on success) until
  * pentax_camera_readiness() reports a POSITIVE IDLE transition, bounded by
- * max_ms.  Returns 1 only when IDLE was actually observed; returns 0 when the
- * bound is exhausted while the camera is still BUSY or UNKNOWN - in which case
- * the caller must treat the capture as not-ready (GP_ERROR_CAMERA_BUSY), never
- * as a successful completion.  A failed read is UNKNOWN, never IDLE. */
+ * max_ms.  Returns:
+ *   1  when IDLE was actually observed;
+ *   0  when the bound is exhausted while the camera is still BUSY or UNKNOWN -
+ *      in which case the caller must treat the capture as not-ready
+ *      (GP_ERROR_CAMERA_BUSY), never as a successful completion.  A failed read
+ *      is UNKNOWN, never IDLE.
+ *  -1  when cancel_cb (if non-NULL) reports a cancel while polling, so the wait
+ *      exits promptly without consuming the remaining bound and the caller
+ *      propagates GP_ERROR_CANCEL.  This preserves capture cancellation across
+ *      the refactor to this helper: the pre-refactor inline loop checked
+ *      gp_context_cancel() on every iteration (issue #122 follow-up).
+ * cancel_cb is invoked once per poll iteration with cancel_user_data and returns
+ * non-zero when the operation has been cancelled.  Pass NULL for both cancel
+ * parameters to disable cancellation checking. */
 int pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
                       unsigned int *size),
-              void *user_data, int max_ms);
+              void *user_data,
+              int (*cancel_cb) (void *cancel_user_data),
+              void *cancel_user_data,
+              int max_ms);
 
 /* Whether the camera is currently in Astro Tracer mode, per IT2's own signal:
  * the exposure-mode dial value (offset 184) equals ExpMode.AstroTracer (20).
