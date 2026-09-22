@@ -6581,6 +6581,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
+	/* The candidate is finalized.  A later error must not issue a second
+	 * DeleteTransferCandidate against the same completed exposure. */
+	have_candidate = 0;
 	initiated = 1;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
@@ -6894,59 +6897,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				"consumed and published", reconciled);
 	}
 
-	/* Wait for the camera to report idle before returning success.
-	 * In astro pixel-shift mode (and other multi-shot modes), the camera
-	 * may still be processing even after all candidates are consumed.
-	 * Without this wait, Benro Connect fires the next shutter release
-	 * while the camera is busy → InitiateCapture fails with CAMERA_BUSY.
-	 * Bounded so a wedged camera cannot hang the caller forever.
-	 *
-	 * Issue #122 (single-shot wedge): an ordinary single-shot capture was
-	 * previously returned to Benro immediately after reconciliation, even
-	 * though the camera can still be finishing internal processing (RAW
-	 * conversion, card write) for a short window.  Benro then fired the next
-	 * command into a busy camera and wedged until a mode toggle + USB reset.
-	 * Panorama / time-lapse did not reproduce it because their multi-shot
-	 * path already ran the long idle wait.  We therefore now run a SHORT
-	 * bounded readiness check for single-shot too: it proves the camera is
-	 * idle before control returns (the common case settles in well under the
-	 * bound), and only proceeds with a warning if the bound is exhausted —
-	 * never firing Benro into an unproven-busy camera.  Multi-shot / astro /
-	 * bulb keep the long bound because they can genuinely process for minutes. */
-	{
-		/* Issue #122 (TA follow-up): fail-closed readiness gate.  Only a POSITIVE
-		 * IDLE transition may complete the capture successfully.  If the bound is
-		 * exhausted while the camera is still BUSY or UNKNOWN, return
-		 * GP_ERROR_CAMERA_BUSY instead of claiming normal completion - a timer
-		 * expiring is not equivalent to an observed IDLE transition. */
-		const int IDLE_WAIT_MAX_MS = needs_idle_wait ?
-			60 * 1000 : 15 * 1000;
-
-		/* Issue #122 (TA follow-up): pass a cancellation probe so a user/app cancel
-		 * during the wait exits promptly (return -1) instead of blocking for the full
-		 * 15 s / 60 s bound.  Cancellation is distinct from "not idle": it propagates
-		 * GP_ERROR_CANCEL, whereas bound exhaustion on BUSY/UNKNOWN returns CAMERA_BUSY. */
-		int idle_result = pentax_wait_for_idle (pentax_capture_read_conditions, params,
-						  pentax_capture_cancel, context, IDLE_WAIT_MAX_MS);
-		if (idle_result == -1) {
-			GP_LOG_D ("post-capture idle wait cancelled; returning CANCEL");
-			ret = GP_ERROR_CANCEL;
-			goto out;
-		}
-		if (idle_result == 0) {
-			/* Bound exhausted while the camera is still BUSY or UNKNOWN: a timer
-			 * expiring is not equivalent to an observed IDLE transition, so return
-			 * CAMERA_BUSY instead of claiming normal completion. */
-			GP_LOG_E ("pentax-capture[%llu]: camera not proven idle after %d ms "
-				"post-capture wait%s; returning CAMERA_BUSY instead of claiming "
-				"completion", capture_id, IDLE_WAIT_MAX_MS,
-				needs_idle_wait ? "" : " (single-shot short bound)");
-			gp_context_error (context,
-				_("The camera is still processing the capture; try again shortly."));
-			ret = GP_ERROR_CAMERA_BUSY;
-			goto out;
-		}
-	}
+	/* o-v12e hardware evidence proved that this conditions predicate can remain
+	 * BUSY/UNKNOWN for 63 seconds while the K-3 III successfully accepts normal
+	 * identity/config traffic.  It is therefore not an API-completion predicate.
+	 * The file and camera-side candidate are already complete here.  Publish the
+	 * result now, and reuse the fail-closed recovery probe at the start of the
+	 * next capture so no later shutter is initiated without a fresh positive
+	 * idle observation. */
+	params->pentax.recovery_required = 1;
+	GP_LOG_D ("pentax-capture[%llu]: transfer/finalization complete; next shutter "
+		"requires a positive idle recovery probe", capture_id);
 
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
