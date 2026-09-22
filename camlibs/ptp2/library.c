@@ -6349,6 +6349,8 @@ pentax_capture_cancel (void *user_data)
 static int
 camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 {
+	static unsigned long long next_capture_id;
+	unsigned long long capture_id = __sync_add_and_fetch (&next_capture_id, 1);
 	PTPParams *params = &camera->pl->params;
 	PentaxCaptureBuffer capture = {0};
 	struct timeval started;
@@ -6372,6 +6374,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
 	/* Every capture starts with an empty extra-file list (issue #73):
 	 * the list always describes the most recent exposure only. */
 	params->pentax.extra_capture_count = 0;
@@ -6572,6 +6575,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	}
 
 	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	GP_LOG_D ("pentax-capture[%llu]: InitiateCapture returned 0x%04x",
+		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
@@ -6715,24 +6720,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
-		/* Attribute the timeout to the first failing boundary (issue #111):
-		 * a non-zero candidate_handle means the camera published a
-		 * transfer candidate before the budget ran out, so the wait was
-		 * spent in the post-exposure processing phase; a zero handle
-		 * means the exposure phase itself never published a candidate
-		 * within its budget. */
-		if (candidate_handle)
-			GP_LOG_E ("capture wait timed out in the post-exposure "
-				"processing phase (candidate observed, transfer not "
-				"finalized within %u ms)", capture_timeout_ms);
-		else
-			GP_LOG_E ("capture wait timed out in the exposure phase "
-				"(no transfer candidate observed within %u ms; "
-				"exposure budget was %u ms)", capture_timeout_ms,
-				exposure_phase_ms);
+		/* This loop exits as soon as a non-zero candidate is observed, so a
+		 * candidate-present timeout is mechanically impossible here.  The old
+		 * nested `if (candidate_handle)` made the advertised post-exposure
+		 * diagnostic unreachable and obscured the first real boundary. */
+		GP_LOG_E ("pentax-capture[%llu]: capture wait timed out before candidate "
+			"publication (%u ms total; exposure budget %u ms)", capture_id,
+			capture_timeout_ms, exposure_phase_ms);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}
+	GP_LOG_D ("pentax-capture[%llu]: candidate %u observed", capture_id,
+		candidate_handle);
 	params->pentax.candidate_handle = candidate_handle;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_CANDIDATE;
 	have_candidate = 1;
@@ -6820,6 +6819,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	transfer.bytes_transferred = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRANSFERRING;
 	ret = pentax_transfer_run (&capture, &transfer_operations);
+	GP_LOG_D ("pentax-capture[%llu]: transfer returned %d (%zu bytes)",
+		capture_id, ret, capture.size);
 	if (ret < GP_OK)
 		goto out;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_CACHING;
@@ -6846,6 +6847,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * discarded (issue #12). */
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_FINALIZING;
 	ptpres = ptp_pentax_delete_transfer_candidate (params);
+	GP_LOG_D ("pentax-capture[%llu]: DeleteTransferCandidate returned 0x%04x",
+		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
@@ -6934,9 +6937,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			/* Bound exhausted while the camera is still BUSY or UNKNOWN: a timer
 			 * expiring is not equivalent to an observed IDLE transition, so return
 			 * CAMERA_BUSY instead of claiming normal completion. */
-			GP_LOG_E ("camera not proven idle after %d ms post-capture wait%s; "
-				"returning CAMERA_BUSY instead of claiming completion",
-				IDLE_WAIT_MAX_MS, needs_idle_wait ? "" : " (single-shot short bound)");
+			GP_LOG_E ("pentax-capture[%llu]: camera not proven idle after %d ms "
+				"post-capture wait%s; returning CAMERA_BUSY instead of claiming "
+				"completion", capture_id, IDLE_WAIT_MAX_MS,
+				needs_idle_wait ? "" : " (single-shot short bound)");
 			gp_context_error (context,
 				_("The camera is still processing the capture; try again shortly."));
 			ret = GP_ERROR_CAMERA_BUSY;
@@ -6968,6 +6972,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
 	ret = GP_OK;
+	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
 
 out:
 	free (data);
@@ -7041,6 +7046,8 @@ out:
 	params->pentax.candidate_handle = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_IDLE;
 	SET_CONTEXT_P (params, NULL);
+	GP_LOG_D ("pentax-capture[%llu]: return %d initiated=%d candidate_live=%d",
+		capture_id, ret, initiated, have_candidate);
 	return ret;
 }
 
