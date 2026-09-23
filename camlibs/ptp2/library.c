@@ -6263,6 +6263,14 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		if (ret == GP_OK)
 			ret = gp_file_set_data_and_size (file, (char *)buffer->data,
 				buffer->size);
+		/* gp_file_set_data_and_size() takes ownership of the buffer.  Clear
+		 * the transfer object immediately so the reconciliation loop cannot
+		 * free the same bytes after this callback returns.  The primary-file
+		 * path follows the same ownership rule. */
+		if (ret == GP_OK) {
+			buffer->data = NULL;
+			buffer->size = 0;
+		}
 		if (ret == GP_OK) {
 			gp_file_set_mtime (file, time (NULL));
 			ret = gp_filesystem_append (rc->camera->fs, extra.folder,
