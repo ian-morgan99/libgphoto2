@@ -55,6 +55,7 @@ typedef struct {
         /* Fault injection. */
         int conditions_fail_first;   /* fail the first N get_conditions calls */
         int conditions_empty_first;  /* report empty for the first N reads */
+        int writing_format;          /* +524: 2 means RAW+JPEG */
         int conditions_calls;
         int transfer_error;          /* non-zero: transfer_candidate fails */
         int delete_error;            /* non-zero: delete_candidate fails */
@@ -78,7 +79,8 @@ mock_get_conditions (void *user_data, unsigned char **data, size_t *size)
                 *size = 0;
                 return GP_ERROR_IO;
         }
-        blob = calloc (1, PENTAX_CONDITIONS_MIN_SIZE);
+        size_t blob_size = mock->writing_format ? 576 : PENTAX_CONDITIONS_MIN_SIZE;
+        blob = calloc (1, blob_size);
         if (!blob) {
                 *data = NULL;
                 *size = 0;
@@ -89,8 +91,10 @@ mock_get_conditions (void *user_data, unsigned char **data, size_t *size)
                 put_u32le (blob, 32, 1);
                 put_u32le (blob, 36, mock->handles[0]);
         }
+        if (mock->writing_format)
+                put_u32le (blob, 524, (uint32_t)mock->writing_format);
         *data = blob;
-        *size = PENTAX_CONDITIONS_MIN_SIZE;
+        *size = blob_size;
         return GP_OK;
 }
 
@@ -224,6 +228,22 @@ main (void)
         CHECK (mock.delete_calls == 2);
         CHECK (!strcmp (names[0], "IMG_0001.ARW"));
         CHECK (!strcmp (names[1], "IMG_0001.JPG"));
+
+        /* RAW+JPEG: an initially empty post-primary sample is not completion.
+         * The camera's +524 contract requires the delayed companion. */
+        mock_reset (&mock);
+        mock.writing_format = 2;
+        mock.conditions_empty_first = 1;
+        mock.handles[0] = 202;
+        mock.handle_count = 1;
+        mock.names[0] = "IMG_0002.DNG";
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+        CHECK (ret == GP_OK);
+        CHECK (count == 1);
+        CHECK (mock.conditions_calls >= 2);
+        CHECK (mock.transfer_calls == 1);
+        CHECK (mock.delete_calls == 1);
 
         /* 4. Transfer failure: error propagates, count reflects completed. */
         mock_reset (&mock);

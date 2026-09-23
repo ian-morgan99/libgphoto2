@@ -750,6 +750,8 @@ pentax_recovery_probe_ok (const unsigned char *data, size_t size)
 		return 0;
 	if (pentax_get_u32le (data + 32) == 1)
 		return 0;
+	if (pentax_get_u32le (data + 36) != 0)
+		return 0;
 	return 1;
 }
 
@@ -1024,6 +1026,7 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 	struct timespec start, now;
 	int count = 0;
 	int ret = GP_OK;
+	unsigned int required_count = min_count;
 
 	if (!ops || !reconciled_count) {
 		if (reconciled_count)
@@ -1066,6 +1069,15 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			continue;
 		}
 
+		/* The output contract and candidate flag are observations from one
+		 * serialized conditions sample. RAW+JPEG means one companion must be
+		 * observed after the already-finalized primary. Pixel Shift actuation
+		 * count does not change the number of output objects. */
+		if (pentax_expected_extra_candidates (cdata, csize) > required_count) {
+			required_count = pentax_expected_extra_candidates (cdata, csize);
+			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
+				required_count);
+		}
 		handle = 0;
 		if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
 		    pentax_get_u32le (cdata + 32) == 1)
@@ -1076,7 +1088,7 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 		if (!handle) {
 			/* The camera may briefly report no candidate between RAW and JPEG.
 			 * Complete only after the camera-reported output obligation is met. */
-			if ((unsigned int)count >= min_count) {
+			if ((unsigned int)count >= required_count) {
 				done = 1;
 				goto out;
 			}
@@ -1084,7 +1096,7 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			if ((now.tv_sec - start.tv_sec) * 1000 +
 			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
 				GP_LOG_E ("reconciliation timed out waiting for camera-reported "
-					"output %d/%u", count + 1, min_count + 1);
+					"output %d/%u", count + 1, required_count + 1);
 				ret = GP_ERROR_TIMEOUT;
 				goto out;
 			}

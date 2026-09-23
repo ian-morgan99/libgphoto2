@@ -737,6 +737,9 @@ main (void)
 	put_u32le (condition_data, 32, 1);
 	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
 	put_u32le (condition_data, 32, 5);
+	put_u32le (condition_data, 36, 7);
+	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+	put_u32le (condition_data, 36, 0);
 	CHECK (pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
 
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is

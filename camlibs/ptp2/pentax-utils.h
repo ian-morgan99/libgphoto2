@@ -322,10 +322,11 @@ int pentax_transfer_run (PentaxCaptureBuffer *buffer,
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
  * and max_ms (total wall-clock budget in milliseconds). min_count is the
- * minimum companion obligation reported by the camera output configuration;
- * it is not derived from physical exposure count. Each iteration:
+ * minimum companion obligation supplied by the caller. The loop also raises
+ * that obligation from writing-file-format in each conditions response; it is
+ * never derived from physical exposure count. Each iteration:
  *   1. Reads GetAllConditions via get_conditions. An empty response completes
- *      only after min_count candidates have been finalized.
+ *      only after the discovered required count has been finalized.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
