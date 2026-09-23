@@ -168,26 +168,11 @@ pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 
 int
 pentax_live_view_frame_should_retry (uint16_t response,
-		unsigned int attempts, unsigned int elapsed_ms,
-		unsigned int data_size)
+		unsigned int attempts, unsigned int elapsed_ms)
 {
 	/* IT2 identifies 0xa008 as NoUpdateImage.  Thirty attempts at its 33 ms
-	 * cadence are permitted, with an independent 1.5 second wall-time cap.
-	 *
-	 * Issue #86: the K-1 II also returns PTP_RC_GeneralError (0x2002) with a
-	 * zero-byte data phase when PC live view has no fresh frame to hand over
-	 * (the observed "valid 0x2001 frames -> 0x2002 with 0 bytes" transition).
-	 * Treating that as terminal tore the live view down immediately, which is
-	 * what took the camera off USB.  Retry it within the same bounded window so
-	 * a transient empty frame does not poison the session; a genuinely stuck
-	 * stream still times out at the 30-attempt / 1.5 s bound and only then is
-	 * the live view restored. */
-	if ((response == 0xa008) ||
-	    ((response == 0x2002) && (data_size == 0)))
-		return (attempts < 30) && (elapsed_ms < 1500);
-	/* A non-empty 0x2002 (genuine GeneralError with a data phase) is NOT
-	 * the K-1 II empty-frame transition; it remains terminal. */
-	return 0;
+	 * cadence are permitted, with an independent 1.5 second wall-time cap. */
+	return (response == 0xa008) && (attempts < 30) && (elapsed_ms < 1500);
 }
 
 int
@@ -839,149 +824,16 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 			timeout = multi_ms;
 	}
 
-	/* Astro Tracer without a shift limit: honour the camera's own
-	 * AstroTracerTimeLimit when it reports one, otherwise base + margin.
-	 *
-	 * IT2 parity (MtpDevice.cs / MainWindow.xaml.cs): the "in astro mode"
-	 * signal is the exposure-mode dial value (offset 184) == ExpMode.AstroTracer
-	 * (20), and the long-exposure budget comes from AstroTracerTimeLimit
-	 * (offset 528).  The offset-504 capability bit (PENTAX_CONDITION_ASTROTRACER3)
-	 * only says the body CAN do astro; it is not a live-mode indicator, so it
-	 * must not gate this budget.  This is model-agnostic and therefore covers
-	 * the K-1 II (old-focus) as well as the K-3 III. */
-	if (pentax_conditions_in_astro_mode (conditions) &&
+	/* Astrotracer without a shift limit: base + margin. */
+	if ((conditions->astro_status_flags & PENTAX_CONDITION_ASTROTRACER3) &&
 	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
-		uint64_t astro_ms;
-		if (conditions->has_astro_limit)
-			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
-		else
-			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-		astro_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer");
+		uint64_t astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE +
+			PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
 		if (astro_ms > timeout)
 			timeout = astro_ms;
 	}
 
 	return (unsigned int) timeout;
-}
-
-/* Exposure-phase budget in milliseconds (issue #111): how long the camera
- * needs to complete the exposure itself, before any post-exposure processing
- * or transfer-candidate publication.  This is deliberately separate from
- * pentax_capture_timeout_ms(), which also budgets the post-exposure
- * processing margin: a 120 s Bulb must not spend its entire all-in budget
- * before RAW processing even starts.  The result is clamped to the absolute
- * ceiling so a corrupt camera-reported value cannot wrap. */
-unsigned int
-pentax_exposure_phase_ms (const PentaxConditions *conditions)
-{
-	uint64_t exposure_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-
-	/* Bulb: the timer value is the exposure duration itself.  Add one
-	 * second of settle so the candidate is not polled before the shutter
-	 * has actually closed.  This is the exposure phase only — post-exposure
-	 * processing (RAW conversion, candidate publication) is budgeted
-	 * separately by pentax_capture_timeout_ms().
-	 *
-	 * Issue #120: the camera's own conditions report bulb_timer_seconds as the
-	 * exposure duration (offset 272, whole seconds; offset 276 is the TV
-	 * denominator, not a timer fraction — confirmed against IT2 which builds a
-	 * TimeSpan from offset 272 directly).  The observed "countdown then a short
-	 * exposure" symptom in some modes is the camera/app treating the value as a
-	 * pre-shot delay; that is firmware behaviour outside this wait budget, so
-	 * the budget here correctly sizes to the full timer value. */
-	if (conditions->bulb_timer_seconds > 0) {
-		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
-
-		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb exposure");
-		if (bulb_ms > exposure_ms)
-			exposure_ms = bulb_ms;
-	}
-
-	/* Multi-shot: each shot needs its own exposure budget.  Pixel shift is
-	 * 4 shots, so the exposure phase is the per-shot budget times the shot
-	 * count.  Post-exposure processing is budgeted separately. */
-	if (conditions->activity_flags &
-	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
-		uint64_t multi_ms;
-
-		if (conditions->bulb_timer_seconds > 0)
-			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
-				PENTAX_PIXEL_SHIFT_MULTIPLIER;
-		else
-			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
-				PENTAX_PIXEL_SHIFT_MULTIPLIER;
-		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot exposure");
-		if (multi_ms > exposure_ms)
-			exposure_ms = multi_ms;
-	}
-
-	/* Astro Tracer: the exposure itself can run up to the camera's own
-	 * AstroTracerTimeLimit (offset 528), which IT2 caps the bulb timer at.
-	 * Honour that limit so a long astro exposure is not aborted before the
-	 * shutter closes.  Model-agnostic (K-1 II and K-3 III alike). */
-	if (pentax_conditions_in_astro_mode (conditions)) {
-		uint64_t astro_ms;
-
-		if (conditions->has_astro_limit)
-			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
-		else
-			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer exposure");
-		if (astro_ms > exposure_ms)
-			exposure_ms = astro_ms;
-	}
-
-	return (unsigned int) exposure_ms;
-}
-
-PentaxReadiness
-pentax_camera_readiness (const unsigned char *data, unsigned int size)
-{
-	if ((data == NULL) || (size < PENTAX_CONDITIONS_MIN_SIZE))
-		return PENTAX_READINESS_UNKNOWN;
-	{
-		uint32_t activity = pentax_get_u32le (data + 104);
-		uint32_t candidate = pentax_get_u32le (data + 36);
-		if ((activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) == 0 && !candidate)
-			return PENTAX_READINESS_IDLE;
-		return PENTAX_READINESS_BUSY;
-	}
-}
-
-int
-pentax_conditions_in_astro_mode (const PentaxConditions *conditions)
-{
-	if (conditions == NULL)
-		return 0;
-	/* IT2's authoritative "in astro mode" signal is the exposure-mode dial
-	 * value (offset 184) == ExpMode.AstroTracer (20).  The offset-320 shift
-	 * sub-state bit is also a live indicator of an in-progress astro pixel-shift,
-	 * so treat either as "in astro mode".  The offset-504 capability bit is
-	 * deliberately NOT used here: it only says the body CAN do astro. */
-	if (conditions->exposure_mode == PENTAX_EXP_MODE_ASTROTRACER)
-		return 1;
-	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)
-		return 1;
-	return 0;
-}
-
-int
-pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
-{
-	if (conditions == NULL)
-		return 0;
-	/* Multi-shot composites (pixel shift, DNR) and astro modes keep processing
-	 * after the last candidate is consumed; bulb exposures run a long timer.
-	 * Ordinary single-shot captures do not need the wait (issue #122). */
-	if (conditions->activity_flags &
-	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE))
-		return 1;
-	if (pentax_conditions_in_astro_mode (conditions))
-		return 1;
-	if (conditions->bulb_timer_seconds > 0)
-		return 1;
-	return 0;
 }
 
 /* Bounded reconciliation of extra transfer candidates from a dual-format
@@ -1167,65 +1019,4 @@ pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
 	}
 	snprintf (buf, buflen, "%u/%u", numerator, denominator);
 	return 0;
-}
-
-/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.
- *
- * The capture path must only return success when the camera has POSITIVELY
- * reported IDLE.  A timer expiring while the camera is still BUSY or UNKNOWN
- * is NOT equivalent to an observed IDLE transition, so the caller must treat
- * exhaustion as "camera busy" (GP_ERROR_CAMERA_BUSY), not as a successful
- * completion.  This helper centralises that policy so it is deterministic and
- * unit-testable: it polls read_cb until pentax_camera_readiness() returns
- * IDLE, and reports whether that positive transition was observed before the
- * bound.  read_cb returns 0 (PTP_RC_OK) on a successful conditions read and
- * non-zero otherwise; a failed read is UNKNOWN, never IDLE.
- *
- * Cancellation (issue #122 follow-up): the pre-refactor inline loop checked
- * gp_context_cancel() on every iteration so a user/app cancel could not be
- * swallowed by the full 15 s / 60 s bound.  This helper preserves that: if
- * cancel_cb is non-NULL it is polled at the top of each iteration and, when it
- * reports a cancel, the wait returns -1 promptly (without consuming the
- * remaining bound) so the caller propagates GP_ERROR_CANCEL.  Cancellation is
- * distinct from "not idle": a cancel exits immediately, whereas bound
- * exhaustion on BUSY/UNKNOWN still returns 0 (camera busy). */
-int
-pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
-                                      unsigned int *size),
-                      void *user_data,
-                      int (*cancel_cb) (void *cancel_user_data),
-                      void *cancel_user_data,
-                      int max_ms)
-{
-        int waited_ms = 0;
-
-        while (waited_ms < max_ms) {
-                unsigned char *idata = NULL;
-                unsigned int isize = 0;
-                PentaxReadiness readiness;
-
-                if (cancel_cb && cancel_cb (cancel_user_data)) {
-                        GP_LOG_D ("post-capture idle wait cancelled after %d ms", waited_ms);
-                        return -1;       /* cancelled: exit promptly, do not consume the bound */
-                }
-
-                if (read_cb (user_data, &idata, &isize) != 0) {
-                        /* A failed/short read is UNKNOWN, never IDLE: keep polling. */
-                        free (idata);
-                        usleep (500 * 1000);
-                        waited_ms += 500;
-                        continue;
-                }
-                readiness = pentax_camera_readiness (idata, isize);
-                free (idata);
-                if (readiness == PENTAX_READINESS_IDLE) {
-                        GP_LOG_D ("camera idle after capture (waited %d ms)", waited_ms);
-                        return 1;        /* positive IDLE observed */
-                }
-                /* BUSY or UNKNOWN: keep polling within the bound. */
-                usleep (500 * 1000);
-                waited_ms += 500;
-        }
-        GP_LOG_E ("camera still busy/unknown after %d ms post-capture wait", waited_ms);
-        return 0;        /* bound exhausted without a positive IDLE */
 }
