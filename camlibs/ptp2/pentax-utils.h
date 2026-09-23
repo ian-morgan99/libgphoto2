@@ -174,6 +174,12 @@ int pentax_transfer_timeout_reason (unsigned long long total_ms,
  * pending candidate; the caller has already checked the PTP result code. */
 int pentax_recovery_probe_ok (const unsigned char *data, size_t size);
 
+/* Minimum number of candidates expected after the primary candidate has
+ * been finalized, derived from GetAllConditions writing format at +524.
+ * RAW+JPEG publishes two output objects, so one companion remains. */
+unsigned int pentax_expected_extra_candidates (const unsigned char *data,
+	size_t size);
+
 /* Stale-candidate baseline for the pre-capture probe (issue #34): returns
  * the pending transfer handle when one is flagged, else 0. */
 uint32_t pentax_stale_candidate_baseline (const unsigned char *data,
@@ -315,9 +321,11 @@ int pentax_transfer_run (PentaxCaptureBuffer *buffer,
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
- *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
- *      set (offset 32 == 0) the loop terminates with success.
+ * and max_ms (total wall-clock budget in milliseconds). min_count is the
+ * minimum companion obligation reported by the camera output configuration;
+ * it is not derived from physical exposure count. Each iteration:
+ *   1. Reads GetAllConditions via get_conditions. An empty response completes
+ *      only after min_count candidates have been finalized.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
@@ -347,7 +355,7 @@ typedef struct {
 } PentaxReconcileOps;
 
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
-	int max_count, unsigned int max_ms,
+	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count);
 
 #endif

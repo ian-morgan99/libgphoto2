@@ -54,6 +54,15 @@ pentax_get_u32le (const unsigned char *data)
 	       ((uint32_t)data[3] << 24);
 }
 
+unsigned int
+pentax_expected_extra_candidates (const unsigned char *data, size_t size)
+{
+	/* IMAGE Transmitter 2: 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF. */
+	if (!data || size < 528)
+		return 0;
+	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
+}
+
 static uint16_t
 pentax_get_u16le (const unsigned char *data)
 {
@@ -991,9 +1000,11 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
- *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
- *      set (offset 32 == 0) the loop terminates with success.
+ * and max_ms (total wall-clock budget in milliseconds). min_count is the
+ * minimum companion obligation reported by the camera output configuration.
+ * Each iteration:
+ *   1. Reads GetAllConditions via get_conditions. An empty response completes
+ *      only after min_count candidates have been finalized.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
@@ -1007,7 +1018,7 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
  */
 int
 pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
-	int max_count, unsigned int max_ms,
+	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count)
 {
 	struct timespec start, now;
@@ -1063,9 +1074,22 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 		cdata = NULL;
 
 		if (!handle) {
-			/* No more candidates: reconciliation complete. */
-			done = 1;
-			goto out;
+			/* The camera may briefly report no candidate between RAW and JPEG.
+			 * Complete only after the camera-reported output obligation is met. */
+			if ((unsigned int)count >= min_count) {
+				done = 1;
+				goto out;
+			}
+			clock_gettime (CLOCK_MONOTONIC, &now);
+			if ((now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+				GP_LOG_E ("reconciliation timed out waiting for camera-reported "
+					"output %d/%u", count + 1, min_count + 1);
+				ret = GP_ERROR_TIMEOUT;
+				goto out;
+			}
+			usleep (200 * 1000);
+			continue;
 		}
 
 		/* Bound on candidate count. */

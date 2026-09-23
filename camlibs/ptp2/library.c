@@ -6361,6 +6361,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
+	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6453,8 +6454,12 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		unsigned int bsize = 0;
 		uint32_t baseline_candidate = 0;
 
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize))
+		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize)) {
 			baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
+			expected_extra_candidates = pentax_expected_extra_candidates (bdata, bsize);
+			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
+				expected_extra_candidates);
+		}
 		else if (bdata || bsize)
 			GP_LOG_D ("stale-candidate pre-probe failed or short "
 				"(%u bytes); proceeding without baseline check",
@@ -6900,13 +6905,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		};
 		char extra_names[8][128];
 		int reconciled = 0;
-		/* Bounded for the worst case: astro pixel-shift (4 shots) in a
-		 * dual-format mode produces up to 7 extras beyond the primary.
-		 * The wall-clock budget is widened accordingly so a full
-		 * pixel-shift + RAW+ set can be drained without leaving stale
-		 * candidates behind (issue #73). */
+		/* Candidate count is discovered from GetAllConditions. The minimum
+		 * companion obligation comes from the camera's writing-file-format;
+		 * physical Pixel Shift exposure count is deliberately irrelevant.
+		 * Bounds remain safeguards for corrupt or unresponsive hardware. */
 		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
-			8, 120 * 1000, extra_names, &reconciled);
+			8, 120 * 1000, expected_extra_candidates,
+			extra_names, &reconciled);
 
 		if (rret < GP_OK)
 			GP_LOG_E ("dual-format reconciliation stopped early (%d); "
