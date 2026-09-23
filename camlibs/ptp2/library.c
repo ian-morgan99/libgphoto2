@@ -6385,9 +6385,22 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		 * idle with readable conditions is safe to use again. */
 		unsigned char *rdata = NULL;
 		unsigned int rsize = 0;
+		uint32_t recovery_capture = 0, recovery_candidate = 0;
+		uint32_t recovery_activity = 0;
+		uint16_t recovery_ptpres;
 		int recovered = 0;
 
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &rdata, &rsize) &&
+		recovery_ptpres = ptp_pentax_get_all_conditions (params, &rdata, &rsize);
+		if (rdata && (rsize >= PENTAX_CONDITIONS_MIN_SIZE)) {
+			recovery_capture = pentax_get_u32le (rdata + 32);
+			recovery_candidate = pentax_get_u32le (rdata + 36);
+			recovery_activity = pentax_get_u32le (rdata + 104);
+		}
+		GP_LOG_E ("recovery-probe: ptp=0x%04x size=%u field32=0x%08x "
+			"field36=0x%08x field104=0x%08x unsafe-mask=0x%08x",
+			recovery_ptpres, rsize, recovery_capture, recovery_candidate,
+			recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE);
+		if (PTP_RC_OK == recovery_ptpres &&
 		    pentax_recovery_probe_ok (rdata, rsize)) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
