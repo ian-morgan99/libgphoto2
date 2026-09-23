@@ -7536,6 +7536,18 @@ camera_trigger_capture (Camera *camera, GPContext *context)
 
 	SET_CONTEXT_P(params, context);
 
+	/* Pentax vendor capture owns a synchronous lifecycle: pre-capture
+	 * reconciliation, InitiateCapture, candidate discovery/transfer/finalize,
+	 * and positive ready proof before control returns. The generic asynchronous
+	 * trigger API has no CameraFilePath/result channel and cannot uphold that
+	 * contract. Fail closed so every supported Pentax still enters through
+	 * camera_pentax_capture() via gp_camera_capture(GP_CAPTURE_IMAGE). */
+	if (params->pentax.vendor_mode_enabled) {
+		gp_context_error (context,
+			_("Pentax asynchronous trigger capture is unavailable; use synchronous image capture so the complete camera lifecycle is preserved."));
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+
 	/* If there is no capturetarget set yet, the default is "sdram" */
 	if (GP_OK != gp_setting_get("ptp2","capturetarget",buf))
 		strcpy (buf, "sdram");
