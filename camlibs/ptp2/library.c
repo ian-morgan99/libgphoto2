@@ -6409,11 +6409,19 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 		free (rdata);
 		if (!recovered) {
+			fprintf (stderr, "[pentax] recovery-probe: ptp=0x%04x size=%u "
+				"field32=0x%08x field36=0x%08x field104=0x%08x "
+				"unsafe-mask=0x%08x accepted=0\n", recovery_ptpres,
+				rsize, recovery_capture, recovery_candidate,
+				recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE);
 			GP_LOG_E ("capture refused: session reconciliation flagged "
 				"recovery-required and camera is still busy or "
 				"conditions unreadable");
 			gp_context_error (context,
-				_("Camera is in an unreconciled state from a previous session; reconnect or power-cycle it before capturing."));
+				_("Camera recovery probe refused capture (PTP 0x%04x, size %u, fields +32=0x%08x +36=0x%08x +104=0x%08x, unsafe-mask=0x%08x)."),
+				recovery_ptpres, rsize, recovery_capture,
+				recovery_candidate, recovery_activity,
+				PENTAX_CONDITION_ACTIVITY_UNSAFE);
 			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
