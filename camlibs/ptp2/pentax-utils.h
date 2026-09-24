@@ -38,6 +38,10 @@ typedef struct {
 /* From IT2 MtpDevice.cs: 645Z = 77840, KF = 78520. */
 #define PENTAX_MODEL_645Z 77840U
 #define PENTAX_MODEL_KF 78520U
+/* K-01 (PID 0x0131): compact camera, not in IT2.  Uses the older PTP
+ * generation (vendor extension version 0, like 645D).  Vendor mode stays
+ * off; basic PTP operations only until hardware proves otherwise. */
+#define PENTAX_MODEL_K01 77500U
 /* K-3 II (PID 0x017b) is NOT in IT2: fail-closed, vendor mode stays off.
  * Revisit only with hardware proof or a newer IT2 build that lists it. */
 
@@ -113,16 +117,7 @@ typedef struct {
 #define PENTAX_CONDITION_TASK_CHANGING            0x00000020U
 #define PENTAX_CONDITION_BULB_TIMER               0x00000040U
 #define PENTAX_CONDITION_GPS_STATE_MASK           0x00000180U
-/* IT2 ModeEnableInfo.AstroTracer3 (MtpDevice.cs:5926): a CAPABILITY bit in the
- * offset-504 field (capability_flags), NOT an offset-320 astro status bit.  It
- * says "this body can do Astro Tracer", not "it is currently exposing". */
 #define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
-
-/* IT2 ExpMode.AstroTracer (ExpMode.cs): the exposure-mode-dial value that
- * selects Astro Tracer.  Read from conditions offset 184 (exposure_mode).  This
- * is the signal IT2 uses to switch to the long-exposure / bulb-timer path and is
- * model-agnostic, so it works for the K-1 II (old-focus) as well as the K-3 III. */
-#define PENTAX_EXP_MODE_ASTROTRACER 20U
 
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
@@ -201,62 +196,6 @@ unsigned int pentax_capture_timeout_ms (const PentaxConditions *conditions);
  * all-in budget before RAW processing even starts. */
 unsigned int pentax_exposure_phase_ms (const PentaxConditions *conditions);
 
-/* Post-capture readiness tri-state (issue #122 / libgphoto2 #73): only a VALID
- * conditions frame may prove the camera idle.  A failed or short read is
- * UNKNOWN, never IDLE — treating it as idle let Benro fire the next shutter
- * while the camera was still busy, wedging it until a mode toggle + USB reset. */
-typedef enum {
-	PENTAX_READINESS_IDLE = 0,	/* valid frame: no unsafe activity, no candidate */
-	PENTAX_READINESS_BUSY = 1,	/* valid frame: unsafe activity or pending candidate */
-	PENTAX_READINESS_UNKNOWN = 2 /* read failed or frame too short to trust */
-} PentaxReadiness;
-
-/* Classify a raw conditions frame.  data/size are the GetAllConditions payload
- * (may be NULL/0).  Returns IDLE only when the frame is valid AND proves idle;
- * BUSY when the frame is valid and shows activity or a pending candidate;
- * UNKNOWN when the read failed or the frame is shorter than MIN_SIZE. */
-PentaxReadiness pentax_camera_readiness (const unsigned char *data,
-		   unsigned int size);
-
-/* Whether the post-capture idle wait applies to this capture (issue #122):
- * multi-shot composites, astro shift/tracer and bulb exposures can still be
- * processing after all candidates are consumed.  Ordinary single-shot JPEG/RAW
- * captures return immediately — Benro regains control through the normal
- * completion path without an invented readiness state machine. */
-int pentax_capture_needs_idle_wait (const PentaxConditions *conditions);
-
-/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.  Polls
- * read_cb (a conditions reader returning 0/PTP_RC_OK on success) until
- * pentax_camera_readiness() reports a POSITIVE IDLE transition, bounded by
- * max_ms.  Returns:
- *   1  when IDLE was actually observed;
- *   0  when the bound is exhausted while the camera is still BUSY or UNKNOWN -
- *      in which case the caller must treat the capture as not-ready
- *      (GP_ERROR_CAMERA_BUSY), never as a successful completion.  A failed read
- *      is UNKNOWN, never IDLE.
- *  -1  when cancel_cb (if non-NULL) reports a cancel while polling, so the wait
- *      exits promptly without consuming the remaining bound and the caller
- *      propagates GP_ERROR_CANCEL.  This preserves capture cancellation across
- *      the refactor to this helper: the pre-refactor inline loop checked
- *      gp_context_cancel() on every iteration (issue #122 follow-up).
- * cancel_cb is invoked once per poll iteration with cancel_user_data and returns
- * non-zero when the operation has been cancelled.  Pass NULL for both cancel
- * parameters to disable cancellation checking. */
-int pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
-                      unsigned int *size),
-              void *user_data,
-              int (*cancel_cb) (void *cancel_user_data),
-              void *cancel_user_data,
-              int max_ms);
-
-/* Whether the camera is currently in Astro Tracer mode, per IT2's own signal:
- * the exposure-mode dial value (offset 184) equals ExpMode.AstroTracer (20).
- * This is the authoritative "in astro mode" test — the offset-504 capability
- * bit (PENTAX_CONDITION_ASTROTRACER3) only says the body CAN do it, and the
- * offset-320 status bits describe shift/aperture sub-states, not the mode.
- * Model-agnostic, so it covers the K-1 II as well as the K-3 III. */
-int pentax_conditions_in_astro_mode (const PentaxConditions *conditions);
-
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 	PentaxLiveViewGeometry *geometry);
@@ -269,13 +208,8 @@ int pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
 int pentax_live_view_stop_response_ok (uint16_t response);
 int pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
 	uint8_t *fallback);
-/* Issue #86: should the preview frame fetch be retried?  0xa008 (NoUpdateImage)
- * is always retried within the bounded window.  0x2002 (GeneralError) is retried
- * ONLY when the data phase was zero bytes (the K-1 II empty-frame transition);
- * a non-empty 0x2002 carries a genuine failure context and remains terminal. */
 int pentax_live_view_frame_should_retry (uint16_t response,
-	unsigned int attempts, unsigned int elapsed_ms,
-	unsigned int data_size);
+	unsigned int attempts, unsigned int elapsed_ms);
 int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,

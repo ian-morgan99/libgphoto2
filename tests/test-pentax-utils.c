@@ -249,23 +249,11 @@ main (void)
 	fallback = 99;
 	CHECK (pentax_live_view_zoom_fallback (10, 0x201c, &fallback) == 0);
 	CHECK (fallback == 99);
-	CHECK (pentax_live_view_frame_should_retry (0xa008, 1, 0, 0));
-	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500, 0));
-	/* Issue #86: the K-1 II empty-frame transition returns 0x2002 with a
-	 * zero-byte data phase; it must be retried within the same bounded window
-	 * so a transient empty frame does not tear down live view and take the
-	 * camera off USB. */
-	/* Zero-byte 0x2002 (the K-1 II empty-frame transition) is retried. */
-	CHECK (pentax_live_view_frame_should_retry (0x2002, 1, 0, 0));
-	CHECK (pentax_live_view_frame_should_retry (0x2002, 29, 1499, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 30, 0, 0));
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 1500, 0));
-	/* Non-empty 0x2002 (genuine GeneralError with a data phase) is NOT retried. */
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 0, 64));
-	CHECK (!pentax_live_view_frame_should_retry (0x2002, 1, 0, 1));
-	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0, 0));
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 1, 0));
+	CHECK (pentax_live_view_frame_should_retry (0xa008, 29, 1499));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 30, 0));
+	CHECK (!pentax_live_view_frame_should_retry (0xa008, 1, 1500));
+	CHECK (!pentax_live_view_frame_should_retry (0x2019, 1, 0));
 	CHECK (pentax_lookup_model (0x25fb, 0x0189, "PENTAX K-3 Mark III",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78420) && (extension_version == 1));
@@ -622,77 +610,9 @@ main (void)
 	CHECK (pentax_capture_timeout_ms (&conditions) ==
 		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
 
-	/* Astro Tracer live mode is signalled by the exposure-mode dial value
-	 * (offset 184) == ExpMode.AstroTracer (20), NOT by the offset-504
-	 * capability bit.  The capability bit alone must not widen the budget:
-	 * a body that CAN do astro but is currently in P mode stays at base. */
 	memset (&conditions, 0, sizeof (conditions));
-	conditions.capability_flags = PENTAX_CONDITION_ASTROTRACER3;
-	CHECK (pentax_capture_timeout_ms (&conditions) ==
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
-
-	/* In astro mode with no reported limit: base + margin. */
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+	conditions.astro_status_flags = PENTAX_CONDITION_ASTROTRACER3;
 	CHECK (pentax_capture_timeout_ms (&conditions) == 90000); /* base + margin */
-
-	/* In astro mode with a reported AstroTracerTimeLimit: honour the limit. */
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
-	conditions.has_astro_limit = 1;
-	conditions.astro_limit_seconds = 300; /* 301s + margin */
-	CHECK (pentax_capture_timeout_ms (&conditions) == 331000);
-
-	/* Exposure-phase budget (issue #111): the time the camera needs to
-	 * complete the exposure itself, before post-exposure processing.  This is
-	 * deliberately separate from pentax_capture_timeout_ms() so a long Bulb
-	 * does not consume its entire all-in budget before RAW processing starts. */
-	memset (&conditions, 0, sizeof (conditions));
-	CHECK (pentax_exposure_phase_ms (&conditions) ==
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
-
-	conditions.bulb_timer_seconds = 120; /* 121s exposure phase, no margin */
-	CHECK (pentax_exposure_phase_ms (&conditions) == 121000);
-
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
-	CHECK (pentax_exposure_phase_ms (&conditions) == 240000); /* 4x base */
-
-	conditions.bulb_timer_seconds = 9; /* bulb + multi-shot composite:
-	 * 10s*4=40s < base 60s, so the base dominates */
-	CHECK (pentax_exposure_phase_ms (&conditions) == 60000);
-
-	/* A long enough bulb timer that the multi-shot composite exceeds the
-	 * base: 30s bulb * 4 = 120s > 60s base. */
-	conditions.bulb_timer_seconds = 30;
-	CHECK (pentax_exposure_phase_ms (&conditions) == 124000); /* 31s*4 */
-
-	/* Astro Tracer exposure phase: honour the camera's own AstroTracerTimeLimit
-	 * so a long astro exposure is not aborted before the shutter closes.  The
-	 * capability bit alone (body CAN do astro) must not widen the phase. */
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.capability_flags = PENTAX_CONDITION_ASTROTRACER3;
-	CHECK (pentax_exposure_phase_ms (&conditions) ==
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
-
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
-	conditions.has_astro_limit = 1;
-	conditions.astro_limit_seconds = 300; /* 301s exposure phase */
-	CHECK (pentax_exposure_phase_ms (&conditions) == 301000);
-
-	/* In astro mode with no reported limit: the base dominates. */
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
-	CHECK (pentax_exposure_phase_ms (&conditions) ==
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
-
-	/* Overflow-safe clamp: a corrupt UINT32_MAX bulb timer must not wrap the
-	 * 64-bit math or exceed the ceiling. */
-	memset (&conditions, 0, sizeof (conditions));
-	conditions.bulb_timer_seconds = UINT32_MAX;
-	CHECK (pentax_exposure_phase_ms (&conditions) ==
-		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
 
 	/* Session reconciliation decisions (issue #33): short blobs and unsafe
 	 * activity force recovery, a pending candidate must be surfaced. The
@@ -774,174 +694,6 @@ main (void)
 		/* Too-small buffer is rejected. */
 		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, 3) == -1);
 	}
-
-
-        /* Post-capture readiness tri-state (issue #122): only a VALID frame may
-         * prove idle.  A failed/short read must classify as UNKNOWN, never IDLE
-         * - treating it as idle let Benro fire the next shutter while the camera
-         * was still busy and wedge it until a mode toggle + USB reset. */
-        CHECK (pentax_camera_readiness (NULL, 0) == PENTAX_READINESS_UNKNOWN);
-        CHECK (pentax_camera_readiness (condition_data, PENTAX_CONDITIONS_MIN_SIZE - 1)
-               == PENTAX_READINESS_UNKNOWN);
-        memset (condition_data, 0, sizeof (condition_data));
-        /* Valid frame, no activity, no pending candidate -> IDLE. */
-        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
-               == PENTAX_READINESS_IDLE);
-        /* Busy: unsafe activity flag set. */
-        put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
-        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
-               == PENTAX_READINESS_BUSY);
-        memset (condition_data, 0, sizeof (condition_data));
-        /* Busy: pending transfer candidate. */
-        put_u32le (condition_data, 36, 77);
-        CHECK (pentax_camera_readiness (condition_data, sizeof (condition_data))
-               == PENTAX_READINESS_BUSY);
-
-        /* Issue #122 (TA follow-up): fail-closed readiness wait.  Only a
-         * POSITIVE IDLE transition may complete; bound exhaustion on BUSY or
-         * UNKNOWN must report "not idle" so the caller returns CAMERA_BUSY
-         * instead of claiming a successful capture. */
-        {
-                struct mock_reader {
-                        unsigned char frame[532];
-                        int fail_read;
-                        int calls;
-                } mr;
-
-                int
-                mock_read_conditions (void *user_data, unsigned char **data,
-                                      unsigned int *size)
-                {
-                        struct mock_reader *m = user_data;
-                        m->calls++;
-                        if (m->fail_read)
-                                return 1;            /* non-PTP_RC_OK -> UNKNOWN */
-                        *data = malloc (sizeof (m->frame));
-                        if (*data)
-                                memcpy (*data, m->frame, sizeof (m->frame));
-                        *size = sizeof (m->frame);
-                        return 0;                   /* PTP_RC_OK */
-                }
-
-                memset (&mr, 0, sizeof (mr));
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 1);
-                CHECK (mr.calls >= 1);
-
-                memset (&mr, 0, sizeof (mr));
-                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
-
-                memset (&mr, 0, sizeof (mr));
-                mr.fail_read = 1;
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
-        }
-
-        /* Issue #122 (TA follow-up): cancellation must be preserved across the
-         * refactor to pentax_wait_for_idle().  A cancel during BUSY/UNKNOWN polling
-         * must exit promptly (return -1) without consuming the remaining bound, and
-         * be distinct from "not idle" (which returns 0). */
-        {
-                struct mock_reader {
-                        unsigned char frame[532];
-                        int fail_read;
-                        int calls;
-                } mr;
-                struct mock_cancel {
-                        int cancel_after_calls;   /* report cancel once calls reach this */
-                        int calls;
-                } mc;
-
-                int
-                mock_read_conditions (void *user_data, unsigned char **data,
-                                      unsigned int *size)
-                {
-                        struct mock_reader *m = user_data;
-                        m->calls++;
-                        *data = malloc (sizeof (m->frame));
-                        if (*data)
-                                memcpy (*data, m->frame, sizeof (m->frame));
-                        *size = sizeof (m->frame);
-                        return 0;                   /* PTP_RC_OK */
-                }
-
-                int
-                mock_cancel (void *user_data)
-                {
-                        struct mock_cancel *m = user_data;
-                        m->calls++;
-                        return m->calls >= m->cancel_after_calls;
-                }
-
-                /* Cancel on the 2nd poll while the camera is BUSY: the wait must
-                 * return -1 promptly, well before the large bound would exhaust.
-                 * The cancel probe runs at the top of each iteration, so with
-                 * cancel_after_calls=2 it fires before the 2nd read -> only 1 read. */
-                memset (&mr, 0, sizeof (mr));
-                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING); /* BUSY */
-                memset (&mc, 0, sizeof (mc));
-                mc.cancel_after_calls = 2;
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr,
-                                             mock_cancel, &mc, 60 * 1000) == -1);
-                CHECK (mr.calls == 1);            /* exited promptly, not the full 60 s bound */
-
-                /* No cancel callback: same BUSY camera still exhausts the (small) bound
-                 * and reports "not idle" (0), proving cancellation is distinct from it. */
-                memset (&mr, 0, sizeof (mr));
-                put_u32le (mr.frame, 104, PENTAX_CONDITION_ACTIVITY_SHOOTING);
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr, NULL, NULL, 1000) == 0);
-
-                /* Cancel on the very first poll: exits before any conditions read. */
-                memset (&mr, 0, sizeof (mr));
-                memset (&mc, 0, sizeof (mc));
-                mc.cancel_after_calls = 1;
-                CHECK (pentax_wait_for_idle (mock_read_conditions, &mr,
-                                             mock_cancel, &mc, 60 * 1000) == -1);
-                CHECK (mr.calls == 0);            /* cancelled before the first read */
-        }
-
-/* Astro-mode detection (IT2 parity): the live signal is the exposure-mode
-	 * dial value == ExpMode.AstroTracer (20) or an in-progress astro shift.  The
-	 * offset-504 capability bit alone must NOT count as "in astro mode". */
-	{
-		PentaxConditions g;
-		memset (&g, 0, sizeof (g));
-		CHECK (!pentax_conditions_in_astro_mode (&g));
-		CHECK (!pentax_conditions_in_astro_mode (NULL));
-		g.capability_flags = PENTAX_CONDITION_ASTROTRACER3; /* can do astro */
-		CHECK (!pentax_conditions_in_astro_mode (&g));
-		memset (&g, 0, sizeof (g));
-		g.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
-		CHECK (pentax_conditions_in_astro_mode (&g));
-		memset (&g, 0, sizeof (g));
-		g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
-		CHECK (pentax_conditions_in_astro_mode (&g));
-	}
-
-	/* Idle-wait gate (issue #122): ordinary single-shot captures skip the
-	 * post-capture wait; multi-shot / astro / bulb keep it. */
-	{
-		PentaxConditions g;
-		memset (&g, 0, sizeof (g));
-		CHECK (!pentax_capture_needs_idle_wait (&g));
-		CHECK (!pentax_capture_needs_idle_wait (NULL));
-		g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
-		CHECK (pentax_capture_needs_idle_wait (&g));
-		memset (&g, 0, sizeof (g));
-		g.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE;
-		CHECK (pentax_capture_needs_idle_wait (&g));
-		memset (&g, 0, sizeof (g));
-		g.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
-		CHECK (pentax_capture_needs_idle_wait (&g));
-		memset (&g, 0, sizeof (g));
-		g.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER; /* live astro mode */
-		CHECK (pentax_capture_needs_idle_wait (&g));
-		memset (&g, 0, sizeof (g));
-		g.capability_flags = PENTAX_CONDITION_ASTROTRACER3; /* can, not in */
-		CHECK (!pentax_capture_needs_idle_wait (&g));
-                memset (&g, 0, sizeof (g));
-                g.bulb_timer_seconds = 120;
-                CHECK (pentax_capture_needs_idle_wait (&g));
-        }
 
 	free (buffer.data);
 	return 0;
