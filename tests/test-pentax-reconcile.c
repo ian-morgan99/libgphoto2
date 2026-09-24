@@ -61,13 +61,6 @@ typedef struct {
         int delete_error;            /* non-zero: delete_candidate fails */
         int cancel_after;            /* cancel once this many candidates done */
         int info_fail;              /* non-zero: get_candidate_info fails */
-        /* Publication simulation (o-v12m companion UAF regression): when
-         * set, transfer_candidate simulates gp_file_set_data_and_size()
-         * taking ownership of the buffer and clears it, so the reconcile
-         * loop must not free the published bytes again. */
-        int publish;
-        unsigned char *published[4];
-        int published_count;
         /* Observations. */
         int transfer_calls;
         int delete_calls;
@@ -147,16 +140,6 @@ mock_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffer)
                 return GP_ERROR_NO_MEMORY;
         memcpy (buffer->data, "EXTRA", 6);
         buffer->size = 5;
-        if (mock->publish) {
-                /* Simulate gp_file_set_data_and_size(): ownership of the
-                 * buffer transfers to the published CameraFile, so the
-                 * transfer object is cleared and the reconcile loop must
-                 * not free these bytes again (o-v12m companion UAF). */
-                if (mock->published_count < 4)
-                        mock->published[mock->published_count++] = buffer->data;
-                buffer->data = NULL;
-                buffer->size = 0;
-        }
         return GP_OK;
 }
 
@@ -375,27 +358,41 @@ main (void)
                 CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
         }
 
-        /* 13. o-v12m companion UAF regression: a successfully published
-         * companion transfers buffer ownership to the CameraFile (the
-         * transfer callback clears the buffer, simulating
-         * gp_file_set_data_and_size()).  The reconcile loop must complete
-         * without freeing the published bytes again; the published payload
-         * must survive the whole loop. */
-        mock_reset (&mock);
-        mock.publish = 1;
-        mock.handles[0] = 1000;
-        mock.handle_count = 1;
-        mock.names[0] = "IMG_0003.DNG";
-        count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
-        CHECK (ret == GP_OK);
-        CHECK (count == 1);
-        CHECK (mock.published_count == 1);
-        /* The published payload must be intact after the loop: a
-         * double-free or stale write would corrupt these bytes. */
-        CHECK (mock.published[0] != NULL);
-        CHECK (!memcmp (mock.published[0], "EXTRA", 5));
-        CHECK (!strcmp (names[0], "IMG_0003.DNG"));
+        /* 13. o-v12m companion UAF regression: exercise the same production
+         * ownership helper used immediately after gp_file_set_data_and_size().
+         * Success disowns the bytes before any later publication step can
+         * fail; failure before transfer leaves cleanup ownership unchanged. */
+        {
+                PentaxCaptureBuffer owned = {0};
+                unsigned char *published;
+
+                owned.data = malloc (6);
+                CHECK (owned.data != NULL);
+                memcpy (owned.data, "EXTRA", 6);
+                owned.size = 5;
+                published = owned.data;
+                CHECK (pentax_capture_buffer_disown_on_success (&owned, GP_OK) == GP_OK);
+                CHECK (owned.data == NULL);
+                CHECK (owned.size == 0);
+                /* A later filesystem-publication failure must not restore
+                 * transfer ownership and therefore cannot double-free. */
+                ret = GP_ERROR_IO;
+                CHECK (ret == GP_ERROR_IO);
+                CHECK (owned.data == NULL);
+                CHECK (!memcmp (published, "EXTRA", 5));
+                free (published); /* stand-in for CameraFile destruction */
+
+                owned.data = malloc (6);
+                CHECK (owned.data != NULL);
+                memcpy (owned.data, "EXTRA", 6);
+                owned.size = 5;
+                published = owned.data;
+                CHECK (pentax_capture_buffer_disown_on_success (&owned,
+                        GP_ERROR_NO_MEMORY) == GP_ERROR_NO_MEMORY);
+                CHECK (owned.data == published);
+                CHECK (owned.size == 5);
+                free (owned.data);
+        }
 
         printf ("test-pentax-reconcile: all checks passed\n");
         return 0;

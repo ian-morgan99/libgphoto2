@@ -6204,6 +6204,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 	unsigned int cisize = 0;
 	char name[128] = {0};
 	CameraFile *file = NULL;
+	size_t published_size = 0;
 	int ret;
 
 	transfer.started = time_now ();
@@ -6260,16 +6261,11 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		}
 
 		ret = gp_file_new (&file);
-		if (ret == GP_OK)
+		if (ret == GP_OK) {
+			published_size = buffer->size;
 			ret = gp_file_set_data_and_size (file, (char *)buffer->data,
 				buffer->size);
-		/* gp_file_set_data_and_size() takes ownership of the buffer.  Clear
-		 * the transfer object immediately so the reconciliation loop cannot
-		 * free the same bytes after this callback returns.  The primary-file
-		 * path follows the same ownership rule. */
-		if (ret == GP_OK) {
-			buffer->data = NULL;
-			buffer->size = 0;
+			ret = pentax_capture_buffer_disown_on_success (buffer, ret);
 		}
 		if (ret == GP_OK) {
 			gp_file_set_mtime (file, time (NULL));
@@ -6291,7 +6287,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			params->pentax.extra_capture_files[slot] = extra;
 			params->pentax.extra_capture_count = slot + 1;
 			GP_LOG_D ("published extra capture file %s/%s (%u bytes)",
-				extra.folder, extra.name, (unsigned)buffer->size);
+				extra.folder, extra.name, (unsigned)published_size);
 		}
 	} else if (rc->camera && !name[0]) {
 		GP_LOG_D ("extra candidate has no parseable filename; "

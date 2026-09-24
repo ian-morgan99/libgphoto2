@@ -618,6 +618,19 @@ pentax_jpeg_bounds (const unsigned char *data, size_t size,
 	return GP_ERROR_CORRUPTED_DATA;
 }
 
+int
+pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
+		int ownership_result)
+{
+	if (!buffer)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (ownership_result < GP_OK)
+		return ownership_result;
+	buffer->data = NULL;
+	buffer->size = 0;
+	return ownership_result;
+}
+
 static int
 pentax_transfer_interrupted (const PentaxTransferOps *operations)
 {

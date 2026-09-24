@@ -307,6 +307,12 @@ int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,
 	unsigned int operation, int32_t displacement);
+/* Apply the ownership result from an API such as gp_file_set_data_and_size().
+ * A successful call owns buffer->data, so the transfer buffer must be cleared
+ * before any later operation can fail and before generic cleanup runs.  A
+ * failed ownership call leaves the buffer intact for its original owner. */
+int pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
+	int ownership_result);
 int pentax_candidate_filename (const unsigned char *data, uint32_t size,
 		char *filename, size_t filename_size);
 int pentax_jpeg_bounds (const unsigned char *data, size_t size,
