@@ -6365,6 +6365,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
+	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6462,7 +6463,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			return GP_ERROR_CAMERA_BUSY;
 		}
 		baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
+		/* This same mandatory readiness sample also carries the camera's
+		 * writing format.  Preserve its output obligation across the exposure:
+		 * the K-3 III can clear/change +524 after the primary is finalized,
+		 * before reconciliation observes the companion.  Re-reading only after
+		 * capture therefore let RAW+JPEG return after its JPEG member. */
+		expected_extra_candidates =
+			pentax_expected_extra_candidates (bdata, bsize);
 		free (bdata);
+		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
+			expected_extra_candidates);
 
 		if (baseline_candidate) {
 			GP_LOG_E ("capture refused: unowned transfer candidate %u "
@@ -6779,12 +6789,12 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		};
 		char extra_names[8][128];
 		int reconciled = 0;
-		/* Candidate count and the output-format obligation are discovered by
-		 * the same post-capture GetAllConditions polling loop.  Do not add a
-		 * pre-shutter probe solely to predict later objects: IMAGE Transmitter 2
+		/* The minimum obligation comes from the already-mandatory pre-capture
+		 * readiness sample; later samples may increase it but may not erase it.
+		 * This is mode-driven, not a time-based guess.  Reconciliation still
 		 * observes, transfers and finalizes each advertised candidate in turn. */
 		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
-			8, 120 * 1000, 0,
+			8, 120 * 1000, expected_extra_candidates,
 			extra_names, &reconciled);
 
 		if (rret < GP_OK)
