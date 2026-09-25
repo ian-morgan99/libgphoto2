@@ -757,9 +757,17 @@ pentax_transfer_timeout_reason (unsigned long long total_ms, unsigned long long 
 int
 pentax_recovery_probe_ok (const unsigned char *data, size_t size)
 {
+	return pentax_admission_probe_ok (data, size, PENTAX_ADMISSION_STRICT);
+}
+
+int
+pentax_admission_probe_ok (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy)
+{
 	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
 		return 0;
-	if (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+	if (policy == PENTAX_ADMISSION_STRICT &&
+	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
 		return 0;
 	if (pentax_get_u32le (data + 32) == 1)
 		return 0;
