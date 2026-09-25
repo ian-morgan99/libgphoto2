@@ -6204,6 +6204,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 	unsigned int cisize = 0;
 	char name[128] = {0};
 	CameraFile *file = NULL;
+	size_t published_size = 0;
 	int ret;
 
 	transfer.started = time_now ();
@@ -6260,9 +6261,12 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		}
 
 		ret = gp_file_new (&file);
-		if (ret == GP_OK)
+		if (ret == GP_OK) {
+			published_size = buffer->size;
 			ret = gp_file_set_data_and_size (file, (char *)buffer->data,
 				buffer->size);
+			ret = pentax_capture_buffer_disown_on_success (buffer, ret);
+		}
 		if (ret == GP_OK) {
 			gp_file_set_mtime (file, time (NULL));
 			ret = gp_filesystem_append (rc->camera->fs, extra.folder,
@@ -6283,7 +6287,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			params->pentax.extra_capture_files[slot] = extra;
 			params->pentax.extra_capture_count = slot + 1;
 			GP_LOG_D ("published extra capture file %s/%s (%u bytes)",
-				extra.folder, extra.name, (unsigned)buffer->size);
+				extra.folder, extra.name, (unsigned)published_size);
 		}
 	} else if (rc->camera && !name[0]) {
 		GP_LOG_D ("extra candidate has no parseable filename; "
@@ -6349,6 +6353,8 @@ pentax_capture_cancel (void *user_data)
 static int
 camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 {
+	static unsigned long long next_capture_id;
+	unsigned long long capture_id = __sync_add_and_fetch (&next_capture_id, 1);
 	PTPParams *params = &camera->pl->params;
 	PentaxCaptureBuffer capture = {0};
 	struct timeval started;
@@ -6359,6 +6365,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
+	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6372,6 +6379,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	fprintf (stderr, "[pentax] capture=%llu boundary=camlib-enter transfer=%d recovery=%d\n",
+		capture_id, params->pentax.transfer_state,
+		params->pentax.recovery_required);
+	fflush (stderr);
+	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
 	/* Every capture starts with an empty extra-file list (issue #73):
 	 * the list always describes the most recent exposure only. */
 	params->pentax.extra_capture_count = 0;
@@ -6382,10 +6394,39 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		 * idle with readable conditions is safe to use again. */
 		unsigned char *rdata = NULL;
 		unsigned int rsize = 0;
+		uint32_t recovery_capture = 0, recovery_candidate = 0;
+		uint32_t recovery_activity = 0;
+		uint16_t recovery_ptpres;
+		PentaxAdmissionPolicy admission_policy = PENTAX_ADMISSION_STRICT;
+		const char *admission_mode = getenv ("PENTAX_ADMISSION_MODE");
 		int recovered = 0;
+		int strict_ok, output_safe_ok;
 
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &rdata, &rsize) &&
-		    pentax_recovery_probe_ok (rdata, rsize)) {
+		if (admission_mode && !strcmp (admission_mode, "output-safe"))
+			admission_policy = PENTAX_ADMISSION_OUTPUT_SAFE;
+
+		recovery_ptpres = ptp_pentax_get_all_conditions (params, &rdata, &rsize);
+		if (rdata && (rsize >= PENTAX_CONDITIONS_MIN_SIZE)) {
+			recovery_capture = pentax_get_u32le (rdata + 32);
+			recovery_candidate = pentax_get_u32le (rdata + 36);
+			recovery_activity = pentax_get_u32le (rdata + 104);
+		}
+		GP_LOG_E ("recovery-probe: ptp=0x%04x size=%u field32=0x%08x "
+			"field36=0x%08x field104=0x%08x unsafe-mask=0x%08x",
+			recovery_ptpres, rsize, recovery_capture, recovery_candidate,
+			recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE);
+		strict_ok = PTP_RC_OK == recovery_ptpres &&
+			pentax_admission_probe_ok (rdata, rsize, PENTAX_ADMISSION_STRICT);
+		output_safe_ok = PTP_RC_OK == recovery_ptpres &&
+			pentax_admission_probe_ok (rdata, rsize, PENTAX_ADMISSION_OUTPUT_SAFE);
+		GP_LOG_E ("admission-eval: capture=%llu policy=%s strict=%d "
+			"output-safe=%d field32=0x%08x field36=0x%08x field104=0x%08x",
+			capture_id,
+			admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE ? "output-safe" : "strict",
+			strict_ok, output_safe_ok, recovery_capture, recovery_candidate,
+			recovery_activity);
+		if ((admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE) ?
+		    output_safe_ok : strict_ok) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
 			GP_LOG_D ("recovery-required cleared: conditions readable "
@@ -6393,11 +6434,24 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 		free (rdata);
 		if (!recovered) {
+			fprintf (stderr, "[pentax] admission: capture=%llu policy=%s "
+				"ptp=0x%04x size=%u "
+				"field32=0x%08x field36=0x%08x field104=0x%08x "
+				"unsafe-mask=0x%08x strict=%d output-safe=%d accepted=0\n",
+				capture_id,
+				admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE ? "output-safe" : "strict",
+				recovery_ptpres,
+				rsize, recovery_capture, recovery_candidate,
+				recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE,
+				strict_ok, output_safe_ok);
 			GP_LOG_E ("capture refused: session reconciliation flagged "
 				"recovery-required and camera is still busy or "
 				"conditions unreadable");
 			gp_context_error (context,
-				_("Camera is in an unreconciled state from a previous session; reconnect or power-cycle it before capturing."));
+				_("Camera recovery probe refused capture (PTP 0x%04x, size %u, fields +32=0x%08x +36=0x%08x +104=0x%08x, unsafe-mask=0x%08x)."),
+				recovery_ptpres, rsize, recovery_capture,
+				recovery_candidate, recovery_activity,
+				PENTAX_CONDITION_ACTIVITY_UNSAFE);
 			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
@@ -6414,168 +6468,69 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * N-1 as N (issue #34).  This must run BEFORE InitiateCapture so
 	 * the shutter is never triggered on a busy camera.
 	 *
-	 * Dual-format (RAW+ / RAW+JPEG) exposures leave a second transfer
-	 * candidate pending after the primary member is finalized (issue #73).
-	 * If that leftover is not consumed, the NEXT capture's pre-probe sees it
-	 * and hard-refuses with CAMERA_BUSY — the "second RAW+ shot crashes"
-	 * symptom.  So instead of refusing outright, we DRAIN any pending
-	 * candidate (transfer to a throwaway buffer + finalize) in a bounded
-	 * loop, then wait for the camera to report idle before firing.  The
-	 * drain is bounded in both candidate count and wall clock; if it cannot
-	 * clear the camera we still fall back to the original CAMERA_BUSY
-	 * refusal so a genuinely wedged camera never triggers a shutter. */
+	 * A pre-existing candidate has no generation identifier, so it cannot be
+	 * proved to belong to this request.  Never consume or delete it here: doing
+	 * so can silently discard a file from an earlier application/session. */
 	{
 		unsigned char *bdata = NULL;
 		unsigned int bsize = 0;
 		uint32_t baseline_candidate = 0;
+		uint16_t baseline_ptpres;
 
-		if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &bdata, &bsize))
-			baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
-		else if (bdata || bsize)
-			GP_LOG_D ("stale-candidate pre-probe failed or short "
-				"(%u bytes); proceeding without baseline check",
-				(unsigned)bsize);
+		fprintf (stderr, "[pentax] capture=%llu boundary=preconditions-enter\n",
+			capture_id);
+		fflush (stderr);
+		baseline_ptpres = ptp_pentax_get_all_conditions (params, &bdata, &bsize);
+		fprintf (stderr, "[pentax] capture=%llu boundary=preconditions-return ptp=0x%04x size=%u\n",
+			capture_id, baseline_ptpres, bsize);
+		fflush (stderr);
+		if (baseline_ptpres != PTP_RC_OK || bsize < PENTAX_CONDITIONS_MIN_SIZE) {
+			GP_LOG_E ("capture refused: pre-capture conditions unreadable "
+				"(PTP 0x%04x, %u bytes)", baseline_ptpres, bsize);
+			free (bdata);
+			gp_context_error (context,
+				_("Camera readiness is unknown (PTP 0x%04x, %u condition bytes); refusing to initiate an exposure."),
+				baseline_ptpres, bsize);
+			return GP_ERROR_CAMERA_BUSY;
+		}
+		baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
+		/* This same mandatory readiness sample also carries the camera's
+		 * writing format.  Preserve its output obligation across the exposure:
+		 * the K-3 III can clear/change +524 after the primary is finalized,
+		 * before reconciliation observes the companion.  Re-reading only after
+		 * capture therefore let RAW+JPEG return after its JPEG member. */
+		expected_extra_candidates =
+			pentax_expected_extra_candidates (bdata, bsize);
 		free (bdata);
+		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
+			expected_extra_candidates);
 
 		if (baseline_candidate) {
-			/* Bounded drain: consume up to 8 pending candidates, each
-			 * transferred to a throwaway buffer and finalized, within a
-			 * 60 s wall-clock budget.  This clears the leftover dual-format
-			 * members so the next shutter can fire cleanly.  The bound
-			 * covers the worst case: astro pixel-shift (4 shots) in a
-			 * dual-format mode (RAW+JPEG) leaves up to 7 stale candidates
-			 * after the primary is finalized (issue #73). */
-			const unsigned int DRAIN_MAX_MS = 60 * 1000;
-			const int DRAIN_MAX_COUNT = 8;
-			struct timespec dstart, dnow;
-			int drained = 0;
-			int drain_ok = 1;
-
-			clock_gettime (CLOCK_MONOTONIC, &dstart);
-			for (;;) {
-				unsigned char *cdata = NULL;
-				unsigned int csize = 0;
-				uint32_t handle = 0;
-				PentaxCaptureBuffer extra = {0};
-				int iteration_error = GP_OK;
-
-				if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
-					drain_ok = 0;
-					break;
-				}
-				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &cdata, &csize)) {
-					clock_gettime (CLOCK_MONOTONIC, &dnow);
-					if ((long)((dnow.tv_sec - dstart.tv_sec) * 1000 +
-						(dnow.tv_nsec - dstart.tv_nsec) / 1000000) >= (long)DRAIN_MAX_MS) {
-						drain_ok = 0;
-					}
-					free (cdata);
-					if (!drain_ok)
-						break;
-					usleep (200 * 1000);
-					continue;
-				}
-				if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
-				    pentax_get_u32le (cdata + 32) == 1)
-					handle = pentax_get_u32le (cdata + 36);
-				free (cdata);
-				cdata = NULL;
-
-				if (!handle) {
-					/* No more pending candidates: drain complete. */
-					break;
-				}
-				if (drained >= DRAIN_MAX_COUNT) {
-					GP_LOG_D ("pre-capture drain bound reached (%d); "
-						"leaving candidate %u", DRAIN_MAX_COUNT, handle);
-					drain_ok = 0;
-					break;
-				}
-				clock_gettime (CLOCK_MONOTONIC, &dnow);
-				if ((long)((dnow.tv_sec - dstart.tv_sec) * 1000 +
-					(dnow.tv_nsec - dstart.tv_nsec) / 1000000) >= (long)DRAIN_MAX_MS) {
-					GP_LOG_D ("pre-capture drain time budget (%u ms) exhausted; "
-						"leaving candidate %u", DRAIN_MAX_MS, handle);
-					drain_ok = 0;
-					break;
-				}
-
-				/* Transfer the pending candidate to a throwaway buffer. */
-				iteration_error = pentax_transfer_run (&extra, &transfer_operations);
-				if (iteration_error < GP_OK) {
-					GP_LOG_E ("pre-capture drain transfer of candidate %u "
-						"failed (%d)", handle, iteration_error);
-					free (extra.data);
-					drain_ok = 0;
-					break;
-				}
-				free (extra.data);
-				extra.data = NULL;
-
-				/* Finalize (delete) the candidate on the camera. */
-				if (PTP_RC_OK != ptp_pentax_delete_transfer_candidate (params)) {
-					GP_LOG_E ("pre-capture drain delete of candidate %u "
-						"failed", handle);
-					drain_ok = 0;
-					break;
-				}
-				drained++;
-				GP_LOG_D ("pre-capture drain: consumed stale candidate %u [%d/%d]",
-					handle, drained, DRAIN_MAX_COUNT);
-			}
-
-			if (drain_ok && drained) {
-				/* Wait (bounded) for the camera to report idle before firing. */
-				int wait_attempt;
-				int reached_idle = 0;
-			for (wait_attempt = 0; wait_attempt < 50; wait_attempt++) {
-				unsigned char *wdata = NULL;
-				unsigned int wsize = 0;
-
-				if (PTP_RC_OK != ptp_pentax_get_all_conditions (params, &wdata, &wsize)) {
-					/* Issue #122: a failed/short read is UNKNOWN, never IDLE. */
-					free (wdata);
-					usleep (200 * 1000);
-					continue;
-				}
-				if (pentax_camera_readiness (wdata, wsize) == PENTAX_READINESS_IDLE) {
-					free (wdata);
-					reached_idle = 1;
-					break;
-				}
-				free (wdata);
-				usleep (200 * 1000);
-			}
-				if (reached_idle) {
-					GP_LOG_D ("pre-capture drain complete: %d stale candidate(s) consumed", drained);
-				} else {
-					/* Issue #122 (TA follow-up): fail closed on bound exhaustion.
-					 * If the camera is still BUSY/UNKNOWN after draining, firing
-					 * InitiateCapture anyway can wedge it — refuse this exposure
-					 * instead of proceeding unproven-ready. */
-					GP_LOG_E ("pre-capture drain consumed %d candidate(s) but camera "
-						"still busy/unknown after bounded wait; refusing new exposure", drained);
-					gp_context_error (context,
-						_("The camera is still processing a previous capture; try again shortly."));
-					ret = GP_ERROR_CAMERA_BUSY;
-					goto out;
-				}
-			} else if (drained) {
-				GP_LOG_E ("stale transfer candidate still pending after "
-					"bounded drain (%d consumed); refusing new exposure", drained);
-				gp_context_error (context,
-					_("A previous capture's transfer candidate is still pending; resolve it before capturing."));
-				ret = GP_ERROR_CAMERA_BUSY;
-				goto out;
-			}
+			GP_LOG_E ("capture refused: unowned transfer candidate %u "
+				"was present before InitiateCapture", baseline_candidate);
+			gp_context_error (context,
+				_("Camera has an unclaimed transfer candidate (%u); refusing to delete it or initiate a new exposure."),
+				baseline_candidate);
+			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
 
+	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-enter focus=%u companions=%u\n",
+		capture_id, focus_mode, expected_extra_candidates);
+	fflush (stderr);
 	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-return ptp=0x%04x\n",
+		capture_id, ptpres);
+	fflush (stderr);
+	GP_LOG_D ("pentax-capture[%llu]: InitiateCapture returned 0x%04x",
+		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
 	}
+	/* The candidate is finalized.  A later error must not issue a second
+	 * DeleteTransferCandidate against the same completed exposure. */
+	have_candidate = 0;
 	initiated = 1;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
 
@@ -6715,24 +6670,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
-		/* Attribute the timeout to the first failing boundary (issue #111):
-		 * a non-zero candidate_handle means the camera published a
-		 * transfer candidate before the budget ran out, so the wait was
-		 * spent in the post-exposure processing phase; a zero handle
-		 * means the exposure phase itself never published a candidate
-		 * within its budget. */
-		if (candidate_handle)
-			GP_LOG_E ("capture wait timed out in the post-exposure "
-				"processing phase (candidate observed, transfer not "
-				"finalized within %u ms)", capture_timeout_ms);
-		else
-			GP_LOG_E ("capture wait timed out in the exposure phase "
-				"(no transfer candidate observed within %u ms; "
-				"exposure budget was %u ms)", capture_timeout_ms,
-				exposure_phase_ms);
+		/* This loop exits as soon as a non-zero candidate is observed, so a
+		 * candidate-present timeout is mechanically impossible here.  The old
+		 * nested `if (candidate_handle)` made the advertised post-exposure
+		 * diagnostic unreachable and obscured the first real boundary. */
+		GP_LOG_E ("pentax-capture[%llu]: capture wait timed out before candidate "
+			"publication (%u ms total; exposure budget %u ms)", capture_id,
+			capture_timeout_ms, exposure_phase_ms);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}
+	GP_LOG_D ("pentax-capture[%llu]: candidate %u observed", capture_id,
+		candidate_handle);
 	params->pentax.candidate_handle = candidate_handle;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_CANDIDATE;
 	have_candidate = 1;
@@ -6820,6 +6769,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	transfer.bytes_transferred = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRANSFERRING;
 	ret = pentax_transfer_run (&capture, &transfer_operations);
+	GP_LOG_D ("pentax-capture[%llu]: transfer returned %d (%zu bytes)",
+		capture_id, ret, capture.size);
 	if (ret < GP_OK)
 		goto out;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_CACHING;
@@ -6846,6 +6797,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * discarded (issue #12). */
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_FINALIZING;
 	ptpres = ptp_pentax_delete_transfer_candidate (params);
+	GP_LOG_D ("pentax-capture[%llu]: DeleteTransferCandidate returned 0x%04x",
+		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
@@ -6873,13 +6826,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		};
 		char extra_names[8][128];
 		int reconciled = 0;
-		/* Bounded for the worst case: astro pixel-shift (4 shots) in a
-		 * dual-format mode produces up to 7 extras beyond the primary.
-		 * The wall-clock budget is widened accordingly so a full
-		 * pixel-shift + RAW+ set can be drained without leaving stale
-		 * candidates behind (issue #73). */
+		/* The minimum obligation comes from the already-mandatory pre-capture
+		 * readiness sample; later samples may increase it but may not erase it.
+		 * This is mode-driven, not a time-based guess.  Reconciliation still
+		 * observes, transfers and finalizes each advertised candidate in turn. */
 		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
-			8, 120 * 1000, extra_names, &reconciled);
+			8, 120 * 1000, expected_extra_candidates,
+			extra_names, &reconciled);
 
 		if (rret < GP_OK)
 			GP_LOG_E ("dual-format reconciliation stopped early (%d); "
@@ -6891,58 +6844,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				"consumed and published", reconciled);
 	}
 
-	/* Wait for the camera to report idle before returning success.
-	 * In astro pixel-shift mode (and other multi-shot modes), the camera
-	 * may still be processing even after all candidates are consumed.
-	 * Without this wait, Benro Connect fires the next shutter release
-	 * while the camera is busy → InitiateCapture fails with CAMERA_BUSY.
-	 * Bounded so a wedged camera cannot hang the caller forever.
-	 *
-	 * Issue #122 (single-shot wedge): an ordinary single-shot capture was
-	 * previously returned to Benro immediately after reconciliation, even
-	 * though the camera can still be finishing internal processing (RAW
-	 * conversion, card write) for a short window.  Benro then fired the next
-	 * command into a busy camera and wedged until a mode toggle + USB reset.
-	 * Panorama / time-lapse did not reproduce it because their multi-shot
-	 * path already ran the long idle wait.  We therefore now run a SHORT
-	 * bounded readiness check for single-shot too: it proves the camera is
-	 * idle before control returns (the common case settles in well under the
-	 * bound), and only proceeds with a warning if the bound is exhausted —
-	 * never firing Benro into an unproven-busy camera.  Multi-shot / astro /
-	 * bulb keep the long bound because they can genuinely process for minutes. */
-	{
-		/* Issue #122 (TA follow-up): fail-closed readiness gate.  Only a POSITIVE
-		 * IDLE transition may complete the capture successfully.  If the bound is
-		 * exhausted while the camera is still BUSY or UNKNOWN, return
-		 * GP_ERROR_CAMERA_BUSY instead of claiming normal completion - a timer
-		 * expiring is not equivalent to an observed IDLE transition. */
-		const int IDLE_WAIT_MAX_MS = needs_idle_wait ?
-			60 * 1000 : 15 * 1000;
-
-		/* Issue #122 (TA follow-up): pass a cancellation probe so a user/app cancel
-		 * during the wait exits promptly (return -1) instead of blocking for the full
-		 * 15 s / 60 s bound.  Cancellation is distinct from "not idle": it propagates
-		 * GP_ERROR_CANCEL, whereas bound exhaustion on BUSY/UNKNOWN returns CAMERA_BUSY. */
-		int idle_result = pentax_wait_for_idle (pentax_capture_read_conditions, params,
-						  pentax_capture_cancel, context, IDLE_WAIT_MAX_MS);
-		if (idle_result == -1) {
-			GP_LOG_D ("post-capture idle wait cancelled; returning CANCEL");
-			ret = GP_ERROR_CANCEL;
-			goto out;
-		}
-		if (idle_result == 0) {
-			/* Bound exhausted while the camera is still BUSY or UNKNOWN: a timer
-			 * expiring is not equivalent to an observed IDLE transition, so return
-			 * CAMERA_BUSY instead of claiming normal completion. */
-			GP_LOG_E ("camera not proven idle after %d ms post-capture wait%s; "
-				"returning CAMERA_BUSY instead of claiming completion",
-				IDLE_WAIT_MAX_MS, needs_idle_wait ? "" : " (single-shot short bound)");
-			gp_context_error (context,
-				_("The camera is still processing the capture; try again shortly."));
-			ret = GP_ERROR_CAMERA_BUSY;
-			goto out;
-		}
-	}
+	/* o-v12e hardware evidence proved that this conditions predicate can remain
+	 * BUSY/UNKNOWN for 63 seconds while the K-3 III successfully accepts normal
+	 * identity/config traffic.  It is therefore not an API-completion predicate.
+	 * The file and camera-side candidate are already complete here.  Publish the
+	 * result now, and reuse the fail-closed recovery probe at the start of the
+	 * next capture so no later shutter is initiated without a fresh positive
+	 * idle observation. */
+	params->pentax.recovery_required = 1;
+	GP_LOG_D ("pentax-capture[%llu]: transfer/finalization complete; next shutter "
+		"requires a positive idle recovery probe", capture_id);
 
 	ret = gp_filesystem_append (camera->fs, path->folder, path->name, context);
 	if (ret < GP_OK)
@@ -6968,6 +6879,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
 	ret = GP_OK;
+	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
 
 out:
 	free (data);
@@ -7041,6 +6953,8 @@ out:
 	params->pentax.candidate_handle = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_IDLE;
 	SET_CONTEXT_P (params, NULL);
+	GP_LOG_D ("pentax-capture[%llu]: return %d initiated=%d candidate_live=%d",
+		capture_id, ret, initiated, have_candidate);
 	return ret;
 }
 
@@ -7542,6 +7456,18 @@ camera_trigger_capture (Camera *camera, GPContext *context)
 	GP_LOG_D ("camera_trigger_capture");
 
 	SET_CONTEXT_P(params, context);
+
+	/* Pentax vendor capture owns a synchronous lifecycle: pre-capture
+	 * reconciliation, InitiateCapture, candidate discovery/transfer/finalize,
+	 * and positive ready proof before control returns. The generic asynchronous
+	 * trigger API has no CameraFilePath/result channel and cannot uphold that
+	 * contract. Fail closed so every supported Pentax still enters through
+	 * camera_pentax_capture() via gp_camera_capture(GP_CAPTURE_IMAGE). */
+	if (params->pentax.vendor_mode_enabled) {
+		gp_context_error (context,
+			_("Pentax asynchronous trigger capture is unavailable; use synchronous image capture so the complete camera lifecycle is preserved."));
+		return GP_ERROR_NOT_SUPPORTED;
+	}
 
 	/* If there is no capturetarget set yet, the default is "sdram" */
 	if (GP_OK != gp_setting_get("ptp2","capturetarget",buf))

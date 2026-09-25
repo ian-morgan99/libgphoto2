@@ -174,6 +174,25 @@ int pentax_transfer_timeout_reason (unsigned long long total_ms,
  * pending candidate; the caller has already checked the PTP result code. */
 int pentax_recovery_probe_ok (const unsigned char *data, size_t size);
 
+/* Runtime-selectable diagnostic admission policies for the one remaining
+ * K-3 III hardware discriminator. STRICT preserves the broad historical
+ * activity predicate. OUTPUT_SAFE requires only a complete conditions frame,
+ * no active exposure (+32) and no pending candidate (+36), while still
+ * surfacing +104 for correlation.  The latter is diagnostic until physical
+ * evidence proves it safe. */
+typedef enum {
+	PENTAX_ADMISSION_STRICT = 0,
+	PENTAX_ADMISSION_OUTPUT_SAFE = 1
+} PentaxAdmissionPolicy;
+int pentax_admission_probe_ok (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy);
+
+/* Minimum number of candidates expected after the primary candidate has
+ * been finalized, derived from GetAllConditions writing format at +524.
+ * RAW+JPEG publishes two output objects, so one companion remains. */
+unsigned int pentax_expected_extra_candidates (const unsigned char *data,
+	size_t size);
+
 /* Stale-candidate baseline for the pre-capture probe (issue #34): returns
  * the pending transfer handle when one is flagged, else 0. */
 uint32_t pentax_stale_candidate_baseline (const unsigned char *data,
@@ -301,6 +320,12 @@ int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,
 	unsigned int operation, int32_t displacement);
+/* Apply the ownership result from an API such as gp_file_set_data_and_size().
+ * A successful call owns buffer->data, so the transfer buffer must be cleared
+ * before any later operation can fail and before generic cleanup runs.  A
+ * failed ownership call leaves the buffer intact for its original owner. */
+int pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
+	int ownership_result);
 int pentax_candidate_filename (const unsigned char *data, uint32_t size,
 		char *filename, size_t filename_size);
 int pentax_jpeg_bounds (const unsigned char *data, size_t size,
@@ -315,9 +340,12 @@ int pentax_transfer_run (PentaxCaptureBuffer *buffer,
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
- *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
- *      set (offset 32 == 0) the loop terminates with success.
+ * and max_ms (total wall-clock budget in milliseconds). min_count is the
+ * minimum companion obligation supplied by the caller. The loop also raises
+ * that obligation from writing-file-format in each conditions response; it is
+ * never derived from physical exposure count. Each iteration:
+ *   1. Reads GetAllConditions via get_conditions. An empty response completes
+ *      only after the discovered required count has been finalized.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
@@ -347,7 +375,7 @@ typedef struct {
 } PentaxReconcileOps;
 
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
-	int max_count, unsigned int max_ms,
+	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count);
 
 #endif

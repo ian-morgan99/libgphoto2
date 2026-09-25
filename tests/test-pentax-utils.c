@@ -737,7 +737,26 @@ main (void)
 	put_u32le (condition_data, 32, 1);
 	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
 	put_u32le (condition_data, 32, 5);
+	put_u32le (condition_data, 36, 7);
+	CHECK (!pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+	put_u32le (condition_data, 36, 0);
 	CHECK (pentax_recovery_probe_ok (condition_data, sizeof (condition_data)));
+
+	/* The diagnostic output-safe policy differs from strict policy only on
+	 * broad activity: neither policy may admit unreadable conditions, an
+	 * active exposure, or a pending output candidate. */
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_PROCESSING);
+	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT));
+	CHECK (pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_OUTPUT_SAFE));
+	put_u32le (condition_data, 32, 1);
+	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_OUTPUT_SAFE));
+	put_u32le (condition_data, 32, 0);
+	put_u32le (condition_data, 36, 9);
+	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_OUTPUT_SAFE));
 
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active

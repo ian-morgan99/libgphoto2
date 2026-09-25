@@ -54,6 +54,8 @@ typedef struct {
         const char *names[8];
         /* Fault injection. */
         int conditions_fail_first;   /* fail the first N get_conditions calls */
+        int conditions_empty_first;  /* report empty for the first N reads */
+        int writing_format;          /* +524: 2 means RAW+JPEG */
         int conditions_calls;
         int transfer_error;          /* non-zero: transfer_candidate fails */
         int delete_error;            /* non-zero: delete_candidate fails */
@@ -77,18 +79,22 @@ mock_get_conditions (void *user_data, unsigned char **data, size_t *size)
                 *size = 0;
                 return GP_ERROR_IO;
         }
-        blob = calloc (1, PENTAX_CONDITIONS_MIN_SIZE);
+        size_t blob_size = mock->writing_format ? 576 : PENTAX_CONDITIONS_MIN_SIZE;
+        blob = calloc (1, blob_size);
         if (!blob) {
                 *data = NULL;
                 *size = 0;
                 return GP_ERROR_NO_MEMORY;
         }
-        if (mock->handle_count > 0) {
+        if (mock->handle_count > 0 &&
+            mock->conditions_calls > mock->conditions_empty_first) {
                 put_u32le (blob, 32, 1);
                 put_u32le (blob, 36, mock->handles[0]);
         }
+        if (mock->writing_format)
+                put_u32le (blob, 524, (uint32_t)mock->writing_format);
         *data = blob;
-        *size = PENTAX_CONDITIONS_MIN_SIZE;
+        *size = blob_size;
         return GP_OK;
 }
 
@@ -187,7 +193,7 @@ main (void)
         /* 1. No pending candidate: immediate success, zero work. */
         mock_reset (&mock);
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 0);
         CHECK (mock.transfer_calls == 0);
@@ -199,7 +205,7 @@ main (void)
         mock.handle_count = 1;
         mock.names[0] = "IMG_9999.ARW";
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 1);
         CHECK (mock.transfer_calls == 1);
@@ -215,7 +221,7 @@ main (void)
         mock.names[0] = "IMG_0001.ARW";
         mock.names[1] = "IMG_0001.JPG";
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 2);
         CHECK (mock.transfer_calls == 2);
@@ -223,13 +229,29 @@ main (void)
         CHECK (!strcmp (names[0], "IMG_0001.ARW"));
         CHECK (!strcmp (names[1], "IMG_0001.JPG"));
 
+        /* RAW+JPEG: an initially empty post-primary sample is not completion.
+         * The camera's +524 contract requires the delayed companion. */
+        mock_reset (&mock);
+        mock.writing_format = 2;
+        mock.conditions_empty_first = 1;
+        mock.handles[0] = 202;
+        mock.handle_count = 1;
+        mock.names[0] = "IMG_0002.DNG";
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+        CHECK (ret == GP_OK);
+        CHECK (count == 1);
+        CHECK (mock.conditions_calls >= 2);
+        CHECK (mock.transfer_calls == 1);
+        CHECK (mock.delete_calls == 1);
+
         /* 4. Transfer failure: error propagates, count reflects completed. */
         mock_reset (&mock);
         mock.handles[0] = 300;
         mock.handle_count = 1;
         mock.transfer_error = GP_ERROR_IO;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_ERROR_IO);
         CHECK (count == 0);
         CHECK (mock.delete_calls == 0);
@@ -240,7 +262,7 @@ main (void)
         mock.handle_count = 1;
         mock.delete_error = GP_ERROR_IO;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_ERROR_IO);
         CHECK (count == 0);
         CHECK (mock.transfer_calls == 1);
@@ -251,7 +273,7 @@ main (void)
         mock.handle_count = 1;
         mock.conditions_fail_first = 2;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 1);
         CHECK (mock.conditions_calls >= 3);
@@ -265,7 +287,7 @@ main (void)
         mock.handles[2] = 602;
         mock.handle_count = 3;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 2, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 2, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 2);
         CHECK (mock.handle_count == 1);
@@ -280,16 +302,16 @@ main (void)
          * iteration's cancellation check stops the loop. */
         mock.cancel_after = 0;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_ERROR_CANCEL);
         CHECK (count == 1);
 
         /* 9. Bad parameters: NULL ops or count. */
         count = -1;
-        CHECK (pentax_reconcile_extra_candidates (NULL, 4, 60000, names, &count)
+        CHECK (pentax_reconcile_extra_candidates (NULL, 4, 60000, 0, names, &count)
                 == GP_ERROR_BAD_PARAMETERS);
         CHECK (count == 0);
-        CHECK (pentax_reconcile_extra_candidates (&ops, 4, 60000, names, NULL)
+        CHECK (pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, NULL)
                 == GP_ERROR_BAD_PARAMETERS);
 
         /* 10. Unreadable/short conditions: get_conditions reports a short
@@ -300,10 +322,77 @@ main (void)
         mock.handle_count = 1;
         mock.info_fail = 1;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 1);
         CHECK (names[0][0] == '\0');
+
+        /* 11. RAW+JPEG: an empty gap after primary finalization is not
+         * completion. Discover and finalize the delayed companion. */
+        mock_reset (&mock);
+        mock.handles[0] = 900;
+        mock.handle_count = 1;
+        mock.names[0] = "IMG_0002.DNG";
+        mock.conditions_empty_first = 3;
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 1, names, &count);
+        CHECK (ret == GP_OK);
+        CHECK (count == 1);
+        CHECK (mock.conditions_calls >= 4);
+        CHECK (mock.transfer_calls == 1);
+        CHECK (mock.delete_calls == 1);
+        CHECK (!strcmp (names[0], "IMG_0002.DNG"));
+
+        /* 12. The camera-reported writing format supplies the minimum output
+         * obligation; Pixel Shift exposure count is deliberately irrelevant. */
+        {
+                unsigned char conditions[528] = {0};
+                CHECK (pentax_expected_extra_candidates (conditions, 527) == 0);
+                put_u32le (conditions, 524, 0);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
+                put_u32le (conditions, 524, 1);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
+                put_u32le (conditions, 524, 2);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                put_u32le (conditions, 524, 3);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
+        }
+
+        /* 13. o-v12m companion UAF regression: exercise the same production
+         * ownership helper used immediately after gp_file_set_data_and_size().
+         * Success disowns the bytes before any later publication step can
+         * fail; failure before transfer leaves cleanup ownership unchanged. */
+        {
+                PentaxCaptureBuffer owned = {0};
+                unsigned char *published;
+
+                owned.data = malloc (6);
+                CHECK (owned.data != NULL);
+                memcpy (owned.data, "EXTRA", 6);
+                owned.size = 5;
+                published = owned.data;
+                CHECK (pentax_capture_buffer_disown_on_success (&owned, GP_OK) == GP_OK);
+                CHECK (owned.data == NULL);
+                CHECK (owned.size == 0);
+                /* A later filesystem-publication failure must not restore
+                 * transfer ownership and therefore cannot double-free. */
+                ret = GP_ERROR_IO;
+                CHECK (ret == GP_ERROR_IO);
+                CHECK (owned.data == NULL);
+                CHECK (!memcmp (published, "EXTRA", 5));
+                free (published); /* stand-in for CameraFile destruction */
+
+                owned.data = malloc (6);
+                CHECK (owned.data != NULL);
+                memcpy (owned.data, "EXTRA", 6);
+                owned.size = 5;
+                published = owned.data;
+                CHECK (pentax_capture_buffer_disown_on_success (&owned,
+                        GP_ERROR_NO_MEMORY) == GP_ERROR_NO_MEMORY);
+                CHECK (owned.data == published);
+                CHECK (owned.size == 5);
+                free (owned.data);
+        }
 
         printf ("test-pentax-reconcile: all checks passed\n");
         return 0;

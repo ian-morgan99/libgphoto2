@@ -54,6 +54,15 @@ pentax_get_u32le (const unsigned char *data)
 	       ((uint32_t)data[3] << 24);
 }
 
+unsigned int
+pentax_expected_extra_candidates (const unsigned char *data, size_t size)
+{
+	/* IMAGE Transmitter 2: 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF. */
+	if (!data || size < 528)
+		return 0;
+	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
+}
+
 static uint16_t
 pentax_get_u16le (const unsigned char *data)
 {
@@ -609,6 +618,19 @@ pentax_jpeg_bounds (const unsigned char *data, size_t size,
 	return GP_ERROR_CORRUPTED_DATA;
 }
 
+int
+pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
+		int ownership_result)
+{
+	if (!buffer)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (ownership_result < GP_OK)
+		return ownership_result;
+	buffer->data = NULL;
+	buffer->size = 0;
+	return ownership_result;
+}
+
 static int
 pentax_transfer_interrupted (const PentaxTransferOps *operations)
 {
@@ -735,11 +757,21 @@ pentax_transfer_timeout_reason (unsigned long long total_ms, unsigned long long 
 int
 pentax_recovery_probe_ok (const unsigned char *data, size_t size)
 {
+	return pentax_admission_probe_ok (data, size, PENTAX_ADMISSION_STRICT);
+}
+
+int
+pentax_admission_probe_ok (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy)
+{
 	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
 		return 0;
-	if (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+	if (policy == PENTAX_ADMISSION_STRICT &&
+	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
 		return 0;
 	if (pentax_get_u32le (data + 32) == 1)
+		return 0;
+	if (pentax_get_u32le (data + 36) != 0)
 		return 0;
 	return 1;
 }
@@ -991,9 +1023,11 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds).  Each iteration:
- *   1. Reads GetAllConditions via get_conditions; if no candidate flag is
- *      set (offset 32 == 0) the loop terminates with success.
+ * and max_ms (total wall-clock budget in milliseconds). min_count is the
+ * minimum companion obligation reported by the camera output configuration.
+ * Each iteration:
+ *   1. Reads GetAllConditions via get_conditions. An empty response completes
+ *      only after min_count candidates have been finalized.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
@@ -1007,12 +1041,13 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
  */
 int
 pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
-	int max_count, unsigned int max_ms,
+	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count)
 {
 	struct timespec start, now;
 	int count = 0;
 	int ret = GP_OK;
+	unsigned int required_count = min_count;
 
 	if (!ops || !reconciled_count) {
 		if (reconciled_count)
@@ -1055,6 +1090,15 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			continue;
 		}
 
+		/* The output contract and candidate flag are observations from one
+		 * serialized conditions sample. RAW+JPEG means one companion must be
+		 * observed after the already-finalized primary. Pixel Shift actuation
+		 * count does not change the number of output objects. */
+		if (pentax_expected_extra_candidates (cdata, csize) > required_count) {
+			required_count = pentax_expected_extra_candidates (cdata, csize);
+			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
+				required_count);
+		}
 		handle = 0;
 		if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
 		    pentax_get_u32le (cdata + 32) == 1)
@@ -1063,9 +1107,22 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 		cdata = NULL;
 
 		if (!handle) {
-			/* No more candidates: reconciliation complete. */
-			done = 1;
-			goto out;
+			/* The camera may briefly report no candidate between RAW and JPEG.
+			 * Complete only after the camera-reported output obligation is met. */
+			if ((unsigned int)count >= required_count) {
+				done = 1;
+				goto out;
+			}
+			clock_gettime (CLOCK_MONOTONIC, &now);
+			if ((now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+				GP_LOG_E ("reconciliation timed out waiting for camera-reported "
+					"output %d/%u", count + 1, required_count + 1);
+				ret = GP_ERROR_TIMEOUT;
+				goto out;
+			}
+			usleep (200 * 1000);
+			continue;
 		}
 
 		/* Bound on candidate count. */
