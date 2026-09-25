@@ -6379,6 +6379,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	fprintf (stderr, "[pentax] capture=%llu boundary=camlib-enter transfer=%d recovery=%d\n",
+		capture_id, params->pentax.transfer_state,
+		params->pentax.recovery_required);
+	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
 	/* Every capture starts with an empty extra-file list (issue #73):
 	 * the list always describes the most recent exposure only. */
@@ -6473,7 +6477,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		uint32_t baseline_candidate = 0;
 		uint16_t baseline_ptpres;
 
+		fprintf (stderr, "[pentax] capture=%llu boundary=preconditions-enter\n",
+			capture_id);
+		fflush (stderr);
 		baseline_ptpres = ptp_pentax_get_all_conditions (params, &bdata, &bsize);
+		fprintf (stderr, "[pentax] capture=%llu boundary=preconditions-return ptp=0x%04x size=%u\n",
+			capture_id, baseline_ptpres, bsize);
+		fflush (stderr);
 		if (baseline_ptpres != PTP_RC_OK || bsize < PENTAX_CONDITIONS_MIN_SIZE) {
 			GP_LOG_E ("capture refused: pre-capture conditions unreadable "
 				"(PTP 0x%04x, %u bytes)", baseline_ptpres, bsize);
@@ -6505,7 +6515,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 	}
 
+	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-enter focus=%u companions=%u\n",
+		capture_id, focus_mode, expected_extra_candidates);
+	fflush (stderr);
 	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-return ptp=0x%04x\n",
+		capture_id, ptpres);
+	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: InitiateCapture returned 0x%04x",
 		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {

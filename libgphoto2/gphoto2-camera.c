@@ -1324,6 +1324,9 @@ int
 gp_camera_capture (Camera *camera, CameraCaptureType type,
 		   CameraFilePath *path, GPContext *context)
 {
+	fprintf (stderr, "[libgphoto2] gp_camera_capture: enter camera=%p type=%d path=%p context=%p\n",
+		(void *)camera, (int)type, (void *)path, (void *)context);
+	fflush (stderr);
 	C_PARAMS (camera);
 	CHECK_INIT (camera, context);
 
