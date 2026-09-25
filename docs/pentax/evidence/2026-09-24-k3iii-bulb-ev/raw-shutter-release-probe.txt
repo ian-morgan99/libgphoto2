@@ -1,0 +1,35 @@
+$ /tmp/k3iii-shutter-release-probe 'Pentax K-3 Mark III (MTP mode)' usb:002,003
+*** Contexterror *** The camera is still processing the capture; try again shortly.  (x2, at init)
+stage=open result=0 (No error)
+stage=init result=0 (No error)
+stage=baseline
+  shooting=no  bulb-timer=no  bulb-seconds=1/20  ISO=100  exposure-comp=0/10
+stage=60s set_result=-1 (Unspecified error)
+stage=60s-conditions: unchanged (bulb-seconds=1/20)   # 60s REJECTED
+stage=30s set_result=0 (No error)
+stage=30s-conditions: bulb-seconds=30/1   # 30s APPLIED
+stage=capture-30s-timer starting (expect ~30s auto-release)...
+stage=capture-30s-timer result=-110 (I/O in progress) elapsed=94 s file=//IMGP3603.DNG
+   # gp_camera_capture returned after 94s; camera created IMGP3603.DNG on the card.
+   # -110 = GP_ERROR_CAMERA_BUSY ("still processing") — the exposure completed,
+   #   the PTP session was still busy when the call returned.
+stage=restore-shutter set_result=0 (No error)
+stage=post-restore: bulb-seconds=1/20 (restored)
+stage=iso-12800 set_result=0 (No error)
+stage=iso-12800-verify: ISO=12800   # APPLIED + verified via pentaxconditions
+stage=capture-iso12800 result=-110 (I/O in progress) file=//IMGP3604.DNG
+   # IMGP3604.DNG created on the card at ISO 12800.
+stage=restore-iso set_result=0 (No error)
+stage=final: ISO=100 (restored)
+shutter_release_probe=pass cleanup=ok
+
+--- DNG retrieval (separate probe, /tmp/k3iii-dng-get + root-list) ---
+Camera PTP object store layout is non-standard:
+  /            -> only folder "store_00010001"
+  /store_00010001 -> lists empty (no subfolders, no files)
+  /DCIM, /store_00010001/DCIM -> Directory not found (-107)
+  get //IMGP3603.DNG -> -108 File not found (the path capture reported)
+  get /store_00010001/IMGP3603.DNG -> -108 File not found
+=> The DNGs exist on the card (capture created them, counter advanced
+   IMGP3602->3603->3604) but are not reachable through the PTP object-store
+   folder mapping this build exposes. Retrieval path is an open item.

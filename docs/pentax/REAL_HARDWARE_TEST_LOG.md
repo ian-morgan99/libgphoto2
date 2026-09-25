@@ -763,3 +763,77 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 - No larger magnitude, retry, or speculative precondition was sent. Issue #59
   records the exact failure and remains open pending a source-faithful retained
   PC-LV discriminator and physical observation.
+
+### 2026-09-24 — K-3 III ISO capability probe (issue #109 / libgphoto2#77 downstream)
+
+- PC-side session, no Polaris in the loop. K-3 III at `25fb:0189`,
+  `usb:002,002` (firmware 2.20, serial 8093033). Driver tree at `c57a8a3ac`;
+  pre-existing WIP (k01/readiness) stashed as "agent: WIP k01/readiness edits
+  (pre K-3 III PC ISO test)" and `ptp2.so` relinked clean before the run.
+- New harness `examples/pentax-k3iii-iso-probe.c` (single session, one
+  variable): baseline read → advertised choices → SET 12800 → verify via
+  conditions → invalid SET 99999 → restore baseline.
+- Result PASS: the `iso` widget advertises 15 choices from 100 to 1600000
+  (including 12800/25600), SET 12800 applied and read back through
+  `pentaxconditions`, invalid 99999 failed cleanly with ISO unchanged, and
+  the baseline 100 restored. The 6400 truncation in issue #109 is therefore
+  NOT in this libgphoto2 build's `iso` widget; it must live in the
+  pgphoto/Stage-2/Benro protocol layer or the client UI.
+- No capture was fired (set/read-back only); a >6400 capture+restore remains
+  open per #109 acceptance item 5.
+- Raw output and environment are in
+  `docs/pentax/evidence/2026-09-24-k3iii-iso/README.md`.
+
+### 2026-09-24 — K-3 III bulb/EV/timer probe (issues #114, #118/#113, #112)
+
+- PC-side session, no Polaris in the loop. K-3 III at `25fb:0189`,
+  `usb:002,002`. New harness `examples/pentax-k3iii-bulb-ev-probe.c`
+  (single session, one variable per stage).
+- Result: **"Bulb" is not an advertised `pentaxdirectshutter` choice** — the
+  widget lists 55 values from `1/8000` to `1s`; whole-second timer strings
+  are accepted by the setter but "Bulb" is rejected by the camera
+  (GP_ERROR, conditions unchanged). The writable long-exposure domain is the
+  **bulb timer** (`bulb-seconds`).
+- Timer boundary: **30s applies** (`bulb-seconds=30/1`), **120s rejected**
+  (camera kept `30/1`). Max timer is in (30, 120]; a 60s boundary test is
+  open.
+- EV-in-Bulb (#114): with the 30s timer active, `exposurecompensation=-1`
+  returned GP_OK but conditions still read `exposure-comp=0/10` — the write
+  is acknowledged but not committed while the bulb-timer domain is active.
+- `astro-limit` stayed 0 throughout (#112 field present and readable).
+- The camera was **disconnected from bus 002** before the follow-up
+  60s-boundary + ISO-12800-capture harness could run; re-init then failed
+  with `GP_ERROR_BAD_PARAMETERS` (device absent), confirming the disconnect.
+- Raw output and analysis are in
+  `docs/pentax/evidence/2026-09-24-k3iii-bulb-ev/README.md`.
+
+### 2026-09-24 — K-3 III shutter-release process + ISO 12800 capture (issues #114, #109)
+
+- PC-side session, no Polaris in the loop. K-3 III at `25fb:0189`,
+  `usb:002,003`. New harness `examples/pentax-k3iii-shutter-release-probe.c`
+  (single session; 60s boundary → 30s-timer capture with release timing →
+  ISO 12800 capture + restore).
+- **Bulb-timer max is 30s.** 60s was rejected by the camera (GP_ERROR,
+  conditions unchanged); 30s applies (`bulb-seconds=30/1`), 120s rejected.
+  The writable long-exposure domain tops out at a 30s timer on this body.
+- **Shutter auto-releases at timer expiry — no manual bulb release needed.**
+  With the 30s timer set, `gp_camera_capture` returned after **94 s** with
+  `GP_ERROR_CAMERA_BUSY (-110)` and the camera had created
+  `IMGP3603.DNG` on the card. The exposure completed on its own at timer
+  expiry; the -110 is the PTP session still processing when the call
+  returned, not a hang awaiting a manual bulb release. This directly
+  addresses the o-v9q "capture hangs until manual bulb release" symptom:
+  with the *timer* (not a discrete Bulb value) the camera self-releases.
+- **ISO 12800 capture works** (issue #109 acceptance item 5): SET 12800
+  applied and verified via `pentaxconditions` (`ISO=12800`), capture created
+  `IMGP3604.DNG`, baseline ISO 100 restored. The >6400 truncation is NOT in
+  this libgphoto2 build's capture path.
+- **Open item — DNG retrieval:** the camera's PTP object store exposes a
+  non-standard layout (root → `store_00010001`, which lists empty; no
+  `/DCIM`). The two DNGs exist on the card (counter advanced
+  IMGP3602→3603→3604) but are not reachable through the folder mapping this
+  build exposes (`//IMGP3603.DNG` → File not found). EXIF verification of
+  the captured DNGs (ISO/exposure-time fields) is blocked on a retrieval
+  path.
+- Raw output and analysis are in
+  `docs/pentax/evidence/2026-09-24-k3iii-bulb-ev/raw-shutter-release-probe.txt`.

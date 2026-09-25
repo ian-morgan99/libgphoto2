@@ -1,0 +1,50 @@
+$ /tmp/k3iii-bulb-ev-probe 'Pentax K-3 Mark III (MTP mode)' usb:002,002
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000000.
+stage=baseline
+  state=48
+   astro-phase=inactive/other
+   exposure-mode-raw=8
+   astro-mode=no
+   user-mode-raw=0
+   drive-mode-raw=0
+   ISO=100
+   exposure-step=1
+   open-av-num=28
+   shooting=no
+   processing=no
+   task-changing=no
+   Tv-changeable=yes
+   bulb-timer=no
+   bulb-seconds=1/20
+   aperture=32/10
+   exposure-comp=0/10
+   astrotracer3-capable=no
+   astro-shift=no
+   astro-movement-failed=no
+   astro-time-too-long=no
+   astro-limit=0
+   gps-state=0
+stage=bulb set_result=-1
+stage=bulb-conditions
+  (identical to baseline: bulb-timer=no bulb-seconds=1/20 exposure-comp=0/10)
+stage=ev-in-bulb set_result=0
+stage=ev-in-bulb-verify exposure-comp=0/10; astrotracer3-capable=no; ...
+stage=ev-restore set_result=0
+stage=30s set_result=0
+stage=30s-conditions
+  bulb-timer=no
+  bulb-seconds=30/1
+  (all other fields unchanged)
+stage=120s set_result=-1
+stage=120s-conditions
+  bulb-seconds=30/1   (unchanged; camera rejected 120s)
+stage=restore-shutter set_result=0
+stage=final-conditions
+  bulb-seconds=1/20   (restored)
+bulb_ev_probe=pass cleanup=ok
+
+--- follow-up: camera disconnected from bus 002 ---
+$ /tmp/k3iii-bulb-ev-probe 'Pentax K-3 Mark III (MTP mode)' usb:002,002
+probe failed: Bad parameters (-2)   # GP_ERROR_BAD_PARAMETERS at gp_camera_init
+lsusb | grep 25fb -> (no device; bus 002 has only the root hub)
