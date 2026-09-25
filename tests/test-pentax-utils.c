@@ -571,6 +571,12 @@ main (void)
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K3));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_KP));
 
+        /* Star AF / AF Active Area (0xd038, issue #76): K-3 III family only.
+         * The model gate is necessary but not sufficient — the descriptor must
+         * also advertise the enum at runtime for activated bodies. */
+        CHECK (pentax_model_supports_star_af (PENTAX_MODEL_K3_MARK_III));
+        CHECK (pentax_model_supports_star_af (PENTAX_MODEL_K3_MARK_III_MONO));
+
 	/* Research-capable PIDs (issue #19): only the three vendor bodies whose
 	 * capture flow we exercise may enter research paths. K-3 II (0x017b) is
 	 * deliberately absent from IT2, so it must fail closed here too. */

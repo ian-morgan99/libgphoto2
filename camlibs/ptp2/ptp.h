@@ -320,6 +320,12 @@ typedef enum {
 #define PTP_DPC_PENTAX_UsbLiveViewMode			0xd035
 #define PTP_DPC_PENTAX_LiveViewAFPosition		0xd036
 #define PTP_DPC_PENTAX_LiveViewZoom			0xd037
+/* AF Active Area selection (K-3 III family, firmware >= 2.20).  The K-3 III
+ * v2.20 body firmware handles 0xd038 in the same LV property group as
+ * 0xd035/0xd036/0xd037/0xd039 (verified by decompiling fwdc233b.bin); the
+ * Star AF enum value is carried here, advertised only when the body's
+ * Astrophoto Assist is activated (issue #76). */
+#define PTP_DPC_PENTAX_LiveViewAFActiveArea             0xd038
 #define PTP_DPC_PENTAX_MovieMode			0xd039
 #define PTP_OC_GetResizedImageObject	0x1022
 #define PTP_OC_GetFilesystemManifest	0x1023

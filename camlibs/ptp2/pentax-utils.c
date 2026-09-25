@@ -408,6 +408,18 @@ pentax_model_supports_exp_bracket (uint32_t model_no)
 }
 
 int
+pentax_model_supports_star_af (uint32_t model_no)
+{
+	/* Star AF (AF Active Area, 0xd038) is a K-3 III family feature added
+	 * in firmware 2.20.  The model gate is necessary but NOT sufficient:
+	 * the body must also have Astrophoto Assist activated, which is
+	 * detected at runtime by the 0xd038 descriptor advertising the Star
+	 * AF enum value (issue #76).  Never infer availability from
+	 * model+firmware alone. */
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+int
 pentax_model_supports_composition_adjust (uint32_t model_no)
 {
 	return pentax_model_is_k3iii_family (model_no) ||
