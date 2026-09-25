@@ -37,3 +37,13 @@ d02c_probe
 
 # IT2 MSI installer
 IT2_262_msi/
+
+# local scratch (raw data / binaries live in PrivateResearch)
+OrionStarshoot/
+_issue_work/issues_raw.json
+_issue_work/comments/
+_issue_work/timeline/
+docs/pentax/evidence/2026-09-02/k1ii-duration-timeout-debug.log
+
+# nested standalone libgphoto2 source clone (separate repo)
+libgphoto2/

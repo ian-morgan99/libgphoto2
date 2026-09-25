@@ -172,6 +172,21 @@ On **K-3 III**: ISO 3200→1600→3200; aperture f/3.5→f/4→f/3.5; **Bulb tim
 
 1. ~~Add K-3 III Monochrome + KP + K-70 to pentax_lookup_model()~~ **DONE 2026-08-22** — plus K-3, K-1, GR III, 645D, K-3 II (see §6 additions). Build clean.
 
+2. **Wait for K-3 III battery pull** (physical cold cycle) to clear vendor wedge — camera currently NOT ENUMERATED on USB bus.
+
+3. **Test K-1 II capture path** on Polaris to diagnose issue #48 (-6 error on still-image capture).
+
+4. **When K-3 III available after battery pull:**
+   - Test normal capture (release_mode=0) on K-3 III with file download via 0x900D
+   - Test live view (0x9006 polling) on K-3 III
+   - Test bulb capture with release_mode=0 and bulb timer set (not release_mode=2)
+   - Verify status blob parsing for battery, ISO, WB, astrotracer phase, pixel shift flag
+   - Test model-specific capability gating on K-3 III
+   - Re-test cross-process (d02c) with proper preset values (33+)
+   - Re-run K-3 III card-write after battery pull to rule out session-reuse state as cause of 0x201d
+
+5. **Fix #49 applied**: `_pentax_verify_rational_in_conditions` attempts increased from 5 to 10 (500ms → 1s) in config.c:9700 — rebuilt and ready for validation.
+
 ### 2026-09-02 (late evening) — K-3 III d02c encoding confirmed on hardware; simple values rejected, presets work
 
 HW probe on the K-3 III (`usb:002,002`, evidence `docs/pentax/evidence/2026-09-02/k3iii-d02c.log` + `k3iii-d02c-preset33.log`):
@@ -180,3 +195,14 @@ HW probe on the K-3 III (`usb:002,002`, evidence `docs/pentax/evidence/2026-09-0
 - This confirms the offset encoding already implemented in config.c's `_put_Pentax_CrossProcess` (user v>3 → wire `v - 3 + 32`; user 0–3 → wire 1–4): on k3iii-family bodies, **user values 0–3 are effectively unusable** — only presets (wire 33+) write cleanly. No code change needed; the widget's preset choices are the supported path.
 - K-01 matrix row also completed: card-write all four modes → `0x2005` with `vendor_mode_enabled=0` at probe time (single-slot body, not in the card-writing gate — 0x2005 may be an artifact of the camera's PTP operation table); d02c/d02d GETs all `0x200a`, consistent with non-k3iii gating.
 - Open: re-run K-3 III card-write after a battery pull to rule out session-reuse state as the cause of its `0x201d` (reconciliation noise 0x2017 on d035/GetAllConditions in every probe run).
+
+### 2026-09-06 — K-3 III bulb probe (release_mode=2) and vendor wedge recurrence; fix #49 applied
+
+- Context: K-3 III (25fb:0189) enumerated at `usb:002,003` after operator reported camera powered on. K-1 II connected to Polaris device (downstream). libgphoto2 fork built with `-DLIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1`; `tests/bulb_probe` rebuilt against current ptp2.so.
+- Baseline conditions read via `0x900f` before capture: `state=0` (idle), `flags=0x0`, `expmode=8` (M), `drive=0`, `bulb=1s/160`, `astrotracer3=0`, `shooting=0`, `processing=0`. Battery 33%.
+- Ran `./tests/bulb_probe 5000 usb:002,003 2` (hold_ms=5000, release_mode=2).
+- Vendor-mode enable `0x9001` succeeded (flags=0). Initiate capture `0x9011` with `release_mode=2` returned **0x2002 (General Error)** after 68 ms. Post-failure conditions unchanged: `state=0`, `flags=0x0`.
+- Camera subsequently **disappeared from USB bus entirely** — no longer enumerated on any bus. This matches the vendor wedge pattern documented 2026-08-26: camera-side firmware state persists across power-switch cycles; only a physical battery pull clears it.
+- Verdict: K-3 III vendor operations **unavailable** until operator performs a battery-pull cold cycle. The `release_mode=2` (bulb-open) path is rejected on K-3 III with 0x2002; normal capture path (release_mode=0) + file download remains untested on K-3 III.
+- **Fix applied without hardware (issue #49)**: increased `_pentax_verify_rational_in_conditions` attempts from 5 to 10 (500ms → 1s) in `config.c:9700`. The PTP write succeeds but conditions don't update fast enough on some camera models, causing false failure reports for `pentaxdirectwb` and `pentaxdirectaperture`. Rebuilt ptp2.so successfully.
+- Evidence: `docs/pentax/evidence/2026-09-06/k3iii-bulb-probe-release-mode-2.log` (staged in spec repo evidence tree; hash to be recorded in `EVIDENCE_RETENTION.md`).

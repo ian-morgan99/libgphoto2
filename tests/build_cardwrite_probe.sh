@@ -6,7 +6,8 @@
 B=/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2/_build
 SRC=/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2
 T=$(dirname "$(readlink -f "$0")")
-gcc -D_GPHOTO2_INTERNAL_CODE -o "$1" \
+export PKG_CONFIG_PATH=$B/meson-uninstalled:$PKG_CONFIG_PATH
+gcc -D_GPHOTO2_INTERNAL_CODE -DHAVE_UNISTD_H=1 -DHAVE_CONFIG_H=1 -o "$1" \
     "$T/cardwrite_probe.c" \
     "$SRC/camlibs/ptp2/ptp.c" \
     "$SRC/camlibs/ptp2/pentax-utils.c" \
