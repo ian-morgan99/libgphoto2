@@ -6397,13 +6397,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		uint32_t recovery_capture = 0, recovery_candidate = 0;
 		uint32_t recovery_activity = 0;
 		uint16_t recovery_ptpres;
-		PentaxAdmissionPolicy admission_policy = PENTAX_ADMISSION_STRICT;
-		const char *admission_mode = getenv ("PENTAX_ADMISSION_MODE");
 		int recovered = 0;
 		int strict_ok, output_safe_ok;
-
-		if (admission_mode && !strcmp (admission_mode, "output-safe"))
-			admission_policy = PENTAX_ADMISSION_OUTPUT_SAFE;
 
 		recovery_ptpres = ptp_pentax_get_all_conditions (params, &rdata, &rsize);
 		if (rdata && (rsize >= PENTAX_CONDITIONS_MIN_SIZE)) {
@@ -6416,17 +6411,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			recovery_ptpres, rsize, recovery_capture, recovery_candidate,
 			recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE);
 		strict_ok = PTP_RC_OK == recovery_ptpres &&
-			pentax_admission_probe_ok (rdata, rsize, PENTAX_ADMISSION_STRICT);
+			pentax_recovery_probe_ok (rdata, rsize);
 		output_safe_ok = PTP_RC_OK == recovery_ptpres &&
 			pentax_admission_probe_ok (rdata, rsize, PENTAX_ADMISSION_OUTPUT_SAFE);
-		GP_LOG_E ("admission-eval: capture=%llu policy=%s strict=%d "
+		GP_LOG_E ("admission-eval: capture=%llu policy=strict strict=%d "
 			"output-safe=%d field32=0x%08x field36=0x%08x field104=0x%08x",
 			capture_id,
-			admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE ? "output-safe" : "strict",
 			strict_ok, output_safe_ok, recovery_capture, recovery_candidate,
 			recovery_activity);
-		if ((admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE) ?
-		    output_safe_ok : strict_ok) {
+		/* Output-safe is diagnostic comparison data only. Until direct
+		 * hardware evidence establishes that an active +104 state permits a
+		 * subsequent InitiateCapture, it must never clear recovery_required. */
+		if (strict_ok) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
 			GP_LOG_D ("recovery-required cleared: conditions readable "
@@ -6434,12 +6430,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 		free (rdata);
 		if (!recovered) {
-			fprintf (stderr, "[pentax] admission: capture=%llu policy=%s "
+			fprintf (stderr, "[pentax] admission: capture=%llu policy=strict "
 				"ptp=0x%04x size=%u "
 				"field32=0x%08x field36=0x%08x field104=0x%08x "
 				"unsafe-mask=0x%08x strict=%d output-safe=%d accepted=0\n",
 				capture_id,
-				admission_policy == PENTAX_ADMISSION_OUTPUT_SAFE ? "output-safe" : "strict",
 				recovery_ptpres,
 				rsize, recovery_capture, recovery_candidate,
 				recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE,

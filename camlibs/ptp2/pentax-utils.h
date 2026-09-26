@@ -174,12 +174,12 @@ int pentax_transfer_timeout_reason (unsigned long long total_ms,
  * pending candidate; the caller has already checked the PTP result code. */
 int pentax_recovery_probe_ok (const unsigned char *data, size_t size);
 
-/* Runtime-selectable diagnostic admission policies for the one remaining
- * K-3 III hardware discriminator. STRICT preserves the broad historical
- * activity predicate. OUTPUT_SAFE requires only a complete conditions frame,
- * no active exposure (+32) and no pending candidate (+36), while still
- * surfacing +104 for correlation.  The latter is diagnostic until physical
- * evidence proves it safe. */
+/* Diagnostic admission-policy comparison for the one remaining K-3 III
+ * hardware discriminator. STRICT preserves the broad historical activity
+ * predicate. OUTPUT_SAFE requires only a complete conditions frame, no active
+ * exposure (+32) and no pending candidate (+36), while still surfacing +104
+ * for correlation. OUTPUT_SAFE is telemetry only until physical evidence
+ * proves it safe; production admission remains strict. */
 typedef enum {
 	PENTAX_ADMISSION_STRICT = 0,
 	PENTAX_ADMISSION_OUTPUT_SAFE = 1
