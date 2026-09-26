@@ -64,3 +64,37 @@ pentax_capture_publication_find (PTPParams *params, const char *folder,
 	}
 	return NULL;
 }
+int
+pentax_capture_publication_remove (PTPParams *params, const char *folder,
+	const char *filename)
+{
+	int i, last;
+
+	if (!params || !folder || !filename)
+		return GP_ERROR_BAD_PARAMETERS;
+	for (i = 0; i < params->pentax.capture_publication_count; i++) {
+		CameraFilePath *path = &params->pentax.capture_publication_paths[i];
+
+		if (!strcmp (path->folder, folder) && !strcmp (path->name, filename)) {
+			if (params->pentax.capture_publications[i])
+				gp_file_unref (params->pentax.capture_publications[i]);
+			last = params->pentax.capture_publication_count - 1;
+			if (i != last) {
+				params->pentax.capture_publication_paths[i] =
+					params->pentax.capture_publication_paths[last];
+				params->pentax.capture_publications[i] =
+					params->pentax.capture_publications[last];
+			}
+			params->pentax.capture_publications[last] = NULL;
+			memset (&params->pentax.capture_publication_paths[last], 0,
+				sizeof (params->pentax.capture_publication_paths[0]));
+			params->pentax.capture_publication_count = last;
+			GP_LOG_D ("Pentax capture publication %s/%s removed from the retention ledger",
+				folder, filename);
+			return GP_OK;
+		}
+	}
+	/* Not retained: nothing to release.  Callers deleting a virtual root
+	 * entry that was never published (or already cleared) must not fail. */
+	return GP_OK;
+}

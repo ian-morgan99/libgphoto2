@@ -98,6 +98,14 @@ main (void)
 	assert (pentax_capture_publication_find (&params, first.folder, first.name) == NULL);
 	assert (pentax_capture_publication_find (&params, second.folder, second.name) != NULL);
 
+	/* A deleted virtual publication must be dropped from the ledger so a later
+	 * filesystem refresh cannot resurrect it (review fix #2).  Removing an entry
+	 * that is not retained is a harmless no-op. */
+	assert (pentax_capture_publication_remove (&params, "nope", "IMGP9999.JPG") == GP_OK);
+	assert (pentax_capture_publication_remove (&params, second.folder, second.name) == GP_OK);
+	assert (pentax_capture_publication_find (&params, second.folder, second.name) == NULL);
+	assert (params.pentax.capture_publication_count == 0);
+
 	gp_file_unref (published);
 	gp_file_unref (received);
 	pentax_capture_publications_clear (&params);

@@ -10017,12 +10017,18 @@ get_file_func (CameraFilesystem *fs, const char *folder, const char *filename,
 	CameraFile *publication;
 
 	SET_CONTEXT_P(params, context);
-	publication = pentax_capture_publication_find (params, folder, filename);
-	if (publication) {
-		GP_LOG_D ("Serving retained Pentax capture publication generation %llu: %s/%s",
-			(unsigned long long)params->pentax.capture_publication_generation,
-			folder, filename);
-		return gp_file_copy (file, publication);
+	/* The retained payload is the normal capture output.  Only serve it for
+	 * GP_FILE_TYPE_NORMAL: a derivative request (EXIF/RAW/preview) must keep
+	 * its existing type-specific behaviour instead of silently receiving the
+	 * full normal file. */
+	if (type == GP_FILE_TYPE_NORMAL) {
+		publication = pentax_capture_publication_find (params, folder, filename);
+		if (publication) {
+			GP_LOG_D ("Serving retained Pentax capture publication generation %llu: %s/%s",
+				(unsigned long long)params->pentax.capture_publication_generation,
+				folder, filename);
+			return gp_file_copy (file, publication);
+		}
 	}
 
 #if 0
@@ -10409,8 +10415,14 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 	 * A caller deleting that virtual entry (for example gphoto2 after
 	 * --capture-image-and-download) must not be routed through the real
 	 * storage-path resolver, which only accepts /store_xxxxxxxxx/. */
-	if (params->pentax.vendor_mode_enabled && !strcmp (folder, "/"))
+	if (params->pentax.vendor_mode_enabled && !strcmp (folder, "/")) {
+		/* A deleted virtual publication must not survive a later filesystem
+		 * refresh: drop it from the retention ledger as well, otherwise the
+		 * root listing would resurrect it and it would stay downloadable
+		 * until the next admitted capture or session exit. */
+		CR (pentax_capture_publication_remove (params, folder, filename));
 		return GP_OK;
+	}
 
 	/* virtual file created by Nikon special capture */
 	if (	((params->deviceinfo.VendorExtensionID == PTP_VENDOR_NIKON) ||
