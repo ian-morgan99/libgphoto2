@@ -4096,6 +4096,16 @@ struct _PTPParams {
 		 * capture. */
 		CameraFilePath extra_capture_files[8];
 		int extra_capture_count;
+		/* Pentax tether captures are finalized on the camera before the
+		 * returned virtual-root files are consumed by the caller.  Keep an
+		 * explicit session/generation-owned reference so a filesystem refresh
+		 * between gp_camera_capture() and gp_camera_file_get() cannot discard
+		 * the only copy (Polaris issue #145).  Slot zero is the primary output;
+		 * subsequent slots mirror extra_capture_files. */
+		CameraFilePath capture_publication_paths[8];
+		CameraFile *capture_publications[8];
+		int capture_publication_count;
+		uint64_t capture_publication_generation;
 	} pentax;
 
 	/* PTP: caching time for properties, default 2 */
