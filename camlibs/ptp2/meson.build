@@ -4,6 +4,8 @@ shared_module(
   'ptp.h',
   'pentax-utils.c',
   'pentax-utils.h',
+  'pentax-publication.c',
+  'pentax-publication.h',
   'chdk_ptp.h',
   'chdk_live_view.h',
   'library.c',

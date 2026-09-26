@@ -47,6 +47,7 @@
 #include "ptp-private.h"
 #include "olympus-wrap.h"
 #include "pentax-utils.h"
+#include "pentax-publication.h"
 
 #ifdef HAVE_LIBWS232
 #include <winsock2.h>
@@ -3479,6 +3480,7 @@ camera_exit (Camera *camera, GPContext *context)
 			ptp_closesession (params);
 		}
 exitfailed:
+		pentax_capture_publications_clear (params);
 		ptp_free_params(params);
 
 #if defined(HAVE_ICONV) && defined(HAVE_LANGINFO_H)
@@ -6275,6 +6277,8 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		if (ret == GP_OK)
 			ret = gp_filesystem_set_file_noop (rc->camera->fs, extra.folder,
 				extra.name, GP_FILE_TYPE_NORMAL, file, rc->context);
+		if (ret == GP_OK)
+			ret = pentax_capture_publication_add (params, &extra, file);
 		if (ret < GP_OK) {
 			GP_LOG_E ("failed to publish extra capture file %s/%s (%d)",
 				extra.folder, extra.name, ret);
@@ -6384,9 +6388,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		params->pentax.recovery_required);
 	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
-	/* Every capture starts with an empty extra-file list (issue #73):
-	 * the list always describes the most recent exposure only. */
-	params->pentax.extra_capture_count = 0;
 	if (params->pentax.recovery_required) {
 		/* The flag is set once reconciliation sees the camera busy
 		 * or conditions unreadable. Rather than locking captures out
@@ -6514,6 +6515,12 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
+
+	/* Admission has succeeded. Start a new output generation only now: a
+	 * refused shutter must not destroy the preceding completed result. */
+	pentax_capture_publications_clear (params);
+	params->pentax.capture_publication_generation++;
+	params->pentax.extra_capture_count = 0;
 
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-enter focus=%u companions=%u\n",
 		capture_id, focus_mode, expected_extra_candidates);
@@ -6877,6 +6884,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 		goto out;
 	}
+	ret = pentax_capture_publication_add (params, path, file);
+	if (ret < GP_OK)
+		goto out;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
 	ret = GP_OK;
 	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
@@ -9427,13 +9437,20 @@ file_list_func (CameraFilesystem *fs, const char *folder, CameraList *list,
 		void *data, GPContext *context)
 {
 	PTPParams *params = &((Camera *)data)->pl->params;
+	int i;
 
 	SET_CONTEXT_P(params, context);
 	GP_LOG_D ("file_list_func(%s)", folder);
 
-	/* There should be NO files in root folder */
-	if (!strcmp(folder, "/"))
+	/* Physical PTP objects do not live in root.  Pentax tether outputs do:
+	 * they have already been transferred and finalized, and the retained
+	 * publication ledger is their authoritative session-owned namespace. */
+	if (!strcmp(folder, "/")) {
+		for (i = 0; i < params->pentax.capture_publication_count; i++)
+			CR (gp_list_append (list,
+				params->pentax.capture_publication_paths[i].name, NULL));
 		return (GP_OK);
+	}
 
 	if (!strcmp(folder, "/special")) {
 		for_each (special_file*, psf, special_files)
@@ -9997,8 +10014,16 @@ get_file_func (CameraFilesystem *fs, const char *folder, const char *filename,
 	uint32_t storage;
 	PTPObject *ob;
 	PTPParams *params = &camera->pl->params;
+	CameraFile *publication;
 
 	SET_CONTEXT_P(params, context);
+	publication = pentax_capture_publication_find (params, folder, filename);
+	if (publication) {
+		GP_LOG_D ("Serving retained Pentax capture publication generation %llu: %s/%s",
+			(unsigned long long)params->pentax.capture_publication_generation,
+			folder, filename);
+		return gp_file_copy (file, publication);
+	}
 
 #if 0
 	/* The new Canons like to switch themselves off in the middle. */

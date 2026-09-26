@@ -34,6 +34,20 @@ test(
   env: gp_test_env,
 )
 
+test_pentax_publication_exe = executable(
+  'test-pentax-publication',
+  'test-pentax-publication.c',
+  '../camlibs/ptp2/pentax-publication.c',
+  include_directories: [include_directories('../camlibs/ptp2'), include_directories('..')],
+  dependencies: libgphoto2_dep,
+)
+
+test(
+  'test-pentax-publication',
+  test_pentax_publication_exe,
+  env: gp_test_env,
+)
+
 # Regression test for Pentax generic exposure compatibility aliases.
 # Drives the real public config-lookup path: dlopens the built ptp2 camlib via
 # CAMLIBS and calls its exported camera_get_single_config("aperture") with a
