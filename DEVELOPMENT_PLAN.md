@@ -15,6 +15,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 
 | Date | Work | Result | Evidence / next gate |
 |---|---|---|---|
+| 2026-09-22 | Polaris o-v12e K-3 III capture-completion observation | DOWNSTREAM INTEGRATION EVIDENCE ONLY | A packaged build from libgphoto2 `38d6e2fcb` transferred the completed file but held `gp_camera_capture()` for about 63 seconds before returning busy. This disproves broad activity/+104 as an API-completion predicate in that integration, but is not a direct-libgphoto hardware qualification. Source: [patcher #122 handover](https://github.com/ian-morgan99/benro-polaris-firmware-patcher/issues/122#issuecomment-5782034902). The next-shutter safety predicate remains a separate physical gate. |
 | 2026-08-21 | Canonical plan review and cloud publication | PASS | Commit `9ca537595`; obsolete workspace plans moved to `archive/` |
 | 2026-08-21 | M0 repository, tool, and camera inventory | PARTIAL | Repository/tool inventory PASS; target hardware BLOCKED; see `docs/pentax/evidence/2026-08-21/M0.1/` |
 | 2026-08-21 | P1 client-side protocol extraction | PARTIAL | Passive USB and limited warm-session observations exist; official-client handshake trace and capture/transfer traces remain BLOCKED |

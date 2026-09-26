@@ -750,6 +750,8 @@ main (void)
 		PENTAX_ADMISSION_STRICT));
 	CHECK (pentax_admission_probe_ok (condition_data, sizeof (condition_data),
 		PENTAX_ADMISSION_OUTPUT_SAFE));
+	/* Output-safe is telemetry for hardware comparison. The strict result
+	 * above remains the authoritative permission to issue another shutter. */
 	put_u32le (condition_data, 32, 1);
 	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
 		PENTAX_ADMISSION_OUTPUT_SAFE));
