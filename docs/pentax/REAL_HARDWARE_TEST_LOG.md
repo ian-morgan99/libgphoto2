@@ -4,6 +4,10 @@ This is the canonical, chronological record of tests executed against a
 physical Pentax camera. It is separate from `DEVELOPMENT_PLAN.md`, which tracks
 work and acceptance gates, and from the smaller per-gate evidence records.
 
+Downstream appliance observations are recorded in a separately labelled
+section when they constrain this driver's design. They do not count as direct
+libgphoto2 hardware qualification.
+
 Camera: PENTAX K-3 Mark III, firmware 2.20. Test date: 2026-08-21. The camera
 serial number and all image content are deliberately omitted. Unless explicitly
 stated otherwise, tests used the colour K-3 Mark III in MTP mode over USB.
@@ -24,6 +28,25 @@ ISO write changed 3200 to 1600; battery loss interrupted its restore, and that
 open restoration obligation is recorded below.
 Preview JPEGs existed only in memory or disposable storage and were not retained.
 Camera serial data seen during discovery was not committed.
+
+## Downstream integration observations (not direct qualification)
+
+### 2026-09-22 — Polaris o-v12e K-3 III completion boundary
+
+The Polaris o-v12e diagnostic packaged libgphoto2 commit `38d6e2fcb` and made
+one physical K-3 III exposure. The image transferred, but the real
+`gp_camera_capture()` remained blocked for about 63 seconds before reporting
+`GP_ERROR_CAMERA_BUSY`. Camera identity and configuration reads succeeded
+during that interval. This is evidence that the broad activity/+104 condition
+is not a valid API-operation-completion predicate in the Polaris integration.
+It does **not** establish that another `InitiateCapture` is safe while that
+field remains active; next-shutter admission therefore stays strict and
+fail-closed until a direct bounded hardware test proves a narrower predicate.
+
+Primary downstream record: [BenroPolarisPatcher issue #122, o-v12e handover](https://github.com/ian-morgan99/benro-polaris-firmware-patcher/issues/122#issuecomment-5782034902).
+Artifact and source hashes are recorded in that repository's
+`docs/FWPKT-PROVENANCE-CONTRACT.md` under
+`o-v12e-shutter-diag-20260922`.
 
 ## Chronological results
 
