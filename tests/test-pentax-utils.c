@@ -1001,6 +1001,16 @@ main (void)
                 CHECK (pentax_capture_needs_idle_wait (&g));
         }
 
+	/* A killed Benro appliance process leaves the K-3 III session resident.
+	 * Reconnect reports 0x02fa, not SessionAlreadyOpened.  It must select the
+	 * ordered close+port-reset recovery twice, then fail closed rather than
+	 * entering a reset storm. */
+	CHECK (pentax_session_error_needs_close_reset (0x02fa, 1));
+	CHECK (pentax_session_error_needs_close_reset (0x02fd, 2));
+	CHECK (pentax_session_error_needs_close_reset (0x02ff, 1));
+	CHECK (!pentax_session_error_needs_close_reset (0x02fa, 3));
+	CHECK (!pentax_session_error_needs_close_reset (0x201e, 1));
+
 	free (buffer.data);
 	return 0;
 }

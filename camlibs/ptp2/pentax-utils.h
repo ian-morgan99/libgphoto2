@@ -325,6 +325,10 @@ int pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen);
 int pentax_parse_shutter_duration (const char *value, uint32_t *seconds);
 int pentax_parse_legacy_shutter_denominator (const char *value,
 		uint32_t *denominator);
+/* Classify the bounded Pentax reconnect failures that require the same
+ * close-session + USB port reset sequence as SessionAlreadyOpened. */
+int pentax_session_error_needs_close_reset (uint16_t response,
+		unsigned int attempt);
 int pentax_model_supports_cross_process (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);

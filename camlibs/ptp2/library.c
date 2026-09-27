@@ -11149,15 +11149,29 @@ camera_init (Camera *camera, GPContext *context)
 				sessionid = 1;
 				continue;
 			}
-		} else if ((ret == PTP_ERROR_RESP_EXPECTED) || (ret == PTP_ERROR_IO) || (ret == 0x02fa)) {
-			/* Try whacking PTP device */
-			if (tries < 3 && camera->port->type == GP_PORT_USB) {
-				if (pentax_candidate)
-					gp_context_error (context,
-						_("Pentax init recovery is issuing the existing USB control reset after OpenSession attempt %d."),
-						tries);
-				ptp_usb_control_device_reset_request (params);
+		} else if (pentax_candidate &&
+			pentax_session_error_needs_close_reset (ret, tries)) {
+			/* A replacement appliance process can receive 0x02fa rather
+			 * than SessionAlreadyOpened for the same stale-owner condition.
+			 * A control reset alone was observed to repeat 0x02fa forever.
+			 * Use the already hardware-established ordered recovery: ask the
+			 * camera to close the resident PTP session, reset the USB port,
+			 * settle, then retry. */
+			uint16_t close_ret = ptp_closesession (params);
+
+			gp_context_error (context,
+				_("Pentax init recovery after OpenSession 0x%04x attempt %d: CloseSession returned 0x%04x; resetting USB port."),
+				ret, tries, close_ret);
+			if (camera->port->type == GP_PORT_USB) {
+				if (GP_OK != gp_port_reset (camera->port))
+					GP_LOG_E ("Pentax reconnect USB port reset failed");
+				sleep (2);
 			}
+		} else if ((ret == PTP_ERROR_RESP_EXPECTED) ||
+			   (ret == PTP_ERROR_IO) || (ret == 0x02fa)) {
+			/* Preserve generic-camera historical recovery. */
+			if (tries < 3 && camera->port->type == GP_PORT_USB)
+				ptp_usb_control_device_reset_request (params);
 		}
 
 		if (tries < 3)

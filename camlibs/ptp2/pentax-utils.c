@@ -15,6 +15,18 @@
 #define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
 #define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
 
+int
+pentax_session_error_needs_close_reset (uint16_t response,
+	unsigned int attempt)
+{
+	/* 0x02fa is the K-3 III response observed when a killed appliance
+	 * process leaves its PTP session resident.  The generic transport errors
+	 * have the same ownership ambiguity.  Recovery is deliberately bounded:
+	 * the third failure is returned to the caller instead of reset-looping. */
+	return attempt < 3 &&
+		(response == 0x02fa || response == 0x02fd || response == 0x02ff);
+}
+
 /* Capture budget is configurable for hosts with constrained storage
  * (issue #36); parsed once and cached. */
 static size_t
