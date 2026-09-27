@@ -5271,6 +5271,7 @@ _get_Ricoh_ShutterSpeed(CONFIG_GET_ARGS) {
 static int
 _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 	int x,y;
+	uint32_t duration_seconds;
 	const char *value_str;
 
 	gp_widget_get_value (widget, &value_str);
@@ -5286,11 +5287,11 @@ _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 		propval->u64 = ((uint64_t)x<<32) | y;
 		return GP_OK;
 	}
-	if (sscanf (value_str, "%ds", &x) == 1) {
-		/* Whole-second timer value ("120s" for a 2-minute Bulb): the wire
+	if (pentax_parse_shutter_duration (value_str, &duration_seconds) == 0) {
+		/* Whole-second timer value ("2m" for a 2-minute Bulb): the wire
 		 * layout is numerator in the low 32 bits, denominator in the high
 		 * 32 bits, so seconds map to (1 << 32) | seconds. */
-		propval->u64 = ((uint64_t)1<<32) | (uint32_t)x;
+		propval->u64 = ((uint64_t)1<<32) | duration_seconds;
 		return GP_OK;
 	}
 	if (!sscanf (value_str, "%d", &x))

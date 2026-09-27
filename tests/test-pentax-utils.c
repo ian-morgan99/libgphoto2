@@ -779,10 +779,24 @@ main (void)
 		CHECK (!strcmp (fmt, "Auto"));
 		/* 120 s Bulb timer: low 32 = 120, high 32 = 1. */
 		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, sizeof (fmt)) == 0);
-		CHECK (!strcmp (fmt, "120s"));
+		CHECK (!strcmp (fmt, "2m"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 120);
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 80ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1m20s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 80);
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 90ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1m30s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 90);
 		/* 30 s Bulb timer. */
 		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 30ULL, fmt, sizeof (fmt)) == 0);
 		CHECK (!strcmp (fmt, "30s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 30);
+		CHECK (pentax_parse_shutter_duration ("1m60s", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("4294967296s", &candidate) == -1);
 		/* 1/60 s: low 32 = 1, high 32 = 60. */
 		CHECK (pentax_format_shutter_speed (((uint64_t)60 << 32) | 1ULL, fmt, sizeof (fmt)) == 0);
 		CHECK (!strcmp (fmt, "1/60"));
