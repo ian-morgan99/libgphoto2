@@ -1258,7 +1258,7 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	char *end;
 	unsigned long long first, remainder = 0;
 
-	if (!value || !seconds || !*value)
+	if (!value || !seconds || value[0] < '0' || value[0] > '9')
 		return -1;
 	errno = 0;
 	first = strtoull (value, &end, 10);
@@ -1275,6 +1275,8 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	end++;
 	if (*end) {
 		char *seconds_end;
+		if (end[0] < '0' || end[0] > '9')
+			return -1;
 		errno = 0;
 		remainder = strtoull (end, &seconds_end, 10);
 		if (seconds_end == end || errno == ERANGE || *seconds_end != 's' || seconds_end[1] != '\0' || remainder >= 60)
@@ -1298,7 +1300,7 @@ pentax_parse_legacy_shutter_denominator (const char *value,
 	char *end;
 	unsigned long long parsed;
 
-	if (!value || !denominator || !*value)
+	if (!value || !denominator || value[0] < '0' || value[0] > '9')
 		return -1;
 	errno = 0;
 	parsed = strtoull (value, &end, 10);

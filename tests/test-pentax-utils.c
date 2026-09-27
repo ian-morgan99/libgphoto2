@@ -809,10 +809,13 @@ main (void)
 		CHECK (candidate == 30);
 		CHECK (pentax_parse_shutter_duration ("1m60s", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("4294967296s", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("-18446744073709551615s", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("1m-1s", &candidate) == -1);
 		/* A rejected unit-bearing duration must not be accepted by the
 		 * legacy plain-integer fallback as its leading numeric prefix. */
 		CHECK (pentax_parse_legacy_shutter_denominator ("1m60s", &candidate) == -1);
 		CHECK (pentax_parse_legacy_shutter_denominator ("4294967296s", &candidate) == -1);
+		CHECK (pentax_parse_legacy_shutter_denominator ("-18446744073709551615", &candidate) == -1);
 		CHECK (pentax_parse_legacy_shutter_denominator ("30junk", &candidate) == -1);
 		/* Preserve the historical plain-integer spelling: 30 means 1/30 s. */
 		CHECK (pentax_parse_legacy_shutter_denominator ("30", &candidate) == 0);
