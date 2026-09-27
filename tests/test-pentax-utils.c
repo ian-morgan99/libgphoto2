@@ -694,6 +694,18 @@ main (void)
 	CHECK (pentax_exposure_phase_ms (&conditions) ==
 		PENTAX_CAPTURE_TIMEOUT_MS_MAX);
 
+	/* Timeout phase attribution uses the camera's last +104 state, not the
+	 * necessarily-zero candidate handle at the timeout boundary. */
+	CHECK (pentax_capture_timeout_state (0) ==
+		PENTAX_CAPTURE_TIMEOUT_STATE_UNKNOWN);
+	CHECK (pentax_capture_timeout_state (PENTAX_CONDITION_ACTIVITY_SHOOTING) ==
+		PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING);
+	CHECK (pentax_capture_timeout_state (PENTAX_CONDITION_ACTIVITY_PROCESSING) ==
+		PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING);
+	CHECK (pentax_capture_timeout_state (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		PENTAX_CONDITION_ACTIVITY_PROCESSING) ==
+		PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING);
+
 	/* Session reconciliation decisions (issue #33): short blobs and unsafe
 	 * activity force recovery, a pending candidate must be surfaced. The
 	 * out-param is only written on STALE_CANDIDATE; sentinel checks pin that. */

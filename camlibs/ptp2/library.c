@@ -6549,6 +6549,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * timeout and abort a valid long exposure (issue #32). */
 	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 	unsigned int exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	uint32_t last_activity_flags = 0;
 	int conditions_known = 0;
 	int needs_idle_wait = 0;
 	{
@@ -6667,6 +6668,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			ret = translate_ptp_result (ptpres);
 			goto out;
 		}
+		last_activity_flags = pentax_get_u32le (data + 104);
 		if (pentax_get_u32le (data + 32) == 1) {
 			candidate_handle = pentax_get_u32le (data + 36);
 			if (candidate_handle)
@@ -6677,13 +6679,23 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
-		/* This loop exits as soon as a non-zero candidate is observed, so a
-		 * candidate-present timeout is mechanically impossible here.  The old
-		 * nested `if (candidate_handle)` made the advertised post-exposure
-		 * diagnostic unreachable and obscured the first real boundary. */
-		GP_LOG_E ("pentax-capture[%llu]: capture wait timed out before candidate "
-			"publication (%u ms total; exposure budget %u ms)", capture_id,
-			capture_timeout_ms, exposure_phase_ms);
+		PentaxCaptureTimeoutState timeout_state =
+			pentax_capture_timeout_state (last_activity_flags);
+		if (timeout_state == PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING)
+			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out in "
+				"post-exposure processing before candidate publication "
+				"(%u ms; +104=0x%08x)", capture_id,
+				capture_timeout_ms, last_activity_flags);
+		else if (timeout_state == PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING)
+			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out while "
+				"the camera was still exposing (%u ms total; exposure "
+				"budget %u ms; +104=0x%08x)", capture_id,
+				capture_timeout_ms, exposure_phase_ms, last_activity_flags);
+		else
+			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out with "
+				"no usable activity state before candidate publication "
+				"(%u ms; +104=0x%08x)", capture_id,
+				capture_timeout_ms, last_activity_flags);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}

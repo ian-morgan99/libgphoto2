@@ -220,6 +220,16 @@ unsigned int pentax_capture_timeout_ms (const PentaxConditions *conditions);
  * all-in budget before RAW processing even starts. */
 unsigned int pentax_exposure_phase_ms (const PentaxConditions *conditions);
 
+/* Attribute a candidate-publication timeout to the last camera activity state.
+ * A zero candidate handle cannot distinguish an exposure still in progress
+ * from post-exposure processing, so diagnostics must use +104 instead. */
+typedef enum {
+	PENTAX_CAPTURE_TIMEOUT_STATE_UNKNOWN = 0,
+	PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING,
+	PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING
+} PentaxCaptureTimeoutState;
+PentaxCaptureTimeoutState pentax_capture_timeout_state (uint32_t activity_flags);
+
 /* Post-capture readiness tri-state (issue #122 / libgphoto2 #73): only a VALID
  * conditions frame may prove the camera idle.  A failed or short read is
  * UNKNOWN, never IDLE — treating it as idle let Benro fire the next shutter
