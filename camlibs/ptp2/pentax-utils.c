@@ -968,6 +968,19 @@ pentax_exposure_phase_ms (const PentaxConditions *conditions)
 	return (unsigned int) exposure_ms;
 }
 
+PentaxCaptureTimeoutState
+pentax_capture_timeout_state (uint32_t activity_flags)
+{
+	/* Prefer PROCESSING if both bits are present: it proves the camera has
+	 * reached the post-exposure phase, whereas the absent candidate merely
+	 * says publication has not completed. */
+	if (activity_flags & PENTAX_CONDITION_ACTIVITY_PROCESSING)
+		return PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING;
+	if (activity_flags & PENTAX_CONDITION_ACTIVITY_SHOOTING)
+		return PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING;
+	return PENTAX_CAPTURE_TIMEOUT_STATE_UNKNOWN;
+}
+
 PentaxReadiness
 pentax_camera_readiness (const unsigned char *data, unsigned int size)
 {
