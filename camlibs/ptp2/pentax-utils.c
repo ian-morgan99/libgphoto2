@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1242,12 +1243,13 @@ int
 pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 {
 	char *end;
-	unsigned long first, remainder = 0;
+	unsigned long long first, remainder = 0;
 
 	if (!value || !seconds || !*value)
 		return -1;
-	first = strtoul (value, &end, 10);
-	if (end == value)
+	errno = 0;
+	first = strtoull (value, &end, 10);
+	if (end == value || errno == ERANGE)
 		return -1;
 	if (*end == 's' && end[1] == '\0') {
 		if (first > UINT32_MAX)
@@ -1260,8 +1262,9 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	end++;
 	if (*end) {
 		char *seconds_end;
-		remainder = strtoul (end, &seconds_end, 10);
-		if (seconds_end == end || *seconds_end != 's' || seconds_end[1] != '\0' || remainder >= 60)
+		errno = 0;
+		remainder = strtoull (end, &seconds_end, 10);
+		if (seconds_end == end || errno == ERANGE || *seconds_end != 's' || seconds_end[1] != '\0' || remainder >= 60)
 			return -1;
 	}
 	if (first > (UINT32_MAX - remainder) / 60)
