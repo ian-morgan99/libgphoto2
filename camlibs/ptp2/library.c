@@ -6369,6 +6369,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
+	int port_timeout_raised = 0;
 	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
@@ -6622,7 +6623,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * Canon/Nikon paths do the same thing with their own capture_timeout.
 	 * A failure to raise the timeout must not abort a live exposure: the
 	 * wait budget below still bounds the total wait, so log and continue. */
-	if (gp_port_set_timeout (camera->port, (int)capture_timeout_ms))
+	if (gp_port_set_timeout (camera->port, (int)capture_timeout_ms) == GP_OK)
+		port_timeout_raised = 1;
+	else
 		GP_LOG_E ("failed to raise port timeout to %u ms for the capture "
 			"wait; continuing with the previous timeout",
 			capture_timeout_ms);
@@ -6673,8 +6676,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				break;
 		}
 	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
-	/* Restore the normal port timeout now that the exposure wait is done. */
-	gp_port_set_timeout (camera->port, normal_timeout);
 	}
 	if (!candidate_handle) {
 		/* This loop exits as soon as a non-zero candidate is observed, so a
@@ -6892,6 +6893,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
 
 out:
+	/* The capture wait temporarily raises the shared port timeout.  Every
+	 * abnormal path after that point (cancel, unreadable conditions, transport
+	 * error, timeout) jumps here, so restoring only after the polling loop can
+	 * leave all later PTP operations using a minutes- or hours-long timeout.
+	 * Restore it exactly once on the common cleanup path (historical PR #78). */
+	if (port_timeout_raised)
+		gp_port_set_timeout (camera->port, normal_timeout);
 	free (data);
 	free (capture.data);
 	/* The filesystem cache (set_file_noop above) holds its own
