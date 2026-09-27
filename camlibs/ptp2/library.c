@@ -6671,6 +6671,13 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				break;
 		}
 	} while (waiting_for_timeout (&back_off_wait, started, capture_timeout_ms));
+	/* Candidate discovery has completed, so later metadata/transfer operations
+	 * must use the normal per-I/O timeout.  Keep the common-exit fallback below
+	 * for every abnormal exit from the polling loop. */
+	if (port_timeout_raised) {
+		gp_port_set_timeout (camera->port, normal_timeout);
+		port_timeout_raised = 0;
+	}
 	}
 	if (!candidate_handle) {
 		/* This loop exits as soon as a non-zero candidate is observed, so a
