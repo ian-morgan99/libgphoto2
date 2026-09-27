@@ -36,9 +36,11 @@ main (void)
 	CameraFilesystemFuncs funcs;
 	CameraFile *published = NULL, *received = NULL;
 	CameraFile *retained;
+	CameraList *list = NULL;
 	char *owned;
 	const char *data = NULL;
 	unsigned long size = 0;
+	int handled = 0, count = 0;
 
 	memset (&params, 0, sizeof (params));
 	memset (&first, 0, sizeof (first));
@@ -75,8 +77,17 @@ main (void)
 		GP_FILE_TYPE_NORMAL, received, NULL) == GP_ERROR_FILE_NOT_FOUND);
 
 	/* The production Pentax callback now serves the generation-owned copy. */
-	retained = pentax_capture_publication_find (&params, first.folder, first.name);
+	retained = pentax_capture_publication_find_for_type (&params, first.folder,
+		first.name, GP_FILE_TYPE_NORMAL);
 	assert (retained != NULL);
+	/* Drive the same selector used by get_file_func: derivative requests must
+	 * not receive the retained normal payload. */
+	assert (pentax_capture_publication_find_for_type (&params, first.folder,
+		first.name, GP_FILE_TYPE_PREVIEW) == NULL);
+	assert (pentax_capture_publication_find_for_type (&params, first.folder,
+		first.name, GP_FILE_TYPE_EXIF) == NULL);
+	assert (pentax_capture_publication_find_for_type (&params, first.folder,
+		first.name, GP_FILE_TYPE_RAW) == NULL);
 	assert (gp_file_copy (received, retained) == GP_OK);
 	assert (gp_file_get_data_and_size (received, &data, &size) == GP_OK);
 	assert (size == sizeof (payload));
@@ -101,13 +112,28 @@ main (void)
 	/* A deleted virtual publication must be dropped from the ledger so a later
 	 * filesystem refresh cannot resurrect it (review fix #2).  Removing an entry
 	 * that is not retained is a harmless no-op. */
-	assert (pentax_capture_publication_remove (&params, "nope", "IMGP9999.JPG") == GP_OK);
-	assert (pentax_capture_publication_remove (&params, second.folder, second.name) == GP_OK);
+	assert (gp_list_new (&list) == GP_OK);
+	assert (pentax_capture_publications_list (&params, list) == GP_OK);
+	assert (gp_list_count (list) == 1);
+	assert (pentax_capture_publication_delete_virtual (&params, second.folder,
+		second.name, &handled) == GP_OK);
+	assert (handled == 1);
 	assert (pentax_capture_publication_find (&params, second.folder, second.name) == NULL);
 	assert (params.pentax.capture_publication_count == 0);
+	/* The production root-list helper is also what refresh calls. Deleted
+	 * publications must not reappear after resetting/relisting the filesystem. */
+	assert (gp_filesystem_reset (fs) == GP_OK);
+	assert (gp_list_reset (list) == GP_OK);
+	assert (pentax_capture_publications_list (&params, list) == GP_OK);
+	assert (gp_list_count (list) == 0);
+	handled = 99;
+	assert (pentax_capture_publication_delete_virtual (&params, "/store_00000001",
+		"physical.JPG", &handled) == GP_OK);
+	assert (handled == 0);
 
 	gp_file_unref (published);
 	gp_file_unref (received);
+	gp_list_free (list);
 	pentax_capture_publications_clear (&params);
 	gp_filesystem_free (fs);
 	return 0;

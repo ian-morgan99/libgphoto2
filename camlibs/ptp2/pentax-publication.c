@@ -64,6 +64,16 @@ pentax_capture_publication_find (PTPParams *params, const char *folder,
 	}
 	return NULL;
 }
+
+CameraFile *
+pentax_capture_publication_find_for_type (PTPParams *params,
+	const char *folder, const char *filename, CameraFileType type)
+{
+	if (type != GP_FILE_TYPE_NORMAL)
+		return NULL;
+	return pentax_capture_publication_find (params, folder, filename);
+}
+
 int
 pentax_capture_publication_remove (PTPParams *params, const char *folder,
 	const char *filename)
@@ -96,5 +106,34 @@ pentax_capture_publication_remove (PTPParams *params, const char *folder,
 	}
 	/* Not retained: nothing to release.  Callers deleting a virtual root
 	 * entry that was never published (or already cleared) must not fail. */
+	return GP_OK;
+}
+
+int
+pentax_capture_publication_delete_virtual (PTPParams *params,
+	const char *folder, const char *filename, int *handled)
+{
+	if (!params || !folder || !filename || !handled)
+		return GP_ERROR_BAD_PARAMETERS;
+	*handled = 0;
+	if (!params->pentax.vendor_mode_enabled || strcmp (folder, "/"))
+		return GP_OK;
+	*handled = 1;
+	return pentax_capture_publication_remove (params, folder, filename);
+}
+
+int
+pentax_capture_publications_list (PTPParams *params, CameraList *list)
+{
+	int i;
+
+	if (!params || !list)
+		return GP_ERROR_BAD_PARAMETERS;
+	for (i = 0; i < params->pentax.capture_publication_count; i++) {
+		int ret = gp_list_append (list,
+			params->pentax.capture_publication_paths[i].name, NULL);
+		if (ret < GP_OK)
+			return ret;
+	}
 	return GP_OK;
 }

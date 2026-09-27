@@ -9468,10 +9468,7 @@ file_list_func (CameraFilesystem *fs, const char *folder, CameraList *list,
 	 * they have already been transferred and finalized, and the retained
 	 * publication ledger is their authoritative session-owned namespace. */
 	if (!strcmp(folder, "/")) {
-		for (i = 0; i < params->pentax.capture_publication_count; i++)
-			CR (gp_list_append (list,
-				params->pentax.capture_publication_paths[i].name, NULL));
-		return (GP_OK);
+		return pentax_capture_publications_list (params, list);
 	}
 
 	if (!strcmp(folder, "/special")) {
@@ -10043,14 +10040,13 @@ get_file_func (CameraFilesystem *fs, const char *folder, const char *filename,
 	 * GP_FILE_TYPE_NORMAL: a derivative request (EXIF/RAW/preview) must keep
 	 * its existing type-specific behaviour instead of silently receiving the
 	 * full normal file. */
-	if (type == GP_FILE_TYPE_NORMAL) {
-		publication = pentax_capture_publication_find (params, folder, filename);
-		if (publication) {
-			GP_LOG_D ("Serving retained Pentax capture publication generation %llu: %s/%s",
-				(unsigned long long)params->pentax.capture_publication_generation,
-				folder, filename);
-			return gp_file_copy (file, publication);
-		}
+	publication = pentax_capture_publication_find_for_type (params, folder,
+		filename, type);
+	if (publication) {
+		GP_LOG_D ("Serving retained Pentax capture publication generation %llu: %s/%s",
+			(unsigned long long)params->pentax.capture_publication_generation,
+			folder, filename);
+		return gp_file_copy (file, publication);
 	}
 
 #if 0
@@ -10426,6 +10422,7 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 	Camera *camera = data;
 	uint32_t	storage;
 	PTPParams *params = &camera->pl->params;
+	int handled, ret;
 
 	SET_CONTEXT_P(params, context);
 
@@ -10437,13 +10434,14 @@ delete_file_func (CameraFilesystem *fs, const char *folder,
 	 * A caller deleting that virtual entry (for example gphoto2 after
 	 * --capture-image-and-download) must not be routed through the real
 	 * storage-path resolver, which only accepts /store_xxxxxxxxx/. */
-	if (params->pentax.vendor_mode_enabled && !strcmp (folder, "/")) {
+	ret = pentax_capture_publication_delete_virtual (params, folder, filename,
+		&handled);
+	if (handled) {
 		/* A deleted virtual publication must not survive a later filesystem
 		 * refresh: drop it from the retention ledger as well, otherwise the
 		 * root listing would resurrect it and it would stay downloadable
 		 * until the next admitted capture or session exit. */
-		CR (pentax_capture_publication_remove (params, folder, filename));
-		return GP_OK;
+		return ret;
 	}
 
 	/* virtual file created by Nikon special capture */
