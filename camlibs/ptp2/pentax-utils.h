@@ -323,6 +323,8 @@ int pentax_model_supports_pc_live_view (uint32_t model_no);
  * (Bulb timer), "1/<n>" and "<a>/<b>" for fractions.  Returns 0 on success. */
 int pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen);
 int pentax_parse_shutter_duration (const char *value, uint32_t *seconds);
+int pentax_parse_legacy_shutter_denominator (const char *value,
+		uint32_t *denominator);
 int pentax_model_supports_cross_process (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);

@@ -1286,6 +1286,29 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	return 0;
 }
 
+/* Parse the legacy plain-integer shutter spelling (for example "30" means
+ * 1/30 s).  This deliberately requires the complete input to be a positive
+ * decimal integer.  In particular, a rejected unit-bearing duration must not
+ * fall through to a prefix-only sscanf conversion and silently become a
+ * different shutter speed. */
+int
+pentax_parse_legacy_shutter_denominator (const char *value,
+		uint32_t *denominator)
+{
+	char *end;
+	unsigned long long parsed;
+
+	if (!value || !denominator || !*value)
+		return -1;
+	errno = 0;
+	parsed = strtoull (value, &end, 10);
+	if (end == value || *end != '\0' || errno == ERANGE ||
+	    parsed == 0 || parsed > UINT32_MAX)
+		return -1;
+	*denominator = (uint32_t)parsed;
+	return 0;
+}
+
 /* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.
  *
  * The capture path must only return success when the camera has POSITIVELY

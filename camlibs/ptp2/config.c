@@ -5271,7 +5271,7 @@ _get_Ricoh_ShutterSpeed(CONFIG_GET_ARGS) {
 static int
 _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 	int x,y;
-	uint32_t duration_seconds;
+	uint32_t duration_seconds, legacy_denominator;
 	const char *value_str;
 
 	gp_widget_get_value (widget, &value_str);
@@ -5294,10 +5294,10 @@ _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 		propval->u64 = ((uint64_t)1<<32) | duration_seconds;
 		return GP_OK;
 	}
-	if (!sscanf (value_str, "%d", &x))
+	if (pentax_parse_legacy_shutter_denominator (value_str,
+			&legacy_denominator) != 0)
 		return GP_ERROR;
-	y = 1;
-	propval->u64 = ((uint64_t)x<<32) | y;
+	propval->u64 = ((uint64_t)legacy_denominator<<32) | 1;
 	return GP_OK;
 }
 
