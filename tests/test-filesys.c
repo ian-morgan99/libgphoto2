@@ -78,13 +78,24 @@ get_info_func (CameraFilesystem __unused__ *fs, const char __unused__ *folder,
 }
 
 static int
+same_folder (const char *folder, const char *expected)
+{
+	size_t len = strlen (folder);
+	size_t expected_len = strlen (expected);
+
+	while (len > 1 && folder[len - 1] == '/')
+		len--;
+	return (len == expected_len) && !strncmp (folder, expected, len);
+}
+
+static int
 file_list_func (CameraFilesystem __unused__ *fs, const char *folder,
 		CameraList *list,
 		void __unused__ *data, GPContext __unused__ *context)
 {
 	printf ("### -> The camera will list the files in '%s' here.\n", folder);
 
-	if (!strcmp (folder, "/whatever")) {
+	if (same_folder (folder, "/whatever")) {
 		gp_list_append (list, "file1", NULL);
 		gp_list_append (list, "file2", NULL);
 		gp_list_append (list, "file3", NULL);
@@ -104,17 +115,17 @@ folder_list_func (CameraFilesystem __unused__ *fs, const char *folder,
 	printf ("### -> The camera will list the folders in '%s' here.\n",
 		folder);
 
-	if (!strcmp (folder, "/")) {
+	if (same_folder (folder, "/")) {
 		gp_list_append (list, "whatever", NULL);
 		gp_list_append (list, "another", NULL);
 	}
 
-	if (!strcmp (folder, "/whatever")) {
+	if (same_folder (folder, "/whatever")) {
 		gp_list_append (list, "directory", NULL);
 		gp_list_append (list, "dir", NULL);
 	}
 
-	if (!strcmp (folder, "/whatever/directory")) {
+	if (same_folder (folder, "/whatever/directory")) {
 		gp_list_append (list, "my_special_folder", NULL);
 	}
 
