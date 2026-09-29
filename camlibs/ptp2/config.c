@@ -9631,10 +9631,28 @@ _pentax_readiness_preflight (PTPParams *params, PentaxConditions *conditions)
 		}
 		result = pentax_parse_conditions (condition_data, condition_size,
 			conditions);
+		if (result < GP_OK) {
+			free (condition_data);
+			condition_data = NULL;
+			return result;
+		}
+		/* This preflight is also used by autofocusdrive, which issues its own
+		 * Pentax InitiateCapture. Keep that path behind the same candidate and
+		 * in-flight-capture barrier as an ordinary shutter: a candidate can be
+		 * an image left by an earlier, incomplete operation and must never be
+		 * discarded or bypassed here. */
+		if (!pentax_admission_probe_ok (condition_data, condition_size,
+				PENTAX_ADMISSION_STRICT)) {
+			GP_LOG_E ("readiness preflight sample %d rejected by capture admission "
+				"predicate (candidate 0x%08x, activity 0x%08x)", sample,
+				pentax_get_u32le (condition_data + 36),
+				pentax_get_u32le (condition_data + 104));
+			free (condition_data);
+			condition_data = NULL;
+			return GP_ERROR_CAMERA_BUSY;
+		}
 		free (condition_data);
 		condition_data = NULL;
-		if (result < GP_OK)
-			return result;
 		if ((conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) ||
 			(conditions->activity_flags & (PENTAX_CONDITION_ACTIVITY_SHOOTING |
 			PENTAX_CONDITION_ACTIVITY_PROCESSING))) {

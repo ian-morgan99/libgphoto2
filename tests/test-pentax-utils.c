@@ -770,7 +770,13 @@ main (void)
 	put_u32le (condition_data, 32, 0);
 	put_u32le (condition_data, 36, 9);
 	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT));
+	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
 		PENTAX_ADMISSION_OUTPUT_SAFE));
+	put_u32le (condition_data, 36, 0);
+	put_u32le (condition_data, 104, 0);
+	CHECK (pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT));
 
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active
