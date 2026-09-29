@@ -148,6 +148,11 @@ main (void)
 	MockTransfer mock;
 	PentaxTransferOps transfer_operations;
 
+	CHECK (pentax_capture_cleanup_decision (0) ==
+		PENTAX_CAPTURE_CLEANUP_ABORT);
+	CHECK (pentax_capture_cleanup_decision (1) ==
+		PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE);
+
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
 

@@ -6923,42 +6923,36 @@ out:
 	 * LRU cache and produce 0-byte downloads (issue #31). */
 	if (file)
 		gp_file_unref (file);
-	/* Best-effort camera-side cleanup on abnormal exits. Initiation
-	 * failure means no capture was started, so there is nothing to abort.
-	 * Once a candidate exists its deletion is the authoritative cleanup;
-	 * otherwise ask the camera to abort the in-flight capture (issues
-	 * #10 and #11). */
-	if (ret != GP_OK && initiated) {
-		/* Every abnormal exit with a candidate must issue at least
-		 * one camera-side cleanup attempt; retrying a delete whose
-		 * earlier attempt failed is harmless (issues #11 and #20). */
-		if (have_candidate) {
-			uint16_t dres = ptp_pentax_delete_transfer_candidate (params);
+	/* On an abnormal exit, preserve a discovered candidate because it may be
+	 * the only copy of the exposure. If no candidate exists, abort the
+	 * in-flight camera operation and verify recovery state below. */
+	if (ret != GP_OK &&
+	    pentax_capture_cleanup_decision (have_candidate) !=
+		PENTAX_CAPTURE_CLEANUP_ABORT) {
+		/* A live candidate may be the only remaining copy of the exposure.
+		 * Do not destroy it on an error path: keep the shutter admission
+		 * barrier armed so the caller can recover/rebind rather than silently
+		 * losing the output. */
+		params->pentax.recovery_required = 1;
+		GP_LOG_E ("preserving orphaned transfer candidate %u after capture error %d; "
+			"session recovery required", candidate_handle, ret);
+	} else if (ret != GP_OK && initiated) {
+		/* TerminateCapture 0x9012 with release mode 0 matches
+		 * the documented still-capture path (issue #21);
+		 * InterruptFunction 0x9013 is characterized only as
+		 * "Green button" and its cancellation semantics are
+		 * unverified. */
+		uint16_t tres = ptp_pentax_terminate_capture (params, 0);
 
-			if (dres == PTP_RC_OK)
-				GP_LOG_D ("deleted orphaned transfer candidate %u",
-					candidate_handle);
-			else
-				GP_LOG_E ("failed to delete orphaned transfer candidate %u",
-					candidate_handle);
-		} else {
-			/* TerminateCapture 0x9012 with release mode 0 matches
-			 * the documented still-capture path (issue #21);
-			 * InterruptFunction 0x9013 is characterized only as
-			 * "Green button" and its cancellation semantics are
-			 * unverified. */
-			uint16_t tres = ptp_pentax_terminate_capture (params, 0);
-
-			/* 0x2018 CaptureAlreadyTerminated means the capture
-			 * had already stopped on its own; that is success for
-			 * an abort path. */
-			if (tres == PTP_RC_OK ||
-			    tres == PTP_RC_CaptureAlreadyTerminated)
-				GP_LOG_D ("aborted capture after pre-candidate failure");
-			else
-				GP_LOG_E ("failed to abort capture after pre-candidate failure (ptp 0x%04x)",
-					tres);
-		}
+		/* 0x2018 CaptureAlreadyTerminated means the capture
+		 * had already stopped on its own; that is success for
+		 * an abort path. */
+		if (tres == PTP_RC_OK ||
+		    tres == PTP_RC_CaptureAlreadyTerminated)
+			GP_LOG_D ("aborted capture after pre-candidate failure");
+		else
+			GP_LOG_E ("failed to abort capture after pre-candidate failure (ptp 0x%04x)",
+				tres);
 	}
 	if (ret != GP_OK && initiated && !have_candidate) {
 		/* Verify post-abort quiescence via conditions activity flags

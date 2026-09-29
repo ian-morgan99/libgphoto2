@@ -12,6 +12,14 @@
 
 #include "pentax-utils.h"
 
+PentaxCaptureCleanup
+pentax_capture_cleanup_decision (int candidate_live)
+{
+	if (candidate_live)
+		return PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE;
+	return PENTAX_CAPTURE_CLEANUP_ABORT;
+}
+
 #define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
 #define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
 

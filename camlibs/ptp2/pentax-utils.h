@@ -11,6 +11,15 @@ typedef struct {
 	size_t offset;
 } PentaxCaptureBuffer;
 
+/* Decide camera-side cleanup after an initiated capture failed. A live
+ * transfer candidate is potentially the only copy of an image; preserve it
+ * and require session recovery instead of deleting it as generic cleanup. */
+typedef enum {
+	PENTAX_CAPTURE_CLEANUP_ABORT = 0,
+	PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE = 1
+} PentaxCaptureCleanup;
+PentaxCaptureCleanup pentax_capture_cleanup_decision (int candidate_live);
+
 typedef struct {
 	void *user_data;
 	uint32_t max_block_size;
