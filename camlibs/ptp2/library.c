@@ -6222,10 +6222,15 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			name[0] = '\0';
 	}
 	free (cinfo);
+	if (!rc->camera || !name[0]) {
+		GP_LOG_E ("candidate transfer succeeded but its output name is unknown; "
+			"preserving the camera candidate rather than deleting an unpublished file");
+		return GP_ERROR_CORRUPTED_DATA;
+	}
 
 	/* Publish into the camera filesystem so the extra member is
 	 * retrievable without re-downloading from the SD card. */
-	if (rc->camera && name[0]) {
+	{
 		CameraFilePath extra;
 		int slot = params->pentax.extra_capture_count;
 		GPContext *probe_context = gp_context_new ();
@@ -6282,10 +6287,9 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		if (ret < GP_OK) {
 			GP_LOG_E ("failed to publish extra capture file %s/%s (%d)",
 				extra.folder, extra.name, ret);
-			/* The transfer itself succeeded; the camera-side
-			 * candidate is still finalized below, so the exposure
-			 * does not block the next shutter. */
-			ret = GP_OK;
+			if (file)
+				gp_file_unref (file);
+			return ret;
 		} else if (slot < (int)(sizeof (params->pentax.extra_capture_files)
 			/ sizeof (params->pentax.extra_capture_files[0]))) {
 			params->pentax.extra_capture_files[slot] = extra;
@@ -6293,14 +6297,13 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			GP_LOG_D ("published extra capture file %s/%s (%u bytes)",
 				extra.folder, extra.name, (unsigned)published_size);
 		}
-	} else if (rc->camera && !name[0]) {
-		GP_LOG_D ("extra candidate has no parseable filename; "
-			"transferred but not published");
 	}
 
 	if (file)
 		gp_file_unref (file);
-	return GP_OK;
+	return pentax_candidate_output_published (ret == GP_OK,
+		name[0] != '\0', ret == GP_OK) ?
+		GP_OK : GP_ERROR_CORRUPTED_DATA;
 }
 
 /* Dual-format exposure support (issue #73): report the extra files
@@ -6565,6 +6568,18 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				capture_id, baseline_capture, baseline_candidate,
 				baseline_activity);
 		}
+		if (!pentax_capture_output_contract_known (bdata, bsize)) {
+			params->pentax.recovery_required = 1;
+			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
+				"reason=output-contract-unknown size=%u accepted=0 "
+				"action=hold-shutter; read-complete-supported-output-format; re-probe-before-retry\n",
+				capture_id, bsize);
+			gp_context_error (context,
+				_("Pentax output format is missing or unknown (%u condition bytes); refusing to initiate a capture whose file count cannot be reconciled."),
+				bsize);
+			free (bdata);
+			return GP_ERROR_CAMERA_BUSY;
+		}
 		/* This same mandatory readiness sample also carries the camera's
 		 * writing format.  Preserve its output obligation across the exposure:
 		 * the K-3 III can clear/change +524 after the primary is finalized,
@@ -6587,6 +6602,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-enter focus=%u companions=%u\n",
 		capture_id, focus_mode, expected_extra_candidates);
 	fflush (stderr);
+	/* Record the obligation before sending the command: a transport timeout
+	 * can mean the camera accepted the shutter but its response was lost. */
+	params->pentax.capture_output_pending = 1;
 	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-return ptp=0x%04x\n",
 		capture_id, ptpres);
@@ -6595,22 +6613,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
-		/* Any non-OK InitiateCapture response leaves exposure/output state
-		 * uncertain. Do not replay it; require a fresh strict probe first. */
+		/* A parsed PTP response is an explicit camera rejection. Internal
+		 * transport results (0x02f9..0x02ff) are ambiguous: the shutter may
+		 * have been accepted before the response was lost. Keep its obligation
+		 * latched in that case; never replay an ambiguous command. */
+		if (!pentax_capture_initiate_response_ambiguous (ptpres))
+			params->pentax.capture_output_pending = 0;
 		params->pentax.recovery_required = 1;
 		fprintf (stderr, "[pentax-recovery] capture=%llu path=initiate "
-			"reason=ptp-initiate-rejected ptp=0x%04x gp=%d accepted=0 "
-			"action=do-not-replay-initiate; require-positive-strict-probe-before-next-request\n",
-			capture_id, ptpres, ret);
+			"reason=initiate-not-confirmed ptp=0x%04x gp=%d output_pending=%d "
+			"action=do-not-replay-initiate; resolve-ambiguous-output-before-next-request\n",
+			capture_id, ptpres, ret, params->pentax.capture_output_pending);
 		gp_context_error (context,
-			_("Pentax InitiateCapture returned PTP 0x%04x (GP %d); do not replay it. A fresh strict readiness probe is required before a later request."),
+			_("Pentax InitiateCapture was not confirmed (PTP 0x%04x, GP %d); do not replay it. A fresh strict readiness probe and any ambiguous output recovery are required before a later request."),
 			ptpres, ret);
 		goto out;
 	}
 	/* An accepted shutter creates an output obligation distinct from camera
 	 * readiness. Do not discharge it from +32/+36/+104 alone; only successful
 	 * transfer, finalization and publication of all mode-required outputs can. */
-	params->pentax.capture_output_pending = 1;
 	/* The candidate is finalized.  A later error must not issue a second
 	 * DeleteTransferCandidate against the same completed exposure. */
 	have_candidate = 0;

@@ -58,6 +58,7 @@ typedef struct {
         int writing_format;          /* +524: 2 means RAW+JPEG */
         int conditions_calls;
         int transfer_error;          /* non-zero: transfer_candidate fails */
+        int publication_error;       /* transfer succeeded, file publication failed */
         int delete_error;            /* non-zero: delete_candidate fails */
         int cancel_after;            /* cancel once this many candidates done */
         int info_fail;              /* non-zero: get_candidate_info fails */
@@ -140,6 +141,8 @@ mock_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffer)
                 return GP_ERROR_NO_MEMORY;
         memcpy (buffer->data, "EXTRA", 6);
         buffer->size = 5;
+	if (mock->publication_error)
+		return mock->publication_error;
         return GP_OK;
 }
 
@@ -255,6 +258,19 @@ main (void)
         CHECK (ret == GP_ERROR_IO);
         CHECK (count == 0);
         CHECK (mock.delete_calls == 0);
+
+	/* A successfully transferred candidate that could not be published is
+	 * still camera-owned output: finalization must not delete it. */
+	mock_reset (&mock);
+	mock.handles[0] = 301;
+	mock.handle_count = 1;
+	mock.publication_error = GP_ERROR_CORRUPTED_DATA;
+	count = -1;
+	ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+	CHECK (ret == GP_ERROR_CORRUPTED_DATA);
+	CHECK (mock.transfer_calls == 1);
+	CHECK (mock.delete_calls == 0);
+	CHECK (mock.handle_count == 1);
 
         /* 5. Delete failure: error propagates after the transfer. */
         mock_reset (&mock);

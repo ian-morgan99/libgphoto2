@@ -84,6 +84,20 @@ pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
 }
 
+int
+pentax_capture_output_contract_known (const unsigned char *data, size_t size)
+{
+	uint32_t format;
+
+	/* IMAGE Transmitter 2 documents 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF.
+	 * A short/unknown value must not silently turn a multi-file capture into a
+	 * single-file obligation. */
+	if (!data || size < 528)
+		return 0;
+	format = pentax_get_u32le (data + 524);
+	return format <= 3;
+}
+
 static uint16_t
 pentax_get_u16le (const unsigned char *data)
 {
@@ -854,6 +868,23 @@ pentax_capture_output_obligation_resolved (int capture_accepted,
 {
 	return !capture_accepted ||
 		(primary_published && all_expected_outputs_published);
+}
+
+int
+pentax_candidate_output_published (int transfer_succeeded, int filename_known,
+	int filesystem_publication_succeeded)
+{
+	return transfer_succeeded && filename_known &&
+		filesystem_publication_succeeded;
+}
+
+int
+pentax_capture_initiate_response_ambiguous (uint16_t response)
+{
+	/* ptp.h reserves 0x02f9..0x02ff for transport/session failures. Unlike an
+	 * explicit PTP response, these do not prove whether the camera accepted the
+	 * command before the response path failed. */
+	return response >= 0x02f9 && response <= 0x02ff;
 }
 
 int

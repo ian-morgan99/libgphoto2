@@ -147,6 +147,7 @@ main (void)
 	uint8_t fallback = 99;
 	MockTransfer mock;
 	PentaxTransferOps transfer_operations;
+	unsigned int i;
 
 	CHECK (pentax_capture_cleanup_decision (0) ==
 		PENTAX_CAPTURE_CLEANUP_ABORT);
@@ -825,12 +826,36 @@ main (void)
 	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
 	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));
 	CHECK (pentax_capture_output_obligation_resolved (0, 0, 0));
+	CHECK (!pentax_candidate_output_published (0, 1, 1));
+	CHECK (!pentax_candidate_output_published (1, 0, 1));
+	CHECK (!pentax_candidate_output_published (1, 1, 0));
+	CHECK (pentax_candidate_output_published (1, 1, 1));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x2001));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x2019));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02f9));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02fa));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02fb));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02ff));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x0300));
 	CHECK (!strcmp (pentax_admission_block_reason_name (
 		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
 		"output-obligation-unresolved"));
 	CHECK (strstr (pentax_admission_recovery_action (
 		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
 		"keep-shutter-blocked") != NULL);
+	/* A short/unknown format must not silently become a one-file capture. */
+	CHECK (!pentax_capture_output_contract_known (NULL, 0));
+	CHECK (!pentax_capture_output_contract_known (condition_data, 527));
+	for (i = 0; i <= 3; i++) {
+		put_u32le (condition_data, 524, i);
+		CHECK (pentax_capture_output_contract_known (condition_data,
+			sizeof (condition_data)));
+		CHECK (pentax_expected_extra_candidates (condition_data,
+			sizeof (condition_data)) == (i == 2 ? 1U : 0U));
+	}
+	put_u32le (condition_data, 524, 4);
+	CHECK (!pentax_capture_output_contract_known (condition_data,
+		sizeof (condition_data)));
 
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active

@@ -211,6 +211,9 @@ int pentax_recovery_probe_can_clear (
 	PentaxAdmissionBlockReason reason, int capture_output_pending);
 int pentax_capture_output_obligation_resolved (
 	int capture_accepted, int primary_published, int all_expected_outputs_published);
+int pentax_candidate_output_published (int transfer_succeeded,
+	int filename_known, int filesystem_publication_succeeded);
+int pentax_capture_initiate_response_ambiguous (uint16_t response);
 int pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy);
 
@@ -218,6 +221,10 @@ int pentax_admission_probe_ok (const unsigned char *data, size_t size,
  * been finalized, derived from GetAllConditions writing format at +524.
  * RAW+JPEG publishes two output objects, so one companion remains. */
 unsigned int pentax_expected_extra_candidates (const unsigned char *data,
+	size_t size);
+/* A shutter is admissible only when the camera's output-format field is
+ * present and names a format whose object count this driver understands. */
+int pentax_capture_output_contract_known (const unsigned char *data,
 	size_t size);
 
 /* Stale-candidate baseline for the pre-capture probe (issue #34): returns
@@ -410,7 +417,9 @@ typedef struct {
 	/* Get transfer candidate info (type 0); caller frees *data. */
 	int (*get_candidate_info) (void *user_data, unsigned char **data,
 		size_t *size);
-	/* Transfer the current pending candidate into buffer. */
+	/* Transfer AND publish the current pending candidate into the caller's
+	 * file namespace. Return success only after its ownership is secured there;
+	 * the loop will delete the camera candidate only after this callback passes. */
 	int (*transfer_candidate) (void *user_data, PentaxCaptureBuffer *buffer);
 	/* Finalize (delete) the current candidate on the camera. */
 	int (*delete_candidate) (void *user_data);
