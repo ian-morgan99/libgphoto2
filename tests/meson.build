@@ -48,6 +48,18 @@ test(
   env: gp_test_env,
 )
 
+# Inventory-only regression: the measured iPolar is UVC, while the measured
+# 16c0:29a0 StarShoot is vendor-specific USB and must not be advertised as UVC.
+test_uvc_device_table_exe = executable(
+  'test-uvc-device-table',
+  'test-uvc-device-table.c',
+)
+
+test(
+  'test-uvc-device-table',
+  test_uvc_device_table_exe,
+)
+
 # Regression test for Pentax generic exposure compatibility aliases.
 # Drives the real public config-lookup path: dlopens the built ptp2 camlib via
 # CAMLIBS and calls its exported camera_get_single_config("aperture") with a
