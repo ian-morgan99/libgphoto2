@@ -781,20 +781,64 @@ pentax_recovery_probe_ok (const unsigned char *data, size_t size)
 	return pentax_admission_probe_ok (data, size, PENTAX_ADMISSION_STRICT);
 }
 
+PentaxAdmissionBlockReason
+pentax_admission_block_reason (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy)
+{
+	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
+		return PENTAX_ADMISSION_BLOCK_UNREADABLE;
+	if (policy == PENTAX_ADMISSION_STRICT &&
+	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
+		return PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY;
+	if (pentax_get_u32le (data + 32) == 1)
+		return PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE;
+	if (pentax_get_u32le (data + 36) != 0)
+		return PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE;
+	return PENTAX_ADMISSION_BLOCK_NONE;
+}
+
+const char *
+pentax_admission_block_reason_name (PentaxAdmissionBlockReason reason)
+{
+	switch (reason) {
+	case PENTAX_ADMISSION_BLOCK_NONE:
+		return "none";
+	case PENTAX_ADMISSION_BLOCK_UNREADABLE:
+		return "conditions-unreadable";
+	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
+		return "unsafe-activity";
+	case PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE:
+		return "capture-active";
+	case PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE:
+		return "pending-candidate";
+	}
+	return "invalid-reason";
+}
+
+const char *
+pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
+{
+	switch (reason) {
+	case PENTAX_ADMISSION_BLOCK_NONE:
+		return "none";
+	case PENTAX_ADMISSION_BLOCK_UNREADABLE:
+		return "hold-shutter; restore-readable-PTP-conditions; re-probe-before-retry";
+	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
+		return "hold-shutter; let-camera-operation-quiesce; re-probe-without-timed-retry";
+	case PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE:
+		return "do-not-start-another-exposure; finish-or-recover-current-operation-first";
+	case PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE:
+		return "preserve-candidate; recover-output-with-ownership; never-delete-or-shoot-over-it";
+	}
+	return "hold-shutter; inspect-diagnostics";
+}
+
 int
 pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy)
 {
-	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
-		return 0;
-	if (policy == PENTAX_ADMISSION_STRICT &&
-	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
-		return 0;
-	if (pentax_get_u32le (data + 32) == 1)
-		return 0;
-	if (pentax_get_u32le (data + 36) != 0)
-		return 0;
-	return 1;
+	return pentax_admission_block_reason (data, size, policy) ==
+		PENTAX_ADMISSION_BLOCK_NONE;
 }
 
 /* The stale-candidate baseline is the transfer candidate handle recorded in a

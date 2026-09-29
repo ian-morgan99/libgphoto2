@@ -783,6 +783,33 @@ main (void)
 	CHECK (pentax_admission_probe_ok (condition_data, sizeof (condition_data),
 		PENTAX_ADMISSION_STRICT));
 
+	/* Every fail-closed admission cause must be separately diagnosable and
+	 * carry a non-destructive recovery action. */
+	CHECK (pentax_admission_block_reason (NULL, 0,
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_UNREADABLE);
+	memset (condition_data, 0, sizeof (condition_data));
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_PROCESSING);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_OUTPUT_SAFE) == PENTAX_ADMISSION_BLOCK_NONE);
+	put_u32le (condition_data, 104, 0);
+	put_u32le (condition_data, 32, 1);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE);
+	put_u32le (condition_data, 32, 0);
+	put_u32le (condition_data, 36, 23);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE);
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE), "pending-candidate"));
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE), "never-delete") != NULL);
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY), "without-timed-retry") != NULL);
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_NONE), "none"));
+
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active
 	 * capture; otherwise callers proceed without the check. */

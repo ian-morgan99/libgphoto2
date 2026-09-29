@@ -193,6 +193,19 @@ typedef enum {
 	PENTAX_ADMISSION_STRICT = 0,
 	PENTAX_ADMISSION_OUTPUT_SAFE = 1
 } PentaxAdmissionPolicy;
+typedef enum {
+	PENTAX_ADMISSION_BLOCK_NONE = 0,
+	PENTAX_ADMISSION_BLOCK_UNREADABLE,
+	PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY,
+	PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE,
+	PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE
+} PentaxAdmissionBlockReason;
+PentaxAdmissionBlockReason pentax_admission_block_reason (
+	const unsigned char *data, size_t size, PentaxAdmissionPolicy policy);
+const char *pentax_admission_block_reason_name (
+	PentaxAdmissionBlockReason reason);
+const char *pentax_admission_recovery_action (
+	PentaxAdmissionBlockReason reason);
 int pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy);
 

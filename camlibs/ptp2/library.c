@@ -6400,7 +6400,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		uint32_t recovery_activity = 0;
 		uint16_t recovery_ptpres;
 		int recovered = 0;
-		int strict_ok, output_safe_ok;
+		PentaxAdmissionBlockReason strict_reason, output_safe_reason;
 
 		recovery_ptpres = ptp_pentax_get_all_conditions (params, &rdata, &rsize);
 		if (rdata && (rsize >= PENTAX_CONDITIONS_MIN_SIZE)) {
@@ -6412,19 +6412,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			"field36=0x%08x field104=0x%08x unsafe-mask=0x%08x",
 			recovery_ptpres, rsize, recovery_capture, recovery_candidate,
 			recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE);
-		strict_ok = PTP_RC_OK == recovery_ptpres &&
-			pentax_recovery_probe_ok (rdata, rsize);
-		output_safe_ok = PTP_RC_OK == recovery_ptpres &&
-			pentax_admission_probe_ok (rdata, rsize, PENTAX_ADMISSION_OUTPUT_SAFE);
+		strict_reason = (PTP_RC_OK == recovery_ptpres) ?
+			pentax_admission_block_reason (rdata, rsize,
+				PENTAX_ADMISSION_STRICT) :
+			PENTAX_ADMISSION_BLOCK_UNREADABLE;
+		output_safe_reason = (PTP_RC_OK == recovery_ptpres) ?
+			pentax_admission_block_reason (rdata, rsize,
+				PENTAX_ADMISSION_OUTPUT_SAFE) :
+			PENTAX_ADMISSION_BLOCK_UNREADABLE;
 		GP_LOG_E ("admission-eval: capture=%llu policy=strict strict=%d "
 			"output-safe=%d field32=0x%08x field36=0x%08x field104=0x%08x",
 			capture_id,
-			strict_ok, output_safe_ok, recovery_capture, recovery_candidate,
+			strict_reason == PENTAX_ADMISSION_BLOCK_NONE,
+			output_safe_reason == PENTAX_ADMISSION_BLOCK_NONE,
+			recovery_capture, recovery_candidate,
 			recovery_activity);
 		/* Output-safe is diagnostic comparison data only. Until direct
 		 * hardware evidence establishes that an active +104 state permits a
 		 * subsequent InitiateCapture, it must never clear recovery_required. */
-		if (strict_ok) {
+		if (strict_reason == PENTAX_ADMISSION_BLOCK_NONE) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
 			GP_LOG_D ("recovery-required cleared: conditions readable "
@@ -6432,15 +6438,21 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		}
 		free (rdata);
 		if (!recovered) {
-			fprintf (stderr, "[pentax] admission: capture=%llu policy=strict "
+			fprintf (stderr, "[pentax-recovery] capture=%llu path=recovery-probe "
+				"reason=%s "
 				"ptp=0x%04x size=%u "
 				"field32=0x%08x field36=0x%08x field104=0x%08x "
-				"unsafe-mask=0x%08x strict=%d output-safe=%d accepted=0\n",
+				"unsafe-mask=0x%08x output-safe-reason=%s accepted=0 action=%s%s\n",
 				capture_id,
+				pentax_admission_block_reason_name (strict_reason),
 				recovery_ptpres,
 				rsize, recovery_capture, recovery_candidate,
 				recovery_activity, PENTAX_CONDITION_ACTIVITY_UNSAFE,
-				strict_ok, output_safe_ok);
+				pentax_admission_block_reason_name (output_safe_reason),
+				pentax_admission_recovery_action (strict_reason),
+				recovery_candidate ?
+					";preserve-candidate; recover-output-with-ownership; never-delete-or-shoot-over-it" :
+					"");
 			GP_LOG_E ("capture refused: session reconciliation flagged "
 				"recovery-required and camera is still busy or "
 				"conditions unreadable");
@@ -6452,8 +6464,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
-	if (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE)
+	if (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE) {
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=transfer-state "
+			"reason=operation-in-progress transfer=%d accepted=0 "
+			"action=wait-for-owner-to-complete; if-owner-is-lost-preserve-output-before-rebind\n",
+			capture_id, params->pentax.transfer_state);
+		gp_context_error (context,
+			_("Pentax operation %d is still active; wait for it to complete and do not retry the shutter."),
+			params->pentax.transfer_state);
 		return GP_ERROR_CAMERA_BUSY;
+	}
 	if ((GP_OK == gp_setting_get ("ptp2", "autofocus", setting)) &&
 	    strcmp (setting, "off"))
 		focus_mode = 3;
@@ -6471,8 +6491,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	{
 		unsigned char *bdata = NULL;
 		unsigned int bsize = 0;
-		uint32_t baseline_candidate = 0;
+		uint32_t baseline_candidate = 0, baseline_capture = 0;
+		uint32_t baseline_activity = 0;
 		uint16_t baseline_ptpres;
+		PentaxAdmissionBlockReason baseline_reason;
+		int was_recovery_required = params->pentax.recovery_required;
 
 		fprintf (stderr, "[pentax] capture=%llu boundary=preconditions-enter\n",
 			capture_id);
@@ -6482,6 +6505,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			capture_id, baseline_ptpres, bsize);
 		fflush (stderr);
 		if (baseline_ptpres != PTP_RC_OK || bsize < PENTAX_CONDITIONS_MIN_SIZE) {
+			params->pentax.recovery_required = 1;
+			fprintf (stderr, "[pentax-recovery] capture=%llu path=preconditions "
+				"reason=conditions-unreadable ptp=0x%04x size=%u accepted=0 "
+				"action=hold-shutter; restore-readable-PTP-conditions; re-probe-before-retry\n",
+				capture_id, baseline_ptpres, bsize);
 			GP_LOG_E ("capture refused: pre-capture conditions unreadable "
 				"(PTP 0x%04x, %u bytes)", baseline_ptpres, bsize);
 			free (bdata);
@@ -6490,7 +6518,44 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				baseline_ptpres, bsize);
 			return GP_ERROR_CAMERA_BUSY;
 		}
-		baseline_candidate = pentax_stale_candidate_baseline (bdata, bsize);
+		baseline_capture = pentax_get_u32le (bdata + 32);
+		baseline_candidate = pentax_get_u32le (bdata + 36);
+		baseline_activity = pentax_get_u32le (bdata + 104);
+		baseline_reason = pentax_admission_block_reason (bdata, bsize,
+			PENTAX_ADMISSION_STRICT);
+		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE) {
+			params->pentax.recovery_required = 1;
+			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
+				"reason=%s ptp=0x%04x size=%u field32=0x%08x "
+				"field36=0x%08x field104=0x%08x accepted=0 action=%s%s\n",
+				capture_id,
+				pentax_admission_block_reason_name (baseline_reason),
+				baseline_ptpres, bsize, baseline_capture, baseline_candidate,
+				baseline_activity,
+				pentax_admission_recovery_action (baseline_reason),
+				baseline_candidate ?
+					";preserve-candidate; recover-output-with-ownership; never-delete-or-shoot-over-it" :
+					"");
+			gp_context_error (context,
+				_("Pentax pre-shutter admission blocked (%s; PTP 0x%04x, size %u, +32=0x%08x, +36=0x%08x, +104=0x%08x). %s%s."),
+				pentax_admission_block_reason_name (baseline_reason),
+				baseline_ptpres, bsize, baseline_capture, baseline_candidate,
+				baseline_activity,
+				pentax_admission_recovery_action (baseline_reason),
+				baseline_candidate ?
+					_(" Preserve the candidate; recover it only with proven ownership; never delete or shoot over it.") :
+					"");
+			free (bdata);
+			return GP_ERROR_CAMERA_BUSY;
+		}
+		if (was_recovery_required) {
+			params->pentax.recovery_required = 0;
+			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
+				"reason=strict-probe-cleared field32=0x%08x field36=0x%08x "
+				"field104=0x%08x accepted=continue\n",
+				capture_id, baseline_capture, baseline_candidate,
+				baseline_activity);
+		}
 		/* This same mandatory readiness sample also carries the camera's
 		 * writing format.  Preserve its output obligation across the exposure:
 		 * the K-3 III can clear/change +524 after the primary is finalized,
@@ -6502,14 +6567,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
 			expected_extra_candidates);
 
-		if (baseline_candidate) {
-			GP_LOG_E ("capture refused: unowned transfer candidate %u "
-				"was present before InitiateCapture", baseline_candidate);
-			gp_context_error (context,
-				_("Camera has an unclaimed transfer candidate (%u); refusing to delete it or initiate a new exposure."),
-				baseline_candidate);
-			return GP_ERROR_CAMERA_BUSY;
-		}
 	}
 
 	/* Admission has succeeded. Start a new output generation only now: a
@@ -6529,6 +6586,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		capture_id, ptpres);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
+		/* Any non-OK InitiateCapture response leaves exposure/output state
+		 * uncertain. Do not replay it; require a fresh strict probe first. */
+		params->pentax.recovery_required = 1;
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=initiate "
+			"reason=ptp-initiate-rejected ptp=0x%04x gp=%d accepted=0 "
+			"action=do-not-replay-initiate; require-positive-strict-probe-before-next-request\n",
+			capture_id, ptpres, ret);
+		gp_context_error (context,
+			_("Pentax InitiateCapture returned PTP 0x%04x (GP %d); do not replay it. A fresh strict readiness probe is required before a later request."),
+			ptpres, ret);
 		goto out;
 	}
 	/* The candidate is finalized.  A later error must not issue a second
@@ -6934,6 +7001,10 @@ out:
 		 * barrier armed so the caller can recover/rebind rather than silently
 		 * losing the output. */
 		params->pentax.recovery_required = 1;
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=cleanup "
+			"reason=candidate-preserved handle=%u gp=%d accepted=0 "
+			"action=preserve-output; recover-with-ownership-before-next-shutter\n",
+			capture_id, candidate_handle, ret);
 		GP_LOG_E ("preserving orphaned transfer candidate %u after capture error %d; "
 			"session recovery required", candidate_handle, ret);
 	} else if (ret != GP_OK && initiated) {
