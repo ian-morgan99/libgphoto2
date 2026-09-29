@@ -1,141 +1,105 @@
-# Process this file with automake to generate a GNU Makefile
+CLEANFILES =
+EXTRA_DIST =
+noinst_DATA =
 
-########################################################################
-# put file lists and special compile rules here
 
-bin_SCRIPTS = gphoto2-config
+# included by all *.c files containing translated string literals as
+# libgphoto2/i18n.h
+EXTRA_DIST += i18n.h
 
-EXTRA_DIST = MAINTAINERS TESTERS installcheck.mk
-EXTRA_DIST += HACKING.md SECURITY.md
 
-# Note: $(subdirs) lists all the directories from AC_CONFIG_SUBDIRS()
-SUBDIRS = $(subdirs) libgphoto2 camlibs tests examples po packaging doc
+# dummy file needed by gtk-doc
+EXTRA_DIST += gphoto2-library.c
 
-EXTRA_DIST    += libgphoto2.pc.in
-pkgconfig_DATA = libgphoto2.pc
 
-EXTRA_DIST += libgphoto2-uninstalled.pc.in
-noinst_DATA = libgphoto2-uninstalled.pc
+lib_LTLIBRARIES             = libgphoto2.la
+libgphoto2_la_CFLAGS        =
+libgphoto2_la_CPPFLAGS      =
+libgphoto2_la_DEPENDENCIES  =
+libgphoto2_la_LDFLAGS       =
+libgphoto2_la_LIBADD        =
+libgphoto2_la_SOURCES       =
 
-EXTRA_DIST += ChangeLog
-EXTRA_DIST += INSTALL
-EXTRA_DIST += OUTDATED.txt
-doc_DATA = AUTHORS COPYING NEWS
-doc_DATA += ABOUT-NLS ChangeLog
+libgphoto2_la_CPPFLAGS     += -I$(top_srcdir)
+libgphoto2_la_CPPFLAGS     += -I$(top_builddir)
 
-EXTRA_DIST += README.md
-doc_DATA   += README.md
+libgphoto2_la_CPPFLAGS     += -I$(top_srcdir)/libgphoto2_port
+libgphoto2_la_CPPFLAGS     += -I$(top_builddir)/libgphoto2_port
 
-EXTRA_DIST += RELEASE-HOWTO.md
-doc_DATA   += RELEASE-HOWTO.md
+libgphoto2_la_CPPFLAGS     += $(AM_CPPFLAGS)
 
-EXTRA_DIST += README.packaging
-doc_DATA   += README.packaging
+libgphoto2_la_LDFLAGS      += -no-undefined
 
-nobase_include_HEADERS =	\
-	gphoto2/gphoto2.h		\
-	gphoto2/gphoto2-abilities-list.h\
-	gphoto2/gphoto2-camera.h	\
-	gphoto2/gphoto2-context.h	\
-	gphoto2/gphoto2-file.h		\
-	gphoto2/gphoto2-filesys.h	\
-	gphoto2/gphoto2-library.h	\
-	gphoto2/gphoto2-list.h		\
-	gphoto2/gphoto2-result.h	\
-	gphoto2/gphoto2-setting.h	\
-	gphoto2/gphoto2-version.h	\
-	gphoto2/gphoto2-widget.h
-
-DISTCLEANFILES = libgphoto2/gphoto2-endian.h
-
-# we use just ONE .PHONY target in order not to confuse automake
-
-.PHONY: source-code-check install-drivers
-
-########################################################################
-# source code check maintenance task
+# Notes about the list of exported symbols:
+#    gp_* also contains internal symbols which are intended for
+#         INTERNAL USE ONLY and should be converted into gpi_* symbols
+#    gpi_* are for libgphoto2/camlib internal use only
+#          NEVER USE gpi_* in frontends!
+#    gp_* gphoto2 API, used in
+#         - frontends
+#           BE AWARE that NOT ALL gp_* FUNCTIONS ARE CONSIDERED PUBLIC.
 #
-#   This finds code patterns we don't want to have.
-#
-#   Use it to get rid of existing patterns and make sure they aren't
-#   reintroduced later.
-#
-#   The output is meant to be read and interpreted by human programmers.
+# Yes, this is messy, but we are going to clean this up.
 
-source-code-check:
-	@echo "######## Finding // comments"
-	find $(srcdir) -type f -name '*.[ch]' -exec grep -E -H '(^//|[^:]//)' {} \;
-	@echo "######## Finding remainders of Arnaud's comment replacement"
-	find $(srcdir) -type f -name '*.[ch]' -exec grep -E -H 'http:/\*' {} \;
-	@echo "######## Finding explicit libintl.h references"
-	find $(srcdir) -type f -name '*.[ch]' -exec grep -E -H '^#.*include.*libintl\.h' {} \;
+# Keep on using libgphoto2.sym until we actually have a libgphoto2.ver
+# version script.
+# EXTRA_DIST                 += libgphoto2.ver
+EXTRA_DIST                 += libgphoto2.sym
+# if HAVE_ASM_SYMVER
+# libgphoto2_la_DEPENDENCIES += libgphoto2.ver
+# libgphoto2_la_LDFLAGS      += -Wl,--version-script=$(srcdir)/libgphoto2.ver
+# else
+libgphoto2_la_DEPENDENCIES += libgphoto2.sym
+libgphoto2_la_LDFLAGS      += -export-symbols $(srcdir)/libgphoto2.sym
+# endif
 
+libgphoto2_la_LDFLAGS      += -version-info @LIBGPHOTO2_VERSION_INFO@
 
-########################################################################
-# Shortcut for installation of a subset of camlibs/drivers
-# Usage: make CAMLIBS="canon.la ptp2.la" install-camlibs
+libgphoto2_la_LIBADD       += $(top_builddir)/libgphoto2_port/libgphoto2_port/libgphoto2_port.la
 
-install-camlibs:
-	cd camlibs && $(MAKE) $(AM_MAKEFLAGS) CAMLIBS="$(CAMLIBS)" install-camlibs
+# The libtool docs describe these params, but they don't build.
+#	"-dlopen" self \
+#	"-dlopen" $(top_builddir)/camlibs/canon/....la \
+#	"-dlopen" $(top_builddir)/camlibs/ptp2/....la
 
+libgphoto2_la_CPPFLAGS     += $(LTDLINCL)
+libgphoto2_la_LIBADD       += $(LIBLTDL)
 
-########################################################################
-# Convenience shortcuts to update the *.po translation files in both
-# po/ subdirs at once and to reset the *.po translation files to "git
-# HEAD" in both po/ subdirs at once.
+libgphoto2_la_CPPFLAGS     += $(LIBEXIF_CFLAGS)
+libgphoto2_la_LIBADD       += $(LIBEXIF_LIBS)
 
-PO_SUBDIRS =
-PO_SUBDIRS += libgphoto2_port/po
-PO_SUBDIRS += po
+libgphoto2_la_LIBADD       += -lm
+libgphoto2_la_LIBADD       += $(INTLLIBS)
 
-# Run "git checkout *.po" in all po/ subdirs
-# which is quite useful after "make dist" to clean up "git status".
-.PHONY: git-checkout-po
-git-checkout-po:
-	set -e; cd "$(top_srcdir)" && if test -d .git; then \
-		for d in $(PO_SUBDIRS); do \
-			(cd "$$d" && git checkout *.po); \
-		done; \
-	fi
+libgphoto2_la_SOURCES      += gphoto2-abilities-list.c
+libgphoto2_la_SOURCES      += ahd_bayer.c
+libgphoto2_la_SOURCES      += bayer.c
+libgphoto2_la_SOURCES      += bayer.h
+libgphoto2_la_SOURCES      += bayer-types.h
+libgphoto2_la_SOURCES      += gphoto2-camera.c
+libgphoto2_la_SOURCES      += gphoto2-context.c
+libgphoto2_la_SOURCES      += exif.c
+libgphoto2_la_SOURCES      += exif.h
+libgphoto2_la_SOURCES      += gphoto2-file.c
+libgphoto2_la_SOURCES      += gphoto2-filesys.c
+libgphoto2_la_SOURCES      += gamma.c
+libgphoto2_la_SOURCES      += gamma.h
+libgphoto2_la_SOURCES      += jpeg.c
+libgphoto2_la_SOURCES      += jpeg.h
+libgphoto2_la_SOURCES      += gphoto2-list.c
+libgphoto2_la_SOURCES      += gphoto2-result.c
+libgphoto2_la_SOURCES      += gphoto2-version.c
+libgphoto2_la_SOURCES      += gphoto2-setting.c
+libgphoto2_la_SOURCES      += gphoto2-widget.c
 
-.PHONY: pull-translations
-if HAVE_RSYNC
-pull-translations:
-	$(RSYNC) -Lrtvz translationproject.org::tp/latest/libgphoto2/ $(top_srcdir)/po
-	$(RSYNC) -Lrtvz translationproject.org::tp/latest/libgphoto2_port/ $(top_srcdir)/libgphoto2_port/po
-else
-pull-translations:
-	echo "Error: Cannot pull translations: Could not find rsync at configure time."
-	exit 1
-endif
-
-# Run "make update-po" in all po/ subdirs
-.PHONY: update-po
-update-po:
-	@for d in $(PO_SUBDIRS); do (cd "$$d" && $(MAKE) $(AM_MAKEFLAGS) update-po)  || exit 1; done
-
-@GP_GETTEXT_SETUP_MK@
-
-# We need *some* `all-local` target (dummy or real) to force Automake
-# to make the `all` target depend on it.  In this case, print build
-# flags for debugging purposes.
-all-local:
-	@test -z "$(CFLAGS)"   || printf "  %s %-8s %s\n" env CFLAGS   "$(CFLAGS)"
-	@test -z "$(CPPFLAGS)" || printf "  %s %-8s %s\n" env CPPFLAGS "$(CPPFLAGS)"
-	@test -z "$(LDADD)"    || printf "  %s %-8s %s\n" env LDADD    "$(LDADD)"
-	@test -z "$(LIBADD)"   || printf "  %s %-8s %s\n" env LIBADD   "$(LIBADD)"
-	@test -z "$(LDFLAGS)"  || printf "  %s %-8s %s\n" env LDFLAGS  "$(LDFLAGS)"
-
-# Dummy target to force Automake to make the distclean target depend on it
-distclean-local:
-	@:
+libgphoto2_la_DEPENDENCIES += $(top_srcdir)/gphoto2/gphoto2-version.h
 
 
-########################################################################
-# The following default options for aclocal and automake
-# are required in the top level Makefile.am for the automatic
-# re-building of the build system files.
-
-ACLOCAL_AMFLAGS = -I auto-m4 -I libgphoto2_port/gphoto-m4
-
-include libgphoto2_port/gphoto-m4/Makefile-files
+CLEANFILES  += libgphoto2-buildflags.stamp
+noinst_DATA += libgphoto2-buildflags.stamp
+libgphoto2-buildflags.stamp: libgphoto2.la
+	@test -z "$(libgphoto2_la_CFLAGS)"   || printf "  %s %-8s %s\n" lg2 CFLAGS   "$(libgphoto2_la_CFLAGS)"
+	@test -z "$(libgphoto2_la_CPPFLAGS)" || printf "  %s %-8s %s\n" lg2 CPPFLAGS "$(libgphoto2_la_CPPFLAGS)"
+	@test -z "$(libgphoto2_la_LIBADD)"   || printf "  %s %-8s %s\n" lg2 LIBADD   "$(libgphoto2_la_LIBADD)"
+	@test -z "$(libgphoto2_la_LDFLAGS)"  || printf "  %s %-8s %s\n" lg2 LDFLAGS  "$(libgphoto2_la_LDFLAGS)"
+	@date > $@
