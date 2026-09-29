@@ -810,6 +810,28 @@ main (void)
 	CHECK (!strcmp (pentax_admission_block_reason_name (
 		PENTAX_ADMISSION_BLOCK_NONE), "none"));
 
+	/* Camera readiness can discharge a recovery flag only when there is no
+	 * accepted capture whose output obligation remains unresolved.  This is the
+	 * production recovery decision used before another InitiateCapture. */
+	CHECK (pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_NONE, 0));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_NONE, 1));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED, 1));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0));
+	CHECK (!pentax_capture_output_obligation_resolved (1, 0, 0));
+	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
+	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));
+	CHECK (pentax_capture_output_obligation_resolved (0, 0, 0));
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
+		"output-obligation-unresolved"));
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
+		"keep-shutter-blocked") != NULL);
+
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active
 	 * capture; otherwise callers proceed without the check. */

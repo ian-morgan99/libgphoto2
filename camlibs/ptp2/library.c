@@ -6369,6 +6369,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	uint32_t focus_mode = 2;
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
+	int reconciled_output_complete = 1;
 	int port_timeout_raised = 0;
 	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
@@ -6384,9 +6385,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 
 	if (!params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
-	fprintf (stderr, "[pentax] capture=%llu boundary=camlib-enter transfer=%d recovery=%d\n",
+	fprintf (stderr, "[pentax] capture=%llu boundary=camlib-enter transfer=%d recovery=%d output_pending=%d\n",
 		capture_id, params->pentax.transfer_state,
-		params->pentax.recovery_required);
+		params->pentax.recovery_required,
+		params->pentax.capture_output_pending);
 	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
 	if (params->pentax.recovery_required) {
@@ -6430,11 +6432,15 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		/* Output-safe is diagnostic comparison data only. Until direct
 		 * hardware evidence establishes that an active +104 state permits a
 		 * subsequent InitiateCapture, it must never clear recovery_required. */
-		if (strict_reason == PENTAX_ADMISSION_BLOCK_NONE) {
+		if (params->pentax.capture_output_pending &&
+		    strict_reason == PENTAX_ADMISSION_BLOCK_NONE)
+			strict_reason = PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+		if (pentax_recovery_probe_can_clear (strict_reason,
+			params->pentax.capture_output_pending)) {
 			recovered = 1;
 			params->pentax.recovery_required = 0;
 			GP_LOG_D ("recovery-required cleared: conditions readable "
-				"and camera idle");
+				"and camera idle, with no unresolved output obligation");
 		}
 		free (rdata);
 		if (!recovered) {
@@ -6523,6 +6529,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		baseline_activity = pentax_get_u32le (bdata + 104);
 		baseline_reason = pentax_admission_block_reason (bdata, bsize,
 			PENTAX_ADMISSION_STRICT);
+		if (baseline_reason == PENTAX_ADMISSION_BLOCK_NONE &&
+		    params->pentax.capture_output_pending)
+			baseline_reason = PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
 		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE) {
 			params->pentax.recovery_required = 1;
 			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
@@ -6598,6 +6607,10 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			ptpres, ret);
 		goto out;
 	}
+	/* An accepted shutter creates an output obligation distinct from camera
+	 * readiness. Do not discharge it from +32/+36/+104 alone; only successful
+	 * transfer, finalization and publication of all mode-required outputs can. */
+	params->pentax.capture_output_pending = 1;
 	/* The candidate is finalized.  A later error must not issue a second
 	 * DeleteTransferCandidate against the same completed exposure. */
 	have_candidate = 0;
@@ -6931,6 +6944,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		else if (reconciled)
 			GP_LOG_D ("dual-format reconciliation: %d extra candidate(s) "
 				"consumed and published", reconciled);
+		reconciled_output_complete = rret == GP_OK &&
+			(unsigned int)reconciled >= expected_extra_candidates;
 	}
 
 	/* o-v12e hardware evidence proved that this conditions predicate can remain
@@ -6972,6 +6987,20 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
 	ret = GP_OK;
 	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
+	if (pentax_capture_output_obligation_resolved (initiated, 1,
+		reconciled_output_complete)) {
+		params->pentax.capture_output_pending = 0;
+		GP_LOG_D ("pentax-capture[%llu]: all output obligations published",
+			capture_id);
+	} else {
+		params->pentax.capture_output_pending = 1;
+		params->pentax.recovery_required = 1;
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=publication "
+			"reason=output-obligation-unresolved extras-expected=%u "
+			"accepted=1 action=preserve-published-files; keep-next-shutter-blocked; "
+			"recover-remaining-output-with-original-owner\n",
+			capture_id, expected_extra_candidates);
+	}
 
 out:
 	/* The capture wait temporarily raises the shared port timeout.  Every

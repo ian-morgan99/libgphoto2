@@ -198,7 +198,8 @@ typedef enum {
 	PENTAX_ADMISSION_BLOCK_UNREADABLE,
 	PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY,
 	PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE,
-	PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE
+	PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE,
+	PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED
 } PentaxAdmissionBlockReason;
 PentaxAdmissionBlockReason pentax_admission_block_reason (
 	const unsigned char *data, size_t size, PentaxAdmissionPolicy policy);
@@ -206,6 +207,10 @@ const char *pentax_admission_block_reason_name (
 	PentaxAdmissionBlockReason reason);
 const char *pentax_admission_recovery_action (
 	PentaxAdmissionBlockReason reason);
+int pentax_recovery_probe_can_clear (
+	PentaxAdmissionBlockReason reason, int capture_output_pending);
+int pentax_capture_output_obligation_resolved (
+	int capture_accepted, int primary_published, int all_expected_outputs_published);
 int pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy);
 

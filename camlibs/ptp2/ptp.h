@@ -4075,6 +4075,10 @@ struct _PTPParams {
 		 * state (active exposure or unreadable conditions); Pentax
 		 * capture is refused until resolved (issue #33). */
 		int recovery_required;
+		/* A shutter was accepted, but its output has not been fully
+		 * transferred/finalized/published. Camera readiness alone cannot
+		 * discharge this obligation (Polaris issue #149). */
+		int capture_output_pending;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;

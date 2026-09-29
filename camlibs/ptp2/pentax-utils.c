@@ -811,6 +811,8 @@ pentax_admission_block_reason_name (PentaxAdmissionBlockReason reason)
 		return "capture-active";
 	case PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE:
 		return "pending-candidate";
+	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
+		return "output-obligation-unresolved";
 	}
 	return "invalid-reason";
 }
@@ -829,8 +831,29 @@ pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
 		return "do-not-start-another-exposure; finish-or-recover-current-operation-first";
 	case PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE:
 		return "preserve-candidate; recover-output-with-ownership; never-delete-or-shoot-over-it";
+	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
+		return "preserve-capture-output-obligation; keep-shutter-blocked; recover-with-original-owner";
 	}
 	return "hold-shutter; inspect-diagnostics";
+}
+
+int
+pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
+	int capture_output_pending)
+{
+	/* Readiness and output completion are independent predicates. A clean
+	 * conditions frame may clear a stale activity barrier, but never an
+	 * obligation created by an accepted capture and not yet published. */
+	return (reason == PENTAX_ADMISSION_BLOCK_NONE) &&
+		!capture_output_pending;
+}
+
+int
+pentax_capture_output_obligation_resolved (int capture_accepted,
+	int primary_published, int all_expected_outputs_published)
+{
+	return !capture_accepted ||
+		(primary_published && all_expected_outputs_published);
 }
 
 int
