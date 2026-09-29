@@ -112,7 +112,7 @@ ptp_usb_senddata (PTPParams* params, PTPContainer* ptp,
 	unsigned char *bytes;
 	int progressid = 0;
 	int usecontext = (size > CONTEXT_BLOCK_SIZE);
-	GPContext *context = ((PTPData *)params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	GP_LOG_D ("Sending PTP_OC 0x%0x (%s) data...", ptp->Code, ptp_get_opcode_name(params, ptp->Code));
 	/* build appropriate USB container */
@@ -247,7 +247,7 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp, PTPDataHandler *handler)
 	uint32_t	bytes_to_read = 0, bytes_read = 0;
 	Camera		*camera = ((PTPData *)params->data)->camera;
 	int		report_progress, progress_id = 0, do_retry = TRUE, res = GP_OK;
-	GPContext *context = ((PTPData *)params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	GP_LOG_D ("Reading PTP_OC 0x%0x (%s) data...", ptp->Code, ptp_get_opcode_name(params, ptp->Code));
 	PTP_CNT_INIT(usbdata);
@@ -469,7 +469,7 @@ ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 	uint16_t 		ret;
 	uint32_t		rlen;
 	PTPUSBBulkContainer	usbresp;
-	/*GPContext		*context = ((PTPData *)params->data)->context;*/
+	/*GPContext		*context = ptp_context_get (params->data);*/
 
 	GP_LOG_D ("Reading PTP_OC 0x%0x (%s) response...", resp->Code, ptp_get_opcode_name(params, resp->Code));
 	PTP_CNT_INIT(usbresp);

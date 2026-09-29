@@ -171,13 +171,13 @@ build_fixture (Camera **out, GPContext *context, int pentax, int advertise_ops)
 	}
 	seed_pentax_params (&camera->pl->params, pentax, advertise_ops);
 
-	/* Wire the context into the PTP data block as ptp2 expects. */
+	/* The public camlib operation installs its context in the current thread. */
 	camera->pl->params.data = calloc (1, sizeof (PTPData));
 	if (!camera->pl->params.data) {
 		fprintf (stderr, "out of memory for PTPData\n");
 		return 1;
 	}
-	((PTPData *) camera->pl->params.data)->context = context;
+	(void)context;
 
 	*out = camera;
 	return 0;
