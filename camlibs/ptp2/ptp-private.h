@@ -26,6 +26,7 @@
 
 #include <string.h>
 #include <sys/time.h>
+#include "ptp-context.h"
 
 /* config.c */
 int camera_get_config (Camera *camera, CameraWidget **window, GPContext *context);
@@ -181,7 +182,6 @@ struct _CameraPrivateLibrary {
 
 struct _PTPData {
 	Camera *camera;
-	GPContext *context;
 };
 typedef struct _PTPData PTPData;
 

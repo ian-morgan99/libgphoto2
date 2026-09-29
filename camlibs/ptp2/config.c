@@ -52,7 +52,7 @@
 # define __unused__
 #endif
 
-#define SET_CONTEXT(camera, ctx) ((PTPData *) camera->pl->params.data)->context = ctx
+#define	SET_CONTEXT(camera, ctx) ptp_context_set ((PTPData *) camera->pl->params.data, ctx)
 
 static int
 config_vendor_matches (Camera *camera, uint16_t vendor)
@@ -1306,7 +1306,7 @@ _put_Nikon_OffOn_UINT8(CONFIG_PUT_ARGS) {
 #define PUT_SONY_VALUE_(bits,inttype) 								\
 static int										\
 _put_sony_value_##bits (PTPParams*params, uint16_t prop, inttype value,int useenumorder) {	\
-	GPContext 		*context = ((PTPData *) params->data)->context;		\
+	GPContext 		*context = ptp_context_get (params->data);		\
 	PTPDevicePropDesc	dpd;							\
 	PTPPropValue		propval;						\
 	inttype			origval;						\
@@ -3100,13 +3100,13 @@ _put_Olympus_OMD_Bulb(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
 	int val;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 	if (val) {
 		int ret = ptp_olympus_omd_bulbstart (params);
 		if (ret == PTP_RC_GeneralError) {
-			gp_context_error (((PTPData *) camera->pl->params.data)->context,
+			gp_context_error (ptp_context_get (camera->pl->params.data),
 			_("For bulb capture to work, make sure the mode dial is switched to 'M' and set 'shutterspeed' to 'bulb'."));
 			return translate_ptp_result (ret);
 		}
@@ -3171,7 +3171,7 @@ static int
 _put_Fuji_AFDrive(CONFIG_PUT_ARGS)
 {
 	PTPParams	*params = &(camera->pl->params);
-	GPContext	*context = ((PTPData *) params->data)->context;
+	GPContext	*context = ptp_context_get (params->data);
 	PTPPropValue	pval;
 	uint16_t	af_start_code;
 	uint16_t	af_stop_code;
@@ -3244,7 +3244,7 @@ static int
 _put_Fuji_AFDriveManual(CONFIG_PUT_ARGS)
 {
 	PTPParams     *params = &(camera->pl->params);
-	GPContext     *context = ((PTPData *) params->data)->context;
+	GPContext     *context = ptp_context_get (params->data);
 	PTPPropValue  pval;
 	int ret;
 
@@ -3294,7 +3294,7 @@ _get_Fuji_FocusPoint(CONFIG_GET_ARGS) {
 static int
 _put_Fuji_FocusPoint(CONFIG_PUT_ARGS) {
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 	PTPPropValue pval;
 
 	CR (gp_widget_get_value(widget, &pval.str));
@@ -3320,7 +3320,7 @@ _put_Fuji_Bulb(CONFIG_PUT_ARGS)
 {
 	PTPParams	*params = &(camera->pl->params);
 	int		val;
-	GPContext	*context = ((PTPData *) params->data)->context;
+	GPContext	*context = ptp_context_get (params->data);
 	PTPPropValue	pval;
 
 	CR (gp_widget_get_value(widget, &val));
@@ -5641,7 +5641,7 @@ _get_Sony_ShutterSpeed(CONFIG_GET_ARGS) {
 	int			x,y;
 	char			buf[20];
 	PTPParams		*params = &(camera->pl->params);
-	GPContext 		*context = ((PTPData *) params->data)->context;
+	GPContext 		*context = ptp_context_get (params->data);
 
 	if (dpd->DataType != PTP_DTC_UINT32)
 		return GP_ERROR;
@@ -5724,7 +5724,7 @@ _put_Sony_ShutterSpeedMode2(CONFIG_PUT_ARGS) {
 	PTPPropValue	value;
 	uint32_t	new32, origval;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 	time_t		start,end;
 	unsigned int	i;
 
@@ -5890,7 +5890,7 @@ _put_Sony_ShutterSpeedMode2(CONFIG_PUT_ARGS) {
 static int
 _put_Sony_ShutterSpeed(CONFIG_PUT_ARGS) {
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 	int		numerator,denominator,a,b;
 	const char	*val;
 	PTPPropValue	value;
@@ -6433,7 +6433,7 @@ GENERIC16TABLE(FocusMode,focusmodes)
 static int
 _put_Sony_FocusMode(CONFIG_PUT_ARGS) {
 	PTPParams		*params = &(camera->pl->params);
-	GPContext 		*context = ((PTPData *) params->data)->context;
+	GPContext 		*context = ptp_context_get (params->data);
 	int 			ret;
 	PTPDevicePropDesc	dpd2;
 	time_t			start,end;
@@ -7482,7 +7482,7 @@ GENERIC8TABLE(Sony_DRangeOptimizer,sony_drange_optimizer)
 static int
 _put_Sony_CompressionSetting(CONFIG_PUT_ARGS) {
 	PTPParams		*params = &(camera->pl->params);
-	GPContext 		*context = ((PTPData *) params->data)->context;
+	GPContext 		*context = ptp_context_get (params->data);
 	int 			ret;
 	PTPDevicePropDesc	dpd2;
 	time_t			start,end;
@@ -8003,7 +8003,7 @@ _get_Nikon_AFDrive(CONFIG_GET_ARGS) {
 static int
 _put_Nikon_AFDrive(CONFIG_PUT_ARGS) {
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 
 	if (!ptp_operation_issupported(&camera->pl->params, PTP_OC_NIKON_AfDrive))
 		return (GP_ERROR_NOT_SUPPORTED);
@@ -8030,7 +8030,7 @@ _put_Nikon_ChangeAfArea(CONFIG_PUT_ARGS) {
 	char		*val;
 	int		x,y;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 
@@ -8119,7 +8119,7 @@ _put_Nikon_MFDrive(CONFIG_PUT_ARGS) {
 	float		val;
 	unsigned int	xval, flag;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 
 	if (!ptp_operation_issupported(&camera->pl->params, PTP_OC_NIKON_MfDrive))
 		return (GP_ERROR_NOT_SUPPORTED);
@@ -8237,7 +8237,7 @@ static int
 _put_Canon_EOS_RemoteRelease(CONFIG_PUT_ARGS) {
 	const char*	val;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext 	*context = ((PTPData *) params->data)->context;
+	GPContext 	*context = ptp_context_get (params->data);
 
 	if (!ptp_operation_issupported(params, PTP_OC_CANON_EOS_RemoteReleaseOn))
 		return (GP_ERROR_NOT_SUPPORTED);
@@ -8831,7 +8831,7 @@ static int
 _put_Nikon_ViewFinder(CONFIG_PUT_ARGS) {
 	int			val;
 	PTPParams		*params = &(camera->pl->params);
-	GPContext 		*context = ((PTPData *) params->data)->context;
+	GPContext 		*context = ptp_context_get (params->data);
 
 	if (!ptp_operation_issupported(params, PTP_OC_NIKON_StartLiveView))
 		return GP_ERROR_NOT_SUPPORTED;
@@ -9041,7 +9041,7 @@ _put_Sony_Movie(CONFIG_PUT_ARGS)
 	PTPParams *params = &(camera->pl->params);
 	int val;
 	PTPPropValue value;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 	if (val)
@@ -9069,7 +9069,7 @@ _put_Sony_QX_Movie(CONFIG_PUT_ARGS)
 	PTPParams *params = &(camera->pl->params);
 	int val;
 	PTPPropValue value;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 	if (val)
@@ -9182,7 +9182,7 @@ _put_Nikon_Movie(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
 	int val, ret;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 	PTPPropValue value;
 
 	CR (gp_widget_get_value(widget, &val));
@@ -9336,7 +9336,7 @@ _put_OpenCapture(CONFIG_PUT_ARGS)
 	PTPParams *params = &(camera->pl->params);
 	int val;
 	int ret;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 	if (val) {
@@ -9671,7 +9671,7 @@ _pentax_readiness_preflight (PTPParams *params, PentaxConditions *conditions)
 			int slice;
 			for (slice = 0; slice < 10; slice++) {
 				usleep (10000);
-				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+				if (gp_context_cancel (ptp_context_get (params->data)) ==
 					GP_CONTEXT_FEEDBACK_CANCEL)
 					return GP_ERROR_CANCEL;
 			}
@@ -9715,7 +9715,7 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 	 * The PTP write succeeds but conditions may take longer to reflect
 	 * the new value, especially for WB and aperture. */
 	for (attempt = 1; attempt <= 10; attempt++) {
-		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+		if (gp_context_cancel (ptp_context_get (params->data)) ==
 			GP_CONTEXT_FEEDBACK_CANCEL) {
 			return GP_ERROR_CANCEL;
 		}
@@ -9769,7 +9769,7 @@ _pentax_verify_u16_property (PTPParams *params, uint32_t property,
 	uint16_t ret;
 
 	for (attempt = 1; attempt <= 10; attempt++) {
-		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+		if (gp_context_cancel (ptp_context_get (params->data)) ==
 			GP_CONTEXT_FEEDBACK_CANCEL)
 			return GP_ERROR_CANCEL;
 		usleep (100000);
@@ -11445,7 +11445,7 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 		if (result == GP_OK) {
 			result = GP_ERROR;
 			for (attempt = 1; attempt <= 5; attempt++) {
-				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+				if (gp_context_cancel (ptp_context_get (params->data)) ==
 				    GP_CONTEXT_FEEDBACK_CANCEL) {
 					result = GP_ERROR_CANCEL;
 					break;
@@ -11577,7 +11577,7 @@ _put_Pentax_DirectISO (CONFIG_PUT_ARGS)
 		if (result == GP_OK) {
 			result = GP_ERROR;
 			for (attempt = 1; attempt <= 5; attempt++) {
-				if (gp_context_cancel (((PTPData *)params->data)->context) ==
+				if (gp_context_cancel (ptp_context_get (params->data)) ==
 				    GP_CONTEXT_FEEDBACK_CANCEL) {
 					result = GP_ERROR_CANCEL;
 					break;
@@ -11647,13 +11647,13 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 	ret = ptp_pentax_get_all_conditions (params, &data, &size);
 	if (ret != PTP_RC_OK) {
 		free (data);
-		gp_context_error (((PTPData *)params->data)->context,
+		gp_context_error (ptp_context_get (params->data),
 			_("Pentax GetAllConditions failed with response 0x%04x."), ret);
 		return translate_ptp_result (ret);
 	}
 	if (size < 332) {
 		free (data);
-		gp_context_error (((PTPData *)params->data)->context,
+		gp_context_error (ptp_context_get (params->data),
 			_("Pentax GetAllConditions returned only %u bytes; at least 332 are required."),
 			size);
 		return GP_ERROR_CORRUPTED_DATA;
@@ -11664,16 +11664,16 @@ _put_Pentax_MinimumFocusDrive (CONFIG_PUT_ARGS)
 		&displacement));
 	GP_LOG_D ("Pentax minimum focus drive openAvNum=%u displacement=%d",
 		open_av_num, displacement);
-	gp_context_status (((PTPData *)params->data)->context,
+	gp_context_status (ptp_context_get (params->data),
 		_("Pentax minimum focus drive: openAvNum=%u, displacement=%d, opcode=0x9017, retries=0."),
 		open_av_num, displacement);
 	ret = ptp_pentax_focus_control_new (params, (uint32_t)displacement);
 	if (ret != PTP_RC_OK)
-		gp_context_error (((PTPData *)params->data)->context,
+		gp_context_error (ptp_context_get (params->data),
 			_("Pentax minimum focus drive (%d) failed with response 0x%04x."),
 			displacement, ret);
 	else
-		gp_context_status (((PTPData *)params->data)->context,
+		gp_context_status (ptp_context_get (params->data),
 			_("Pentax minimum focus drive returned response 0x%04x."), ret);
 	return translate_ptp_result (ret);
 }
@@ -11753,7 +11753,7 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 		if (cresult < GP_OK)
 			return cresult;
 		if (conditions.af_mode == 0) {
-			gp_context_error (((PTPData *)params->data)->context,
+			gp_context_error (ptp_context_get (params->data),
 				_("Pentax old focus drive requires the body to be "
 				"in an AF mode (AF/MF switch set to AF)."));
 			return GP_ERROR_NOT_SUPPORTED;
@@ -11772,17 +11772,17 @@ _put_Pentax_OldFocusDrive (CONFIG_PUT_ARGS)
 	/* IT2 FocusFineTune: old-path amount = |UI value| * 5; the buttons
 	 * use a single step, so the minimum command is 5. */
 	amount = 5U;
-	gp_context_status (((PTPData *)params->data)->context,
+	gp_context_status (ptp_context_get (params->data),
 		_("Pentax old focus drive: amount=%u, direction=%u (%s), opcode=0x9016, retries=0."),
 		amount, (unsigned)protocol_direction,
 		semantic_direction > 0 ? "Near" : "Far");
 	ret = ptp_pentax_focus_control (params, amount,
 		protocol_direction);
 	if (ret != PTP_RC_OK)
-		gp_context_error (((PTPData *)params->data)->context,
+		gp_context_error (ptp_context_get (params->data),
 			_("Pentax old focus drive failed with response 0x%04x."), ret);
 	else
-		gp_context_status (((PTPData *)params->data)->context,
+		gp_context_status (ptp_context_get (params->data),
 			_("Pentax old focus drive returned response 0x%04x."), ret);
 	return translate_ptp_result (ret);
 }
@@ -11810,7 +11810,7 @@ _put_Pentax_ModelAwareFocusDrive (CONFIG_PUT_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
-	gp_context_status (((PTPData *)params->data)->context,
+	gp_context_status (ptp_context_get (params->data),
 		_("Pentax model-aware focus dispatch: model=%u, family=%s."),
 		params->pentax.model_no,
 		pentax_model_uses_new_focus (params->pentax.model_no) ? "new" : "old");
@@ -11873,7 +11873,7 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 		}
 		if (size < 332) {
 			free (data);
-			gp_context_error (((PTPData *)params->data)->context,
+			gp_context_error (ptp_context_get (params->data),
 				_("Pentax GetAllConditions returned only %u bytes; at least 332 are required."),
 				size);
 			return GP_ERROR_CORRUPTED_DATA;
@@ -11886,10 +11886,10 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 			open_av_num, displacement);
 		ret = ptp_pentax_focus_control_new (params, (uint32_t)displacement);
 		if (ret != PTP_RC_OK)
-			gp_context_error (((PTPData *)params->data)->context,
+			gp_context_error (ptp_context_get (params->data),
 				_("Pentax manual focus drive (new) failed with response 0x%04x."), ret);
 		else
-			gp_context_status (((PTPData *)params->data)->context,
+			gp_context_status (ptp_context_get (params->data),
 				_("Pentax manual focus drive (new) returned response 0x%04x."), ret);
 	} else {
 		/* Old-focus family (K-1 II): 0x9016 with amount=5 and the
@@ -11899,15 +11899,15 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 
 		CR (pentax_old_focus_protocol_direction (direction, &old_direction));
 
-		gp_context_status (((PTPData *)params->data)->context,
+		gp_context_status (ptp_context_get (params->data),
 			_("Pentax manual focus drive (old): amount=%u, direction=%u (%s), opcode=0x9016."),
 			amount, old_direction, direction > 0 ? "Near" : "Far");
 		ret = ptp_pentax_focus_control (params, amount, old_direction);
 		if (ret != PTP_RC_OK)
-			gp_context_error (((PTPData *)params->data)->context,
+			gp_context_error (ptp_context_get (params->data),
 				_("Pentax manual focus drive (old) failed with response 0x%04x."), ret);
 		else
-			gp_context_status (((PTPData *)params->data)->context,
+			gp_context_status (ptp_context_get (params->data),
 				_("Pentax manual focus drive (old) returned response 0x%04x."), ret);
 	}
 	return translate_ptp_result (ret);
@@ -11958,7 +11958,7 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	if (ptpres != PTP_RC_OK)
 		return translate_ptp_result (ptpres);
 	if (live_view.u8 != 1) {
-		gp_context_error (((PTPData *)params->data)->context,
+		gp_context_error (ptp_context_get (params->data),
 			_("Pentax autofocus drive requires active PC live view."));
 		return GP_ERROR_NOT_SUPPORTED;
 	}
@@ -11968,7 +11968,7 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	/* Bounded proof that AF settles without creating a still-transfer
 	 * candidate. Never delete a candidate here: that would risk user data. */
 	for (attempt = 1; attempt <= 20; attempt++) {
-		if (gp_context_cancel (((PTPData *)params->data)->context) ==
+		if (gp_context_cancel (ptp_context_get (params->data)) ==
 		    GP_CONTEXT_FEEDBACK_CANCEL)
 			return GP_ERROR_CANCEL;
 		usleep (100000);
@@ -11981,7 +11981,7 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 			continue;
 		if (pentax_get_u32le (data + 36) != 0) {
 			free (data);
-			gp_context_error (((PTPData *)params->data)->context,
+			gp_context_error (ptp_context_get (params->data),
 				_("Pentax autofocus unexpectedly created a transfer candidate; refusing to discard it."));
 			return GP_ERROR_CAMERA_BUSY;
 		}
@@ -12333,7 +12333,7 @@ _get_Panasonic_Shutter(CONFIG_GET_ARGS) {
 	uint32_t listCount;
 	uint32_t *list;
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_ShutterSpeed, 4, &currentVal, &list, &listCount));
 
@@ -12426,7 +12426,7 @@ _get_Panasonic_ISO(CONFIG_GET_ARGS) {
 	uint32_t *list;
 	uint16_t valsize;
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_ISO, 4, &currentVal, &list, &listCount));
 
@@ -12500,7 +12500,7 @@ _get_Panasonic_AdjustGM(CONFIG_GET_ARGS) {
 	uint32_t currentVal = 0;
 	char buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	uint16_t valsize;
 	C_PTP_REP (ptp_panasonic_getdeviceproperty(params, PTP_DPC_PANASONIC_WhiteBalance_ADJ_GM, &valsize, &currentVal));
@@ -12541,7 +12541,7 @@ _get_Panasonic_AdjustAB(CONFIG_GET_ARGS) {
 	uint32_t currentVal = 0;
 	char buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	uint16_t valsize;
 	C_PTP_REP (ptp_panasonic_getdeviceproperty(params, PTP_DPC_PANASONIC_WhiteBalance_ADJ_AB, &valsize, &currentVal));
@@ -12583,7 +12583,7 @@ _get_Panasonic_ColorTemp(CONFIG_GET_ARGS) {
 	int	valset = 0;
 	char	buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_WhiteBalance_KSet, 2, &currentVal, &list, &listCount));
 
@@ -12654,7 +12654,7 @@ _get_Panasonic_AFMode(CONFIG_GET_ARGS) {
 	int	valset = 0;
 	char	buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_AFArea_AFModeParam, 2, &currentVal, &list, &listCount));
 
@@ -12749,7 +12749,7 @@ _get_Panasonic_ExpMode(CONFIG_GET_ARGS) {
 	int	valset = 0;
 	char	buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, 0x06000011, 2, &currentVal, &list, &listCount));
 
@@ -12820,7 +12820,7 @@ _get_Panasonic_Recording(CONFIG_GET_ARGS) {
 	char buf[32];
 	uint32_t i;
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	uint16_t valsize;
 	C_PTP_REP (ptp_panasonic_getrecordingstatus(params, 0x12000013, &valsize, &currentVal));
@@ -12894,7 +12894,7 @@ _get_Panasonic_Whitebalance(CONFIG_GET_ARGS) {
 	int	valset = 0;
 	char	buf[32];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_WhiteBalance_Param, 2, &currentVal, &list, &listCount));
 
@@ -12952,7 +12952,7 @@ _get_Panasonic_Exposure(CONFIG_GET_ARGS) {
 	uint32_t i;
 	char	buf[16];
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, PTP_DPC_PANASONIC_Exposure, 2, &currentVal, &list, &listCount));
 
@@ -12996,7 +12996,7 @@ _put_Panasonic_Bulb(CONFIG_PUT_ARGS)
     PTPParams *params = &(camera->pl->params);
     int val;
     int ret;
-    GPContext *context = ((PTPData *) params->data)->context;
+    GPContext *context = ptp_context_get (params->data);
 
     /* Read toggle switch value (1 = start, 0 = stop) */
     CR (gp_widget_get_value(widget, &val));
@@ -13046,7 +13046,7 @@ _get_Panasonic_LiveViewSize(CONFIG_GET_ARGS) {
 	unsigned int		i;
 	char			buf[100];
 	PTPParams		*params = &(camera->pl->params);
-	GPContext		*context = ((PTPData *) params->data)->context;
+	GPContext		*context = ptp_context_get (params->data);
 	PanasonicLiveViewSize	liveviewsize, *liveviewsizes = NULL;
 	unsigned int		nrofliveviewsizes = 0;
 
@@ -13091,7 +13091,7 @@ _get_Panasonic_FNumber(CONFIG_GET_ARGS) {
 	uint16_t valsize;
 	uint32_t *list;
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, 0x2000040, 2, &currentVal, &list, &listCount));
 
@@ -13153,7 +13153,7 @@ _get_Panasonic_ImageFormat(CONFIG_GET_ARGS) {
 	uint32_t listCount;
 	uint32_t *list;
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_panasonic_getdevicepropertydesc(params, 0x20000A2, 2, &currentVal, &list, &listCount));
 
@@ -13193,13 +13193,13 @@ _put_Canon_EOS_Bulb(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
 	int val;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 	if (val) {
 		int ret = ptp_canon_eos_bulbstart (params);
 		if (ret == PTP_RC_GeneralError) {
-			gp_context_error (((PTPData *) camera->pl->params.data)->context,
+			gp_context_error (ptp_context_get (camera->pl->params.data),
 			_("For bulb capture to work, make sure the mode dial is switched to 'M' and set 'shutterspeed' to 'bulb'."));
 			return translate_ptp_result (ret);
 		}
@@ -13226,7 +13226,7 @@ _put_Canon_EOS_UILock(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
 	int val;
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value(widget, &val));
 
@@ -13257,7 +13257,7 @@ static int
 _put_Canon_EOS_PopupFlash(CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &(camera->pl->params);
-	GPContext *context = ((PTPData *) params->data)->context;
+	GPContext *context = ptp_context_get (params->data);
 
 	C_PTP_REP (ptp_canon_eos_popupflash (params));
 	return GP_OK;
@@ -13306,7 +13306,7 @@ static int
 _put_Nikon_Thumbsize(CONFIG_PUT_ARGS) {
 	char *buf;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext	*context = ((PTPData *) params->data)->context;
+	GPContext	*context = ptp_context_get (params->data);
 
 	CR (gp_widget_get_value  (widget, &buf));
 	if (!strcmp(buf,_("normal"))) {
@@ -13352,7 +13352,7 @@ _put_CaptureTarget(CONFIG_PUT_ARGS) {
 	unsigned int	i;
 	char		*val;
 	PTPParams	*params = &(camera->pl->params);
-	GPContext	*context = ((PTPData *) params->data)->context;
+	GPContext	*context = ptp_context_get (params->data);
 	char		buf[1024];
 
 	CR (gp_widget_get_value(widget, &val));

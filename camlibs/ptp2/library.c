@@ -60,8 +60,8 @@ static int normal_timeout = USB_NORMAL_TIMEOUT;
 #define USB_TIMEOUT_CAPTURE 100000
 static int capture_timeout = USB_TIMEOUT_CAPTURE;
 
-#define	SET_CONTEXT(camera, ctx) ((PTPData *) camera->pl->params.data)->context = ctx
-#define	SET_CONTEXT_P(p, ctx) ((PTPData *) p->data)->context = ctx
+#define	SET_CONTEXT(camera, ctx) ptp_context_set ((PTPData *) camera->pl->params.data, ctx)
+#define	SET_CONTEXT_P(p, ctx) ptp_context_set ((PTPData *) (p)->data, ctx)
 
 #define STORAGE_FOLDER_PREFIX		"store_"
 
@@ -3102,7 +3102,7 @@ ptp_error_func (void *data, const char *format, va_list args)
 	char buf[2048];
 
 	vsnprintf (buf, sizeof (buf), format, args);
-	gp_context_error (ptp_data->context, "%s", buf);
+	gp_context_error (ptp_context_get (ptp_data), "%s", buf);
 }
 
 static int
@@ -3493,6 +3493,7 @@ exitfailed:
 			ptp_ptpip_disconnect (params);
 		}
 
+		ptp_context_set (params->data, NULL);
 		free (params->data);
 		free (camera->pl); /* also frees params */
 		params = NULL;
@@ -9038,7 +9039,6 @@ nikon_curve_get (CameraFilesystem *fs, const char *folder, const char *filename,
 	char		*ntcfile;
 	char		*charptr;
 	double		*doubleptr;
-	((PTPData *) camera->pl->params.data)->context = context;
 	SET_CONTEXT(camera, context);
 
 	C_PTP_REP (ptp_nikon_curve_download (params, &xdata, &size));
@@ -9493,7 +9493,7 @@ find_storage_and_handle_from_path(PTPParams *params, const char *folder, uint32_
 	if (strncmp(folder, "/"STORAGE_FOLDER_PREFIX, strlen("/"STORAGE_FOLDER_PREFIX)) ||
 	    strlen(folder) < strlen("/"STORAGE_FOLDER_PREFIX) + 8
 	) {
-		gp_context_error (((PTPData*)params->data)->context, _("You need to specify a folder starting with /store_xxxxxxxxx/"));
+		gp_context_error (ptp_context_get (params->data), _("You need to specify a folder starting with /store_xxxxxxxxx/"));
 		return GP_ERROR;
 	}
 

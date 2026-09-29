@@ -2,6 +2,16 @@ gp_test_env = gp_port_test_env + [
   'CAMLIBS=@0@'.format(':'.join(camlib_paths)),
 ]
 
+ptp_context_test = executable(
+  'test-ptp-context',
+  'test-ptp-context.c',
+  '../camlibs/ptp2/ptp-context.c',
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: [libgphoto2_dep, dependency('threads')],
+)
+
+test('test-ptp-context', ptp_context_test)
+
 test_pentax_utils_exe = executable(
   'test-pentax-utils',
   'test-pentax-utils.c',
