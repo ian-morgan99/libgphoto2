@@ -11055,6 +11055,7 @@ camera_init (Camera *camera, GPContext *context)
 	params->debug_func = ptp_debug_func;
 	params->error_func = ptp_error_func;
 	C_MEM (params->data = calloc (1, sizeof (PTPData)));
+	ptp_context_owner_init (params->data);
 	((PTPData *) params->data)->camera = camera;
 	params->byteorder = PTP_DL_LE;
 	if (params->byteorder == PTP_DL_LE)

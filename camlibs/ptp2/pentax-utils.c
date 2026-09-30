@@ -1221,6 +1221,17 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			usleep (200 * 1000);
 			continue;
 		}
+		/* A successful transport call is not sufficient evidence of an empty
+		 * output queue. The output-format obligation (+524) and candidate
+		 * handle (+36) must come from a complete conditions frame. */
+		if (!cdata || csize < 528) {
+			free (cdata);
+			cdata = NULL;
+			GP_LOG_E ("reconciliation received a short conditions frame (%lu bytes)",
+				(unsigned long)csize);
+			ret = GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
 
 		/* The output contract and candidate flag are observations from one
 		 * serialized conditions sample. RAW+JPEG means one companion must be
@@ -1259,9 +1270,9 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 
 		/* Bound on candidate count. */
 		if (count >= max_count) {
-			GP_LOG_D ("reconciliation bound reached (%d extras); "
-				"leaving candidate %u for next capture", max_count, handle);
-			done = 1;
+			GP_LOG_E ("reconciliation bound reached (%d extras); "
+				"candidate %u remains pending", max_count, handle);
+			ret = GP_ERROR_TIMEOUT;
 			goto out;
 		}
 
@@ -1269,9 +1280,9 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 		clock_gettime (CLOCK_MONOTONIC, &now);
 		if ((now.tv_sec - start.tv_sec) * 1000 +
 		    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
-			GP_LOG_D ("reconciliation time budget (%u ms) exhausted; "
-				"leaving candidate %u", max_ms, handle);
-			done = 1;
+			GP_LOG_E ("reconciliation time budget (%u ms) exhausted; "
+				"candidate %u remains pending", max_ms, handle);
+			ret = GP_ERROR_TIMEOUT;
 			goto out;
 		}
 

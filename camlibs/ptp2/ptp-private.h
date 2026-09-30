@@ -182,6 +182,10 @@ struct _CameraPrivateLibrary {
 
 struct _PTPData {
 	Camera *camera;
+	/* Unique lifetime identity for the thread-local GPContext cache. PTPData
+	 * addresses may be reused after camera teardown while another thread still
+	 * has a cached binding for the old session. */
+	uint32_t context_generation;
 };
 typedef struct _PTPData PTPData;
 

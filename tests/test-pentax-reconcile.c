@@ -54,6 +54,7 @@ typedef struct {
         const char *names[8];
         /* Fault injection. */
         int conditions_fail_first;   /* fail the first N get_conditions calls */
+        int short_conditions;        /* successful call with incomplete frame */
         int conditions_empty_first;  /* report empty for the first N reads */
         int writing_format;          /* +524: 2 means RAW+JPEG */
         int conditions_calls;
@@ -80,7 +81,8 @@ mock_get_conditions (void *user_data, unsigned char **data, size_t *size)
                 *size = 0;
                 return GP_ERROR_IO;
         }
-        size_t blob_size = mock->writing_format ? 576 : PENTAX_CONDITIONS_MIN_SIZE;
+        size_t blob_size = mock->short_conditions ? PENTAX_CONDITIONS_MIN_SIZE :
+                (mock->writing_format ? 576 : 528);
         blob = calloc (1, blob_size);
         if (!blob) {
                 *data = NULL;
@@ -294,9 +296,8 @@ main (void)
         CHECK (count == 1);
         CHECK (mock.conditions_calls >= 3);
 
-        /* 7. Bound exhaustion: more candidates than max_count; the loop
-         * stops at the bound and reports success with the remainder left
-         * for the next-capture stale-candidate barrier. */
+        /* 7. Bound exhaustion is unresolved output, never successful
+         * completion. Preserve the candidate for the next-capture barrier. */
         mock_reset (&mock);
         mock.handles[0] = 600;
         mock.handles[1] = 601;
@@ -304,7 +305,7 @@ main (void)
         mock.handle_count = 3;
         count = -1;
         ret = pentax_reconcile_extra_candidates (&ops, 2, 60000, 0, names, &count);
-        CHECK (ret == GP_OK);
+        CHECK (ret == GP_ERROR_TIMEOUT);
         CHECK (count == 2);
         CHECK (mock.handle_count == 1);
         CHECK (mock.handles[0] == 602);
@@ -330,9 +331,21 @@ main (void)
         CHECK (pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, NULL)
                 == GP_ERROR_BAD_PARAMETERS);
 
-        /* 10. Unreadable/short conditions: get_conditions reports a short
-         * blob via the GP_OK path is not possible in this mock; instead
-         * verify that a failed info read never blocks reconciliation. */
+        /* 10. A short successful conditions response is not proof of an
+         * empty queue. Fail without transferring or deleting anything. */
+        mock_reset (&mock);
+        mock.handles[0] = 801;
+        mock.handle_count = 1;
+        mock.short_conditions = 1;
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+        CHECK (ret == GP_ERROR_CORRUPTED_DATA);
+        CHECK (count == 0);
+        CHECK (mock.transfer_calls == 0);
+        CHECK (mock.delete_calls == 0);
+
+        /* A failed candidate-info read remains a non-destructive error
+         * boundary only when the normal path is otherwise eligible. */
         mock_reset (&mock);
         mock.handles[0] = 800;
         mock.handle_count = 1;

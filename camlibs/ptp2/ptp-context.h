@@ -7,7 +7,10 @@
 /* PTPParams->data is shared by all operations on a Camera. The operation
  * context is not: callers may invoke the same Camera from multiple threads.
  * Keep contexts thread-local so an overlapping operation cannot replace or
- * outlive the context used by an in-flight USB transfer. */
+ * outlive the context used by an in-flight USB transfer. Each PTPData lifetime
+ * receives a unique generation so a stale thread-local entry cannot match a
+ * later session that reuses the same PTPData address. */
+void ptp_context_owner_init (void *owner);
 void ptp_context_set (void *owner, GPContext *context);
 GPContext *ptp_context_get (void *owner);
 
