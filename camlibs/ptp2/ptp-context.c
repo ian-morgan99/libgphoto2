@@ -59,6 +59,14 @@ ptp_context_set (void *owner, GPContext *context)
 			}
 			return;
 		}
+		/* The same address with a different generation is a new owner
+		 * lifetime. Reclaim this thread's obsolete slot instead of allowing
+		 * repeated camera reconnects to exhaust the fixed TLS table. */
+		if (bindings[i].owner == owner) {
+			bindings[i].owner = NULL;
+			bindings[i].generation = 0;
+			bindings[i].context = NULL;
+		}
 		if (!bindings[i].owner && free_slot == PTP_CONTEXT_BINDINGS)
 			free_slot = i;
 	}

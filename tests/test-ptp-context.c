@@ -71,6 +71,11 @@ main (void)
 	while (!worker_bound)
 		pthread_cond_wait (&lifecycle_cond, &lifecycle_mutex);
 	ptp_context_owner_init (&owner); /* simulate allocator address reuse */
+	/* Rebind the current thread too; stale generations for this address must
+	 * be reclaimed rather than consuming another TLS slot per reconnect. */
+	ptp_context_set (&owner, (GPContext *)&main_context);
+	if (ptp_context_get (&owner) != (GPContext *)&main_context)
+		failed = 1;
 	owner_recreated = 1;
 	pthread_cond_broadcast (&lifecycle_cond);
 	pthread_mutex_unlock (&lifecycle_mutex);
