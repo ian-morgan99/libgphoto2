@@ -147,6 +147,12 @@ main (void)
 	uint8_t fallback = 99;
 	MockTransfer mock;
 	PentaxTransferOps transfer_operations;
+	unsigned int i;
+
+	CHECK (pentax_capture_cleanup_decision (0) ==
+		PENTAX_CAPTURE_CLEANUP_ABORT);
+	CHECK (pentax_capture_cleanup_decision (1) ==
+		PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE);
 
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
@@ -770,7 +776,86 @@ main (void)
 	put_u32le (condition_data, 32, 0);
 	put_u32le (condition_data, 36, 9);
 	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT));
+	CHECK (!pentax_admission_probe_ok (condition_data, sizeof (condition_data),
 		PENTAX_ADMISSION_OUTPUT_SAFE));
+	put_u32le (condition_data, 36, 0);
+	put_u32le (condition_data, 104, 0);
+	CHECK (pentax_admission_probe_ok (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT));
+
+	/* Every fail-closed admission cause must be separately diagnosable and
+	 * carry a non-destructive recovery action. */
+	CHECK (pentax_admission_block_reason (NULL, 0,
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_UNREADABLE);
+	memset (condition_data, 0, sizeof (condition_data));
+	put_u32le (condition_data, 104, PENTAX_CONDITION_ACTIVITY_PROCESSING);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_OUTPUT_SAFE) == PENTAX_ADMISSION_BLOCK_NONE);
+	put_u32le (condition_data, 104, 0);
+	put_u32le (condition_data, 32, 1);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE);
+	put_u32le (condition_data, 32, 0);
+	put_u32le (condition_data, 36, 23);
+	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT);
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT), "selector-present"));
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT), "recover-output-with-ownership") != NULL);
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY), "without-timed-retry") != NULL);
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_NONE), "none"));
+
+	/* Camera readiness can discharge a recovery flag only when there is no
+	 * accepted capture whose output obligation remains unresolved.  This is the
+	 * production recovery decision used before another InitiateCapture. */
+	CHECK (pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_NONE, 0));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_NONE, 1));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED, 1));
+	CHECK (!pentax_recovery_probe_can_clear (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0));
+	CHECK (!pentax_capture_output_obligation_resolved (1, 0, 0));
+	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
+	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));
+	CHECK (pentax_capture_output_obligation_resolved (0, 0, 0));
+	CHECK (!pentax_candidate_output_published (0, 1, 1));
+	CHECK (!pentax_candidate_output_published (1, 0, 1));
+	CHECK (!pentax_candidate_output_published (1, 1, 0));
+	CHECK (pentax_candidate_output_published (1, 1, 1));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x2001));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x2019));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02f9));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02fa));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02fb));
+	CHECK (pentax_capture_initiate_response_ambiguous (0x02ff));
+	CHECK (!pentax_capture_initiate_response_ambiguous (0x0300));
+	CHECK (!strcmp (pentax_admission_block_reason_name (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
+		"output-obligation-unresolved"));
+	CHECK (strstr (pentax_admission_recovery_action (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
+		"keep-shutter-blocked") != NULL);
+	/* A short/unknown format must not silently become a one-file capture. */
+	CHECK (!pentax_capture_output_contract_known (NULL, 0));
+	CHECK (!pentax_capture_output_contract_known (condition_data, 527));
+	for (i = 0; i <= 3; i++) {
+		put_u32le (condition_data, 524, i);
+		CHECK (pentax_capture_output_contract_known (condition_data,
+			sizeof (condition_data)));
+		CHECK (pentax_expected_extra_candidates (condition_data,
+			sizeof (condition_data)) == (i == 2 ? 1U : 0U));
+	}
+	put_u32le (condition_data, 524, 4);
+	CHECK (!pentax_capture_output_contract_known (condition_data,
+		sizeof (condition_data)));
 
 	/* Stale-candidate baseline (issue #34): the pending transfer handle is
 	 * only valid when the blob is complete and field 32 flags an active
