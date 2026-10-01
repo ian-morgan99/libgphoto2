@@ -797,15 +797,15 @@ main (void)
 	put_u32le (condition_data, 104, 0);
 	put_u32le (condition_data, 32, 1);
 	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
-		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_CAPTURE_ACTIVE);
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE);
 	put_u32le (condition_data, 32, 0);
 	put_u32le (condition_data, 36, 23);
 	CHECK (pentax_admission_block_reason (condition_data, sizeof (condition_data),
-		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE);
+		PENTAX_ADMISSION_STRICT) == PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT);
 	CHECK (!strcmp (pentax_admission_block_reason_name (
-		PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE), "pending-candidate"));
+		PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT), "selector-present"));
 	CHECK (strstr (pentax_admission_recovery_action (
-		PENTAX_ADMISSION_BLOCK_PENDING_CANDIDATE), "never-delete") != NULL);
+		PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT), "recover-output-with-ownership") != NULL);
 	CHECK (strstr (pentax_admission_recovery_action (
 		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY), "without-timed-retry") != NULL);
 	CHECK (!strcmp (pentax_admission_block_reason_name (
