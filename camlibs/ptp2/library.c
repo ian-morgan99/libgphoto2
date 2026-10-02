@@ -6375,6 +6375,8 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	int initiated = 0, have_candidate = 0;
 	int reconciled_output_complete = 1;
 	int port_timeout_raised = 0;
+	PentaxConditions pre_capture_conditions = {0};
+	int pre_capture_conditions_known = 0;
 	unsigned int expected_extra_candidates = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
@@ -6588,6 +6590,23 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		 * capture therefore let RAW+JPEG return after its JPEG member. */
 		expected_extra_candidates =
 			pentax_expected_extra_candidates (bdata, bsize);
+		/* Preserve the same complete readiness frame for the exposure wait.
+		 * Once InitiateCapture is accepted, the camera may answer condition
+		 * reads as busy or omit the Bulb timer.  Throwing this frame away
+		 * forced the post-initiate path back to the short default budget, which
+		 * is exactly how a 70 s exposure could time out around 60 s. */
+		if (pentax_parse_conditions (bdata, bsize,
+			&pre_capture_conditions) == GP_OK) {
+			pre_capture_conditions_known = 1;
+			GP_LOG_D ("pre-capture wait conditions: bulb=%u astro-limit=%u "
+				"activity=0x%08x",
+				pre_capture_conditions.bulb_timer_seconds,
+				pre_capture_conditions.astro_limit_seconds,
+				pre_capture_conditions.activity_flags);
+		} else {
+			GP_LOG_E ("pre-capture conditions could not be parsed for "
+				"capture wait budgeting (%u bytes)", bsize);
+		}
 		free (bdata);
 		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
 			expected_extra_candidates);
@@ -6645,17 +6664,27 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * retried with a bounded policy: once the exposure has been
 	 * initiated we must never silently fall back to the short base
 	 * timeout and abort a valid long exposure (issue #32). */
-	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-	unsigned int exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	unsigned int capture_timeout_ms = pre_capture_conditions_known ?
+		pentax_capture_timeout_ms (&pre_capture_conditions) :
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	unsigned int exposure_phase_ms = pre_capture_conditions_known ?
+		pentax_exposure_phase_ms (&pre_capture_conditions) :
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE;
 	uint32_t last_activity_flags = 0;
-	int conditions_known = 0;
-	int needs_idle_wait = 0;
+	int conditions_known = pre_capture_conditions_known;
+	int needs_idle_wait = pre_capture_conditions_known ?
+		pentax_capture_needs_idle_wait (&pre_capture_conditions) : 0;
 	{
 		PentaxConditions conditions;
 		int attempt;
 
 		memset (&conditions, 0, sizeof (conditions));
-		for (attempt = 0; attempt < 3 && !conditions_known; attempt++) {
+		/* A valid pre-capture frame already gives us a safe budget.  Do not
+		 * spend three default-timeout reads trying to refresh it before the
+		 * long-read timeout is raised: an exposing Pentax can legitimately
+		 * answer those reads only after the exposure completes. */
+		for (attempt = 0; attempt < 3 && !pre_capture_conditions_known;
+			attempt++) {
 			if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
 				ret = GP_ERROR_CANCEL;
 				goto out;
@@ -6677,8 +6706,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 				usleep (100 * 1000);
 				continue;
 			}
-			capture_timeout_ms = pentax_capture_timeout_ms (&conditions);
-			exposure_phase_ms = pentax_exposure_phase_ms (&conditions);
+			{
+				unsigned int post_timeout =
+					pentax_capture_timeout_ms (&conditions);
+				unsigned int post_exposure =
+					pentax_exposure_phase_ms (&conditions);
+				if (post_timeout > capture_timeout_ms)
+					capture_timeout_ms = post_timeout;
+				if (post_exposure > exposure_phase_ms)
+					exposure_phase_ms = post_exposure;
+			}
 			/* The exposure phase must not exceed the total budget. */
 			if (exposure_phase_ms > capture_timeout_ms)
 				exposure_phase_ms = capture_timeout_ms;
@@ -6739,34 +6776,28 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		size = 0;
 		ptpres = ptp_pentax_get_all_conditions (params, &data, &size);
 		if (ptpres != PTP_RC_OK || size < PENTAX_CONDITIONS_MIN_SIZE) {
-			/* A transient conditions failure must not abort a
-			 * live long exposure (issue #32 / review #4);
-			 * retry within the wait budget, but only a bounded
-			 * number of times so a wedged camera still times
-			 * out with a clear error. */
-			if (++conditions_failures <= 5) {
+			/* A Pentax can return DeviceBusy, or a short frame, throughout
+			 * the exposure.  A fixed five-read limit made the effective Bulb
+			 * limit depend on transport timing instead of the requested
+			 * duration.  Keep retrying until the already-computed total budget
+			 * expires; that remains fail-closed and bounded. */
+			conditions_failures++;
+			if (conditions_failures <= 5 || !(conditions_failures % 10)) {
 				if (ptpres != PTP_RC_OK)
-					GP_LOG_D ("conditions read failed "
-						"in-flight (ptp 0x%04x); "
-						"retry %d/5", ptpres,
-						conditions_failures);
+					GP_LOG_D ("conditions read failed in-flight "
+						"(ptp 0x%04x); retry %d within %u ms budget",
+						ptpres, conditions_failures, capture_timeout_ms);
 				else
-					GP_LOG_D ("conditions read returned "
-						"short data (%u bytes) "
-						"in-flight; retry %d/5",
-						(unsigned)size,
-						conditions_failures);
-				/* Back off between retries so a wedged camera
-				 * is not busy-spun; waiting_for_timeout
-				 * still bounds the total wait. */
-				waiting_for_timeout (&back_off_wait, started,
-					capture_timeout_ms);
-				continue;
+					GP_LOG_D ("conditions read returned short data "
+						"(%u bytes) in-flight; retry %d within %u ms budget",
+						(unsigned)size, conditions_failures,
+						capture_timeout_ms);
 			}
-			GP_LOG_E ("conditions unreadable %d times during "
-				"capture wait; aborting", conditions_failures);
-			ret = translate_ptp_result (ptpres);
-			goto out;
+			/* Back off between retries so a wedged camera is not busy-spun;
+			 * waiting_for_timeout still bounds the total wait. */
+			waiting_for_timeout (&back_off_wait, started,
+				capture_timeout_ms);
+			continue;
 		}
 		last_activity_flags = pentax_get_u32le (data + 104);
 		if (pentax_get_u32le (data + 32) == 1) {

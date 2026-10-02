@@ -5288,7 +5288,7 @@ _put_Ricoh_ShutterSpeed(CONFIG_PUT_ARGS) {
 		return GP_OK;
 	}
 	if (pentax_parse_shutter_duration (value_str, &duration_seconds) == 0) {
-		/* Whole-second timer value ("2m" for a 2-minute Bulb): the wire
+		/* Whole-second timer value ("02:00" for a 2-minute Bulb): the wire
 		 * layout is numerator in the low 32 bits, denominator in the high
 		 * 32 bits, so seconds map to (1 << 32) | seconds. */
 		propval->u64 = ((uint64_t)1<<32) | duration_seconds;
