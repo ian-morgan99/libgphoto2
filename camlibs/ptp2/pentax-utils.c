@@ -126,7 +126,7 @@ pentax_admission_block_reason (const unsigned char *data, size_t size,
 	if (policy == PENTAX_ADMISSION_STRICT &&
 	    (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE))
 		return PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY;
-	if (capture)
+	if (capture == 1)
 		return PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE;
 	if (candidate)
 		return PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT;
