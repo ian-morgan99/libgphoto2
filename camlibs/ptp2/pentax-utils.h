@@ -25,6 +25,7 @@
 #define PENTAX_UTILS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* Bounded capture-wait defaults. These are shared by the production path and
  * the deterministic Pentax timeout tests. */
@@ -33,6 +34,23 @@
 #define PENTAX_PIXEL_SHIFT_MULTIPLIER 4
 #define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
 #define PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK (2U * 60 * 1000)
+#define PENTAX_CONDITIONS_MIN_SIZE 528
+
+typedef struct {
+	unsigned char *data;
+	size_t size;
+	size_t capacity;
+	size_t offset;
+} PentaxCaptureBuffer;
+
+typedef struct {
+	void *user_data;
+	uint32_t max_block_size;
+	int (*get_command) (void *, uint8_t *, int32_t *);
+	int (*get_block) (void *, uint32_t, unsigned char **, uint32_t *);
+	int (*is_cancelled) (void *);
+	int (*is_timed_out) (void *);
+} PentaxTransferOps;
 
 /* Pentax condition flags for activity states that make mutating vendor
  * operations unsafe after a reconnect (issue #33). */
@@ -222,5 +240,17 @@ pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
 /* Pentax admission recovery action. */
 const char *
 pentax_admission_recovery_action (PentaxAdmissionBlockReason reason);
+
+typedef struct {
+	void *user_data;
+	int (*get_conditions) (void *, unsigned char **, size_t *);
+	int (*get_candidate_info) (void *, unsigned char **, size_t *);
+	int (*transfer_candidate) (void *, PentaxCaptureBuffer *);
+	int (*delete_candidate) (void *);
+	int (*is_cancelled) (void *);
+} PentaxReconcileOps;
+
+int pentax_reconcile_extra_candidates (const PentaxReconcileOps *, int,
+	unsigned int, char (*)[128], int *);
 
 #endif /* PENTAX_UTILS_H */
