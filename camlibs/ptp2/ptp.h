@@ -4079,6 +4079,18 @@ struct _PTPParams {
 		 * transferred/finalized/published. Camera readiness alone cannot
 		 * discharge this obligation (Polaris issue #149). */
 		int capture_output_pending;
+		/* Research-only standard actions/bulb state.  A start action leaves
+		 * 0x9011 in flight until the matching stop action; the normal capture
+		 * lifecycle then owns candidate transfer, reconciliation and publication.
+		 * Keep the stop edge separate so an ambiguous/already-terminated
+		 * response can never cause a second 0x9012. */
+		int bulb_action_active;
+		int bulb_action_stop_requested;
+		unsigned int bulb_action_expected_extra_candidates;
+		unsigned int bulb_action_capture_timeout_ms;
+		unsigned int bulb_action_exposure_phase_ms;
+		int bulb_action_needs_idle_wait;
+		uint32_t bulb_action_release_mode;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;

@@ -128,6 +128,12 @@ main (void)
 	int32_t displacement = 0;
 	PentaxCaptureBuffer buffer = {0};
 	PentaxConditions conditions, unchanged;
+
+	CHECK (pentax_bulb_action_mode_supported (PENTAX_EXP_MODE_BULB));
+	CHECK (pentax_bulb_action_mode_supported (PENTAX_EXP_MODE_BULB_LENS));
+	CHECK (pentax_bulb_action_mode_supported (PENTAX_EXP_MODE_ASTROTRACER));
+	CHECK (!pentax_bulb_action_mode_supported (8));
+	CHECK (!pentax_bulb_action_mode_supported (4));
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};

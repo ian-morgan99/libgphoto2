@@ -67,6 +67,18 @@ pentax_get_u32le (const unsigned char *data)
 	       ((uint32_t)data[3] << 24);
 }
 
+int
+pentax_bulb_action_mode_supported (uint32_t exposure_mode)
+{
+	/* Image Transmitter 2's release-mode selection uses 2 for B, lens-B
+	 * and Astro Tracer when the camera-timed Bulb flag is clear.  Keep this
+	 * predicate small and explicit: the generic action must never send a
+	 * held-shutter command in an ordinary M/Tv/Av mode. */
+	return exposure_mode == PENTAX_EXP_MODE_BULB ||
+	       exposure_mode == PENTAX_EXP_MODE_BULB_LENS ||
+	       exposure_mode == PENTAX_EXP_MODE_ASTROTRACER;
+}
+
 unsigned int
 pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 {

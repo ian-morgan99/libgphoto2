@@ -6400,13 +6400,21 @@ pentax_capture_cancel (void *user_data)
         return gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL;
 }
 
+typedef enum {
+	PENTAX_CAPTURE_COMPLETE = 0,
+	PENTAX_CAPTURE_BULB_START,
+	PENTAX_CAPTURE_BULB_FINALIZE
+} PentaxCaptureMode;
 
 static int
-camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
+camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
+	GPContext *context, PentaxCaptureMode mode)
 {
 	static unsigned long long next_capture_id;
 	unsigned long long capture_id = __sync_add_and_fetch (&next_capture_id, 1);
 	PTPParams *params = &camera->pl->params;
+	int bulb_action_start = mode == PENTAX_CAPTURE_BULB_START;
+	int bulb_action_finalize = mode == PENTAX_CAPTURE_BULB_FINALIZE;
 	PentaxCaptureBuffer capture = {0};
 	struct timeval started;
 	unsigned char *data = NULL;
@@ -6422,6 +6430,11 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	PentaxConditions pre_capture_conditions = {0};
 	int pre_capture_conditions_known = 0;
 	unsigned int expected_extra_candidates = 0;
+	unsigned int capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	unsigned int exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+	uint32_t last_activity_flags = 0;
+	int conditions_known = 0;
+	int needs_idle_wait = 0;
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6441,7 +6454,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		params->pentax.capture_output_pending);
 	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: enter", capture_id);
-	if (params->pentax.recovery_required) {
+	if (bulb_action_finalize) {
+		if (!params->pentax.bulb_action_active ||
+		    !params->pentax.bulb_action_stop_requested ||
+		    params->pentax.transfer_state != PTP_PENTAX_TRANSFER_TRIGGERED ||
+		    !params->pentax.capture_output_pending) {
+			gp_context_error (context,
+				_("Pentax Bulb stop has no matching active start; refusing to send another shutter command."));
+			return GP_ERROR_CAMERA_BUSY;
+		}
+	} else if (params->pentax.recovery_required) {
 		/* The flag is set once reconciliation sees the camera busy
 		 * or conditions unreadable. Rather than locking captures out
 		 * until process restart, re-probe: a camera that has gone
@@ -6520,7 +6542,9 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			return GP_ERROR_CAMERA_BUSY;
 		}
 	}
-	if (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE) {
+	if (!bulb_action_finalize &&
+	    (params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE ||
+	     (bulb_action_start && params->pentax.bulb_action_active))) {
 		fprintf (stderr, "[pentax-recovery] capture=%llu path=transfer-state "
 			"reason=operation-in-progress transfer=%d accepted=0 "
 			"action=wait-for-owner-to-complete; if-owner-is-lost-preserve-output-before-rebind\n",
@@ -6535,16 +6559,17 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		focus_mode = 3;
 	SET_CONTEXT_P (params, context);
 
-	/* Refuse to fire when a candidate from a previous request is still
-	 * pending: without a generation ID the first observed handle after
-	 * InitiateCapture could be that stale image, mislabelling exposure
-	 * N-1 as N (issue #34).  This must run BEFORE InitiateCapture so
-	 * the shutter is never triggered on a busy camera.
-	 *
-	 * A pre-existing candidate has no generation identifier, so it cannot be
-	 * proved to belong to this request.  Never consume or delete it here: doing
-	 * so can silently discard a file from an earlier application/session. */
-	{
+	if (!bulb_action_finalize) {
+		/* Refuse to fire when a candidate from a previous request is still
+		 * pending: without a generation ID the first observed handle after
+		 * InitiateCapture could be that stale image, mislabelling exposure
+		 * N-1 as N (issue #34).  This must run BEFORE InitiateCapture so
+		 * the shutter is never triggered on a busy camera.
+		 *
+		 * A pre-existing candidate has no generation identifier, so it cannot be
+		 * proved to belong to this request.  Never consume or delete it here: doing
+		 * so can silently discard a file from an earlier application/session. */
+		{
 		unsigned char *bdata = NULL;
 		unsigned int bsize = 0;
 		uint32_t baseline_candidate = 0, baseline_capture = 0;
@@ -6651,31 +6676,74 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			GP_LOG_E ("pre-capture conditions could not be parsed for "
 				"capture wait budgeting (%u bytes)", bsize);
 		}
+		if (bulb_action_start &&
+		    (!pre_capture_conditions_known ||
+		     !pentax_bulb_action_mode_supported (
+			pre_capture_conditions.exposure_mode))) {
+			GP_LOG_E ("pentax-bulb: refusing start outside a known B/B-lens/"
+				"Astro exposure mode");
+			params->pentax.recovery_required = pre_capture_conditions_known ?
+				params->pentax.recovery_required : 1;
+			free (bdata);
+			gp_context_error (context,
+				_("Pentax Bulb action requires a readable B, lens-B or Astro exposure mode."));
+			return pre_capture_conditions_known ? GP_ERROR_NOT_SUPPORTED :
+				GP_ERROR_CAMERA_BUSY;
+		}
+		if (bulb_action_start &&
+		    (pre_capture_conditions.capability_flags &
+		     PENTAX_CONDITION_BULB_TIMER)) {
+			/* The camera-timed path is intentionally not converted into a
+			 * held-shutter action.  Normal gp_camera_capture() owns that path
+			 * and waits for its natural candidate/output lifecycle. */
+			GP_LOG_D ("pentax-bulb: camera-timed Bulb is active; use timed capture");
+			free (bdata);
+			gp_context_error (context,
+				_("Camera-timed Bulb is active; use normal timed capture instead of the start/stop action."));
+			return GP_ERROR_NOT_SUPPORTED;
+		}
 		free (bdata);
 		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
 			expected_extra_candidates);
 
+		}
 	}
 
 	/* Admission has succeeded. Start a new output generation only now: a
 	 * refused shutter must not destroy the preceding completed result. */
-	pentax_capture_publications_clear (params);
-	params->pentax.capture_publication_generation++;
-	params->pentax.extra_capture_count = 0;
+	if (!bulb_action_finalize) {
+		pentax_capture_publications_clear (params);
+		params->pentax.capture_publication_generation++;
+		params->pentax.extra_capture_count = 0;
+	} else {
+		expected_extra_candidates =
+			params->pentax.bulb_action_expected_extra_candidates;
+		/* A held Bulb has no bounded exposure timer at its start.  Begin
+		 * the post-stop lifecycle with the conservative fallback budget and
+		 * require a fresh conditions read before accepting a candidate. */
+		capture_timeout_ms = params->pentax.bulb_action_capture_timeout_ms;
+		exposure_phase_ms = params->pentax.bulb_action_exposure_phase_ms;
+		needs_idle_wait = params->pentax.bulb_action_needs_idle_wait;
+	}
 
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-enter focus=%u companions=%u\n",
 		capture_id, focus_mode, expected_extra_candidates);
 	fflush (stderr);
 	/* Record the obligation before sending the command: a transport timeout
 	 * can mean the camera accepted the shutter but its response was lost. */
-	params->pentax.capture_output_pending = 1;
-	ptpres = ptp_pentax_initiate_capture (params, 0, focus_mode, 0, 0, 0);
+	if (!bulb_action_finalize)
+		params->pentax.capture_output_pending = 1;
+	if (bulb_action_finalize)
+		ptpres = PTP_RC_OK;
+	else
+		ptpres = ptp_pentax_initiate_capture (params,
+			bulb_action_start ? 2U : 0U, focus_mode, 0, 0, 0);
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-return ptp=0x%04x\n",
 		capture_id, ptpres);
 	fflush (stderr);
 	GP_LOG_D ("pentax-capture[%llu]: InitiateCapture returned 0x%04x",
 		capture_id, ptpres);
-	if (ptpres != PTP_RC_OK) {
+	if (!bulb_action_finalize && ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		/* A parsed PTP response is an explicit camera rejection. Internal
 		 * transport results (0x02f9..0x02ff) are ambiguous: the shutter may
@@ -6693,6 +6761,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 			ptpres, ret);
 		goto out;
 	}
+	if (bulb_action_start) {
+		/* The first edge only arms the camera.  The matching action=0 edge
+		 * will call TerminateCapture and re-enter this same lifecycle at the
+		 * candidate wait, so no output is reported before it is owned. */
+		params->pentax.bulb_action_active = 1;
+		params->pentax.bulb_action_stop_requested = 0;
+		params->pentax.bulb_action_expected_extra_candidates =
+			expected_extra_candidates;
+		params->pentax.bulb_action_capture_timeout_ms =
+			PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK;
+		params->pentax.bulb_action_exposure_phase_ms =
+			PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		params->pentax.bulb_action_needs_idle_wait = 1;
+		params->pentax.bulb_action_release_mode = 2;
+		params->pentax.transfer_state = PTP_PENTAX_TRANSFER_TRIGGERED;
+		SET_CONTEXT_P (params, NULL);
+		GP_LOG_D ("pentax-bulb: start accepted; awaiting explicit stop");
+		return GP_OK;
+	}
 	/* An accepted shutter creates an output obligation distinct from camera
 	 * readiness. Do not discharge it from +32/+36/+104 alone; only successful
 	 * transfer, finalization and publication of all mode-required outputs can. */
@@ -6708,16 +6795,24 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * retried with a bounded policy: once the exposure has been
 	 * initiated we must never silently fall back to the short base
 	 * timeout and abort a valid long exposure (issue #32). */
-	unsigned int capture_timeout_ms = pre_capture_conditions_known ?
-		pentax_capture_timeout_ms (&pre_capture_conditions) :
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-	unsigned int exposure_phase_ms = pre_capture_conditions_known ?
-		pentax_exposure_phase_ms (&pre_capture_conditions) :
-		PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-	uint32_t last_activity_flags = 0;
-	int conditions_known = pre_capture_conditions_known;
-	int needs_idle_wait = pre_capture_conditions_known ?
-		pentax_capture_needs_idle_wait (&pre_capture_conditions) : 0;
+	if (!bulb_action_finalize) {
+		capture_timeout_ms = pre_capture_conditions_known ?
+			pentax_capture_timeout_ms (&pre_capture_conditions) :
+			PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		exposure_phase_ms = pre_capture_conditions_known ?
+			pentax_exposure_phase_ms (&pre_capture_conditions) :
+			PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		conditions_known = pre_capture_conditions_known;
+		needs_idle_wait = pre_capture_conditions_known ?
+			pentax_capture_needs_idle_wait (&pre_capture_conditions) : 0;
+	} else {
+		/* The stop edge is the beginning of the output lifecycle.  Force
+		 * the bounded post-stop probe even if the start snapshot was idle. */
+		capture_timeout_ms = PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK;
+		exposure_phase_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		conditions_known = 0;
+		needs_idle_wait = 1;
+	}
 	{
 		PentaxConditions conditions;
 		int attempt;
@@ -7146,7 +7241,7 @@ out:
 			capture_id, candidate_handle, ret);
 		GP_LOG_E ("preserving orphaned transfer candidate %u after capture error %d; "
 			"session recovery required", candidate_handle, ret);
-	} else if (ret != GP_OK && initiated) {
+	} else if (ret != GP_OK && initiated && !bulb_action_finalize) {
 		/* TerminateCapture 0x9012 with release mode 0 matches
 		 * the documented still-capture path (issue #21);
 		 * InterruptFunction 0x9013 is characterized only as
@@ -7188,10 +7283,100 @@ out:
 	}
 	params->pentax.candidate_handle = 0;
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_IDLE;
+	if (bulb_action_finalize) {
+		/* TerminateCapture has already been accepted (or was reported as
+		 * already terminated), so the camera shutter is no longer owned by
+		 * this action.  Any unresolved output remains protected by the normal
+		 * recovery/output-pending barriers, but a later action=0 must not send
+		 * a second stop command. */
+		params->pentax.bulb_action_active = 0;
+		params->pentax.bulb_action_stop_requested = 0;
+		params->pentax.bulb_action_expected_extra_candidates = 0;
+		params->pentax.bulb_action_capture_timeout_ms = 0;
+		params->pentax.bulb_action_exposure_phase_ms = 0;
+		params->pentax.bulb_action_needs_idle_wait = 0;
+		params->pentax.bulb_action_release_mode = 0;
+	}
 	SET_CONTEXT_P (params, NULL);
 	GP_LOG_D ("pentax-capture[%llu]: return %d initiated=%d candidate_live=%d",
 		capture_id, ret, initiated, have_candidate);
 	return ret;
+}
+
+static int
+camera_pentax_capture (Camera *camera, CameraFilePath *path,
+	GPContext *context)
+{
+	return camera_pentax_capture_internal (camera, path, context,
+		PENTAX_CAPTURE_COMPLETE);
+}
+
+int
+ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
+{
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+	(void) camera;
+	(void) enabled;
+	(void) context;
+	return GP_ERROR_NOT_SUPPORTED;
+#else
+	PTPParams *params = &camera->pl->params;
+	CameraFilePath path;
+	uint16_t ptpres;
+	int ret;
+
+	if (!params->pentax.vendor_mode_enabled ||
+	    !params->pentax.supported_model)
+		return GP_ERROR_NOT_SUPPORTED;
+
+	if (enabled) {
+		if (params->pentax.bulb_action_active ||
+		    params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE ||
+		    params->pentax.recovery_required ||
+		    params->pentax.capture_output_pending)
+			return GP_ERROR_CAMERA_BUSY;
+		return camera_pentax_capture_internal (camera, NULL, context,
+			PENTAX_CAPTURE_BULB_START);
+	}
+
+	if (!params->pentax.bulb_action_active ||
+	    params->pentax.bulb_action_stop_requested ||
+	    params->pentax.transfer_state != PTP_PENTAX_TRANSFER_TRIGGERED) {
+		gp_context_error (context,
+			_("Pentax Bulb stop has no matching active start; refusing to send another shutter command."));
+		return GP_ERROR_CAMERA_BUSY;
+	}
+
+	/* The stop edge is the only place that sends TerminateCapture.  An
+	 * explicit 0x2018 means the camera closed the exposure naturally; a
+	 * transport result in the ambiguous range is treated the same way so
+	 * the output lifecycle can reconcile without blindly replaying 0x9012. */
+	ptpres = ptp_pentax_terminate_capture (params,
+		params->pentax.bulb_action_release_mode);
+	if (ptpres != PTP_RC_OK &&
+	    ptpres != PTP_RC_CaptureAlreadyTerminated &&
+	    !pentax_capture_initiate_response_ambiguous (ptpres)) {
+		params->pentax.bulb_action_stop_requested = 1;
+		params->pentax.recovery_required = 1;
+		GP_LOG_E ("pentax-bulb: TerminateCapture rejected (0x%04x); "
+			"stop will not be replayed", ptpres);
+		gp_context_error (context,
+			_("Pentax Bulb stop was not accepted (PTP 0x%04x); refusing to retry it automatically."),
+			ptpres);
+		return translate_ptp_result (ptpres);
+	}
+	params->pentax.bulb_action_stop_requested = 1;
+	if (ptpres == PTP_RC_CaptureAlreadyTerminated)
+		GP_LOG_D ("pentax-bulb: camera already terminated; continuing output reconciliation");
+	else if (pentax_capture_initiate_response_ambiguous (ptpres))
+		GP_LOG_E ("pentax-bulb: TerminateCapture response ambiguous (0x%04x); "
+			"continuing without a retry", ptpres);
+
+	memset (&path, 0, sizeof (path));
+	ret = camera_pentax_capture_internal (camera, &path, context,
+		PENTAX_CAPTURE_BULB_FINALIZE);
+	return ret;
+#endif
 }
 
 

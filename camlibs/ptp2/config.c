@@ -95,6 +95,15 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 		    camera->pl->params.pentax.supported_model &&
 		    !pentax_model_uses_new_focus (camera->pl->params.pentax.model_no))
 			return 1;
+		/* Image Transmitter 2 sends the Pentax held-Bulb pair directly;
+		 * several bodies do not list 0x9012 in DeviceInfo even though it is
+		 * the corresponding vendor command.  The getter remains research-build
+		 * gated, and the put path performs the stricter mode/state checks. */
+		if (vendor == PTP_VENDOR_PENTAX &&
+		    prop == PTP_OC_PENTAX_TerminateCapture &&
+		    camera->pl->params.pentax.supported_model &&
+		    camera->pl->params.pentax.vendor_mode_enabled)
+			return 1;
 		for (i=0; i<camera->pl->params.deviceinfo.Operations_len; i++) {
 
 			if (prop != camera->pl->params.deviceinfo.Operations[i])
@@ -9319,6 +9328,53 @@ _put_Nikon_Bulb(CONFIG_PUT_ARGS)
 	}
 }
 
+/* Pentax's standard action is research-build only.  The action is a real
+ * two-edge operation: bulb=1 sends the IT2-compatible held-shutter initiate
+ * (0x9011/release mode 2), while bulb=0 sends exactly one 0x9012 and then
+ * runs the normal candidate transfer/reconciliation/publication lifecycle.
+ * Camera-timed Bulb is deliberately rejected by the library helper so its
+ * natural completion path is never replaced by an early stop. */
+static int
+_get_Pentax_Bulb(CONFIG_GET_ARGS)
+{
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+	return GP_ERROR_NOT_SUPPORTED;
+#else
+	PTPParams *params = &camera->pl->params;
+	int val = 2; /* action widgets are edge-triggered and always changed */
+
+	if (!params->pentax.supported_model ||
+	    !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_set_value (*widget, &val);
+	return GP_OK;
+#endif
+}
+
+static int
+_put_Pentax_Bulb(CONFIG_PUT_ARGS)
+{
+#ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
+	(void) camera;
+	(void) widget;
+	(void) propval;
+	(void) dpd;
+	(void) alreadyset;
+	return GP_ERROR_NOT_SUPPORTED;
+#else
+	int val;
+	GPContext *context = ptp_context_get (camera->pl->params.data);
+
+	(void) propval;
+	(void) dpd;
+	(void) alreadyset;
+	CR (gp_widget_get_value (widget, &val));
+	return ptp2_pentax_bulb_action (camera, val != 0, context);
+#endif
+}
+
 static int
 _get_OpenCapture(CONFIG_GET_ARGS) {
 	int val;
@@ -14066,6 +14122,7 @@ static struct submenu camera_actions_menu[] = {
 	{ N_("Bulb Mode"),                      "bulb",             PTP_DPC_SONY_RequestOneShooting,PTP_VENDOR_SONY,   0,       _get_Sony_Bulb,                 _put_Sony_Bulb },
 	{ N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_CANON,   PTP_OC_CANON_EOS_BulbStart,         _get_Canon_EOS_Bulb,            _put_Canon_EOS_Bulb },
 	{ N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_NIKON,   PTP_OC_NIKON_TerminateCapture,      _get_Nikon_Bulb,                _put_Nikon_Bulb },
+	{ N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_PENTAX,  PTP_OC_PENTAX_TerminateCapture,      _get_Pentax_Bulb,              _put_Pentax_Bulb },
 	{ N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_GP_OLYMPUS_OMD, PTP_OC_OLYMPUS_OMD_Capture,  _get_Olympus_OMD_Bulb,          _put_Olympus_OMD_Bulb },
 	{ N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_FUJI,    PTP_OC_InitiateCapture,             _get_Fuji_Bulb,                 _put_Fuji_Bulb },
     { N_("Bulb Mode"),                      "bulb",             0,  PTP_VENDOR_PANASONIC,      PTP_OC_PANASONIC_InitiateCapture, _get_Panasonic_Bulb,       _put_Panasonic_Bulb },

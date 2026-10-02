@@ -123,6 +123,14 @@ typedef struct {
  * is the signal IT2 uses to switch to the long-exposure / bulb-timer path and is
  * model-agnostic, so it works for the K-1 II (old-focus) as well as the K-3 III. */
 #define PENTAX_EXP_MODE_ASTROTRACER 20U
+#define PENTAX_EXP_MODE_BULB 9U
+#define PENTAX_EXP_MODE_BULB_LENS 12U
+
+/* The standard action is deliberately restricted to the same exposure modes
+ * for which Image Transmitter 2 selects release mode 2.  Camera-timed Bulb
+ * (capability flag 0x40) is excluded by the caller and remains on the normal
+ * timed-capture path. */
+int pentax_bulb_action_mode_supported (uint32_t exposure_mode);
 
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and

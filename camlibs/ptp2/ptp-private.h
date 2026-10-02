@@ -41,6 +41,7 @@ int camera_canon_eos_update_capture_target(Camera *camera, GPContext *context, i
 int have_prop(Camera *camera, uint16_t vendor, uint32_t prop);
 int camera_lookup_by_property(Camera *camera, PTPDevicePropDesc *dpd, char **name, char **content, GPContext *context);
 int camera_keep_device_on(Camera *camera);
+int ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context);
 
 /* library.c */
 int translate_ptp_result (uint16_t result);
