@@ -126,11 +126,21 @@ typedef struct {
 
 /* Get a 32-bit little-endian value from unaligned memory. */
 static inline uint32_t
-pentax_get_u32le (const unsigned char *data);
+pentax_get_u32le (const unsigned char *data)
+{
+	return (uint32_t)data[0] |
+	       ((uint32_t)data[1] << 8) |
+	       ((uint32_t)data[2] << 16) |
+	       ((uint32_t)data[3] << 24);
+}
 
 /* Get a 16-bit little-endian value from unaligned memory. */
 static inline uint16_t
-pentax_get_u16le (const unsigned char *data);
+pentax_get_u16le (const unsigned char *data)
+{
+	return (uint16_t)data[0] |
+	       ((uint16_t)data[1] << 8);
+}
 
 /* Check if Pentax admission probe is OK. */
 int
