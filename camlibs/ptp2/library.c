@@ -6186,6 +6186,22 @@ pentax_reconcile_cancelled (void *user_data)
 	return gp_context_cancel (rc->context) == GP_CONTEXT_FEEDBACK_CANCEL;
 }
 
+/* Candidate ownership is deliberately not guessed from order, filename, or
+ * output count.  No stable exposure-to-candidate correlation has yet been
+ * demonstrated for the Pentax transfer queue, so the production path remains
+ * fail-closed until a proven correlation callback is available. */
+static int
+pentax_reconcile_candidate_is_owned (void *user_data, uint32_t handle,
+	const unsigned char *info, size_t info_size, const char *name)
+{
+	(void)user_data;
+	(void)handle;
+	(void)info;
+	(void)info_size;
+	(void)name;
+	return 0;
+}
+
 /* Transfer the pending extra candidate and publish it into the camera
  * filesystem.  The candidate still exists at this point (the delete runs
  * afterwards), so its filename can be read for the publication name. */
@@ -6236,36 +6252,63 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		int slot = params->pentax.extra_capture_count;
 		GPContext *probe_context = gp_context_new ();
 		int existing;
+		int probe_ret;
+		int written;
 
 		memset (&extra, 0, sizeof (extra));
 		strcpy (extra.folder, "/");
 		strcpy (extra.name, name);
-		if (probe_context) {
-			existing = gp_filesystem_number (rc->camera->fs, extra.folder,
-				extra.name, probe_context);
-			gp_context_unref (probe_context);
-			if (existing >= GP_OK) {
-				char stem[sizeof (extra.name)];
-				const char *dot = strrchr (extra.name, '.');
-				int suffix = 1;
+		if (!probe_context) {
+			GP_LOG_E ("could not allocate collision-probe context; preserving "
+				"candidate %s", name);
+			return GP_ERROR_NO_MEMORY;
+		}
+		existing = gp_filesystem_number (rc->camera->fs, extra.folder,
+			extra.name, probe_context);
+		gp_context_unref (probe_context);
+		if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
+			existing != GP_ERROR_BAD_PARAMETERS) {
+			GP_LOG_E ("collision probe of companion %s failed (%d); preserving "
+				"candidate", extra.name, existing);
+			return existing;
+		}
+		if (existing >= GP_OK) {
+			char stem[sizeof (extra.name)];
+			char extension[sizeof (extra.name)];
+			const char *dot = strrchr (extra.name, '.');
+			int suffix = 1;
 
-				if (dot)
-					snprintf (stem, sizeof (stem), "%.*s",
-						(int)(dot - extra.name), extra.name);
-				else
-					snprintf (stem, sizeof (stem), "%s", extra.name);
-				do {
-					if (dot)
-						snprintf (extra.name, sizeof (extra.name),
-							"%s_%d%s", stem, suffix, dot);
-					else
-						snprintf (extra.name, sizeof (extra.name),
-							"%s_%d", stem, suffix);
-					suffix++;
-					existing = gp_filesystem_number (rc->camera->fs,
-						extra.folder, extra.name, rc->context);
-				} while (existing >= GP_OK && suffix < 1000);
+			extension[0] = '\0';
+			if (dot)
+				written = snprintf (stem, sizeof (stem), "%.*s",
+					(int)(dot - extra.name), extra.name);
+			else
+				written = snprintf (stem, sizeof (stem), "%s", extra.name);
+			if (written < 0 || (size_t)written >= sizeof (stem))
+				return GP_ERROR_BAD_PARAMETERS;
+			if (dot) {
+				written = snprintf (extension, sizeof (extension), "%s", dot);
+				if (written < 0 || (size_t)written >= sizeof (extension))
+					return GP_ERROR_BAD_PARAMETERS;
 			}
+			do {
+				if (dot)
+					written = snprintf (extra.name, sizeof (extra.name),
+						"%s_%d%s", stem, suffix, extension);
+				else
+					written = snprintf (extra.name, sizeof (extra.name),
+						"%s_%d", stem, suffix);
+				if (written < 0 || (size_t)written >= sizeof (extra.name))
+					return GP_ERROR_BAD_PARAMETERS;
+				suffix++;
+				existing = gp_filesystem_number (rc->camera->fs,
+					extra.folder, extra.name, rc->context);
+				if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
+					existing != GP_ERROR_BAD_PARAMETERS)
+					return existing;
+			} while (existing >= GP_OK && suffix < 1000);
+			if (existing >= GP_OK)
+				return GP_ERROR_FILE_EXISTS;
 		}
 
 		ret = gp_file_new (&file);
@@ -6374,6 +6417,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	int back_off_wait = 0, ret = GP_ERROR;
 	int initiated = 0, have_candidate = 0;
 	int reconciled_output_complete = 1;
+	int reconciliation_result = GP_OK;
 	int port_timeout_raised = 0;
 	PentaxConditions pre_capture_conditions = {0};
 	int pre_capture_conditions_known = 0;
@@ -6966,15 +7010,16 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	 * pre-capture stale-candidate barrier on the NEXT capture, which is
 	 * the intended fail-safe.  Each extra is published into the camera
 	 * filesystem and recorded in params->pentax.extra_capture_files.
-	 * A reconciliation failure never fails the primary capture: the main
-	 * file is already finalized above, so the error is logged and the
-	 * next-capture barrier handles the remainder. */
+	 * A reconciliation failure preserves the primary file but remains an
+	 * error: the accepted exposure still has an unresolved output obligation,
+	 * so the caller must not be told that capture completed. */
 	{
 		PentaxReconcileContext reconcile_context = {params, context, camera};
 		PentaxReconcileOps reconcile_ops = {
 			&reconcile_context,
 			pentax_reconcile_get_conditions,
 			pentax_reconcile_get_candidate_info,
+			pentax_reconcile_candidate_is_owned,
 			pentax_reconcile_transfer_candidate,
 			pentax_reconcile_delete_candidate,
 			pentax_reconcile_cancelled
@@ -6997,6 +7042,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		else if (reconciled)
 			GP_LOG_D ("dual-format reconciliation: %d extra candidate(s) "
 				"consumed and published", reconciled);
+		reconciliation_result = rret;
 		reconciled_output_complete = rret == GP_OK &&
 			(unsigned int)reconciled >= expected_extra_candidates;
 	}
@@ -7037,6 +7083,25 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 	ret = pentax_capture_publication_add (params, path, file);
 	if (ret < GP_OK)
 		goto out;
+	if (!reconciled_output_complete) {
+		/* The primary file is published, but the accepted exposure still has
+		 * an unresolved output obligation.  Do not report success or permit
+		 * another shutter merely because one file arrived. */
+		params->pentax.capture_output_pending = 1;
+		params->pentax.recovery_required = 1;
+		ret = reconciliation_result < GP_OK ? reconciliation_result :
+			GP_ERROR_CAMERA_BUSY;
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=publication "
+			"reason=output-obligation-unresolved extras-expected=%u "
+			"accepted=1 action=preserve-published-files; keep-next-shutter-blocked; "
+			"recover-remaining-output-with-original-owner\n",
+			capture_id, expected_extra_candidates);
+		gp_context_error (context,
+			_("Pentax capture produced a file, but not every expected output "
+			"has been correlated and published; preserving the result and "
+			"blocking the next shutter."));
+		goto out;
+	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;
 	ret = GP_OK;
 	GP_LOG_D ("pentax-capture[%llu]: filesystem publication complete", capture_id);
@@ -7045,14 +7110,6 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path, GPContext *context)
 		params->pentax.capture_output_pending = 0;
 		GP_LOG_D ("pentax-capture[%llu]: all output obligations published",
 			capture_id);
-	} else {
-		params->pentax.capture_output_pending = 1;
-		params->pentax.recovery_required = 1;
-		fprintf (stderr, "[pentax-recovery] capture=%llu path=publication "
-			"reason=output-obligation-unresolved extras-expected=%u "
-			"accepted=1 action=preserve-published-files; keep-next-shutter-blocked; "
-			"recover-remaining-output-with-original-owner\n",
-			capture_id, expected_extra_candidates);
 	}
 
 out:

@@ -63,6 +63,7 @@ typedef struct {
         int delete_error;            /* non-zero: delete_candidate fails */
         int cancel_after;            /* cancel once this many candidates done */
         int info_fail;              /* non-zero: get_candidate_info fails */
+        int candidate_owned;        /* explicit exposure ownership proof */
         /* Observations. */
         int transfer_calls;
         int delete_calls;
@@ -113,7 +114,7 @@ mock_get_candidate_info (void *user_data, unsigned char **data, size_t *size)
                 *size = 0;
                 return GP_ERROR_IO;
         }
-        if (mock->handle_count <= 0 || !mock->names[0]) {
+        if (mock->handle_count <= 0) {
                 *data = NULL;
                 *size = 0;
                 return GP_OK;
@@ -124,7 +125,8 @@ mock_get_candidate_info (void *user_data, unsigned char **data, size_t *size)
                 *size = 0;
                 return GP_ERROR_NO_MEMORY;
         }
-        len = make_candidate_info (mock->names[0], info, 256);
+        len = make_candidate_info (mock->names[0] ? mock->names[0] :
+                "IMG_DEFAULT.JPG", info, 256);
         *data = info;
         *size = len;
         return GP_OK;
@@ -146,6 +148,19 @@ mock_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffer)
 	if (mock->publication_error)
 		return mock->publication_error;
         return GP_OK;
+}
+
+static int
+mock_candidate_is_owned (void *user_data, uint32_t handle,
+        const unsigned char *info, size_t info_size, const char *name)
+{
+        MockReconcile *mock = user_data;
+
+        (void)handle;
+        (void)info;
+        (void)info_size;
+        (void)name;
+        return mock->candidate_owned;
 }
 
 static int
@@ -177,6 +192,7 @@ mock_reset (MockReconcile *mock)
 {
         memset (mock, 0, sizeof (*mock));
         mock->cancel_after = -1;
+        mock->candidate_owned = 1;
 }
 
 int
@@ -191,6 +207,7 @@ main (void)
         ops.user_data = &mock;
         ops.get_conditions = mock_get_conditions;
         ops.get_candidate_info = mock_get_candidate_info;
+        ops.candidate_is_owned = mock_candidate_is_owned;
         ops.transfer_candidate = mock_transfer_candidate;
         ops.delete_candidate = mock_delete_candidate;
         ops.is_cancelled = mock_cancelled;
@@ -344,17 +361,33 @@ main (void)
         CHECK (mock.transfer_calls == 0);
         CHECK (mock.delete_calls == 0);
 
-        /* A failed candidate-info read remains a non-destructive error
-         * boundary only when the normal path is otherwise eligible. */
+        /* A failed candidate-info read is a non-destructive ownership
+         * boundary: the candidate remains on the camera. */
         mock_reset (&mock);
         mock.handles[0] = 800;
         mock.handle_count = 1;
         mock.info_fail = 1;
+        memset (names, 0, sizeof (names));
         count = -1;
         ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
-        CHECK (ret == GP_OK);
-        CHECK (count == 1);
+        CHECK (ret == GP_ERROR_IO);
+        CHECK (count == 0);
         CHECK (names[0][0] == '\0');
+
+        /* An unowned candidate must not be transferred or deleted merely
+         * because the output count predicts a companion. */
+        mock_reset (&mock);
+        mock.handles[0] = 802;
+        mock.handle_count = 1;
+        mock.names[0] = "IMG_0003.JPG";
+        mock.candidate_owned = 0;
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+        CHECK (ret == GP_ERROR_CAMERA_BUSY);
+        CHECK (count == 0);
+        CHECK (mock.transfer_calls == 0);
+        CHECK (mock.delete_calls == 0);
+        CHECK (mock.handle_count == 1);
 
         /* 11. RAW+JPEG: an empty gap after primary finalization is not
          * completion. Discover and finalize the delayed companion. */

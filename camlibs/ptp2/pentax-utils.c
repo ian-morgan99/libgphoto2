@@ -1269,22 +1269,42 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			goto out;
 		}
 
-		/* Get the candidate filename for diagnostics. */
-		if (names && ops->get_candidate_info) {
-			iteration_error = ops->get_candidate_info (ops->user_data, &cinfo, &cisize);
-			if (iteration_error == GP_OK && cisize > 0) {
-				int nret = pentax_candidate_filename (cinfo, cisize,
-					names[count], 128);
-				if (nret != GP_OK)
-					names[count][0] = '\0';
-			} else {
-				names[count][0] = '\0';
+		/* A visible candidate is not automatically owned by this exposure.
+		 * Candidate order, the expected companion count, and a filename are
+		 * insufficient: a stale candidate can otherwise be transferred and
+		 * deleted as if it belonged to the just-initiated shutter (issue #73).
+		 * Require a caller-supplied correlation proof before touching it. */
+		if (!ops->get_candidate_info || !ops->candidate_is_owned) {
+			GP_LOG_E ("reconciliation found candidate %u without an ownership "
+				"proof; preserving it", handle);
+			ret = GP_ERROR_CAMERA_BUSY;
+			goto out;
+		}
+		iteration_error = ops->get_candidate_info (ops->user_data, &cinfo,
+			&cisize);
+		if (iteration_error < GP_OK || !cinfo || cisize == 0) {
+			GP_LOG_E ("reconciliation could not read metadata for candidate %u; "
+				"preserving it", handle);
+			ret = iteration_error < GP_OK ? iteration_error :
+				GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
+		{
+			char candidate_name[128] = {0};
+			iteration_error = pentax_candidate_filename (cinfo, cisize,
+				candidate_name, sizeof (candidate_name));
+			if (iteration_error < GP_OK ||
+				!ops->candidate_is_owned (ops->user_data, handle, cinfo,
+					cisize, candidate_name)) {
+				GP_LOG_E ("candidate %u (%s) is not proven to belong to the "
+					"current exposure; preserving it", handle,
+					candidate_name[0] ? candidate_name : "unknown");
+				ret = iteration_error < GP_OK ? iteration_error :
+					GP_ERROR_CAMERA_BUSY;
+				goto out;
 			}
-			free (cinfo);
-			cinfo = NULL;
-			/* A failed info read is diagnostic-only; the transfer
-			 * still proceeds. */
-			iteration_error = GP_OK;
+			if (names)
+				snprintf (names[count], 128, "%s", candidate_name);
 		}
 
 		/* Transfer the extra candidate. */

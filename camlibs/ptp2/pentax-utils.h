@@ -394,7 +394,9 @@ int pentax_transfer_run (PentaxCaptureBuffer *buffer,
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
- *   4. Records the candidate filename (from get_candidate_info +
+ *   4. Requires a caller-supplied ownership proof from candidate metadata;
+ *      an unowned/ambiguous candidate remains untouched.
+ *   5. Records the candidate filename (from get_candidate_info +
  *      pentax_candidate_filename) in names[reconciled_count].
  *
  * On success *reconciled_count is set to the number of extras consumed
@@ -411,6 +413,11 @@ typedef struct {
 	/* Get transfer candidate info (type 0); caller frees *data. */
 	int (*get_candidate_info) (void *user_data, unsigned char **data,
 		size_t *size);
+	/* Return non-zero only when the candidate is positively correlated with
+	 * the capture currently being reconciled.  A filename, candidate order,
+	 * or expected count alone is not ownership evidence. */
+	int (*candidate_is_owned) (void *user_data, uint32_t handle,
+		const unsigned char *info, size_t info_size, const char *name);
 	/* Transfer the current pending candidate into buffer. */
 	int (*transfer_candidate) (void *user_data, PentaxCaptureBuffer *buffer);
 	/* Finalize (delete) the current candidate on the camera. */
