@@ -177,6 +177,103 @@ pentax_camera_readiness (const unsigned char *data, unsigned int size)
 	}
 }
 
+int
+pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
+	int max_count, unsigned int max_ms,
+	unsigned int expected_extra_candidates,
+	char (*names)[128], int *reconciled_count)
+{
+	struct timespec start, now;
+	int count = 0;
+	int ret = GP_OK;
+
+	if (!ops || !ops->get_conditions || !ops->transfer_candidate ||
+	    !ops->delete_candidate || !reconciled_count) {
+		if (reconciled_count)
+			*reconciled_count = 0;
+		return GP_ERROR_BAD_PARAMETERS;
+	}
+	if (max_count < 1)
+		max_count = 4;
+	if (max_ms == 0)
+		max_ms = 60000;
+	*reconciled_count = 0;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
+	for (;;) {
+		unsigned char *data = NULL, *info = NULL;
+		size_t size = 0, info_size = 0;
+		PentaxCaptureBuffer extra = {0};
+		uint32_t handle = 0;
+		int done = 0;
+
+		if (ops->is_cancelled && ops->is_cancelled(ops->user_data)) {
+			ret = GP_ERROR_CANCEL;
+			goto iteration_out;
+		}
+		ret = ops->get_conditions(ops->user_data, &data, &size);
+		if (ret < GP_OK) {
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			if ((now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+				ret = GP_ERROR_TIMEOUT;
+				goto iteration_out;
+			}
+			usleep(200 * 1000);
+			continue;
+		}
+		if (size >= PENTAX_CONDITIONS_MIN_SIZE &&
+		    pentax_get_u32le(data + 32) == 1)
+			handle = pentax_get_u32le(data + 36);
+		free(data);
+		data = NULL;
+
+		if (!handle) {
+			if ((unsigned int)count < expected_extra_candidates)
+				ret = GP_ERROR_CORRUPTED_DATA;
+			done = 1;
+			goto iteration_out;
+		}
+		if (count >= max_count) {
+			GP_LOG_D("Pentax reconciliation bound reached; preserving candidate %u", handle);
+			done = 1;
+			goto iteration_out;
+		}
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		if ((now.tv_sec - start.tv_sec) * 1000 +
+		    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+			done = 1;
+			goto iteration_out;
+		}
+		if (names && ops->get_candidate_info) {
+			if (ops->get_candidate_info(ops->user_data, &info, &info_size) == GP_OK &&
+			    pentax_candidate_filename(info, info_size, names[count], 128) == GP_OK)
+				;
+			else
+				names[count][0] = '\0';
+		}
+		free(info);
+		info = NULL;
+		ret = ops->transfer_candidate(ops->user_data, &extra);
+		if (ret < GP_OK)
+			goto iteration_out;
+		ret = ops->delete_candidate(ops->user_data);
+		if (ret < GP_OK)
+			goto iteration_out;
+		count++;
+		*reconciled_count = count;
+
+iteration_out:
+		free(data);
+		free(info);
+		free(extra.data);
+		if (done || ret < GP_OK)
+			break;
+	}
+	*reconciled_count = count;
+	return ret;
+}
+
 /* Pentax conditions in astro mode. */
 int
 pentax_conditions_in_astro_mode (const PentaxConditions *conditions)

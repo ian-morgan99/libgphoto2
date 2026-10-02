@@ -251,6 +251,6 @@ typedef struct {
 } PentaxReconcileOps;
 
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *, int,
-	unsigned int, char (*)[128], int *);
+	unsigned int, unsigned int, char (*)[128], int *);
 
 #endif /* PENTAX_UTILS_H */
