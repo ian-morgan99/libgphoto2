@@ -26,6 +26,14 @@
 
 #include <stdint.h>
 
+/* Bounded capture-wait defaults. These are shared by the production path and
+ * the deterministic Pentax timeout tests. */
+#define PENTAX_CAPTURE_TIMEOUT_MS_BASE (60 * 1000)
+#define PENTAX_CAPTURE_PROCESSING_MARGIN_MS (30 * 1000)
+#define PENTAX_PIXEL_SHIFT_MULTIPLIER 4
+#define PENTAX_CAPTURE_TIMEOUT_MS_MAX (24U * 60 * 60 * 1000)
+#define PENTAX_CAPTURE_TIMEOUT_MS_FALLBACK (2U * 60 * 1000)
+
 /* Pentax condition flags for activity states that make mutating vendor
  * operations unsafe after a reconnect (issue #33). */
 #define PENTAX_CONDITION_ACTIVITY_SHOOTING       0x00000001U
