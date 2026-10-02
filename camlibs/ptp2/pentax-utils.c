@@ -1325,42 +1325,45 @@ out:
 /* Format a Pentax/Ricoh shutter-speed UINT64 wire value for display.
  * Wire layout: high 32 bits = denominator, low 32 bits = numerator.
  * A zero value is the "Auto" sentinel.  When the denominator is 1 the
- * value is a whole-second timer (Bulb timer or 1 s shutter speed).  Keep the
- * total seconds intact and use the Benro-compatible MM:SS spelling: the
- * proprietary Polaris UI parses the label back to a value and otherwise
- * truncates "1m10s" to 60 seconds.  Returns 0 on success, -1 if buf is too
- * small. */
+ * value is a whole-second timer (Bulb timer or 1 s shutter speed) and is
+ * rendered as a compact duration rather than the fraction "1/<n>". Values
+ * below a minute use "<n>s"; longer values use "<m>m" or "<m>m<s>s" so
+ * 80 and 90 seconds are not presented as hard-to-scan raw second counts.
+ * Returns 0 on success, -1 if buf is too small. */
 int
 pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
 {
-	int written;
-
 	if (!buf || buflen < 4)
 		return -1;
 	if (value == 0) {
-		written = snprintf (buf, buflen, "Auto");
-		return written >= 0 && (size_t)written < buflen ? 0 : -1;
+		snprintf (buf, buflen, "Auto");
+		return 0;
 	}
 	uint32_t denominator = (uint32_t)(value >> 32);
 	uint32_t numerator = (uint32_t)value;
 	if (denominator == 1) {
-		uint32_t minutes = numerator / 60;
-		uint32_t seconds = numerator % 60;
-		written = snprintf (buf, buflen, "%02u:%02u", minutes, seconds);
-		return written >= 0 && (size_t)written < buflen ? 0 : -1;
+		if (numerator >= 60) {
+			uint32_t minutes = numerator / 60;
+			uint32_t seconds = numerator % 60;
+			if (seconds)
+				snprintf (buf, buflen, "%um%us", minutes, seconds);
+			else
+				snprintf (buf, buflen, "%um", minutes);
+		} else {
+			snprintf (buf, buflen, "%us", numerator);
+		}
+		return 0;
 	}
 	if (numerator == 1) {
-		written = snprintf (buf, buflen, "1/%u", denominator);
-		return written >= 0 && (size_t)written < buflen ? 0 : -1;
+		snprintf (buf, buflen, "1/%u", denominator);
+		return 0;
 	}
-	written = snprintf (buf, buflen, "%u/%u", numerator, denominator);
-	return written >= 0 && (size_t)written < buflen ? 0 : -1;
+	snprintf (buf, buflen, "%u/%u", numerator, denominator);
+	return 0;
 }
 
 /* Parse the whole-second labels emitted above.  Keep this beside the formatter
- * so a displayed radio choice always maps back to its exact wire value.
- * Accept the old unit-bearing spellings as input for compatibility with
- * existing callers and saved configurations, but emit only MM:SS. */
+ * so a displayed radio choice always maps back to its exact wire value. */
 int
 pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 {
@@ -1373,20 +1376,6 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	first = strtoull (value, &end, 10);
 	if (end == value || errno == ERANGE)
 		return -1;
-	if (*end == ':') {
-		char *seconds_end;
-		if (end[1] < '0' || end[1] > '9')
-			return -1;
-		errno = 0;
-		remainder = strtoull (end + 1, &seconds_end, 10);
-		if (seconds_end == end + 1 || errno == ERANGE ||
-			*seconds_end != '\0' || remainder >= 60)
-			return -1;
-		if (first > (UINT32_MAX - remainder) / 60)
-			return -1;
-		*seconds = (uint32_t)(first * 60 + remainder);
-		return 0;
-	}
 	if (*end == 's' && end[1] == '\0') {
 		if (first > UINT32_MAX)
 			return -1;

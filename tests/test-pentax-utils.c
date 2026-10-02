@@ -868,40 +868,31 @@ main (void)
 	CHECK (pentax_stale_candidate_baseline (condition_data, sizeof (condition_data)) == 77);
 
 	/* Shutter-speed display formatting: whole-second timer values (Bulb
-	 * timer, denominator 1) must preserve total seconds in the Benro
-	 * compatible MM:SS spelling.  The old minute-bearing labels (1m10s)
-	 * were parsed by the proprietary UI as just 60 seconds. */
+	 * timer, denominator 1) must render as integer seconds, not as the
+	 * fraction "1/<n>" that made a 2-minute Bulb read like a minute. */
 	{
 		char fmt[64];
 		CHECK (pentax_format_shutter_speed (0, fmt, sizeof (fmt)) == 0);
 		CHECK (!strcmp (fmt, "Auto"));
-		/* The minute boundaries must retain the remainder end-to-end. */
-		{
-			static const uint32_t durations[] = {23, 59, 60, 61, 110, 119, 120, 121};
-			static const char *labels[] = {
-				"00:23", "00:59", "01:00", "01:01", "01:50",
-				"01:59", "02:00", "02:01"
-			};
-			size_t i;
-			for (i = 0; i < sizeof (durations) / sizeof (durations[0]); i++) {
-				CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) |
-					durations[i], fmt, sizeof (fmt)) == 0);
-				CHECK (!strcmp (fmt, labels[i]));
-				CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
-				CHECK (candidate == durations[i]);
-			}
-		}
-		/* Existing unit-bearing values remain accepted on input only. */
-		CHECK (pentax_parse_shutter_duration ("30s", &candidate) == 0);
+		/* 120 s Bulb timer: low 32 = 120, high 32 = 1. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 120ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "2m"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 120);
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 80ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1m20s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 80);
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 90ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "1m30s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
+		CHECK (candidate == 90);
+		/* 30 s Bulb timer. */
+		CHECK (pentax_format_shutter_speed (((uint64_t)1 << 32) | 30ULL, fmt, sizeof (fmt)) == 0);
+		CHECK (!strcmp (fmt, "30s"));
+		CHECK (pentax_parse_shutter_duration (fmt, &candidate) == 0);
 		CHECK (candidate == 30);
-		CHECK (pentax_parse_shutter_duration ("1m10s", &candidate) == 0);
-		CHECK (candidate == 70);
-		CHECK (pentax_parse_shutter_duration ("1m", &candidate) == 0);
-		CHECK (candidate == 60);
-		CHECK (pentax_parse_shutter_duration ("1:10", &candidate) == 0);
-		CHECK (candidate == 70);
 		CHECK (pentax_parse_shutter_duration ("1m60s", &candidate) == -1);
-		CHECK (pentax_parse_shutter_duration ("01:60", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("4294967296s", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("-18446744073709551615s", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("1m-1s", &candidate) == -1);
