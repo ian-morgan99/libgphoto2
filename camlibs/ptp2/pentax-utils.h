@@ -155,6 +155,25 @@ typedef enum PentaxReconcileDecision {
 	PENTAX_RECONCILE_UNREADABLE	/* conditions payload unreadable/short */
 } PentaxReconcileDecision;
 
+typedef enum {
+	PENTAX_ADMISSION_STRICT = 0,
+	PENTAX_ADMISSION_OUTPUT_SAFE = 1
+} PentaxAdmissionPolicy;
+
+typedef enum {
+	PENTAX_ADMISSION_BLOCK_NONE = 0,
+	PENTAX_ADMISSION_BLOCK_UNREADABLE,
+	PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY,
+	PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE,
+	PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT,
+	PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED
+} PentaxAdmissionBlockReason;
+
+enum {
+	PENTAX_CAPTURE_CLEANUP_ABORT = 0,
+	PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE = 1
+};
+
 /* Research builds only: the vendor Pentax bodies whose capture flow we
  * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome). */
 int pentax_pid_is_research_capable (unsigned int pid);
@@ -186,6 +205,19 @@ typedef enum {
 } PentaxAdmissionPolicy;
 int pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy);
+PentaxAdmissionBlockReason pentax_admission_block_reason (
+	const unsigned char *data, size_t size, PentaxAdmissionPolicy policy);
+const char *pentax_admission_block_reason_name (PentaxAdmissionBlockReason reason);
+const char *pentax_admission_recovery_action (PentaxAdmissionBlockReason reason);
+int pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
+	int capture_output_pending);
+int pentax_capture_cleanup_decision (int capture_accepted);
+int pentax_candidate_output_published (int transfer_succeeded,
+	int filename_known, int filesystem_publication_succeeded);
+int pentax_capture_output_obligation_resolved (int capture_accepted,
+	int primary_published, int all_expected_outputs_published);
+int pentax_capture_initiate_response_ambiguous (uint16_t response);
+int pentax_capture_output_contract_known (const unsigned char *data, size_t size);
 
 /* Minimum number of candidates expected after the primary candidate has
  * been finalized, derived from GetAllConditions writing format at +524.

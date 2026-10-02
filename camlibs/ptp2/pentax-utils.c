@@ -76,6 +76,111 @@ pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
 }
 
+int
+pentax_capture_cleanup_decision (int capture_accepted)
+{
+	return capture_accepted ? PENTAX_CAPTURE_CLEANUP_PRESERVE_CANDIDATE :
+		PENTAX_CAPTURE_CLEANUP_ABORT;
+}
+
+int
+pentax_capture_output_obligation_resolved (int capture_accepted,
+	int primary_published, int all_expected_outputs_published)
+{
+	return !capture_accepted || (primary_published && all_expected_outputs_published);
+}
+
+int
+pentax_candidate_output_published (int transfer_succeeded, int filename_known,
+	int filesystem_publication_succeeded)
+{
+	return transfer_succeeded && filename_known && filesystem_publication_succeeded;
+}
+
+int
+pentax_capture_initiate_response_ambiguous (uint16_t response)
+{
+	return response >= 0x02f9 && response <= 0x02ff;
+}
+
+int
+pentax_capture_output_contract_known (const unsigned char *data, size_t size)
+{
+	uint32_t format;
+	if (!data || size < 528)
+		return 0;
+	format = pentax_get_u32le (data + 524);
+	return format <= 3;
+}
+
+PentaxAdmissionBlockReason
+pentax_admission_block_reason (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy)
+{
+	uint32_t activity, capture, candidate;
+	if (!data || size < 508)
+		return PENTAX_ADMISSION_BLOCK_UNREADABLE;
+	activity = pentax_get_u32le(data + 104);
+	capture = pentax_get_u32le(data + 32);
+	candidate = pentax_get_u32le(data + 36);
+	if (policy == PENTAX_ADMISSION_STRICT &&
+	    (activity & PENTAX_CONDITION_ACTIVITY_UNSAFE))
+		return PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY;
+	if (capture)
+		return PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE;
+	if (candidate)
+		return PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT;
+	return PENTAX_ADMISSION_BLOCK_NONE;
+}
+
+int
+pentax_admission_probe_ok (const unsigned char *data, size_t size,
+	PentaxAdmissionPolicy policy)
+{
+	return pentax_admission_block_reason(data, size, policy) ==
+		PENTAX_ADMISSION_BLOCK_NONE;
+}
+
+const char *
+pentax_admission_block_reason_name (PentaxAdmissionBlockReason reason)
+{
+	switch (reason) {
+	case PENTAX_ADMISSION_BLOCK_NONE: return "none";
+	case PENTAX_ADMISSION_BLOCK_UNREADABLE: return "conditions-unreadable";
+	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY: return "unsafe-activity";
+	case PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE:
+		return "transfer-candidate-available";
+	case PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT: return "selector-present";
+	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
+		return "output-obligation-unresolved";
+	}
+	return "unknown";
+}
+
+int
+pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
+	int capture_output_pending)
+{
+	return reason == PENTAX_ADMISSION_BLOCK_NONE && !capture_output_pending;
+}
+
+const char *
+pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
+{
+	switch (reason) {
+	case PENTAX_ADMISSION_BLOCK_NONE: return "";
+	case PENTAX_ADMISSION_BLOCK_UNREADABLE: return "re-probe-before-retry";
+	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
+		return "hold-shutter; wait-for-idle-without-timed-retry";
+	case PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE:
+	case PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT:
+		return "recover-output-with-ownership";
+	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
+		return "keep-shutter-blocked; recover-output-with-ownership";
+	}
+	return "fail-closed";
+}
+
 static uint16_t
 pentax_get_u16le (const unsigned char *data)
 {
@@ -771,22 +876,6 @@ int
 pentax_recovery_probe_ok (const unsigned char *data, size_t size)
 {
 	return pentax_admission_probe_ok (data, size, PENTAX_ADMISSION_STRICT);
-}
-
-int
-pentax_admission_probe_ok (const unsigned char *data, size_t size,
-	PentaxAdmissionPolicy policy)
-{
-	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
-		return 0;
-	if (policy == PENTAX_ADMISSION_STRICT &&
-	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
-		return 0;
-	if (pentax_get_u32le (data + 32) == 1)
-		return 0;
-	if (pentax_get_u32le (data + 36) != 0)
-		return 0;
-	return 1;
 }
 
 /* The stale-candidate baseline is the transfer candidate handle recorded in a
