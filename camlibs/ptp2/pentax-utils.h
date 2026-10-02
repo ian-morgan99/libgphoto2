@@ -199,10 +199,6 @@ int pentax_recovery_probe_ok (const unsigned char *data, size_t size);
  * exposure (+32) and no pending candidate (+36), while still surfacing +104
  * for correlation. OUTPUT_SAFE is telemetry only until physical evidence
  * proves it safe; production admission remains strict. */
-typedef enum {
-	PENTAX_ADMISSION_STRICT = 0,
-	PENTAX_ADMISSION_OUTPUT_SAFE = 1
-} PentaxAdmissionPolicy;
 int pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy);
 PentaxAdmissionBlockReason pentax_admission_block_reason (
