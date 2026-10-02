@@ -1,139 +1,799 @@
-/* SPDX-License-Identifier: LGPL-2.1-or-later */
-/*
- * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
- * Copyright (C) 2003-2026 Marcus Meissner <marcus@jet.franken.de>
- * Copyright (C) 2005 Hubert Figuiere <hfiguiere@teaser.fr>
- * Copyright (C) 2009-2024 Axel Waggershauser <awagger@web.de>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- * Boston, MA  02110-1301  USA
- */
-
 #include "config.h"
 
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
 
-#include "ptp.h"
-#include "ptp-bugs.h"
-#include "ptp-private.h"
+#include <gphoto2/gphoto2-result.h>
+#include <gphoto2/gphoto2-port-log.h>
 
 #include "pentax-utils.h"
 
-/* Minimum size for Pentax conditions block. */
-#define PENTAX_CONDITIONS_MIN_SIZE 528
+#define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
+#define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
 
-/* Check if Pentax admission probe is OK. */
+int
+pentax_session_error_needs_close_reset (uint16_t response,
+	unsigned int attempt)
+{
+	/* 0x02fa is the K-3 III response observed when a killed appliance
+	 * process leaves its PTP session resident.  The generic transport errors
+	 * have the same ownership ambiguity.  Recovery is deliberately bounded:
+	 * the third failure is returned to the caller instead of reset-looping. */
+	return attempt < 3 &&
+		(response == 0x02fa || response == 0x02fd || response == 0x02ff);
+}
+
+/* Capture budget is configurable for hosts with constrained storage
+ * (issue #36); parsed once and cached. */
+static size_t
+pentax_capture_max_file_size (void)
+{
+	static int cached;
+	static size_t budget = PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT;
+	const char *env;
+
+	if (cached)
+		return budget;
+	cached = 1;
+	env = getenv ("LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE");
+	if (env && *env) {
+		char *end = NULL;
+		unsigned long long value = strtoull (env, &end, 10);
+
+		if (end && *end == '\0' && value >= PENTAX_CAPTURE_MIN_FILE_SIZE &&
+		    value <= SIZE_MAX) {
+			budget = (size_t)value;
+			GP_LOG_D ("capture size budget from environment: %llu bytes",
+				value);
+		} else {
+			GP_LOG_E ("invalid LIBGPHOTO2_PENTAX_MAX_CAPTURE_SIZE '%s'; "
+				"using default %zu bytes", env,
+				PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT);
+		}
+	}
+	return budget;
+}
+
+uint32_t
+pentax_get_u32le (const unsigned char *data)
+{
+	return ((uint32_t)data[0]) |
+	       ((uint32_t)data[1] << 8) |
+	       ((uint32_t)data[2] << 16) |
+	       ((uint32_t)data[3] << 24);
+}
+
+unsigned int
+pentax_expected_extra_candidates (const unsigned char *data, size_t size)
+{
+	/* IMAGE Transmitter 2: 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF. */
+	if (!data || size < 528)
+		return 0;
+	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
+}
+
+static uint16_t
+pentax_get_u16le (const unsigned char *data)
+{
+	return (uint16_t)(data[0] | ((uint16_t)data[1] << 8));
+}
+
+int
+pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
+		PentaxLiveViewGeometry *geometry)
+{
+	PentaxLiveViewGeometry parsed;
+
+	if (!data || !geometry)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (size < 20)
+		return GP_ERROR_CORRUPTED_DATA;
+	parsed.area_width = pentax_get_u16le (data + 4);
+	parsed.area_height = pentax_get_u16le (data + 6);
+	parsed.active_width = pentax_get_u16le (data + 8);
+	parsed.active_height = pentax_get_u16le (data + 10);
+	parsed.contrast_af_active_width = pentax_get_u16le (data + 12);
+	parsed.contrast_af_active_height = pentax_get_u16le (data + 14);
+	parsed.contrast_af_spot_width = pentax_get_u16le (data + 16);
+	parsed.contrast_af_spot_height = pentax_get_u16le (data + 18);
+	if (!parsed.area_width || !parsed.area_height ||
+	    (parsed.active_width > parsed.area_width) ||
+	    (parsed.active_height > parsed.area_height) ||
+	    (parsed.contrast_af_active_width > parsed.area_width) ||
+	    (parsed.contrast_af_active_height > parsed.area_height) ||
+	    (parsed.contrast_af_spot_width > parsed.contrast_af_active_width) ||
+	    (parsed.contrast_af_spot_height > parsed.contrast_af_active_height))
+		return GP_ERROR_CORRUPTED_DATA;
+	*geometry = parsed;
+	return GP_OK;
+}
+
+int
+pentax_parse_live_view_af_position (const unsigned char *data, size_t size,
+		const PentaxLiveViewGeometry *geometry, uint16_t *x, uint16_t *y)
+{
+	uint16_t parsed_x, parsed_y;
+
+	if (!data || !geometry || !x || !y)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* Only the exact 8-byte coordinate form is accepted (issue #26).
+	 * Longer payloads are rejected: the trailing bytes' meaning is
+	 * Unknown-hardware, so accepting 12/16-byte responses would let an
+	 * arbitrary frame pass as a coordinate.  Byte 0 must carry the
+	 * encoder tag 2 used by pentax_encode_live_view_af_position. */
+	if (size != 8)
+		return GP_ERROR_CORRUPTED_DATA;
+	if (data[0] != 2)
+		return GP_ERROR_CORRUPTED_DATA;
+	parsed_x = pentax_get_u16le (data + 4);
+	parsed_y = pentax_get_u16le (data + 6);
+	if ((parsed_x >= geometry->area_width) ||
+	    (parsed_y >= geometry->area_height))
+		return GP_ERROR_CORRUPTED_DATA;
+	*x = parsed_x;
+	*y = parsed_y;
+	return GP_OK;
+}
+
+int
+pentax_encode_live_view_af_position (uint16_t x, uint16_t y,
+		unsigned char data[8])
+{
+	if (!data)
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (data, 0, 8);
+	data[0] = 2;
+	data[4] = (unsigned char)x;
+	data[5] = (unsigned char)(x >> 8);
+	data[6] = (unsigned char)y;
+	data[7] = (unsigned char)(y >> 8);
+	return GP_OK;
+}
+
+int
+pentax_encode_live_view_zoom (uint16_t x, uint16_t y,
+		uint8_t magnification, unsigned char data[12])
+{
+	if (!data || !magnification)
+		return GP_ERROR_BAD_PARAMETERS;
+	memset (data, 0, 12);
+	data[0] = 4;
+	data[4] = (unsigned char)x;
+	data[5] = (unsigned char)(x >> 8);
+	data[6] = (unsigned char)y;
+	data[7] = (unsigned char)(y >> 8);
+	data[8] = magnification;
+	return GP_OK;
+}
+
+int
+pentax_live_view_stop_response_ok (uint16_t response)
+{
+	return (response == 0x2001) || (response == 0xa005);
+}
+
+int
+pentax_live_view_zoom_fallback (uint8_t requested, uint16_t response,
+		uint8_t *fallback)
+{
+	if (!fallback)
+		return GP_ERROR_BAD_PARAMETERS;
+	if ((requested != 16) || (response != 0x201c))
+		return 0;
+	*fallback = 10;
+	return 1;
+}
+
+int
+pentax_live_view_frame_should_retry (uint16_t response,
+		unsigned int attempts, unsigned int elapsed_ms,
+		unsigned int data_size)
+{
+	/* IT2 identifies 0xa008 as NoUpdateImage.  Thirty attempts at its 33 ms
+	 * cadence are permitted, with an independent 1.5 second wall-time cap.
+	 *
+	 * Issue #86: the K-1 II also returns PTP_RC_GeneralError (0x2002) with a
+	 * zero-byte data phase when PC live view has no fresh frame to hand over
+	 * (the observed "valid 0x2001 frames -> 0x2002 with 0 bytes" transition).
+	 * Treating that as terminal tore the live view down immediately, which is
+	 * what took the camera off USB.  Retry it within the same bounded window so
+	 * a transient empty frame does not poison the session; a genuinely stuck
+	 * stream still times out at the 30-attempt / 1.5 s bound and only then is
+	 * the live view restored. */
+	if ((response == 0xa008) ||
+	    ((response == 0x2002) && (data_size == 0)))
+		return (attempts < 30) && (elapsed_ms < 1500);
+	/* A non-empty 0x2002 (genuine GeneralError with a data phase) is NOT
+	 * the K-1 II empty-frame transition; it remains terminal. */
+	return 0;
+}
+
+int
+pentax_parse_conditions (const unsigned char *data, size_t size,
+		PentaxConditions *conditions)
+{
+	PentaxConditions parsed;
+
+	if (!data || !conditions)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* capability_flags at 504 is the final mandatory field. */
+	if (size < PENTAX_CONDITIONS_MIN_SIZE)
+		return GP_ERROR_CORRUPTED_DATA;
+	memset (&parsed, 0, sizeof (parsed));
+	parsed.operation_state = (uint8_t)pentax_get_u32le (data + 24);
+	parsed.activity_flags = pentax_get_u32le (data + 104);
+	parsed.exposure_step = pentax_get_u32le (data + 168);
+	parsed.exposure_mode = pentax_get_u32le (data + 184);
+	parsed.user_mode = pentax_get_u32le (data + 40);
+	parsed.bulb_timer_seconds = pentax_get_u32le (data + 272);
+	parsed.bulb_timer_denominator = pentax_get_u32le (data + 276);
+	parsed.aperture_numerator = pentax_get_u32le (data + 280);
+	parsed.aperture_denominator = pentax_get_u32le (data + 284);
+	parsed.exposure_comp_numerator = (int32_t)pentax_get_u32le (data + 288);
+	parsed.exposure_comp_denominator = pentax_get_u32le (data + 292);
+	parsed.iso = pentax_get_u32le (data + 312);
+	parsed.astro_status_flags = pentax_get_u32le (data + 320);
+	parsed.open_av_num = pentax_get_u32le (data + 328);
+	parsed.drive_mode = pentax_get_u32le (data + 492);
+	/* IT2 offset 120: white balance mode (issue #27). */
+	parsed.white_balance = pentax_get_u32le (data + 120);
+	/* IT2 offset 196: AF mode; 0 = MF, >0 = an AF mode. */
+	parsed.af_mode = pentax_get_u32le (data + 196);
+	parsed.capability_flags = pentax_get_u32le (data + 504);
+	if (size >= 532) {
+		parsed.astro_limit_seconds = pentax_get_u32le (data + 528);
+		parsed.has_astro_limit = 1;
+	}
+	*conditions = parsed;
+	return GP_OK;
+}
+
+int
+pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
+		int32_t *displacement)
+{
+	uint64_t magnitude;
+
+	if (!displacement || ((direction != -1) && (direction != 1)))
+		return GP_ERROR_BAD_PARAMETERS;
+	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0).  The
+	 * protocol sign convention is inverted relative to the UI: positive
+	 * displacement drives the lens toward Far, negative toward Near.
+	 * (Re-verified on K-3 III real hardware 2026-09-14: the original
+	 * mapping had Near/Far swapped.) */
+	magnitude = ((uint64_t)open_av_num * 5U) / 6U;
+	if (!magnitude || (magnitude > INT32_MAX))
+		return GP_ERROR_CORRUPTED_DATA;
+	*displacement = direction > 0 ? -(int32_t)magnitude : (int32_t)magnitude;
+	return GP_OK;
+}
+
+int
+pentax_old_focus_protocol_direction (int direction,
+		uint32_t *protocol_direction)
+{
+	if (!protocol_direction || ((direction != -1) && (direction != 1)))
+		return GP_ERROR_BAD_PARAMETERS;
+	/* IT2 FocusFineTune (old-focus, opcode 0x9016): protocol direction 0
+	 * drives the lens toward Near and 1 toward Far.  The public helper
+	 * follows the newer focus helper's semantic convention: +1 is Near and
+	 * -1 is Far.  (Re-verified on real hardware 2026-09-14: the 5e5585002
+	 * mapping had the two reversed, so MF moved in the wrong sense while AF
+	 * was unaffected.) */
+	*protocol_direction = direction > 0 ? 0U : 1U;
+	return GP_OK;
+}
+
+int
+pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
+		const char *device_model, uint32_t *model_no, uint32_t *extension_version)
+{
+	if (!model_no || !extension_version)
+		return 0;
+	*model_no = 0;
+	*extension_version = 0;
+	if (!device_model || (usb_vendor != 0x25fb))
+		return 0;
+	if ((usb_product == 0x0189) &&
+	    !strcmp (device_model, "PENTAX K-3 Mark III")) {
+		*model_no = PENTAX_MODEL_K3_MARK_III;
+		*extension_version = 1;
+		return 1;
+	}
+	/* IT2 matches the Monochrome with StartsWith("PENTAX K-3 Mark III"),
+	 * so it shares model_no 78420 and all K-3 III capability flags. */
+	if ((usb_product == 0x018f) &&
+	    !strncmp (device_model, "PENTAX K-3 Mark III", strlen ("PENTAX K-3 Mark III"))) {
+		*model_no = PENTAX_MODEL_K3_MARK_III;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x017f) &&
+	    !strncmp (device_model, "PENTAX KP", strlen ("PENTAX KP"))) {
+		*model_no = PENTAX_MODEL_KP;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x017d) &&
+	    !strncmp (device_model, "PENTAX K-70", strlen ("PENTAX K-70"))) {
+		*model_no = PENTAX_MODEL_K70;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x0183) &&
+	    !strcmp (device_model, "PENTAX K-1 Mark II")) {
+		*model_no = PENTAX_MODEL_K1_MARK_II;
+		*extension_version = 1;
+		return 1;
+	}
+	/* IT2 Model setter: 645D uses StartsWith("645D"), model 77320, and is
+	 * the only IT2 model with vendor extension version 0.  IT2's IsSupported
+	 * matches the bare string "645D" (its manufacturer field is "PENTAX",
+	 * not "RICOH IMAGING COMPANY, LTD."), so accept both forms. */
+	if ((usb_product == 0x0130) &&
+	    (!strcmp (device_model, "645D") ||
+	     !strncmp (device_model, "PENTAX 645D", strlen ("PENTAX 645D")))) {
+		*model_no = PENTAX_MODEL_645D;
+		*extension_version = 0;
+		return 1;
+	}
+	/* IT2 Model setter: 645Z = 77840, StartsWith("645Z"), ext version 1,
+	 * isNewTransferMode=false, exp bracket YES, movie NO.  PID from its
+	 * own firmware image (fwdc224b.bin v1.30 header). */
+	if ((usb_product == 0x0167) &&
+	    (!strcmp (device_model, "645Z") ||
+	     !strncmp (device_model, "PENTAX 645Z", strlen ("PENTAX 645Z")))) {
+		*model_no = PENTAX_MODEL_645Z;
+		*extension_version = 1;
+		return 1;
+	}
+	/* IT2 Model setter: KF = 78520.  PID from fwdc245b.bin v1.33 header
+	 * (same fb25 <pid> <pid> pattern as KP/645Z). */
+	if ((usb_product == 0x018e) &&
+	    !strncmp (device_model, "PENTAX KF", strlen ("PENTAX KF"))) {
+		*model_no = PENTAX_MODEL_KF;
+		*extension_version = 1;
+		return 1;
+	}
+	/* K-3 II is NOT in IT2, so we have no normative reference for it.
+	 * Fail-closed: assume the older K-3-generation architecture (old
+	 * transfer, old focus 0x9016) until proven otherwise on hardware or
+	 * via a newer IT2 build.  Not listed here, so vendor mode stays off. */
+	/* IT2 Model setter: K-3 (77760), K-1 (77970), GR III (78350) all use
+	 * vendor extension version 1. */
+	if ((usb_product == 0x0165) &&
+	    !strncmp (device_model, "PENTAX K-3", strlen ("PENTAX K-3"))) {
+		*model_no = PENTAX_MODEL_K3;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x0179) &&
+	    !strncmp (device_model, "PENTAX K-1", strlen ("PENTAX K-1"))) {
+		*model_no = PENTAX_MODEL_K1;
+		*extension_version = 1;
+		return 1;
+	}
+	if ((usb_product == 0x210f) &&
+	    !strncmp (device_model, "RICOH GR III", strlen ("RICOH GR III"))) {
+		*model_no = PENTAX_MODEL_GR_III;
+		*extension_version = 1;
+		return 1;
+	}
+	return 0;
+}
+
+int
+pentax_model_uses_new_focus (uint32_t model_no)
+{
+	/* IT2 explicitly selects 0x9017 only for its new-focus models.  The
+	 * K-1 II is an old-focus 0x9016 model and must fail closed here.
+	 * Per IT2 Model setter: new-focus = K-3 III family, KP, GR III. */
+	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
+	       (model_no == PENTAX_MODEL_KP) ||
+	       (model_no == PENTAX_MODEL_GR_III);
+}
+
+/* IT2 capability gates for the properties below.  IT2's UI only exposes
+ * these controls when the per-model flag is set; on other models the
+ * property exists in the protocol but the camera answers with an OK
+ * response and an EMPTY data phase (verified on K-1 II hardware), which
+ * surfaces as GP_ERROR_CORRUPTED_DATA.  Fail closed instead.
+ *
+ * Exposure bracketing (0xd014/0xd015): _isExpBracketSupport is set only
+ * for K-3 III family and 645Z (MainWindow.xaml.cs:506).  The fork now has
+ * a 645Z entry (PID 0x0167 from its firmware image), so both are covered.
+ * Composition adjustment (0xd02a): _isCompositionAdjSupported only for
+ * K-3 III family and KP (MtpDevice.cs:96,173).
+ * Movie mode setting (0xd039): _isMovieSettingSupported only for the
+ * K-3 III family; IsMovieSupported alone also covers bodies that accept
+ * the movie *state* but not remote movie *settings*.
+ * PC live view (0xd035): _isPcLvHighResolutionSupported only for the
+ * K-3 III family (MtpDevice.cs:103). */
+
+static int
+pentax_model_is_k3iii_family (uint32_t model_no)
+{
+	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
+	       (model_no == PENTAX_MODEL_K3_MARK_III_MONO);
+}
+
+int
+pentax_model_supports_exp_bracket (uint32_t model_no)
+{
+	/* IT2 MainWindow.xaml.cs:506: 645Z also sets _isExpBracketSupport. */
+	return pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_645Z);
+}
+
+int
+pentax_model_supports_composition_adjust (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_KP);
+}
+
+int
+pentax_model_supports_movie_setting (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+int
+pentax_model_supports_pc_live_view (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+/* Cross process (d02c): the HW finding that writes work once CI mode d020 is
+ * set to cross process came from a K-3 III family body.  On a K-1 II the
+ * property GET returns PTP_RC_DevicePropNotSupported and SET returns
+ * PTP_RC_AccessDenied even with d020=10 (evidence: docs/pentax/evidence/
+ * 2026-09-02/k1ii-d02c-probe.log), so fail closed on the k3iii family only. */
+int
+pentax_model_supports_cross_process (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+/* Card writing mode (0x9004): IT2's Model property setter sets _isDualSlot
+ * true for the K-1 family, K-3 family and 645D/645Z, and false for KP,
+ * K-70, GR III and G900SE (MtpDevice.cs).  The SD-writing-mode UI is only
+ * reachable on dual-slot bodies; fail closed on the single-slot set. */
+int
+pentax_model_supports_card_writing_mode (uint32_t model_no)
+{
+	return (model_no == PENTAX_MODEL_K1_MARK_II) ||
+	       (model_no == PENTAX_MODEL_K1) ||
+	       (model_no == PENTAX_MODEL_K3) ||
+	       pentax_model_is_k3iii_family (model_no) ||
+	       (model_no == PENTAX_MODEL_645D) ||
+	       (model_no == PENTAX_MODEL_645Z);
+}
+
+/* Writing file format (0xd01b): the IT2 payload layout for the K-3 III /
+ * K-1 II family is the 10-byte form (byte 0 = 6, bytes 4/5 = file format,
+ * byte 7 = JPEG quality, byte 8 = RAW kind, byte 9 = card slot).  The KP
+ * uses a different 11-byte layout and the K-3 II is not in IT2 at all, so
+ * fail closed on the k3iii family only (issues #54 and #55). */
+int
+pentax_model_supports_writing_file_format (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+/* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
+ * used by IT2 (MtpDevice.cs _camWritingFileFormatCopy):
+ *   0 = fine (3-star), 1 = normal (2-star), 2 = basic (1-star).
+ * Returns -1 for an unknown label so callers can fail closed.  Centralised
+ * here (rather than inlined in config.c) so the encoding is unit-testable and
+ * cannot drift from the documented intent (issue #71 / #55). */
+int
+pentax_wff_quality_byte (const char *value)
+{
+	if (!value)
+		return -1;
+	if (!strcmp (value, "fine"))
+		return 0;
+	if (!strcmp (value, "normal"))
+		return 1;
+	if (!strcmp (value, "basic"))
+		return 2;
+	return -1;
+}
+
+static int
+pentax_capture_buffer_reserve (PentaxCaptureBuffer *buffer, size_t required)
+{
+	size_t capacity;
+	unsigned char *data;
+
+	if (required > pentax_capture_max_file_size())
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	if (required <= buffer->capacity)
+		return GP_OK;
+	capacity = buffer->capacity ? buffer->capacity : 1024U * 1024U;
+	while (capacity < required) {
+		if (capacity > pentax_capture_max_file_size() / 2) {
+			capacity = pentax_capture_max_file_size();
+			break;
+		}
+		capacity *= 2;
+	}
+	data = realloc (buffer->data, capacity);
+	if (!data)
+		return GP_ERROR_NO_MEMORY;
+	buffer->data = data;
+	buffer->capacity = capacity;
+	return GP_OK;
+}
+
+int
+pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
+		const unsigned char *data, size_t size)
+{
+	size_t end;
+	int ret;
+
+	if (!buffer || (!data && size))
+		return GP_ERROR_BAD_PARAMETERS;
+	if (size > pentax_capture_max_file_size() - buffer->offset)
+		return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	end = buffer->offset + size;
+	ret = pentax_capture_buffer_reserve (buffer, end);
+	if (ret < GP_OK)
+		return ret;
+	if (buffer->offset > buffer->size)
+		memset (buffer->data + buffer->size, 0, buffer->offset - buffer->size);
+	if (size)
+		memcpy (buffer->data + buffer->offset, data, size);
+	buffer->offset = end;
+	if (end > buffer->size)
+		buffer->size = end;
+	return GP_OK;
+}
+
+int
+pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer, unsigned int operation,
+		int32_t displacement)
+{
+	int64_t base, destination;
+
+	if (!buffer)
+		return GP_ERROR_BAD_PARAMETERS;
+	switch (operation) {
+	case 4: base = 0; break;
+	case 5: base = (int64_t)buffer->offset; break;
+	case 6: base = (int64_t)buffer->size; break;
+	default: return GP_ERROR_BAD_PARAMETERS;
+	}
+	destination = base + displacement;
+	if ((destination < 0) || ((uint64_t)destination > pentax_capture_max_file_size()))
+		return GP_ERROR_BAD_PARAMETERS;
+	buffer->offset = (size_t)destination;
+	return GP_OK;
+}
+
+int
+pentax_candidate_filename (const unsigned char *data, uint32_t size,
+		char *filename, size_t filename_size)
+{
+	size_t characters, i, output = 0;
+
+	if (!data || (size < 4) || !filename || (filename_size < 2))
+		return GP_ERROR_BAD_PARAMETERS;
+	characters = data[3];
+	if ((characters > (size - 4) / 2) || !characters)
+		return GP_ERROR_CORRUPTED_DATA;
+	for (i = 0; i < characters; i++) {
+		uint16_t character = data[4 + i * 2] | ((uint16_t)data[5 + i * 2] << 8);
+		if (!character)
+			break;
+		if ((character < 0x20) || (character > 0x7e) ||
+		    (character == '/') || (character == '\\'))
+			return GP_ERROR_CORRUPTED_DATA;
+		if (output + 1 >= filename_size)
+			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+		filename[output++] = (char)character;
+	}
+	if (!output)
+		return GP_ERROR_CORRUPTED_DATA;
+	filename[output] = '\0';
+	if (!strcmp (filename, ".") || !strcmp (filename, ".."))
+		return GP_ERROR_CORRUPTED_DATA;
+	return GP_OK;
+}
+
+int
+pentax_jpeg_bounds (const unsigned char *data, size_t size,
+		size_t *offset, size_t *length)
+{
+	size_t start, end;
+
+	if (!data || !offset || !length)
+		return GP_ERROR_BAD_PARAMETERS;
+	*offset = 0;
+	*length = 0;
+	for (start = 0; start + 1 < size; start++)
+		if ((data[start] == 0xff) && (data[start + 1] == 0xd8))
+			break;
+	if (start + 1 >= size)
+		return GP_ERROR_CORRUPTED_DATA;
+	for (end = start + 2; end + 1 < size; end++)
+		if ((data[end] == 0xff) && (data[end + 1] == 0xd9)) {
+			*offset = start;
+			*length = end + 2 - start;
+			return GP_OK;
+		}
+	return GP_ERROR_CORRUPTED_DATA;
+}
+
+int
+pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
+		int ownership_result)
+{
+	if (!buffer)
+		return GP_ERROR_BAD_PARAMETERS;
+	if (ownership_result < GP_OK)
+		return ownership_result;
+	buffer->data = NULL;
+	buffer->size = 0;
+	return ownership_result;
+}
+
+static int
+pentax_transfer_interrupted (const PentaxTransferOps *operations)
+{
+	if (operations->is_cancelled &&
+	    operations->is_cancelled (operations->user_data))
+		return GP_ERROR_CANCEL;
+	if (operations->is_timed_out &&
+	    operations->is_timed_out (operations->user_data))
+		return GP_ERROR_TIMEOUT;
+	return GP_OK;
+}
+
+int
+pentax_transfer_run (PentaxCaptureBuffer *buffer,
+		const PentaxTransferOps *operations)
+{
+	unsigned int command_count = 0;
+	int ret;
+
+	if (!buffer || !operations || !operations->get_command ||
+	    !operations->get_block || !operations->max_block_size)
+		return GP_ERROR_BAD_PARAMETERS;
+	for (;;) {
+		uint8_t operation = 0;
+		int32_t operation_info = 0;
+
+		if (++command_count > 100000U)
+			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+		ret = pentax_transfer_interrupted (operations);
+		if (ret < GP_OK)
+			return ret;
+		ret = operations->get_command (operations->user_data, &operation,
+			&operation_info);
+		if (ret < GP_OK)
+			return ret;
+		if (command_count == 1) {
+			if (operation != 1)
+				return GP_ERROR_CORRUPTED_DATA;
+			continue;
+		}
+		if (operation == 1)
+			return GP_ERROR_CORRUPTED_DATA;
+		if (operation == 2)
+			return buffer->size ? GP_OK : GP_ERROR_CORRUPTED_DATA;
+		if (operation == 3) {
+			uint32_t remaining;
+
+			if (operation_info <= 0)
+				return GP_ERROR_CORRUPTED_DATA;
+			remaining = (uint32_t)operation_info;
+			while (remaining) {
+				unsigned char *data = NULL;
+				uint32_t request = remaining;
+				uint32_t transferred = 0;
+
+				ret = pentax_transfer_interrupted (operations);
+				if (ret < GP_OK)
+					return ret;
+				if (request > operations->max_block_size)
+					request = operations->max_block_size;
+				ret = operations->get_block (operations->user_data, request,
+					&data, &transferred);
+				if (ret < GP_OK) {
+					free (data);
+					return ret;
+				}
+				if (!data || !transferred || (transferred > request)) {
+					free (data);
+					return GP_ERROR_CORRUPTED_DATA;
+				}
+				ret = pentax_capture_buffer_write (buffer, data, transferred);
+				free (data);
+				if (ret < GP_OK)
+					return ret;
+				remaining -= transferred;
+				if (transferred < request) {
+					/* A short block inside a declared
+					 * segment leaves the operation
+					 * incomplete; the camera will not
+					 * resend the missing bytes, so the
+					 * image would be silently truncated
+					 * (issue #35). */
+					return GP_ERROR_CORRUPTED_DATA;
+				}
+			}
+			continue;
+		}
+		if ((operation >= 4) && (operation <= 6)) {
+			ret = pentax_capture_buffer_seek (buffer, operation, operation_info);
+			if (ret < GP_OK)
+				return ret;
+			continue;
+		}
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+}
+
+/* Research builds only: the vendor Pentax bodies whose capture flow we
+ * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome). */
+int
+pentax_pid_is_research_capable (unsigned int pid)
+{
+	return (pid == 0x0183) || (pid == 0x0189) || (pid == 0x018f);
+}
+
+/* A stalled camera (no bytes for a while) is a different failure from one
+ * legitimately streaming a huge image for a long time; only the former should
+ * trip the short bound (issue #38). The stall check must run before the
+ * ceiling so a wedged stream cannot hide behind the absolute budget. */
+int
+pentax_transfer_timeout_reason (unsigned long long total_ms, unsigned long long idle_ms)
+{
+	if (idle_ms >= PENTAX_TRANSFER_NOPROGRESS_TIMEOUT_MS)
+		return PENTAX_TRANSFER_TIMEOUT_STALLED;
+	if (total_ms >= PENTAX_TRANSFER_TIMEOUT_MS)
+		return PENTAX_TRANSFER_TIMEOUT_CEILING;
+	return PENTAX_TRANSFER_TIMEOUT_OK;
+}
+
+/* A recovery probe is only meaningful when the conditions blob is complete,
+ * no unsafe activity flag is set, and the camera reports it is not in a
+ * capture (field 32 != 1). Short-circuiting on size makes this safe to call
+ * with (NULL, 0) after an unreadable probe. */
+int
+pentax_recovery_probe_ok (const unsigned char *data, size_t size)
+{
+	return pentax_admission_probe_ok (data, size, PENTAX_ADMISSION_STRICT);
+}
+
 int
 pentax_admission_probe_ok (const unsigned char *data, size_t size,
 	PentaxAdmissionPolicy policy)
 {
-	return pentax_admission_block_reason (data, size, policy) ==
-		PENTAX_ADMISSION_BLOCK_NONE;
-}
-
-/* Get the name of a Pentax admission block reason. */
-const char *
-pentax_admission_block_reason_name (PentaxAdmissionBlockReason reason)
-{
-	switch (reason) {
-	case PENTAX_ADMISSION_BLOCK_NONE:
-		return "none";
-	case PENTAX_ADMISSION_BLOCK_UNREADABLE:
-		return "conditions-unreadable";
-	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
-		return "unsafe-activity";
-	case PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE:
-		return "transfer-candidate-available";
-	case PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT:
-		return "selector-present";
-	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
-		return "output-obligation-unresolved";
-	}
-	return "unknown";
-}
-
-/* Pentax admission block reason. */
-PentaxAdmissionBlockReason
-pentax_admission_block_reason (const unsigned char *data, size_t size,
-	PentaxAdmissionPolicy policy)
-{
 	if (!data || (size < PENTAX_CONDITIONS_MIN_SIZE))
-		return PENTAX_ADMISSION_BLOCK_UNREADABLE;
+		return 0;
 	if (policy == PENTAX_ADMISSION_STRICT &&
 	    (pentax_get_u32le (data + 104) & PENTAX_CONDITION_ACTIVITY_UNSAFE))
-		return PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY;
-	if (pentax_get_u32le (data + 32) == 1)
-		return PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE;
-	if (pentax_get_u32le (data + 36) != 0)
-		return PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT;
-	return PENTAX_ADMISSION_BLOCK_NONE;
-}
-
-/* Pentax capture output obligation resolved. */
-int
-pentax_capture_output_obligation_resolved (int capture_accepted,
-	int primary_published, int all_expected_outputs_published)
-{
-	return !capture_accepted ||
-		(primary_published && all_expected_outputs_published);
-}
-
-/* Pentax candidate output published. */
-int
-pentax_candidate_output_published (int transfer_succeeded, int filename_known,
-	int filesystem_publication_succeeded)
-{
-	return transfer_succeeded && filename_known &&
-		filesystem_publication_succeeded;
-}
-
-/* Pentax capture initiate response ambiguous. */
-int
-pentax_capture_initiate_response_ambiguous (uint16_t response)
-{
-	/* ptp.h reserves 0x02f9..0x02ff for transport/session failures. Unlike an
-	 * explicit PTP response, these do not prove whether the camera accepted the
-	 * command before the response path failed. */
-	return response >= 0x02f9 && response <= 0x02ff;
-}
-
-/* Pentax capture output contract known. */
-int
-pentax_capture_output_contract_known (const unsigned char *data, size_t size)
-{
-	uint32_t format;
-
-	/* IMAGE Transmitter 2 documents 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF.
-	 * A short/unknown value must not silently turn a multi-file capture into a
-	 * single-file obligation. */
-	if (!data || size < 528)
 		return 0;
-	format = pentax_get_u32le (data + 524);
-	return format <= 3;
+	if (pentax_get_u32le (data + 32) == 1)
+		return 0;
+	if (pentax_get_u32le (data + 36) != 0)
+		return 0;
+	return 1;
 }
 
-/* Pentax expected extra candidates. */
-unsigned int
-pentax_expected_extra_candidates (const unsigned char *data, size_t size)
-{
-	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
-}
-
-/* Pentax stale candidate baseline. */
+/* The stale-candidate baseline is the transfer candidate handle recorded in a
+ * pre-capture conditions probe: only valid when the blob is complete and the
+ * camera reports an active capture (field 32 == 1). A zero result means "no
+ * usable baseline", which callers treat as "proceed without the check"
+ * (issue #34). */
 uint32_t
 pentax_stale_candidate_baseline (const unsigned char *data, size_t size)
 {
@@ -144,7 +804,10 @@ pentax_stale_candidate_baseline (const unsigned char *data, size_t size)
 	return pentax_get_u32le (data + 36);
 }
 
-/* Pentax reconcile conditions. */
+/* Decision for a reused session whose camera state we can only observe, not
+ * control: unreadable/short blobs and unsafe activity both force recovery;
+ * a non-zero candidate handle means the previous capture's transfer is still
+ * pending and must be recovered or refused before capturing (issue #33). */
 PentaxReconcileDecision
 pentax_reconcile_conditions (const unsigned char *data, size_t size, uint32_t *candidate_out)
 {
@@ -162,7 +825,174 @@ pentax_reconcile_conditions (const unsigned char *data, size_t size, uint32_t *c
 	return PENTAX_RECONCILE_IDLE;
 }
 
-/* Pentax camera readiness. */
+/* No capture may exceed the absolute ceiling, whatever the mode math says. */
+static unsigned int
+pentax_clamp_timeout_ms (uint64_t ms, const char *source)
+{
+	if (ms > PENTAX_CAPTURE_TIMEOUT_MS_MAX) {
+		GP_LOG_E ("Pentax capture budget from %s (%llu ms) exceeds clamp; using %u ms.",
+			source, (unsigned long long) ms,
+			(unsigned int) PENTAX_CAPTURE_TIMEOUT_MS_MAX);
+		return (unsigned int) PENTAX_CAPTURE_TIMEOUT_MS_MAX;
+	}
+	return (unsigned int) ms;
+}
+
+/* Capture timeout budget in milliseconds for the current conditions. The base
+ * covers a normal exposure plus processing margin; each special mode widens
+ * it, and every result is clamped to the absolute ceiling so no mode can hang
+ * the caller for 24 hours. */
+unsigned int
+pentax_capture_timeout_ms (const PentaxConditions *conditions)
+{
+	uint64_t timeout = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+
+	/* Astro shift: honour the camera's own limit when it reports one,
+	 * otherwise fall back to base + margin below. */
+	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE) {
+		uint64_t limit_ms = conditions->has_astro_limit ?
+			((uint64_t) conditions->astro_limit_seconds + 1) * 1000 : 0;
+		if (limit_ms > timeout)
+			timeout = limit_ms;
+		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		timeout = pentax_clamp_timeout_ms (timeout, "astro limit");
+	}
+
+	/* Bulb: the timer value plus margin. */
+	if (conditions->bulb_timer_seconds > 0) {
+		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
+		bulb_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb timer");
+		if (bulb_ms > timeout)
+			timeout = bulb_ms;
+	}
+
+	/* Multi-shot: each shot needs its own budget. Base timeout is 60s, so
+	 * for pixel shift: 60s * 4 + 30s margin = 270s. */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
+		uint64_t multi_ms;
+		if (conditions->bulb_timer_seconds > 0)
+			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		else
+			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		multi_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot composite");
+		if (multi_ms > timeout)
+			timeout = multi_ms;
+	}
+
+	/* Astro Tracer without a shift limit: honour the camera's own
+	 * AstroTracerTimeLimit when it reports one, otherwise base + margin.
+	 *
+	 * IT2 parity (MtpDevice.cs / MainWindow.xaml.cs): the "in astro mode"
+	 * signal is the exposure-mode dial value (offset 184) == ExpMode.AstroTracer
+	 * (20), and the long-exposure budget comes from AstroTracerTimeLimit
+	 * (offset 528).  The offset-504 capability bit (PENTAX_CONDITION_ASTROTRACER3)
+	 * only says the body CAN do astro; it is not a live-mode indicator, so it
+	 * must not gate this budget.  This is model-agnostic and therefore covers
+	 * the K-1 II (old-focus) as well as the K-3 III. */
+	if (pentax_conditions_in_astro_mode (conditions) &&
+	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
+		uint64_t astro_ms;
+		if (conditions->has_astro_limit)
+			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
+		else
+			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		astro_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer");
+		if (astro_ms > timeout)
+			timeout = astro_ms;
+	}
+
+	return (unsigned int) timeout;
+}
+
+/* Exposure-phase budget in milliseconds (issue #111): how long the camera
+ * needs to complete the exposure itself, before any post-exposure processing
+ * or transfer-candidate publication.  This is deliberately separate from
+ * pentax_capture_timeout_ms(), which also budgets the post-exposure
+ * processing margin: a 120 s Bulb must not spend its entire all-in budget
+ * before RAW processing even starts.  The result is clamped to the absolute
+ * ceiling so a corrupt camera-reported value cannot wrap. */
+unsigned int
+pentax_exposure_phase_ms (const PentaxConditions *conditions)
+{
+	uint64_t exposure_ms = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+
+	/* Bulb: the timer value is the exposure duration itself.  Add one
+	 * second of settle so the candidate is not polled before the shutter
+	 * has actually closed.  This is the exposure phase only — post-exposure
+	 * processing (RAW conversion, candidate publication) is budgeted
+	 * separately by pentax_capture_timeout_ms().
+	 *
+	 * Issue #120: the camera's own conditions report bulb_timer_seconds as the
+	 * exposure duration (offset 272, whole seconds; offset 276 is the TV
+	 * denominator, not a timer fraction — confirmed against IT2 which builds a
+	 * TimeSpan from offset 272 directly).  The observed "countdown then a short
+	 * exposure" symptom in some modes is the camera/app treating the value as a
+	 * pre-shot delay; that is firmware behaviour outside this wait budget, so
+	 * the budget here correctly sizes to the full timer value. */
+	if (conditions->bulb_timer_seconds > 0) {
+		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
+
+		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb exposure");
+		if (bulb_ms > exposure_ms)
+			exposure_ms = bulb_ms;
+	}
+
+	/* Multi-shot: each shot needs its own exposure budget.  Pixel shift is
+	 * 4 shots, so the exposure phase is the per-shot budget times the shot
+	 * count.  Post-exposure processing is budgeted separately. */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
+		uint64_t multi_ms;
+
+		if (conditions->bulb_timer_seconds > 0)
+			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		else
+			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
+				PENTAX_PIXEL_SHIFT_MULTIPLIER;
+		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot exposure");
+		if (multi_ms > exposure_ms)
+			exposure_ms = multi_ms;
+	}
+
+	/* Astro Tracer: the exposure itself can run up to the camera's own
+	 * AstroTracerTimeLimit (offset 528), which IT2 caps the bulb timer at.
+	 * Honour that limit so a long astro exposure is not aborted before the
+	 * shutter closes.  Model-agnostic (K-1 II and K-3 III alike). */
+	if (pentax_conditions_in_astro_mode (conditions)) {
+		uint64_t astro_ms;
+
+		if (conditions->has_astro_limit)
+			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
+		else
+			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
+		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer exposure");
+		if (astro_ms > exposure_ms)
+			exposure_ms = astro_ms;
+	}
+
+	return (unsigned int) exposure_ms;
+}
+
+PentaxCaptureTimeoutState
+pentax_capture_timeout_state (uint32_t activity_flags)
+{
+	/* Prefer PROCESSING if both bits are present: it proves the camera has
+	 * reached the post-exposure phase, whereas the absent candidate merely
+	 * says publication has not completed. */
+	if (activity_flags & PENTAX_CONDITION_ACTIVITY_PROCESSING)
+		return PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING;
+	if (activity_flags & PENTAX_CONDITION_ACTIVITY_SHOOTING)
+		return PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING;
+	return PENTAX_CAPTURE_TIMEOUT_STATE_UNKNOWN;
+}
+
 PentaxReadiness
 pentax_camera_readiness (const unsigned char *data, unsigned int size)
 {
@@ -178,199 +1008,389 @@ pentax_camera_readiness (const unsigned char *data, unsigned int size)
 }
 
 int
+pentax_conditions_in_astro_mode (const PentaxConditions *conditions)
+{
+	if (conditions == NULL)
+		return 0;
+	/* IT2's authoritative "in astro mode" signal is the exposure-mode dial
+	 * value (offset 184) == ExpMode.AstroTracer (20).  The offset-320 shift
+	 * sub-state bit is also a live indicator of an in-progress astro pixel-shift,
+	 * so treat either as "in astro mode".  The offset-504 capability bit is
+	 * deliberately NOT used here: it only says the body CAN do astro. */
+	if (conditions->exposure_mode == PENTAX_EXP_MODE_ASTROTRACER)
+		return 1;
+	if (conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)
+		return 1;
+	return 0;
+}
+
+int
+pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
+{
+	if (conditions == NULL)
+		return 0;
+	/* Multi-shot composites (pixel shift, DNR) and astro modes keep processing
+	 * after the last candidate is consumed; bulb exposures run a long timer.
+	 * Ordinary single-shot captures do not need the wait (issue #122). */
+	if (conditions->activity_flags &
+	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE))
+		return 1;
+	if (pentax_conditions_in_astro_mode (conditions))
+		return 1;
+	if (conditions->bulb_timer_seconds > 0)
+		return 1;
+	return 0;
+}
+
+/* Bounded reconciliation of extra transfer candidates from a dual-format
+ * exposure (issue #73).  After the primary candidate has been transferred
+ * and finalized, this loop detects and consumes any remaining candidates
+ * belonging to the same already-initiated exposure so the camera is left
+ * ready for the next shutter.
+ *
+ * The loop is bounded by max_count (number of extra candidates to consume)
+ * and max_ms (total wall-clock budget in milliseconds). min_count is the
+ * minimum companion obligation reported by the camera output configuration.
+ * Each iteration:
+ *   1. Reads GetAllConditions via get_conditions. An empty response completes
+ *      only after min_count candidates have been finalized.
+ *   2. Transfers the pending candidate into a fresh buffer via
+ *      transfer_candidate.
+ *   3. Finalizes it via delete_candidate.
+ *   4. Records the candidate filename in names[reconciled_count].
+ *
+ * On success *reconciled_count is set to the number of extras consumed
+ * (0 when none were pending).  On failure the count reflects how many
+ * were completed before the error.  The pre-capture stale-candidate
+ * barrier (issue #34) is NOT weakened: this function only runs AFTER a
+ * successful primary transfer+finalize within the same exposure.
+ */
+int
 pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
-	int max_count, unsigned int max_ms,
-	unsigned int expected_extra_candidates,
+	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count)
 {
 	struct timespec start, now;
 	int count = 0;
 	int ret = GP_OK;
+	unsigned int required_count = min_count;
 
-	if (!ops || !ops->get_conditions || !ops->transfer_candidate ||
-	    !ops->delete_candidate || !reconciled_count) {
+	if (!ops || !reconciled_count) {
 		if (reconciled_count)
 			*reconciled_count = 0;
 		return GP_ERROR_BAD_PARAMETERS;
 	}
 	if (max_count < 1)
-		max_count = 4;
+		max_count = 4; /* default bound: at most 4 extras */
 	if (max_ms == 0)
-		max_ms = 60000;
+		max_ms = 60000; /* default: 60 s total budget */
+
 	*reconciled_count = 0;
-	clock_gettime(CLOCK_MONOTONIC, &start);
+	clock_gettime (CLOCK_MONOTONIC, &start);
 
 	for (;;) {
-		unsigned char *data = NULL, *info = NULL;
-		size_t size = 0, info_size = 0;
+		unsigned char *cdata = NULL, *cinfo = NULL;
+		size_t csize = 0, cisize = 0;
 		PentaxCaptureBuffer extra = {0};
-		uint32_t handle = 0;
+		uint32_t handle;
+		int iteration_error = GP_OK;
 		int done = 0;
 
-		if (ops->is_cancelled && ops->is_cancelled(ops->user_data)) {
+		/* Check cancellation. */
+		if (ops->is_cancelled && ops->is_cancelled (ops->user_data)) {
 			ret = GP_ERROR_CANCEL;
-			goto iteration_out;
+			goto out;
 		}
-		ret = ops->get_conditions(ops->user_data, &data, &size);
+
+		/* Read conditions to check if a candidate is still pending. */
+		ret = ops->get_conditions (ops->user_data, &cdata, &csize);
 		if (ret < GP_OK) {
-			clock_gettime(CLOCK_MONOTONIC, &now);
+			/* Transient failure: bounded retry within the time budget. */
+			clock_gettime (CLOCK_MONOTONIC, &now);
 			if ((now.tv_sec - start.tv_sec) * 1000 +
 			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
 				ret = GP_ERROR_TIMEOUT;
-				goto iteration_out;
+				goto out;
 			}
-			usleep(200 * 1000);
+			usleep (200 * 1000);
 			continue;
 		}
-		if (size >= PENTAX_CONDITIONS_MIN_SIZE &&
-		    pentax_get_u32le(data + 32) == 1)
-			handle = pentax_get_u32le(data + 36);
-		free(data);
-		data = NULL;
+		/* A successful transport call is not sufficient evidence of an empty
+		 * output queue. The output-format obligation (+524) and candidate
+		 * handle (+36) must come from a complete conditions frame. */
+		if (!cdata || csize < 528) {
+			free (cdata);
+			cdata = NULL;
+			GP_LOG_E ("reconciliation received a short conditions frame (%lu bytes)",
+				(unsigned long)csize);
+			ret = GP_ERROR_CORRUPTED_DATA;
+			goto out;
+		}
+
+		/* The output contract and candidate flag are observations from one
+		 * serialized conditions sample. RAW+JPEG means one companion must be
+		 * observed after the already-finalized primary. Pixel Shift actuation
+		 * count does not change the number of output objects. */
+		if (pentax_expected_extra_candidates (cdata, csize) > required_count) {
+			required_count = pentax_expected_extra_candidates (cdata, csize);
+			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
+				required_count);
+		}
+		handle = 0;
+		if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
+		    pentax_get_u32le (cdata + 32) == 1)
+			handle = pentax_get_u32le (cdata + 36);
+		free (cdata);
+		cdata = NULL;
 
 		if (!handle) {
-			if ((unsigned int)count < expected_extra_candidates)
-				ret = GP_ERROR_CORRUPTED_DATA;
-			done = 1;
-			goto iteration_out;
+			/* The camera may briefly report no candidate between RAW and JPEG.
+			 * Complete only after the camera-reported output obligation is met. */
+			if ((unsigned int)count >= required_count) {
+				done = 1;
+				goto out;
+			}
+			clock_gettime (CLOCK_MONOTONIC, &now);
+			if ((now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+				GP_LOG_E ("reconciliation timed out waiting for camera-reported "
+					"output %d/%u", count + 1, required_count + 1);
+				ret = GP_ERROR_TIMEOUT;
+				goto out;
+			}
+			usleep (200 * 1000);
+			continue;
 		}
+
+		/* Bound on candidate count. */
 		if (count >= max_count) {
-			GP_LOG_D("Pentax reconciliation bound reached; preserving candidate %u", handle);
-			done = 1;
-			goto iteration_out;
+			GP_LOG_E ("reconciliation bound reached (%d extras); "
+				"candidate %u remains pending", max_count, handle);
+			ret = GP_ERROR_TIMEOUT;
+			goto out;
 		}
-		clock_gettime(CLOCK_MONOTONIC, &now);
+
+		/* Check time budget. */
+		clock_gettime (CLOCK_MONOTONIC, &now);
 		if ((now.tv_sec - start.tv_sec) * 1000 +
 		    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
-			done = 1;
-			goto iteration_out;
+			GP_LOG_E ("reconciliation time budget (%u ms) exhausted; "
+				"candidate %u remains pending", max_ms, handle);
+			ret = GP_ERROR_TIMEOUT;
+			goto out;
 		}
+
+		/* Get the candidate filename for diagnostics. */
 		if (names && ops->get_candidate_info) {
-			if (ops->get_candidate_info(ops->user_data, &info, &info_size) == GP_OK &&
-			    pentax_candidate_filename(info, info_size, names[count], 128) == GP_OK)
-				;
-			else
+			iteration_error = ops->get_candidate_info (ops->user_data, &cinfo, &cisize);
+			if (iteration_error == GP_OK && cisize > 0) {
+				int nret = pentax_candidate_filename (cinfo, cisize,
+					names[count], 128);
+				if (nret != GP_OK)
+					names[count][0] = '\0';
+			} else {
 				names[count][0] = '\0';
+			}
+			free (cinfo);
+			cinfo = NULL;
+			/* A failed info read is diagnostic-only; the transfer
+			 * still proceeds. */
+			iteration_error = GP_OK;
 		}
-		free(info);
-		info = NULL;
-		ret = ops->transfer_candidate(ops->user_data, &extra);
-		if (ret < GP_OK)
-			goto iteration_out;
-		ret = ops->delete_candidate(ops->user_data);
-		if (ret < GP_OK)
-			goto iteration_out;
+
+		/* Transfer the extra candidate. */
+		iteration_error = ops->transfer_candidate (ops->user_data, &extra);
+		if (iteration_error < GP_OK) {
+			GP_LOG_E ("reconciliation transfer of extra candidate %u "
+				"failed (%d)", handle, iteration_error);
+			ret = iteration_error;
+			goto out;
+		}
+
+		/* Finalize (delete) the candidate on the camera. */
+		iteration_error = ops->delete_candidate (ops->user_data);
+		if (iteration_error < GP_OK) {
+			GP_LOG_E ("reconciliation delete of extra candidate %u "
+				"failed (%d)", handle, iteration_error);
+			ret = iteration_error;
+			goto out;
+		}
+
 		count++;
 		*reconciled_count = count;
+		GP_LOG_D ("reconciled extra candidate %u (%s) [%d/%d]",
+			handle, names ? names[count - 1] : "?", count, max_count);
 
-iteration_out:
-		free(data);
-		free(info);
-		free(extra.data);
+out:
+		free (cdata);
+		free (cinfo);
+		free (extra.data);
 		if (done || ret < GP_OK)
 			break;
 	}
+
 	*reconciled_count = count;
 	return ret;
 }
 
-/* Pentax conditions in astro mode. */
+/* Format a Pentax/Ricoh shutter-speed UINT64 wire value for display.
+ * Wire layout: high 32 bits = denominator, low 32 bits = numerator.
+ * A zero value is the "Auto" sentinel.  When the denominator is 1 the
+ * value is a whole-second timer (Bulb timer or 1 s shutter speed) and is
+ * rendered as a compact duration rather than the fraction "1/<n>". Values
+ * below a minute use "<n>s"; longer values use "<m>m" or "<m>m<s>s" so
+ * 80 and 90 seconds are not presented as hard-to-scan raw second counts.
+ * Returns 0 on success, -1 if buf is too small. */
 int
-pentax_conditions_in_astro_mode (const PentaxConditions *conditions)
+pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
 {
-	/* Whether the camera is currently in Astro Tracer mode, per IT2's own signal:
-	 * the exposure-mode dial value (offset 184) equals ExpMode.AstroTracer (20).
-	 * This is the authoritative "in astro mode" test — the offset-504 capability
-	 * bit (PENTAX_CONDITION_ASTROTRACER3) only says the body CAN do it, and the
-	 * offset-320 status bits describe shift/aperture sub-states, not the mode.
-	 * Model-agnostic, so it covers the K-1 II as well as the K-3 III. */
-	return conditions->exposure_mode == 20;
-}
-
-/* Pentax capture timeout ms. */
-unsigned int
-pentax_capture_timeout_ms (const PentaxConditions *conditions)
-{
-	unsigned int base = PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-	unsigned int margin = PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
-
-	if (conditions->activity_flags & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+	if (!buf || buflen < 4)
+		return -1;
+	if (value == 0) {
+		snprintf (buf, buflen, "Auto");
 		return 0;
-
-	if (conditions->bulb_timer_seconds)
-		return (conditions->bulb_timer_seconds * 1000) +
-			(conditions->bulb_timer_denominator ?
-			 (60000 / conditions->bulb_timer_denominator) : 0) +
-			margin;
-
-	if (conditions->exposure_mode == 20) /* AstroTracer */
-		return base + margin;
-
-	if (conditions->exposure_mode == 21) /* Pixel shift */
-		return (base * PENTAX_PIXEL_SHIFT_MULTIPLIER) + margin;
-
-	return base;
-}
-
-/* Pentax exposure phase ms. */
-unsigned int
-pentax_exposure_phase_ms (const PentaxConditions *conditions)
-{
-	if (conditions->activity_flags & PENTAX_CONDITION_ACTIVITY_UNSAFE)
+	}
+	uint32_t denominator = (uint32_t)(value >> 32);
+	uint32_t numerator = (uint32_t)value;
+	if (denominator == 1) {
+		if (numerator >= 60) {
+			uint32_t minutes = numerator / 60;
+			uint32_t seconds = numerator % 60;
+			if (seconds)
+				snprintf (buf, buflen, "%um%us", minutes, seconds);
+			else
+				snprintf (buf, buflen, "%um", minutes);
+		} else {
+			snprintf (buf, buflen, "%us", numerator);
+		}
 		return 0;
-
-	if (conditions->bulb_timer_seconds)
-		return (conditions->bulb_timer_seconds * 1000) +
-			(conditions->bulb_timer_denominator ?
-			 (60000 / conditions->bulb_timer_denominator) : 0);
-
-	if (conditions->exposure_mode == 20) /* AstroTracer */
-		return 0; /* Handled by capture timeout */
-
-	if (conditions->exposure_mode == 21) /* Pixel shift */
-		return 0; /* Handled by capture timeout */
-
+	}
+	if (numerator == 1) {
+		snprintf (buf, buflen, "1/%u", denominator);
+		return 0;
+	}
+	snprintf (buf, buflen, "%u/%u", numerator, denominator);
 	return 0;
 }
 
-/* Pentax capture needs idle wait. */
+/* Parse the whole-second labels emitted above.  Keep this beside the formatter
+ * so a displayed radio choice always maps back to its exact wire value. */
 int
-pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
+pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 {
-	/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.  Polls
-	 * until the camera reports idle via the activity flags. */
-	return (conditions->activity_flags & PENTAX_CONDITION_ACTIVITY_UNSAFE) != 0;
-}
+	char *end;
+	unsigned long long first, remainder = 0;
 
-/* Pentax recovery probe can clear. */
-int
-pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
-	int capture_output_pending)
-{
-	/* Readiness and output completion are independent predicates. A clean
-	 * conditions frame may clear a stale activity barrier, but never an
-	 * obligation created by an accepted capture and not yet published. */
-	return (reason == PENTAX_ADMISSION_BLOCK_NONE) &&
-		!capture_output_pending;
-}
-
-/* Pentax admission recovery action. */
-const char *
-pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
-{
-	switch (reason) {
-	case PENTAX_ADMISSION_BLOCK_NONE:
-		return "";
-	case PENTAX_ADMISSION_BLOCK_UNREADABLE:
-		return "re-probe-before-retry";
-	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
-		return "hold-shutter; wait-for-idle";
-	case PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE:
-		return "hold-shutter; inspect-transfer-candidate";
-	case PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT:
-		return "hold-shutter; recover-output-with-ownership";
-	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
-		return "hold-shutter; inspect-diagnostics";
+	if (!value || !seconds || value[0] < '0' || value[0] > '9')
+		return -1;
+	errno = 0;
+	first = strtoull (value, &end, 10);
+	if (end == value || errno == ERANGE)
+		return -1;
+	if (*end == 's' && end[1] == '\0') {
+		if (first > UINT32_MAX)
+			return -1;
+		*seconds = (uint32_t)first;
+		return 0;
 	}
-	return "unknown";
+	if (*end != 'm')
+		return -1;
+	end++;
+	if (*end) {
+		char *seconds_end;
+		if (end[0] < '0' || end[0] > '9')
+			return -1;
+		errno = 0;
+		remainder = strtoull (end, &seconds_end, 10);
+		if (seconds_end == end || errno == ERANGE || *seconds_end != 's' || seconds_end[1] != '\0' || remainder >= 60)
+			return -1;
+	}
+	if (first > (UINT32_MAX - remainder) / 60)
+		return -1;
+	*seconds = (uint32_t)(first * 60 + remainder);
+	return 0;
+}
+
+/* Parse the legacy plain-integer shutter spelling (for example "30" means
+ * 1/30 s).  This deliberately requires the complete input to be a positive
+ * decimal integer.  In particular, a rejected unit-bearing duration must not
+ * fall through to a prefix-only sscanf conversion and silently become a
+ * different shutter speed. */
+int
+pentax_parse_legacy_shutter_denominator (const char *value,
+		uint32_t *denominator)
+{
+	char *end;
+	unsigned long long parsed;
+
+	if (!value || !denominator || value[0] < '0' || value[0] > '9')
+		return -1;
+	errno = 0;
+	parsed = strtoull (value, &end, 10);
+	if (end == value || *end != '\0' || errno == ERANGE ||
+	    parsed == 0 || parsed > UINT32_MAX)
+		return -1;
+	*denominator = (uint32_t)parsed;
+	return 0;
+}
+
+/* Issue #122 (TA follow-up): fail-closed post-capture readiness wait.
+ *
+ * The capture path must only return success when the camera has POSITIVELY
+ * reported IDLE.  A timer expiring while the camera is still BUSY or UNKNOWN
+ * is NOT equivalent to an observed IDLE transition, so the caller must treat
+ * exhaustion as "camera busy" (GP_ERROR_CAMERA_BUSY), not as a successful
+ * completion.  This helper centralises that policy so it is deterministic and
+ * unit-testable: it polls read_cb until pentax_camera_readiness() returns
+ * IDLE, and reports whether that positive transition was observed before the
+ * bound.  read_cb returns 0 (PTP_RC_OK) on a successful conditions read and
+ * non-zero otherwise; a failed read is UNKNOWN, never IDLE.
+ *
+ * Cancellation (issue #122 follow-up): the pre-refactor inline loop checked
+ * gp_context_cancel() on every iteration so a user/app cancel could not be
+ * swallowed by the full 15 s / 60 s bound.  This helper preserves that: if
+ * cancel_cb is non-NULL it is polled at the top of each iteration and, when it
+ * reports a cancel, the wait returns -1 promptly (without consuming the
+ * remaining bound) so the caller propagates GP_ERROR_CANCEL.  Cancellation is
+ * distinct from "not idle": a cancel exits immediately, whereas bound
+ * exhaustion on BUSY/UNKNOWN still returns 0 (camera busy). */
+int
+pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
+                                      unsigned int *size),
+                      void *user_data,
+                      int (*cancel_cb) (void *cancel_user_data),
+                      void *cancel_user_data,
+                      int max_ms)
+{
+        int waited_ms = 0;
+
+        while (waited_ms < max_ms) {
+                unsigned char *idata = NULL;
+                unsigned int isize = 0;
+                PentaxReadiness readiness;
+
+                if (cancel_cb && cancel_cb (cancel_user_data)) {
+                        GP_LOG_D ("post-capture idle wait cancelled after %d ms", waited_ms);
+                        return -1;       /* cancelled: exit promptly, do not consume the bound */
+                }
+
+                if (read_cb (user_data, &idata, &isize) != 0) {
+                        /* A failed/short read is UNKNOWN, never IDLE: keep polling. */
+                        free (idata);
+                        usleep (500 * 1000);
+                        waited_ms += 500;
+                        continue;
+                }
+                readiness = pentax_camera_readiness (idata, isize);
+                free (idata);
+                if (readiness == PENTAX_READINESS_IDLE) {
+                        GP_LOG_D ("camera idle after capture (waited %d ms)", waited_ms);
+                        return 1;        /* positive IDLE observed */
+                }
+                /* BUSY or UNKNOWN: keep polling within the bound. */
+                usleep (500 * 1000);
+                waited_ms += 500;
+        }
+        GP_LOG_E ("camera still busy/unknown after %d ms post-capture wait", waited_ms);
+        return 0;        /* bound exhausted without a positive IDLE */
 }
