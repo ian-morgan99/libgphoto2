@@ -132,6 +132,13 @@ typedef struct {
  * timed-capture path. */
 int pentax_bulb_action_mode_supported (uint32_t exposure_mode);
 
+/* Release mode 2 is not a safe generic action on every Pentax body.  In
+ * particular, direct K-3 III evidence shows 0x9011/release=2 rejected with
+ * 0x2002 and the body can disappear from USB afterwards.  Keep that model
+ * out of the generic start/stop widget until a qualified K-3 III trace proves
+ * a different held-shutter contract. */
+int pentax_bulb_action_model_supported (uint32_t model_no);
+
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
  * clamped so a corrupt value can never wrap (issue #43 regression coverage). */

@@ -79,6 +79,17 @@ pentax_bulb_action_mode_supported (uint32_t exposure_mode)
 	       exposure_mode == PENTAX_EXP_MODE_ASTROTRACER;
 }
 
+int
+pentax_bulb_action_model_supported (uint32_t model_no)
+{
+	/* The K-3 III probe on 2026-09-06 accepted vendor mode but rejected the
+	 * held-shutter release=2 edge with 0x2002, followed by USB disappearance.
+	 * Do not expose an action that can wedge the body.  This is deliberately a
+	 * model gate, not a claim that ordinary release=0 capture is unsupported. */
+	return model_no != PENTAX_MODEL_K3_MARK_III &&
+	       model_no != PENTAX_MODEL_K3_MARK_III_MONO;
+}
+
 unsigned int
 pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 {

@@ -134,6 +134,9 @@ main (void)
 	CHECK (pentax_bulb_action_mode_supported (PENTAX_EXP_MODE_ASTROTRACER));
 	CHECK (!pentax_bulb_action_mode_supported (8));
 	CHECK (!pentax_bulb_action_mode_supported (4));
+	CHECK (pentax_bulb_action_model_supported (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III_MONO));
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};

@@ -7326,8 +7326,14 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	int ret;
 
 	if (!params->pentax.vendor_mode_enabled ||
-	    !params->pentax.supported_model)
+	    !params->pentax.supported_model ||
+	    !pentax_bulb_action_model_supported (params->pentax.model_no)) {
+		if (params->pentax.model_no == PENTAX_MODEL_K3_MARK_III ||
+		    params->pentax.model_no == PENTAX_MODEL_K3_MARK_III_MONO)
+			GP_LOG_E ("pentax-bulb: refusing unqualified K-3 III release-mode-2 action; "
+				"use the camera-timed/Polaris 264 path");
 		return GP_ERROR_NOT_SUPPORTED;
+	}
 
 	if (enabled) {
 		if (params->pentax.bulb_action_active ||
