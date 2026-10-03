@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -733,6 +734,73 @@ pentax_candidate_filename (const unsigned char *data, uint32_t size,
 	if (!strcmp (filename, ".") || !strcmp (filename, ".."))
 		return GP_ERROR_CORRUPTED_DATA;
 	return GP_OK;
+}
+
+static int
+pentax_image_extension_equal (const char *left, size_t left_size,
+	const char *right, size_t right_size)
+{
+	size_t i;
+
+	if (left_size != right_size)
+		return 0;
+	for (i = 0; i < left_size; i++)
+		if (tolower ((unsigned char)left[i]) !=
+		    tolower ((unsigned char)right[i]))
+			return 0;
+	return 1;
+}
+
+static int
+pentax_known_image_extension (const char *extension, size_t size)
+{
+	static const char *known[] = {".jpg", ".jpeg", ".dng", ".pef", ".raw"};
+	unsigned int i;
+
+	for (i = 0; i < sizeof (known) / sizeof (known[0]); i++) {
+		size_t known_size = strlen (known[i]);
+		if (size == known_size &&
+		    pentax_image_extension_equal (extension, size,
+			known[i], known_size))
+			return 1;
+	}
+	return 0;
+}
+
+int
+pentax_candidate_is_same_exposure_companion (const char *primary_name,
+	const char *candidate_name)
+{
+	const char *primary_dot;
+	const char *candidate_dot;
+	size_t primary_stem_size;
+	size_t candidate_stem_size;
+	size_t primary_extension_size;
+	size_t candidate_extension_size;
+
+	if (!primary_name || !candidate_name || !*primary_name || !*candidate_name)
+		return 0;
+	primary_dot = strrchr (primary_name, '.');
+	candidate_dot = strrchr (candidate_name, '.');
+	if (!primary_dot || !candidate_dot || primary_dot == primary_name ||
+		candidate_dot == candidate_name)
+		return 0;
+	primary_stem_size = (size_t)(primary_dot - primary_name);
+	candidate_stem_size = (size_t)(candidate_dot - candidate_name);
+	primary_extension_size = strlen (primary_dot);
+	candidate_extension_size = strlen (candidate_dot);
+	if (primary_stem_size != candidate_stem_size ||
+		memcmp (primary_name, candidate_name, primary_stem_size) != 0)
+		return 0;
+	if (strcmp (primary_name, candidate_name) == 0)
+		return 0;
+	if (!pentax_known_image_extension (primary_dot, primary_extension_size) ||
+		!pentax_known_image_extension (candidate_dot, candidate_extension_size))
+		return 0;
+	/* Two candidates with the same format are not the RAW+JPEG companion
+	 * obligation; leave that case untouched rather than guessing. */
+	return !pentax_image_extension_equal (primary_dot, primary_extension_size,
+		candidate_dot, candidate_extension_size);
 }
 
 int

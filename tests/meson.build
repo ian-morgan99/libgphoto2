@@ -44,6 +44,18 @@ test(
   env: gp_test_env,
 )
 
+# Source-contract regression: ordinary Manual and camera-timed Bulb must use
+# the explicit release=0 route; only the separately gated research action may
+# use release=2, and only its explicit stop edge may call TerminateCapture.
+test(
+  'test-pentax-capture-contract',
+  python,
+  args: [
+    files('test-pentax-capture-contract.py'),
+    meson.project_source_root() / 'camlibs/ptp2/library.c',
+  ],
+)
+
 test_pentax_publication_exe = executable(
   'test-pentax-publication',
   'test-pentax-publication.c',

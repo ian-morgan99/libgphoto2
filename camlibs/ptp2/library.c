@@ -6140,6 +6140,11 @@ typedef struct {
 	PTPParams *params;
 	GPContext *context;
 	Camera *camera;
+	/* The primary candidate name is the only stable correlation exposed by
+	 * this Pentax transfer queue.  A companion must retain this basename and
+	 * use a different known image extension. */
+	char primary_name[128];
+	unsigned int expected_extra_candidates;
 } PentaxReconcileContext;
 
 static int
@@ -6186,20 +6191,23 @@ pentax_reconcile_cancelled (void *user_data)
 	return gp_context_cancel (rc->context) == GP_CONTEXT_FEEDBACK_CANCEL;
 }
 
-/* Candidate ownership is deliberately not guessed from order, filename, or
- * output count.  No stable exposure-to-candidate correlation has yet been
- * demonstrated for the Pentax transfer queue, so the production path remains
- * fail-closed until a proven correlation callback is available. */
+/* Candidate ownership is deliberately narrower than candidate order or the
+ * expected output count.  Pentax candidate metadata has no request ID, but a
+ * RAW+JPEG exposure does expose the same camera-assigned basename for both
+ * formats.  Accept only that known companion relation; preserve everything
+ * else as stale/ambiguous output. */
 static int
 pentax_reconcile_candidate_is_owned (void *user_data, uint32_t handle,
 	const unsigned char *info, size_t info_size, const char *name)
 {
-	(void)user_data;
+	PentaxReconcileContext *rc = user_data;
+
 	(void)handle;
 	(void)info;
 	(void)info_size;
-	(void)name;
-	return 0;
+	return rc && rc->expected_extra_candidates > 0 &&
+		pentax_candidate_is_same_exposure_companion (
+		rc->primary_name, name);
 }
 
 /* Transfer the pending extra candidate and publish it into the camera
@@ -6401,10 +6409,30 @@ pentax_capture_cancel (void *user_data)
 }
 
 typedef enum {
-	PENTAX_CAPTURE_COMPLETE = 0,
+	/* This is the ordinary camera-timed path used by both Manual and the
+	 * configured-duration Bulb flow.  It must remain release mode 0. */
+	PENTAX_CAPTURE_TIMED = 0,
 	PENTAX_CAPTURE_BULB_START,
 	PENTAX_CAPTURE_BULB_FINALIZE
 } PentaxCaptureMode;
+
+static uint16_t
+pentax_initiate_camera_timed_capture (PTPParams *params, uint32_t focus_mode)
+{
+	/* K-3 III Manual and camera-timed Bulb share the proven still-capture
+	 * operation.  The camera owns the configured exposure duration; the host
+	 * must not convert this into the experimental held-shutter release mode. */
+	return ptp_pentax_initiate_capture (params, 0U, focus_mode, 0, 0, 0);
+}
+
+static uint16_t
+pentax_initiate_experimental_held_capture (PTPParams *params,
+	uint32_t focus_mode)
+{
+	/* Research-only action, model-gated before entry.  K-3 III is explicitly
+	 * blocked in ptp2_pentax_bulb_action(). */
+	return ptp_pentax_initiate_capture (params, 2U, focus_mode, 0, 0, 0);
+}
 
 static int
 camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
@@ -6435,6 +6463,7 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	uint32_t last_activity_flags = 0;
 	int conditions_known = 0;
 	int needs_idle_wait = 0;
+	char primary_candidate_name[128] = {0};
 	CameraFile *file = NULL;
 	PentaxCameraTransferContext transfer = {params, context, {0, 0}};
 	PentaxTransferOps transfer_operations = {
@@ -6735,9 +6764,11 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		params->pentax.capture_output_pending = 1;
 	if (bulb_action_finalize)
 		ptpres = PTP_RC_OK;
+	else if (bulb_action_start)
+		ptpres = pentax_initiate_experimental_held_capture (params,
+			focus_mode);
 	else
-		ptpres = ptp_pentax_initiate_capture (params,
-			bulb_action_start ? 2U : 0U, focus_mode, 0, 0, 0);
+		ptpres = pentax_initiate_camera_timed_capture (params, focus_mode);
 	fprintf (stderr, "[pentax] capture=%llu boundary=initiate-return ptp=0x%04x\n",
 		capture_id, ptpres);
 	fflush (stderr);
@@ -6991,6 +7022,11 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	ret = pentax_candidate_filename (data, size, path->name, sizeof (path->name));
 	if (ret < GP_OK)
 		goto out;
+	/* Keep the camera's original name for companion correlation.  The public
+	 * path may be suffixed below to avoid a host-filesystem collision; that
+	 * local publication name is not camera ownership evidence. */
+	snprintf (primary_candidate_name, sizeof (primary_candidate_name),
+		"%s", path->name);
 	free (data);
 	data = NULL;
 
@@ -7109,7 +7145,9 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	 * error: the accepted exposure still has an unresolved output obligation,
 	 * so the caller must not be told that capture completed. */
 	{
-		PentaxReconcileContext reconcile_context = {params, context, camera};
+		PentaxReconcileContext reconcile_context = {
+			params, context, camera, {0}, expected_extra_candidates
+		};
 		PentaxReconcileOps reconcile_ops = {
 			&reconcile_context,
 			pentax_reconcile_get_conditions,
@@ -7121,6 +7159,9 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		};
 		char extra_names[8][128];
 		int reconciled = 0;
+		snprintf (reconcile_context.primary_name,
+			sizeof (reconcile_context.primary_name), "%s",
+			primary_candidate_name);
 		/* The minimum obligation comes from the already-mandatory pre-capture
 		 * readiness sample; later samples may increase it but may not erase it.
 		 * This is mode-driven, not a time-based guess.  Reconciliation still
@@ -7308,7 +7349,7 @@ camera_pentax_capture (Camera *camera, CameraFilePath *path,
 	GPContext *context)
 {
 	return camera_pentax_capture_internal (camera, path, context,
-		PENTAX_CAPTURE_COMPLETE);
+		PENTAX_CAPTURE_TIMED);
 }
 
 int

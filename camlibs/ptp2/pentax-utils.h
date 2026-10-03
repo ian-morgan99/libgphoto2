@@ -388,6 +388,14 @@ int pentax_capture_buffer_disown_on_success (PentaxCaptureBuffer *buffer,
 	int ownership_result);
 int pentax_candidate_filename (const unsigned char *data, uint32_t size,
 		char *filename, size_t filename_size);
+
+/* Return non-zero only for a known image-format companion with the same
+ * camera-assigned basename as the already transferred primary candidate.
+ * Pentax does not expose a request ID in candidate metadata, so this is the
+ * deliberately narrow correlation available to the tethered RAW+JPEG path;
+ * unknown names and formats remain unowned and are preserved. */
+int pentax_candidate_is_same_exposure_companion (const char *primary_name,
+		const char *candidate_name);
 int pentax_jpeg_bounds (const unsigned char *data, size_t size,
 		size_t *offset, size_t *length);
 int pentax_transfer_run (PentaxCaptureBuffer *buffer,

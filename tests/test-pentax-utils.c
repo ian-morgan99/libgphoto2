@@ -376,6 +376,25 @@ main (void)
 			sizeof (name)) == GP_ERROR_CORRUPTED_DATA);
 	}
 
+	/* RAW+JPEG ownership is conservative: only a different known image
+	 * extension with the exact primary basename is a same-exposure companion.
+	 * Same-format, differently named and unknown candidates remain stale /
+	 * ambiguous and must not be consumed. */
+	CHECK (pentax_candidate_is_same_exposure_companion (
+		"IMG0001.JPG", "IMG0001.PEF"));
+	CHECK (pentax_candidate_is_same_exposure_companion (
+		"IMG0001.pef", "IMG0001.JPG"));
+	CHECK (pentax_candidate_is_same_exposure_companion (
+		"IMG0001.JPG", "IMG0001.DNG"));
+	CHECK (!pentax_candidate_is_same_exposure_companion (
+		"IMG0001.JPG", "IMG0001.JPG"));
+	CHECK (!pentax_candidate_is_same_exposure_companion (
+		"IMG0001.JPG", "IMG0002.PEF"));
+	CHECK (!pentax_candidate_is_same_exposure_companion (
+		"IMG0001.JPG", "IMG0001.TIF"));
+	CHECK (!pentax_candidate_is_same_exposure_companion (
+		"IMG0001", "IMG0001.PEF"));
+
 	CHECK (pentax_capture_buffer_write (&buffer, first, sizeof (first)) == GP_OK);
 	CHECK ((buffer.size == 4) && (buffer.offset == 4));
 	CHECK (!memcmp (buffer.data, first, sizeof (first)));
