@@ -66,7 +66,7 @@ The hardware-validation matrix in issue #44 remains the authority for claims of 
 - #44: direct Pentax hardware validation matrix.
 - #42: upstream-style isolation and maintainability audit.
 - `docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`: model/protocol source-of-truth for modern Image Transmitter-derived behaviour.
-- `docs/pentax/CAPABILITY_MATRIX_AUDIT.md`: prior model-capability safety audit.
+- `docs/pentax/archive/CAPABILITY_MATRIX_AUDIT.md`: prior model-capability safety audit.
 
 ## Completion criterion
 

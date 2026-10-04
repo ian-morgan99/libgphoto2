@@ -22,7 +22,7 @@ Issues #61–#65 were accidentally created during the same setup window after #5
 - #67 detailed Custom Image controls (`0xd021`–`0xd029`, `0xd02d`)
 - #68 composition-offset movement via `0x9018` (distinct from the existing `0xd02a` enable switch)
 - #69 duplicate `pentaxliveviewafposition` config registration cleanup
-- #70 completed: `CAPABILITY_MATRIX_AUDIT.md` is explicitly historical/provenance-only; #66 owns current reconciliation
+- #70 completed: `archive/CAPABILITY_MATRIX_AUDIT.md` is explicitly historical/provenance-only; #66 owns current reconciliation
 
 ## Reopened evidence / upstream-readiness issues relevant to this programme
 
