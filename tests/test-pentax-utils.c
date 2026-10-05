@@ -850,6 +850,32 @@ main (void)
 		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED, 1));
 	CHECK (!pentax_recovery_probe_can_clear (
 		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0));
+
+	/* Issue #175: "recover-output-with-ownership" must have a decidable
+	 * trigger. A candidate-bearing block with no capture of ours in flight is
+	 * an orphan we may claim; anything else keeps the fail-closed refusal. */
+	CHECK (pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE, 0, 9));
+	CHECK (pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT, 0, 9));
+	/* Our own accepted exposure still owns the object: never claim it here. */
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE, 1, 9));
+	/* No handle means there is nothing to claim. */
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE, 0, 0));
+	/* Unreadable conditions and an active camera operation are not orphans;
+	 * claiming them would issue PTP traffic at a busy body. */
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_UNREADABLE, 0, 9));
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0, 9));
+	/* OUTPUT_UNRESOLVED is derived only from our own pending flag. */
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED, 0, 9));
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_NONE, 0, 9));
+
 	CHECK (!pentax_capture_output_obligation_resolved (1, 0, 0));
 	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
 	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));

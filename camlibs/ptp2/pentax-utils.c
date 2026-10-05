@@ -188,6 +188,44 @@ pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
 	return reason == PENTAX_ADMISSION_BLOCK_NONE && !capture_output_pending;
 }
 
+/* Issue #175: "recover-output-with-ownership" was printed for every
+ * candidate-bearing block, but nothing ever claimed the candidate, so a single
+ * lost frame latched the gate for the rest of the session. This is the policy
+ * half of that recovery: it says only whether an orphan may be claimed, never
+ * how. A candidate is claimable when
+ *
+ *   - the block is specifically about a pending/selected output (not unreadable
+ *     conditions and not an active camera operation), and
+ *   - this process has no capture of its own in flight, so the object cannot
+ *     belong to a request we are still serving, and
+ *   - a concrete handle was actually observed.
+ *
+ * The caller still has to prove ownership by transferring and publishing the
+ * object before deleting it; a failed claim must leave the fail-closed
+ * behaviour untouched. */
+int
+pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
+	int own_capture_in_flight, uint32_t candidate_handle)
+{
+	if (own_capture_in_flight)
+		return 0;
+	if (!candidate_handle)
+		return 0;
+	/* OUTPUT_UNRESOLVED is deliberately absent: it is only ever derived from
+	 * our own capture_output_pending flag, which is the in-flight test above. */
+	switch (reason) {
+	case PENTAX_ADMISSION_BLOCK_TRANSFER_CANDIDATE_AVAILABLE:
+	case PENTAX_ADMISSION_BLOCK_SELECTOR_PRESENT:
+		return 1;
+	case PENTAX_ADMISSION_BLOCK_NONE:
+	case PENTAX_ADMISSION_BLOCK_UNREADABLE:
+	case PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY:
+	case PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED:
+		break;
+	}
+	return 0;
+}
+
 const char *
 pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
 {

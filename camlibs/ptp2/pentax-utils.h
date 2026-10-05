@@ -222,6 +222,11 @@ const char *pentax_admission_block_reason_name (PentaxAdmissionBlockReason reaso
 const char *pentax_admission_recovery_action (PentaxAdmissionBlockReason reason);
 int pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
 	int capture_output_pending);
+/* Issue #175: whether a candidate-bearing admission block may be claimed as an
+ * orphan by the caller. See the comment on the definition for the exact
+ * conditions; claiming still requires a proven transfer before deletion. */
+int pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
+	int own_capture_in_flight, uint32_t candidate_handle);
 int pentax_capture_cleanup_decision (int capture_accepted);
 int pentax_candidate_output_published (int transfer_succeeded,
 	int filename_known, int filesystem_publication_succeeded);

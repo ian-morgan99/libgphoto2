@@ -6361,6 +6361,90 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 /* Dual-format exposure support (issue #73): report the extra files
  * published by the last capture.  The list is reset at the start of every
  * capture, so it always describes the most recent exposure. */
+/* Issue #175: an orphan candidate is a pending output that this process did
+ * not initiate and is not currently serving. Admission already refuses the
+ * shutter in that state and prescribes "recover-output-with-ownership", but
+ * until now nothing implemented it, so one lost frame latched the gate for the
+ * rest of the session (device evidence: SP_0225 accepted at 18:50, never
+ * written, and every capture through SP_0228 refused with -110).
+ *
+ * Ownership here is proven by elimination rather than by a request id, which
+ * this Pentax transfer queue does not expose: pentax_orphan_candidate_claimable
+ * has already established that no capture of ours is in flight, so the object
+ * cannot belong to a live request. That is the same standard the pre-shutter
+ * comment demands, just actually enforced -- the object is transferred and
+ * published before it is deleted, and a failed claim leaves it intact.
+ *
+ * The bounded loop, the transfer, the collision-free publication and the
+ * delete are the ones already used for dual-format reconciliation (#73); only
+ * the ownership predicate differs. */
+static int
+pentax_orphan_candidate_is_owned (void *user_data, uint32_t handle,
+	const unsigned char *info, size_t info_size, const char *name)
+{
+	(void)user_data;
+	(void)info;
+	(void)info_size;
+	(void)name;
+	/* The claimability decision is made once, before the loop, from the
+	 * admission state. Every candidate the loop reaches while no capture of
+	 * ours is in flight is therefore an orphan by that same definition. */
+	return handle != 0;
+}
+
+static int
+pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
+	unsigned long long capture_id)
+{
+	PTPParams *params = &camera->pl->params;
+	PentaxReconcileContext orphan_context = {
+		params, context, camera, {0}, 0
+	};
+	PentaxReconcileOps orphan_ops = {
+		&orphan_context,
+		pentax_reconcile_get_conditions,
+		pentax_reconcile_get_candidate_info,
+		pentax_orphan_candidate_is_owned,
+		pentax_reconcile_transfer_candidate,
+		pentax_reconcile_delete_candidate,
+		pentax_reconcile_cancelled
+	};
+	char names[4][128];
+	int recovered = 0;
+	int rret;
+
+	/* min_count 0 lets the loop finish as soon as the queue is empty; the
+	 * count and wall-clock bounds are what stop a wedged camera from
+	 * hanging the caller. */
+	rret = pentax_reconcile_extra_candidates (&orphan_ops, 4, 30 * 1000, 0,
+		names, &recovered);
+	fprintf (stderr, "[pentax-recovery] capture=%llu path=orphan-recovery "
+		"outcome=%s recovered=%d%s%s%s accepted=%d "
+		"action=preserve-then-delete-only-after-verified-download\n",
+		capture_id,
+		rret == GP_OK ? (recovered ? "cleared" : "nothing-pending")
+		              : "failed",
+		recovered,
+		recovered ? " names=" : "",
+		recovered ? names[0] : "",
+		(recovered > 1) ? " (and further members)" : "",
+		rret == GP_OK ? 1 : 0);
+	fflush (stderr);
+	if (rret < GP_OK) {
+		GP_LOG_E ("orphan candidate recovery failed (%d); %d object(s) "
+			"recovered before that; keeping the shutter blocked",
+			rret, recovered);
+		return rret;
+	}
+	/* The published files belong to an earlier request, so they must not be
+	 * reported as this capture's outputs by the next get_extra_capture_files. */
+	pentax_capture_publications_clear (params);
+	params->pentax.extra_capture_count = 0;
+	GP_LOG_D ("orphan candidate recovery complete: %d object(s) claimed",
+		recovered);
+	return GP_OK;
+}
+
 static int
 camera_get_extra_capture_files (Camera *camera, CameraFilePath *paths,
 	int max_count, int *count)
@@ -6544,6 +6628,37 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 				"and camera idle, with no unresolved output obligation");
 		}
 		free (rdata);
+		rdata = NULL;
+		/* Issue #175: the block is about an output this process does not
+		 * own. Claim it (transfer, publish, then delete) and re-probe once
+		 * instead of refusing the shutter forever. */
+		if (!recovered &&
+		    pentax_orphan_candidate_claimable (strict_reason,
+			    params->pentax.capture_output_pending,
+			    recovery_candidate)) {
+			unsigned char *after_data = NULL;
+			unsigned int after_size = 0;
+			uint16_t after_ptpres;
+
+			GP_LOG_D ("orphan candidate %u present with no capture of "
+				"ours in flight; attempting recovery before the "
+				"shutter is refused", recovery_candidate);
+			if (pentax_recover_orphan_candidates (camera, context,
+				capture_id) == GP_OK) {
+				after_ptpres = ptp_pentax_get_all_conditions (
+					params, &after_data, &after_size);
+				strict_reason = (PTP_RC_OK == after_ptpres) ?
+					pentax_admission_block_reason (after_data,
+						after_size,
+						PENTAX_ADMISSION_STRICT) :
+					PENTAX_ADMISSION_BLOCK_UNREADABLE;
+				free (after_data);
+				if (strict_reason == PENTAX_ADMISSION_BLOCK_NONE) {
+					recovered = 1;
+					params->pentax.recovery_required = 0;
+				}
+			}
+		}
 		if (!recovered) {
 			fprintf (stderr, "[pentax-recovery] capture=%llu path=recovery-probe "
 				"reason=%s "
@@ -6636,6 +6751,71 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		if (baseline_reason == PENTAX_ADMISSION_BLOCK_NONE &&
 		    params->pentax.capture_output_pending)
 			baseline_reason = PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+		/* Issue #175: "never consume or delete it here" was written to
+		 * protect a file from an earlier session, but with nothing ever
+		 * claiming the object it also made the refusal permanent. Claim it
+		 * only when no capture of ours is in flight, and only by
+		 * transferring and publishing it first; then re-probe and let the
+		 * ordinary admission check below decide. A failed claim leaves the
+		 * object and the fail-closed refusal exactly as they were. */
+		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE &&
+		    pentax_orphan_candidate_claimable (baseline_reason,
+			    params->pentax.capture_output_pending,
+			    baseline_candidate)) {
+			GP_LOG_D ("orphan candidate %u present with no capture of "
+				"ours in flight; attempting recovery before the "
+				"shutter is refused", baseline_candidate);
+			free (bdata);
+			bdata = NULL;
+			bsize = 0;
+			if (pentax_recover_orphan_candidates (camera, context,
+				capture_id) == GP_OK) {
+				/* Recompute the whole admission decision from one fresh
+				 * frame so the output contract and the wait budget below
+				 * cannot mix a pre-recovery sample with a post-recovery
+				 * verdict. An unreadable frame after a successful claim is
+				 * still a hold, never a guess. */
+				baseline_ptpres = ptp_pentax_get_all_conditions (params,
+					&bdata, &bsize);
+				if (baseline_ptpres == PTP_RC_OK &&
+				    bsize >= PENTAX_CONDITIONS_MIN_SIZE) {
+					baseline_capture =
+						pentax_get_u32le (bdata + 32);
+					baseline_candidate =
+						pentax_get_u32le (bdata + 36);
+					baseline_activity =
+						pentax_get_u32le (bdata + 104);
+					baseline_reason = pentax_admission_block_reason (
+						bdata, bsize, PENTAX_ADMISSION_STRICT);
+					if (baseline_reason ==
+					    PENTAX_ADMISSION_BLOCK_NONE &&
+					    params->pentax.capture_output_pending)
+						baseline_reason =
+							PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+				} else {
+					free (bdata);
+					bdata = NULL;
+					bsize = 0;
+					baseline_reason =
+						PENTAX_ADMISSION_BLOCK_UNREADABLE;
+				}
+			}
+			if (!bdata) {
+				/* Every path after this point reads the readiness frame;
+				 * without one the output contract cannot be evaluated. */
+				baseline_ptpres = ptp_pentax_get_all_conditions (params,
+					&bdata, &bsize);
+				if (baseline_ptpres != PTP_RC_OK ||
+				    bsize < PENTAX_CONDITIONS_MIN_SIZE) {
+					free (bdata);
+					bdata = NULL;
+					params->pentax.recovery_required = 1;
+					gp_context_error (context,
+						_("Camera readiness is unknown after orphan recovery; refusing to initiate an exposure."));
+					return GP_ERROR_CAMERA_BUSY;
+				}
+			}
+		}
 		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE) {
 			params->pentax.recovery_required = 1;
 			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "

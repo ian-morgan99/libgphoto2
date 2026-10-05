@@ -163,6 +163,20 @@ mock_candidate_is_owned (void *user_data, uint32_t handle,
         return mock->candidate_owned;
 }
 
+/* Issue #175: the orphan path decides claimability once, from the admission
+ * state, before the loop runs. Its ownership predicate therefore accepts any
+ * handle it is asked about -- mirroring pentax_orphan_candidate_is_owned(). */
+static int
+orphan_always_owned (void *user_data, uint32_t handle,
+        const unsigned char *info, size_t info_size, const char *name)
+{
+        (void)user_data;
+        (void)info;
+        (void)info_size;
+        (void)name;
+        return handle != 0;
+}
+
 static int
 mock_delete_candidate (void *user_data)
 {
@@ -454,6 +468,76 @@ main (void)
                 CHECK (owned.data == published);
                 CHECK (owned.size == 5);
                 free (owned.data);
+        }
+
+        /* 14. Issue #175 orphan recovery: the exact call shape
+         * pentax_recover_orphan_candidates() uses (min_count 0, an ownership
+         * predicate that accepts any handle because claimability was already
+         * decided from the admission state). A stale candidate must be claimed
+         * and finalized so the next shutter is admitted, and a failed transfer
+         * must leave the object on the camera. */
+        {
+                PentaxReconcileOps orphan_ops = ops;
+
+                orphan_ops.candidate_is_owned = orphan_always_owned;
+
+                /* The SP_0225 case: one orphan present, nothing of ours in
+                 * flight. Claimed, published, deleted, queue now empty. */
+                mock_reset (&mock);
+                mock.handles[0] = 300;
+                mock.handle_count = 1;
+                mock.names[0] = "SP_0225.RW2";
+                memset (names, 0, sizeof (names));
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&orphan_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret == GP_OK);
+                CHECK (count == 1);
+                CHECK (mock.transfer_calls == 1);
+                CHECK (mock.delete_calls == 1);
+                CHECK (mock.handle_count == 0);
+
+                /* A RAW+JPEG orphan leaves two objects; both are claimed so the
+                 * gate is actually cleared rather than re-tripped next call. */
+                mock_reset (&mock);
+                mock.handles[0] = 301;
+                mock.handles[1] = 302;
+                mock.handle_count = 2;
+                mock.names[0] = "SP_0226.RW2";
+                mock.names[1] = "SP_0226.JPG";
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&orphan_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret == GP_OK);
+                CHECK (count == 2);
+                CHECK (mock.delete_calls == 2);
+
+                /* Failed claim: the object must survive (never delete what we
+                 * could not download), and the caller keeps the fail-closed
+                 * refusal. */
+                mock_reset (&mock);
+                mock.handles[0] = 303;
+                mock.handle_count = 1;
+                mock.names[0] = "SP_0227.RW2";
+                mock.transfer_error = GP_ERROR_IO;
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&orphan_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret < GP_OK);
+                CHECK (mock.transfer_calls == 1);
+                CHECK (mock.delete_calls == 0);
+                CHECK (mock.handle_count == 1);
+
+                /* Nothing pending is a success with zero work: an ordinary
+                 * healthy capture must not pay for the recovery. */
+                mock_reset (&mock);
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&orphan_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret == GP_OK);
+                CHECK (count == 0);
+                CHECK (mock.transfer_calls == 0);
+                CHECK (mock.delete_calls == 0);
         }
 
         printf ("test-pentax-reconcile: all checks passed\n");
