@@ -6145,6 +6145,13 @@ typedef struct {
 	 * use a different known image extension. */
 	char primary_name[128];
 	unsigned int expected_extra_candidates;
+	/* Issue #176 follow-up: when set, a claimed orphan is also written to
+	 * this directory before the camera object is deleted. Empty for the
+	 * dual-format path, which has a live caller to hand the bytes to.
+	 * last_recovered_path is an output field for the audit log. */
+	char recovery_dir[256];
+	unsigned long long recovery_capture_id;
+	char last_recovered_path[512];
 } PentaxReconcileContext;
 
 static int
@@ -6336,6 +6343,38 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 				extra.name, GP_FILE_TYPE_NORMAL, file, rc->context);
 		if (ret == GP_OK)
 			ret = pentax_capture_publication_add (params, &extra, file);
+		if (ret == GP_OK && rc->recovery_dir[0]) {
+			/* Issue #176 follow-up: the publication above only keeps the
+			 * bytes alive until the publication list is cleared, which the
+			 * orphan path does before it returns. Device evidence: the claim
+			 * at 21:22:59 logged outcome=cleared recovered=1 names=IMGP3794.DNG
+			 * and no such file exists anywhere on the card, so the frame was
+			 * deleted from the camera after a verified download into RAM and
+			 * then dropped. Writing it here is what makes the log line's
+			 * "preserve-then-delete-only-after-verified-download" true. A
+			 * failed write is fatal to the claim, so the object is kept. */
+			char dest[512];
+
+			if (!pentax_orphan_recovery_path (rc->recovery_dir, extra.name,
+				rc->recovery_capture_id, dest, sizeof (dest))) {
+				GP_LOG_E ("orphan recovery: could not build a destination path "
+					"for %s in %s; preserving the camera candidate",
+					extra.name, rc->recovery_dir);
+				ret = GP_ERROR_BAD_PARAMETERS;
+			} else {
+				ret = gp_file_save (file, dest);
+				if (ret == GP_OK) {
+					GP_LOG_D ("orphan recovery: wrote %u bytes to %s",
+						(unsigned)published_size, dest);
+					snprintf (rc->last_recovered_path,
+						sizeof (rc->last_recovered_path), "%s", dest);
+				} else {
+					GP_LOG_E ("orphan recovery: could not write %s (%d); "
+						"preserving the camera candidate", dest, ret);
+					unlink (dest);
+				}
+			}
+		}
 		if (ret < GP_OK) {
 			GP_LOG_E ("failed to publish extra capture file %s/%s (%d)",
 				extra.folder, extra.name, ret);
@@ -6392,13 +6431,36 @@ pentax_orphan_candidate_is_owned (void *user_data, uint32_t handle,
 	return handle != 0;
 }
 
+/* Issue #176 follow-up: where a claimed orphan is written to disk. The
+ * appliance's capture output directory is the only writable, user-visible place
+ * the app already reads, so a recovered frame lands where the operator can find
+ * it. Override with OPENPOLARIS_PENTAX_ORPHAN_DIR; set it empty to disable. */
+static const char *
+pentax_orphan_recovery_dir (void)
+{
+	static const char *cached;
+	const char *v;
+
+	if (cached)
+		return cached[0] ? cached : NULL;
+	v = getenv ("OPENPOLARIS_PENTAX_ORPHAN_DIR");
+	if (v && !v[0])
+		cached = "";
+	else if (v && v[0] == '/')
+		cached = v;
+	else
+		cached = "/app/sd/normal";
+	return cached[0] ? cached : NULL;
+}
+
 static int
 pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 	unsigned long long capture_id)
 {
 	PTPParams *params = &camera->pl->params;
+	const char *recovery_dir = pentax_orphan_recovery_dir ();
 	PentaxReconcileContext orphan_context = {
-		params, context, camera, {0}, 0
+		params, context, camera, {0}, 0, "", 0, {0}
 	};
 	PentaxReconcileOps orphan_ops = {
 		&orphan_context,
@@ -6413,6 +6475,14 @@ pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 	int recovered = 0;
 	int rret;
 
+	if (recovery_dir) {
+		if (snprintf (orphan_context.recovery_dir,
+			sizeof (orphan_context.recovery_dir), "%s", recovery_dir) >=
+			(int)sizeof (orphan_context.recovery_dir))
+			orphan_context.recovery_dir[0] = '\0';
+		orphan_context.recovery_capture_id = capture_id;
+	}
+
 	/* min_count 0 lets the loop finish as soon as the queue is empty; the
 	 * count and wall-clock bounds are what stop a wedged camera from
 	 * hanging the caller. */
@@ -6420,7 +6490,7 @@ pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 		names, &recovered);
 	fprintf (stderr, "[pentax-recovery] capture=%llu path=orphan-recovery "
 		"outcome=%s recovered=%d%s%s%s accepted=%d "
-		"action=preserve-then-delete-only-after-verified-download\n",
+		"action=preserve-then-delete-only-after-verified-download%s%s\n",
 		capture_id,
 		rret == GP_OK ? (recovered ? "cleared" : "nothing-pending")
 		              : "failed",
@@ -6428,7 +6498,10 @@ pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 		recovered ? " names=" : "",
 		recovered ? names[0] : "",
 		(recovered > 1) ? " (and further members)" : "",
-		rret == GP_OK ? 1 : 0);
+		rret == GP_OK ? 1 : 0,
+		orphan_context.last_recovered_path[0] ? " wrote=" : "",
+		orphan_context.last_recovered_path[0] ?
+			orphan_context.last_recovered_path : "");
 	fflush (stderr);
 	if (rret < GP_OK) {
 		GP_LOG_E ("orphan candidate recovery failed (%d); %d object(s) "
@@ -7326,7 +7399,8 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	 * so the caller must not be told that capture completed. */
 	{
 		PentaxReconcileContext reconcile_context = {
-			params, context, camera, {0}, expected_extra_candidates
+			params, context, camera, {0}, expected_extra_candidates,
+			"", 0, {0}
 		};
 		PentaxReconcileOps reconcile_ops = {
 			&reconcile_context,

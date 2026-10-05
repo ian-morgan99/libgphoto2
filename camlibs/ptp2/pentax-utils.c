@@ -226,6 +226,62 @@ pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
 	return 0;
 }
 
+/* Issue #176 follow-up: build the on-disk destination for a claimed orphan.
+ * Kept as a pure function so the naming rule is unit-testable without a
+ * camera. The camera-side name is sanitised to a single path component so a
+ * hostile object name cannot escape the recovery directory, and the capture id
+ * makes collisions between separate claims distinguishable. */
+int
+pentax_orphan_recovery_path (const char *dir, const char *camera_name,
+	unsigned long long capture_id, char *out, size_t out_len)
+{
+	char leaf[96];
+	size_t j = 0;
+	const char *dot;
+	const char *base;
+
+	if (!dir || !dir[0] || !camera_name || !camera_name[0] || !out ||
+		out_len < 16)
+		return 0;
+	if (dir[0] != '/')
+		return 0;
+
+	/* Use only the final path component, then keep it to safe characters. */
+	base = strrchr (camera_name, '/');
+	base = base ? base + 1 : camera_name;
+	for (; *base && j < sizeof (leaf) - 1; base++) {
+		unsigned char c = (unsigned char)*base;
+
+		if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
+			c = '_';
+		leaf[j++] = (char)c;
+	}
+	leaf[j] = '\0';
+	/* A name consisting only of dots would produce a shared prefix (and, for
+	 * "..", a path that is not a new file at all), so strip them and fall
+	 * back to a fixed stem if nothing survives. */
+	while (j > 0 && leaf[j - 1] == '.')
+		leaf[--j] = '\0';
+	if (j == 0) {
+		snprintf (leaf, sizeof (leaf), "unknown");
+		j = strlen (leaf);
+	}
+
+	/* Keep the extension last so the recovered file is still openable:
+	 * IMGP3794.DNG -> IMGP3794-orphan-<id>.DNG */
+	dot = strrchr (leaf, '.');
+	if (dot && dot != leaf) {
+		if (snprintf (out, out_len, "%s/%.*s-orphan-%llu%s", dir,
+			(int)(dot - leaf), leaf, capture_id, dot) >= (int)out_len)
+			return 0;
+	} else if (snprintf (out, out_len, "%s/%s-orphan-%llu", dir, leaf,
+		capture_id) >= (int)out_len) {
+		return 0;
+	}
+	return 1;
+}
+
 const char *
 pentax_admission_recovery_action (PentaxAdmissionBlockReason reason)
 {

@@ -876,6 +876,45 @@ main (void)
 	CHECK (!pentax_orphan_candidate_claimable (
 		PENTAX_ADMISSION_BLOCK_NONE, 0, 9));
 
+	/* Issue #176 follow-up: a claimed orphan must reach disk, not just the
+	 * in-memory publication list that the caller clears before returning.
+	 * The device claim at 21:22:59 logged recovered=1 names=IMGP3794.DNG and
+	 * no such file existed anywhere on the card. */
+	{
+		char dest[512];
+
+		/* The extension stays last so the recovered file is still openable. */
+		CHECK (pentax_orphan_recovery_path ("/app/sd/normal", "IMGP3794.DNG",
+			233, dest, sizeof (dest)));
+		CHECK (!strcmp (dest, "/app/sd/normal/IMGP3794-orphan-233.DNG"));
+		/* Only the final component of a camera-side name is used, so a hostile
+		 * name cannot escape the recovery directory. */
+		CHECK (pentax_orphan_recovery_path ("/app/sd/normal",
+			"../../etc/passwd", 1, dest, sizeof (dest)));
+		CHECK (!strncmp (dest, "/app/sd/normal/passwd-orphan-1", 32));
+		CHECK (pentax_orphan_recovery_path ("/app/sd/normal",
+			"/store_00010001/DCIM/489_1005/IMGP3794.JPG", 7, dest,
+			sizeof (dest)));
+		CHECK (!strcmp (dest,
+			"/app/sd/normal/IMGP3794-orphan-7.JPG"));
+		/* A name that sanitises away entirely still yields a distinct file. */
+		CHECK (pentax_orphan_recovery_path ("/app/sd/normal", "...", 5, dest,
+			sizeof (dest)));
+		CHECK (!strcmp (dest, "/app/sd/normal/unknown-orphan-5"));
+		/* Empty/unset directory => no write, previous behaviour preserved. */
+		CHECK (!pentax_orphan_recovery_path ("", "IMGP1.DNG", 1, dest,
+			sizeof (dest)));
+		CHECK (!pentax_orphan_recovery_path (NULL, "IMGP1.DNG", 1, dest,
+			sizeof (dest)));
+		/* Relative directories are refused: the write target must be
+		 * unambiguous regardless of the process cwd. */
+		CHECK (!pentax_orphan_recovery_path ("app/sd/normal", "IMGP1.DNG", 1,
+			dest, sizeof (dest)));
+		/* A buffer too small to hold the path is a refusal, not a truncation. */
+		CHECK (!pentax_orphan_recovery_path ("/app/sd/normal",
+			"IMGP3794.DNG", 233, dest, 16));
+	}
+
 	CHECK (!pentax_capture_output_obligation_resolved (1, 0, 0));
 	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
 	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));

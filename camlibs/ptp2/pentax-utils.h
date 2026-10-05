@@ -227,6 +227,15 @@ int pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
  * conditions; claiming still requires a proven transfer before deletion. */
 int pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
 	int own_capture_in_flight, uint32_t candidate_handle);
+/* Issue #176 follow-up: where a claimed orphan is written so it survives the
+ * call. Publishing alone keeps the bytes only until the publication list is
+ * cleared, so on the appliance the claimed frame was deleted from the camera
+ * and then dropped on the floor. Returns 1 and fills out when dir is a usable
+ * absolute path and a name can be built from camera_name; returns 0 when no
+ * recovery directory is configured, which preserves the previous in-memory-only
+ * behaviour. */
+int pentax_orphan_recovery_path (const char *dir, const char *camera_name,
+	unsigned long long capture_id, char *out, size_t out_len);
 int pentax_capture_cleanup_decision (int capture_accepted);
 int pentax_candidate_output_published (int transfer_succeeded,
 	int filename_known, int filesystem_publication_succeeded);
