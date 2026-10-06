@@ -6148,10 +6148,16 @@ typedef struct {
 	/* Issue #176 follow-up: when set, a claimed orphan is also written to
 	 * this directory before the camera object is deleted. Empty for the
 	 * dual-format path, which has a live caller to hand the bytes to.
-	 * last_recovered_path is an output field for the audit log. */
+	 * last_recovered_path is an output field for the audit log.
+	 *
+	 * Issue #176 review: orphan_claim marks a recovery where no other owner
+	 * exists, so the camera object may only be deleted once durable_owner
+	 * says a durable copy positively exists. */
 	char recovery_dir[256];
 	unsigned long long recovery_capture_id;
 	char last_recovered_path[512];
+	int orphan_claim;
+	int durable_owner;
 } PentaxReconcileContext;
 
 static int
@@ -6185,7 +6191,21 @@ static int
 pentax_reconcile_delete_candidate (void *user_data)
 {
 	PentaxReconcileContext *rc = user_data;
-	uint16_t ptpres = ptp_pentax_delete_transfer_candidate (rc->params);
+	uint16_t ptpres;
+
+	/* Issue #176 review: deleting an orphan is only safe once a durable
+	 * owner positively exists. A disabled, unusable or failed durable
+	 * destination must leave the camera object intact, otherwise
+	 * configuration alone re-enables the data loss this recovery exists to
+	 * prevent. */
+	if (!pentax_orphan_delete_permitted (rc->orphan_claim,
+		rc->durable_owner)) {
+		GP_LOG_E ("orphan recovery: no durable owner was established; "
+			"keeping the camera candidate and leaving the shutter "
+			"blocked");
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	ptpres = ptp_pentax_delete_transfer_candidate (rc->params);
 
 	return ptpres == PTP_RC_OK ? GP_OK : translate_ptp_result (ptpres);
 }
@@ -6243,6 +6263,9 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 
 	transfer.started = time_now ();
 	transfer.last_progress = transfer.started;
+	/* Per candidate: a previous object reaching disk says nothing about this
+	 * one, so the durable-owner evidence the delete relies on starts clear. */
+	rc->durable_owner = 0;
 	ret = pentax_transfer_run (buffer, &transfer_operations);
 	if (ret < GP_OK)
 		return ret;
@@ -6353,26 +6376,51 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			 * then dropped. Writing it here is what makes the log line's
 			 * "preserve-then-delete-only-after-verified-download" true. A
 			 * failed write is fatal to the claim, so the object is kept. */
+			int attempt = 0;
 			char dest[512];
 
-			if (!pentax_orphan_recovery_path (rc->recovery_dir, extra.name,
-				rc->recovery_capture_id, dest, sizeof (dest))) {
-				GP_LOG_E ("orphan recovery: could not build a destination path "
-					"for %s in %s; preserving the camera candidate",
-					extra.name, rc->recovery_dir);
-				ret = GP_ERROR_BAD_PARAMETERS;
-			} else {
+			for (;;) {
+				if (!pentax_orphan_recovery_path_unique (
+					    rc->recovery_dir, extra.name,
+					    rc->recovery_capture_id, attempt, dest,
+					    sizeof (dest))) {
+					GP_LOG_E ("orphan recovery: could not build a destination path "
+						"for %s in %s; preserving the camera candidate",
+						extra.name, rc->recovery_dir);
+					ret = GP_ERROR_BAD_PARAMETERS;
+					break;
+				}
+				/* A destination that already holds a recovered frame must
+				 * not be overwritten (issue #176 review): take the next
+				 * unique name instead of racing the save. */
+				if (access (dest, F_OK) == 0) {
+					GP_LOG_D ("orphan recovery: %s already exists, "
+						"trying the next unique name", dest);
+					if (++attempt > 9) {
+						GP_LOG_E ("orphan recovery: no free destination "
+							"for %s in %s; preserving the camera "
+							"candidate", extra.name,
+							rc->recovery_dir);
+						ret = GP_ERROR_FILE_EXISTS;
+						break;
+					}
+					continue;
+				}
 				ret = gp_file_save (file, dest);
 				if (ret == GP_OK) {
 					GP_LOG_D ("orphan recovery: wrote %u bytes to %s",
 						(unsigned)published_size, dest);
 					snprintf (rc->last_recovered_path,
 						sizeof (rc->last_recovered_path), "%s", dest);
-				} else {
-					GP_LOG_E ("orphan recovery: could not write %s (%d); "
-						"preserving the camera candidate", dest, ret);
-					unlink (dest);
+					/* The invariant the delete depends on: a durable
+					 * owner now positively exists. */
+					rc->durable_owner = 1;
+					break;
 				}
+				unlink (dest);
+				GP_LOG_E ("orphan recovery: could not write %s (%d); "
+					"preserving the camera candidate", dest, ret);
+				break;
 			}
 		}
 		if (ret < GP_OK) {
@@ -6460,7 +6508,7 @@ pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 	PTPParams *params = &camera->pl->params;
 	const char *recovery_dir = pentax_orphan_recovery_dir ();
 	PentaxReconcileContext orphan_context = {
-		params, context, camera, {0}, 0, "", 0, {0}
+		params, context, camera, {0}, 0, "", 0, {0}, 0, 0
 	};
 	PentaxReconcileOps orphan_ops = {
 		&orphan_context,
@@ -6475,13 +6523,29 @@ pentax_recover_orphan_candidates (Camera *camera, GPContext *context,
 	int recovered = 0;
 	int rret;
 
-	if (recovery_dir) {
-		if (snprintf (orphan_context.recovery_dir,
-			sizeof (orphan_context.recovery_dir), "%s", recovery_dir) >=
-			(int)sizeof (orphan_context.recovery_dir))
-			orphan_context.recovery_dir[0] = '\0';
-		orphan_context.recovery_capture_id = capture_id;
+	/* Issue #176 review: this is an orphan claim, so the delete is gated on a
+	 * durable owner. Without a usable destination the claim fails and the
+	 * object stays on the camera with the shutter still blocked, rather than
+	 * being deleted into memory that is about to be cleared. */
+	orphan_context.orphan_claim = 1;
+	if (!recovery_dir) {
+		/* Only reached when a candidate was actually observed, so there is
+		 * something here that would otherwise be downloaded and then thrown
+		 * away. Refuse before spending the transfer. */
+		fprintf (stderr, "[pentax-recovery] capture=%llu path=orphan-recovery "
+			"outcome=destination-unavailable recovered=0 accepted=0 "
+			"action=keep-camera-object; keep-shutter-blocked; "
+			"configure-a-durable-destination\n", capture_id);
+		fflush (stderr);
+		GP_LOG_E ("orphan recovery: no usable durable destination is configured; "
+			"keeping the camera candidate and leaving the shutter blocked");
+		return GP_ERROR_CORRUPTED_DATA;
 	}
+	if (snprintf (orphan_context.recovery_dir,
+		sizeof (orphan_context.recovery_dir), "%s", recovery_dir) >=
+		(int)sizeof (orphan_context.recovery_dir))
+		orphan_context.recovery_dir[0] = '\0';
+	orphan_context.recovery_capture_id = capture_id;
 
 	/* min_count 0 lets the loop finish as soon as the queue is empty; the
 	 * count and wall-clock bounds are what stop a wedged camera from
@@ -7437,7 +7501,7 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	{
 		PentaxReconcileContext reconcile_context = {
 			params, context, camera, {0}, expected_extra_candidates,
-			"", 0, {0}
+			"", 0, {0}, 0, 0
 		};
 		PentaxReconcileOps reconcile_ops = {
 			&reconcile_context,

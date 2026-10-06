@@ -265,16 +265,42 @@ pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
 	return 0;
 }
 
+/* Issue #176 review: the camera object may be deleted if and only if a durable
+ * owner has been positively established. An orphan has no other owner, so a
+ * disabled destination, an unusable one and a failed write must all leave the
+ * object on the camera; otherwise configuration alone switches the original
+ * data-loss bug back on. The dual-format path is not an orphan claim: there the
+ * bytes are handed to a live caller, so deletion stays allowed. */
+int
+pentax_orphan_delete_permitted (int orphan_claim, int durable_owner_established)
+{
+	if (!orphan_claim)
+		return 1;
+	return !!durable_owner_established;
+}
+
 /* Issue #176 follow-up: build the on-disk destination for a claimed orphan.
  * Kept as a pure function so the naming rule is unit-testable without a
  * camera. The camera-side name is sanitised to a single path component so a
  * hostile object name cannot escape the recovery directory, and the capture id
- * makes collisions between separate claims distinguishable. */
+ * makes collisions between separate claims distinguishable. attempt 0 is the
+ * first choice; a higher attempt is used only when the destination already
+ * exists, so a collision yields a unique durable file instead of overwriting a
+ * previously recovered frame (issue #176 review). */
 int
 pentax_orphan_recovery_path (const char *dir, const char *camera_name,
 	unsigned long long capture_id, char *out, size_t out_len)
 {
+	return pentax_orphan_recovery_path_unique (dir, camera_name, capture_id,
+		0, out, out_len);
+}
+
+int
+pentax_orphan_recovery_path_unique (const char *dir, const char *camera_name,
+	unsigned long long capture_id, int attempt, char *out, size_t out_len)
+{
 	char leaf[96];
+	char retry[32];
 	size_t j = 0;
 	const char *dot;
 	const char *base;
@@ -308,14 +334,24 @@ pentax_orphan_recovery_path (const char *dir, const char *camera_name,
 	}
 
 	/* Keep the extension last so the recovered file is still openable:
-	 * IMGP3794.DNG -> IMGP3794-orphan-<id>.DNG */
+	 * IMGP3794.DNG -> IMGP3794-orphan-<id>.DNG
+	 * A repeated claim of the same frame within one capture appends the
+	 * attempt so a second recovery cannot overwrite the first. */
+	if (attempt > 0) {
+		if (snprintf (retry, sizeof (retry), "-retry-%d", attempt) >=
+		    (int)sizeof (retry))
+			return 0;
+	} else {
+		retry[0] = '\0';
+	}
 	dot = strrchr (leaf, '.');
 	if (dot && dot != leaf) {
-		if (snprintf (out, out_len, "%s/%.*s-orphan-%llu%s", dir,
-			(int)(dot - leaf), leaf, capture_id, dot) >= (int)out_len)
+		if (snprintf (out, out_len, "%s/%.*s-orphan-%llu%s%s", dir,
+			(int)(dot - leaf), leaf, capture_id, retry, dot) >=
+		    (int)out_len)
 			return 0;
-	} else if (snprintf (out, out_len, "%s/%s-orphan-%llu", dir, leaf,
-		capture_id) >= (int)out_len) {
+	} else if (snprintf (out, out_len, "%s/%s-orphan-%llu%s", dir, leaf,
+		capture_id, retry) >= (int)out_len) {
 		return 0;
 	}
 	return 1;

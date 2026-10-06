@@ -948,6 +948,51 @@ main (void)
 			"IMGP3794.DNG", 233, dest, 16));
 	}
 
+	/* Issue #176 review: "we fixed recovering-the-orphan-throwing-the-
+	 * photograph-away; configuration must not be able to switch that bug
+	 * back on." A camera object may be deleted if and only if a durable
+	 * owner has been positively established. */
+	{
+		char first[512];
+		char second[512];
+
+		/* 1. Durable destination disabled/empty -> no camera delete. */
+		CHECK (!pentax_orphan_recovery_path ("", "IMGP3794.DNG", 9, first,
+			sizeof (first)));
+		CHECK (!pentax_orphan_delete_permitted (1, 0));
+		/* 2. Durable save fails -> no camera delete. The write is what
+		 * sets the evidence, so a failure leaves it exactly as above. */
+		CHECK (!pentax_orphan_delete_permitted (1, 0));
+		/* 3. Durable save succeeds -> delete permitted. */
+		CHECK (pentax_orphan_recovery_path ("/app/sd/normal",
+			"IMGP3794.DNG", 9, first, sizeof (first)));
+		CHECK (pentax_orphan_delete_permitted (1, 1));
+		/* 4. Destination collision -> a unique durable file, then delete.
+		 * The earlier recovered frame must not be overwritten. */
+		CHECK (pentax_orphan_recovery_path_unique ("/app/sd/normal",
+			"IMGP3794.DNG", 9, 0, first, sizeof (first)));
+		CHECK (pentax_orphan_recovery_path_unique ("/app/sd/normal",
+			"IMGP3794.DNG", 9, 1, second, sizeof (second)));
+		CHECK (strcmp (first, second) != 0);
+		/* Still openable: the extension stays last. */
+		CHECK (strlen (second) > 4 &&
+			!strcmp (second + strlen (second) - 4, ".DNG"));
+		CHECK (!strncmp (second, "/app/sd/normal/IMGP3794-orphan-9", 32));
+		/* A refused destination is never a silent overwrite either. */
+		CHECK (!pentax_orphan_recovery_path_unique ("", "IMGP3794.DNG", 9, 1,
+			second, sizeof (second)));
+		CHECK (!pentax_orphan_recovery_path_unique ("/app/sd/normal",
+			"IMGP3794.DNG", 9, 0, second, 16));
+		/* 5. No Polaris-specific environment configured -> safe, not
+		 * silently in-memory-only: no destination means no delete. */
+		CHECK (!pentax_orphan_recovery_path (NULL, "IMGP3794.DNG", 9, first,
+			sizeof (first)));
+		CHECK (!pentax_orphan_delete_permitted (1, 0));
+		/* The dual-format path is not an orphan claim: the bytes go to a
+		 * live caller, so it must keep working without a recovery dir. */
+		CHECK (pentax_orphan_delete_permitted (0, 0));
+	}
+
 	CHECK (!pentax_capture_output_obligation_resolved (1, 0, 0));
 	CHECK (!pentax_capture_output_obligation_resolved (1, 1, 0));
 	CHECK (pentax_capture_output_obligation_resolved (1, 1, 1));

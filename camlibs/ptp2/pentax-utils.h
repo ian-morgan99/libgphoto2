@@ -240,10 +240,28 @@ int pentax_orphan_candidate_claimable (PentaxAdmissionBlockReason reason,
  * cleared, so on the appliance the claimed frame was deleted from the camera
  * and then dropped on the floor. Returns 1 and fills out when dir is a usable
  * absolute path and a name can be built from camera_name; returns 0 when no
- * recovery directory is configured, which preserves the previous in-memory-only
- * behaviour. */
+ * usable recovery directory is configured, which for an orphan means the camera
+ * object is left in place (see pentax_orphan_delete_permitted).
+ *
+ * INTEGRATION SCAFFOLDING, not a libgphoto2 API commitment: the directory comes
+ * from OPENPOLARIS_PENTAX_ORPHAN_DIR and defaults to the appliance path. The
+ * durable destination and publication policy belong to the caller; the invariant
+ * that survives any refactor is that a claimed orphan is never deleted before a
+ * durable owner exists. attempt 0 is the first-choice name; a higher attempt is
+ * only used when that destination already exists, so a collision produces a
+ * unique file instead of overwriting a previously recovered frame. */
 int pentax_orphan_recovery_path (const char *dir, const char *camera_name,
 	unsigned long long capture_id, char *out, size_t out_len);
+int pentax_orphan_recovery_path_unique (const char *dir,
+	const char *camera_name, unsigned long long capture_id, int attempt,
+	char *out, size_t out_len);
+/* Whether the camera-side object may be deleted after a claim. An orphan has no
+ * other owner, so deletion requires a positively established durable owner; a
+ * disabled, unusable or failed durable handoff must leave the object intact.
+ * Non-orphan transfers (the dual-format path) hand the bytes to a live caller
+ * and are unaffected. */
+int pentax_orphan_delete_permitted (int orphan_claim,
+	int durable_owner_established);
 int pentax_capture_cleanup_decision (int capture_accepted);
 int pentax_candidate_output_published (int transfer_succeeded,
 	int filename_known, int filesystem_publication_succeeded);

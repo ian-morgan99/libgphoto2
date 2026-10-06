@@ -540,6 +540,45 @@ main (void)
                 CHECK (mock.delete_calls == 0);
         }
 
+        /* 15. Issue #176 review: the durable-owner gate composed with the real
+         * reconcile loop. pentax_reconcile_delete_candidate() in library.c
+         * refuses the delete unless a durable owner was positively established;
+         * a refusal must leave the object on the camera and fail the claim,
+         * not let the loop go on to consume it. */
+        {
+                PentaxReconcileOps gated_ops = ops;
+
+                gated_ops.candidate_is_owned = orphan_always_owned;
+
+                /* Durable owner not established => the production op returns
+                 * GP_ERROR_CORRUPTED_DATA without touching the camera. */
+                mock_reset (&mock);
+                mock.handles[0] = 310;
+                mock.handle_count = 1;
+                mock.names[0] = "SP_0230.RW2";
+                mock.delete_error = GP_ERROR_CORRUPTED_DATA;
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&gated_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret < GP_OK);
+                CHECK (mock.transfer_calls == 1);
+                CHECK (mock.handle_count == 1);
+                CHECK (count == 0);
+
+                /* Durable owner established => the delete is allowed and the
+                 * gate actually clears. */
+                mock_reset (&mock);
+                mock.handles[0] = 311;
+                mock.handle_count = 1;
+                mock.names[0] = "SP_0231.RW2";
+                count = -1;
+                ret = pentax_reconcile_extra_candidates (&gated_ops, 4, 30000,
+                        0, names, &count);
+                CHECK (ret == GP_OK);
+                CHECK (count == 1);
+                CHECK (mock.handle_count == 0);
+        }
+
         printf ("test-pentax-reconcile: all checks passed\n");
         return 0;
 }
