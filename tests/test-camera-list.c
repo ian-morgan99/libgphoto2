@@ -278,22 +278,42 @@ main (int argc, char *argv[])
 		const char *camlib_basename;
 		CHECK (gp_abilities_list_get_abilities (al, i, &abilities));
 		camlib_basename = path_basename(abilities.library);
-		if ((!strcmp (abilities.model, "Pentax:K-1 Mark II (PTP mode)")) ||
-		    (!strcmp (abilities.model, "Pentax:K-3 Mark III (MTP mode)"))) {
+		/* R0 containment: in a public build the ptp2 driver may not
+		 * advertise capture for a research-only Pentax body. Keyed on
+		 * the USB product IDs, not on a list of model names: a name
+		 * list silently drifts, and the K-1 II has two product IDs
+		 * (issue #179), so a second table row for the same body would
+		 * not have matched either literal here. This mirrors
+		 * pentax_pid_is_research_capable() in
+		 * camlibs/ptp2/pentax-utils.c; keep the two in step.
+		 *
+		 * Scoped to ptp2 deliberately. The legacy camlibs/pentax SCSI
+		 * driver also claims 0x25fb:0x0182 (K-1 II in MSC mode) and
+		 * 0x25fb:0x0130 (K-01 in MSC mode) with capture, on
+		 * GP_PORT_USB_SCSI; that is upstream behaviour and unrelated
+		 * to the ptp2 research-capture feature. Other ptp2 Pentax
+		 * rows (e.g. the K-01 at 0x0131) are likewise out of scope.
+		 *
+		 * Research builds attach capture per-PID and are checked in
+		 * tests/test-pentax-utils.c instead. */
 #ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
-                    int forbidden = GP_OPERATION_CAPTURE_IMAGE |
-                            GP_OPERATION_CAPTURE_PREVIEW |
-                            GP_OPERATION_TRIGGER_CAPTURE;
-                    if (abilities.operations & forbidden) {
-                            fprintf (stderr,
-                                    "Unverified Pentax capture ability advertised: %s (0x%x)\n",
-                                    abilities.model, abilities.operations);
-                            exit (1);
-                    }
+		if (!strcmp (camlib_basename, "ptp2") &&
+		    abilities.usb_vendor == 0x25fb &&
+		    (abilities.usb_product == 0x0182 ||	/* K-1 Mark II */
+		     abilities.usb_product == 0x0183 ||	/* K-1 Mark II */
+		     abilities.usb_product == 0x0189 ||	/* K-3 Mark III */
+		     abilities.usb_product == 0x018f)) {	/* K-3 Mark III Monochrome */
+			int forbidden = GP_OPERATION_CAPTURE_IMAGE |
+				GP_OPERATION_CAPTURE_PREVIEW |
+				GP_OPERATION_TRIGGER_CAPTURE;
+			if (abilities.operations & forbidden) {
+				fprintf (stderr,
+					"Unverified Pentax capture ability advertised: %s (0x%x)\n",
+					abilities.model, abilities.operations);
+				exit (1);
+			}
+		}
 #endif
-                    /* Research builds advertise capture for these bodies;
-                     * the R0 containment check applies to public builds. */
-            }
 		if (!strcmp(lastmodel, abilities.model)) {
 			fprintf(stderr,"Duplicated model name in camera list: %s\n", lastmodel);
 			exit(1);
