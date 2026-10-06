@@ -2819,6 +2819,16 @@ static struct {
 	{"Pentax:K-3 Mark III Monochrome (PTP Mode)", 0x25fb, 0x018f, 0},
 	/* Ian Morgan <github@morgan-multinational.co.uk> */
 	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, 0},
+	/* The K-1 II declares a PID *pair* in its own firmware image
+	 * (fwdc240b.bin v2.51, offset 0x95f7c: "fb25 8201 310a 8301"), and both
+	 * IDs have been seen on hardware: 0x0183 bound correctly
+	 * (o-v7 field test, 2026-09-10) while 0x0182 produced zero supported
+	 * cameras and a silent fallback to hardcoded K-3 III abilities
+	 * (o-v12n, 2026-09-24).  Same body, so both IDs must resolve.  The name
+	 * differs only by the parenthesised USB-ID qualifier because
+	 * tests/test-camera-list.c rejects duplicate model names; it keeps the
+	 * "Pentax" and "K-1 Mark II" tokens intact for model matching. */
+	{"Pentax:K-1 Mark II (PTP mode, USB id 0182)",	0x25fb, 0x0182, 0},
 	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, 0},
 	/* 645D PTP PID; also used by the legacy K-01 (SCSI camlib). */
 	{"Pentax:645D (PTP Mode)",		0x25fb, 0x0130, 0},

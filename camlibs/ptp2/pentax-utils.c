@@ -622,7 +622,11 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		*extension_version = 1;
 		return 1;
 	}
-	if ((usb_product == 0x0183) &&
+	/* The K-1 II declares two product IDs in its own firmware image
+	 * (fwdc240b.bin v2.51, offset 0x95f7c) and both have been observed on
+	 * hardware: 0x0183 bound correctly, 0x0182 matched nothing and the host
+	 * fell back to hardcoded K-3 III abilities (issue #179).  Accept either. */
+	if (((usb_product == 0x0183) || (usb_product == 0x0182)) &&
 	    !strcmp (device_model, "PENTAX K-1 Mark II")) {
 		*model_no = PENTAX_MODEL_K1_MARK_II;
 		*extension_version = 1;
@@ -1107,11 +1111,16 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
 }
 
 /* Research builds only: the vendor Pentax bodies whose capture flow we
- * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome). */
+ * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome).
+ * 0x0182 is the K-1 II's other declared product ID (issue #179); it is the same
+ * body as 0x0183 and must be treated identically here, otherwise a body that
+ * does bind to the camlib still misses the issue #33 stale-session recovery
+ * gated on pentax_candidate. */
 int
 pentax_pid_is_research_capable (unsigned int pid)
 {
-	return (pid == 0x0183) || (pid == 0x0189) || (pid == 0x018f);
+	return (pid == 0x0182) || (pid == 0x0183) || (pid == 0x0189) ||
+	       (pid == 0x018f);
 }
 
 /* A stalled camera (no bytes for a while) is a different failure from one
