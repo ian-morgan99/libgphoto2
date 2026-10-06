@@ -188,6 +188,45 @@ pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
 	return reason == PENTAX_ADMISSION_BLOCK_NONE && !capture_output_pending;
 }
 
+/* A capture_output_pending flag only records that this process once sent a
+ * shutter it did not see fully published. It is bookkeeping, not a measurement
+ * of the camera, so on its own it can never discharge: an abandoned request
+ * (a capture-wait timeout, a cancelled wait, a transport error after the
+ * response was lost) leaves it set forever and every later shutter is refused
+ * with output-obligation-unresolved until the process restarts.
+ *
+ * Device evidence, Clog_000250 on o-v15r, 2026-10-06: capture 4 was a normal
+ * Manual request that timed out after 66 s while the camera went on to write
+ * and report SP_0240.jpg as a success. Captures 5 and 6 were then refused
+ * pre-shutter with field32=0x00000000 field36=0x00000000 - the camera owed
+ * nothing at all. The block was produced entirely by our own stale flag.
+ *
+ * This decides when the camera itself positively contradicts that flag, so the
+ * caller can release it. Only a complete and readable idle frame with no active
+ * exposure (+32) and no candidate on the body (+36) counts as that
+ * contradiction; anything ambiguous keeps the obligation latched, which is the
+ * fail-closed behaviour the gate was built for. A frame that really did land
+ * without being downloaded still shows up as a candidate, so it is claimed as an
+ * orphan by pentax_orphan_candidate_claimable rather than silently dropped. */
+int
+pentax_output_obligation_releasable (PentaxAdmissionBlockReason camera_reason,
+	int own_capture_in_flight, uint32_t camera_capture,
+	uint32_t camera_candidate)
+{
+	/* A capture we are still serving owns whatever the camera might owe. */
+	if (own_capture_in_flight)
+		return 0;
+	/* Unreadable conditions, an active camera operation or a candidate still
+	 * on the body are all reasons to keep waiting, not to forget. */
+	if (camera_reason != PENTAX_ADMISSION_BLOCK_NONE)
+		return 0;
+	/* Require the explicit zero the camera reports, rather than relying on
+	 * which non-zero values the admission predicate happens to single out. */
+	if (camera_capture || camera_candidate)
+		return 0;
+	return 1;
+}
+
 /* Issue #175: "recover-output-with-ownership" was printed for every
  * candidate-bearing block, but nothing ever claimed the candidate, so a single
  * lost frame latched the gate for the rest of the session. This is the policy

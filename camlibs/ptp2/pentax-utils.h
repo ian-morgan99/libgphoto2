@@ -222,6 +222,14 @@ const char *pentax_admission_block_reason_name (PentaxAdmissionBlockReason reaso
 const char *pentax_admission_recovery_action (PentaxAdmissionBlockReason reason);
 int pentax_recovery_probe_can_clear (PentaxAdmissionBlockReason reason,
 	int capture_output_pending);
+/* Whether a latched capture_output_pending flag is contradicted by the camera
+ * itself: a readable idle frame with no active exposure and no candidate on the
+ * body. Without this the flag can only be discharged by a publication that an
+ * abandoned capture will never produce, so one timed-out request locks every
+ * later shutter for the life of the process. See the definition. */
+int pentax_output_obligation_releasable (PentaxAdmissionBlockReason camera_reason,
+	int own_capture_in_flight, uint32_t camera_capture,
+	uint32_t camera_candidate);
 /* Issue #175: whether a candidate-bearing admission block may be claimed as an
  * orphan by the caller. See the comment on the definition for the exact
  * conditions; claiming still requires a proven transfer before deletion. */

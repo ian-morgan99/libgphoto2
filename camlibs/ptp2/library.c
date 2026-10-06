@@ -6591,6 +6591,42 @@ pentax_initiate_experimental_held_capture (PTPParams *params,
 	return ptp_pentax_initiate_capture (params, 2U, focus_mode, 0, 0, 0);
 }
 
+/* One place decides what a latched capture_output_pending means, because three
+ * admission paths used to derive it independently and each had to be fixed
+ * separately. The flag is our own bookkeeping about a shutter whose publication
+ * we never saw; only the camera can say whether it still owes the output. When
+ * it positively reports an idle body with no active exposure and no candidate,
+ * the obligation belongs to an abandoned request and is released, so one
+ * timed-out capture cannot lock every later shutter for the life of the
+ * process (Clog_000250 on o-v15r: captures 5 and 6 refused with field32=0
+ * field36=0 after capture 4 timed out at 66 s). Anything ambiguous keeps the
+ * fail-closed OUTPUT_UNRESOLVED block. */
+static PentaxAdmissionBlockReason
+pentax_admission_apply_output_obligation (PTPParams *params,
+	unsigned long long capture_id, const char *path,
+	PentaxAdmissionBlockReason camera_reason,
+	uint32_t camera_capture, uint32_t camera_candidate)
+{
+	if (camera_reason != PENTAX_ADMISSION_BLOCK_NONE ||
+	    !params->pentax.capture_output_pending)
+		return camera_reason;
+
+	if (pentax_output_obligation_releasable (
+		    camera_reason,
+		    params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE ||
+		    params->pentax.bulb_action_active,
+		    camera_capture, camera_candidate)) {
+		params->pentax.capture_output_pending = 0;
+		fprintf (stderr, "[pentax-recovery] capture=%llu "
+			"path=obligation-release reason=camera-reports-no-output "
+			"gate=%s field32=0x%08x field36=0x%08x released=1 "
+			"action=forget-abandoned-obligation; continue-admission\n",
+			capture_id, path, camera_capture, camera_candidate);
+		return PENTAX_ADMISSION_BLOCK_NONE;
+	}
+	return PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+}
+
 static int
 camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	GPContext *context, PentaxCaptureMode mode)
@@ -6690,9 +6726,9 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		/* Output-safe is diagnostic comparison data only. Until direct
 		 * hardware evidence establishes that an active +104 state permits a
 		 * subsequent InitiateCapture, it must never clear recovery_required. */
-		if (params->pentax.capture_output_pending &&
-		    strict_reason == PENTAX_ADMISSION_BLOCK_NONE)
-			strict_reason = PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+		strict_reason = pentax_admission_apply_output_obligation (
+			params, capture_id, "recovery-probe", strict_reason,
+			recovery_capture, recovery_candidate);
 		if (pentax_recovery_probe_can_clear (strict_reason,
 			params->pentax.capture_output_pending)) {
 			recovered = 1;
@@ -6821,9 +6857,9 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		baseline_activity = pentax_get_u32le (bdata + 104);
 		baseline_reason = pentax_admission_block_reason (bdata, bsize,
 			PENTAX_ADMISSION_STRICT);
-		if (baseline_reason == PENTAX_ADMISSION_BLOCK_NONE &&
-		    params->pentax.capture_output_pending)
-			baseline_reason = PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+		baseline_reason = pentax_admission_apply_output_obligation (
+			params, capture_id, "preconditions", baseline_reason,
+			baseline_capture, baseline_candidate);
 		/* Issue #175: "never consume or delete it here" was written to
 		 * protect a file from an earlier session, but with nothing ever
 		 * claiming the object it also made the refusal permanent. Claim it
@@ -6860,11 +6896,12 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 						pentax_get_u32le (bdata + 104);
 					baseline_reason = pentax_admission_block_reason (
 						bdata, bsize, PENTAX_ADMISSION_STRICT);
-					if (baseline_reason ==
-					    PENTAX_ADMISSION_BLOCK_NONE &&
-					    params->pentax.capture_output_pending)
-						baseline_reason =
-							PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
+					baseline_reason =
+						pentax_admission_apply_output_obligation (
+							params, capture_id,
+							"preconditions-post-claim",
+							baseline_reason, baseline_capture,
+							baseline_candidate);
 				} else {
 					free (bdata);
 					bdata = NULL;

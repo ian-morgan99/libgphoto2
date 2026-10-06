@@ -851,6 +851,39 @@ main (void)
 	CHECK (!pentax_recovery_probe_can_clear (
 		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0));
 
+	/* A latched output obligation is our own bookkeeping, so it cannot
+	 * discharge itself: an abandoned capture never reaches the publication
+	 * that clears it. The camera reporting a readable idle body with no
+	 * active exposure and no candidate is the positive contradiction that
+	 * releases it (Clog_000250 on o-v15r: captures 5 and 6 refused with
+	 * field32=0x00000000 field36=0x00000000 after capture 4 timed out at
+	 * 66 s, and every later shutter was locked out until restart). */
+	CHECK (pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_NONE, 0, 0, 0));
+	/* A capture we are still serving owns whatever the camera might owe. */
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_NONE, 1, 0, 0));
+	/* Unreadable conditions are unknown, not empty. */
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_UNREADABLE, 0, 0, 0));
+	/* An active camera operation may still produce the output. */
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_UNSAFE_ACTIVITY, 0, 0, 0));
+	/* An exposure in progress, or a frame still on the body, is a real
+	 * obligation (or an orphan to claim), never a stale flag. */
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_NONE, 0, 1, 0));
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_NONE, 0, 0, 9));
+	/* Only the explicit zero the camera reports counts; the block reason
+	 * singles out particular non-zero values, so do not infer from it. */
+	CHECK (!pentax_output_obligation_releasable (
+		PENTAX_ADMISSION_BLOCK_NONE, 0, 2, 0));
+	/* Releasing the flag must not be confused with claiming a candidate:
+	 * with a handle present the orphan path still owns the decision. */
+	CHECK (!pentax_orphan_candidate_claimable (
+		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED, 0, 9));
+
 	/* Issue #175: "recover-output-with-ownership" must have a decidable
 	 * trigger. A candidate-bearing block with no capture of ours in flight is
 	 * an orphan we may claim; anything else keeps the fail-closed refusal. */
