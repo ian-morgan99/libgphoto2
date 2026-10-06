@@ -2820,15 +2820,31 @@ static struct {
 	/* Ian Morgan <github@morgan-multinational.co.uk> */
 	{"Pentax:K-1 Mark II (PTP mode)",	0x25fb, 0x0183, 0},
 	/* The K-1 II declares a PID *pair* in its own firmware image
-	 * (fwdc240b.bin v2.51, offset 0x95f7c: "fb25 8201 310a 8301"), and both
-	 * IDs have been seen on hardware: 0x0183 bound correctly
-	 * (o-v7 field test, 2026-09-10) while 0x0182 produced zero supported
-	 * cameras and a silent fallback to hardcoded K-3 III abilities
-	 * (o-v12n, 2026-09-24).  Same body, so both IDs must resolve.  The name
-	 * differs only by the parenthesised USB-ID qualifier because
-	 * tests/test-camera-list.c rejects duplicate model names; it keeps the
-	 * "Pentax" and "K-1 Mark II" tokens intact for model matching. */
-	{"Pentax:K-1 Mark II (PTP mode, USB id 0182)",	0x25fb, 0x0182, 0},
+	 * (fwdc240b.bin v2.51, offset 0x95f7c: "fb25 8201 310a 8301").  The
+	 * first ID is the body's *mass storage* PID and the second is its PTP
+	 * PID -- the same split as every other Pentax body in this table:
+	 * K-1 0x0178/0x0179, KP 0x017e/0x017f, K-70 0x017c/0x017d,
+	 * K-3 II 0x017a/0x017b, K-3 0x0164/0x0165, K-01 0x0130/0x0131.  In
+	 * each pair the first ID is the one camlibs/pentax claims for MSC/SCSI
+	 * access (see its "in MSC mode, which is used by usbscsi" note against
+	 * 0x0182) and the second is the PTP ID listed here.
+	 *
+	 * A K-1 II presenting 0x0182 is therefore in MSC mode.  This row exists
+	 * so such a body is *named* rather than reported as "no camera": before
+	 * it, a 0x0182 attachment autodetected to nothing and the host fell back
+	 * to hardcoded K-3 III abilities (o-v12n, 2026-09-24) -- the wrong model
+	 * with no diagnostic.  Whether PTP init then succeeds depends on whether
+	 * the body also exposes a PTP interface in that mode; it may well not,
+	 * in which case the outcome is a PTP error against the *correct* model,
+	 * which is still a strictly better diagnostic.  Full vendor control
+	 * needs the camera in the USB mode that enumerates 0x0183.  See
+	 * benro-polaris-firmware-patcher #179.
+	 *
+	 * The name differs from the row above only by the parenthesised USB-ID
+	 * qualifier because tests/test-camera-list.c rejects duplicate model
+	 * names; it keeps the "Pentax" and "K-1 Mark II" tokens intact for
+	 * model matching. */
+	{"Pentax:K-1 Mark II (MSC mode, USB id 0182)",	0x25fb, 0x0182, 0},
 	{"Pentax:K-3 Mark III (MTP mode)",	0x25fb, 0x0189, 0},
 	/* 645D PTP PID; also used by the legacy K-01 (SCSI camlib). */
 	{"Pentax:645D (PTP Mode)",		0x25fb, 0x0130, 0},
