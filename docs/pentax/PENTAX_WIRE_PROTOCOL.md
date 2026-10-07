@@ -61,9 +61,19 @@ sets vendor mode with `0x9001`, then reads DeviceInfo, storage IDs, and
 `0x9001`. Windows WPD may still perform implicit session traffic, so only a USB
 trace can establish the exact on-wire sequence.
 
-After connection, IMAGE Transmitter polls `GetAllConditions` every 100 ms. This
-can keep an already running session active, but it is not evidence of a command
-that can wake a powered-off or non-enumerated camera. Pentax opcode `0x9002` is
+After connection, IMAGE Transmitter keeps `GetAllConditions` in flight with a
+self-rearming one-shot timer, not a fixed-rate poll. `ConditionRefreshTask`
+disarms the timer, issues `0x900f`, performs any candidate object download, and
+only then calls `Change(100, -1)`. The 100 ms is therefore an idle gap measured
+from the *completion* of the previous cycle, so the effective period is
+100 ms + poll duration + any transfer duration, and reads and downloads are
+serialized by construction rather than overlapping on a tick. Two early `return`
+paths inside the callback skip the rearm, which stops polling silently until
+something else re-arms it — see `IMAGE_TRANSMITTER_ERROR_RECOVERY.md`,
+"Scheduling and lifecycle behaviour".
+
+This can keep an already running session active, but it is not evidence of a
+command that can wake a powered-off or non-enumerated camera. Pentax opcode `0x9002` is
 named and used as camera shutdown; it is called only from the application's
 explicit camera-shutdown UI path and must not be used for recovery.
 

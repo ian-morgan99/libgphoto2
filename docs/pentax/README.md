@@ -161,9 +161,23 @@ physical camera.
 
 ## Documentation index
 
+Start with [`NIGHTLY_AGENT_START_HERE.md`](NIGHTLY_AGENT_START_HERE.md) and
+[`AGENT_WORK_QUEUE.md`](AGENT_WORK_QUEUE.md) for current standing work.
+
 - [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md) — chronological hardware test log (authoritative)
 - [`IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md`](IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md) — vendor capability matrix reconciled with our findings
 - [`PENTAX_WIRE_PROTOCOL.md`](PENTAX_WIRE_PROTOCOL.md) — vendor opcode/property reference
+- [`REFERENCE_CLIENTS.md`](REFERENCE_CLIENTS.md) — which reference app is authoritative for what, with content hashes; read before citing "what IT2 does"
 - [`PENTAX_CONFIGURATION.md`](PENTAX_CONFIGURATION.md) — configuration-engine integration rules
 - [`IMAGE_TRANSMITTER_ERROR_RECOVERY.md`](IMAGE_TRANSMITTER_ERROR_RECOVERY.md) — session recovery sequences
+- [`IMAGE_TRANSMITTER_SETTING_PATH.md`](IMAGE_TRANSMITTER_SETTING_PATH.md) — the reference client's set/verify ordering and timing
+- [`GENERIC_CONTROL_COMPATIBILITY_AUDIT.md`](GENERIC_CONTROL_COMPATIBILITY_AUDIT.md) — generic widget ↔ vendor capability mapping
+- [`CONTROL_ISSUE_INDEX.md`](CONTROL_ISSUE_INDEX.md) — per-control tracking index
+- [`CAPTURE-RECOVERY.md`](CAPTURE-RECOVERY.md) — capture failure/recovery contract
+- [`K3III-CAPTURE-MODE-DIAGNOSTICS.md`](K3III-CAPTURE-MODE-DIAGNOSTICS.md) — Bulb / Astro / intervalometer ownership analysis
+- [`K3III-REGRESSION-SUITE.md`](K3III-REGRESSION-SUITE.md) — the regression suite definition
+- [`MODEL_SWEEP_PUBLIC_SUMMARY.md`](MODEL_SWEEP_PUBLIC_SUMMARY.md) — public summary of the model sweep
+- [`HARDWARE_TESTING_RUNBOOK.md`](HARDWARE_TESTING_RUNBOOK.md) — how to run a qualifying hardware test
+- [`EVIDENCE_RETENTION.md`](EVIDENCE_RETENTION.md) — what evidence is kept and where
+- [`PRIVATE_RESEARCH_POINTER.md`](PRIVATE_RESEARCH_POINTER.md) — pointer to the private research tree
 - [`archive/CAPABILITY_MATRIX_AUDIT.md`](archive/CAPABILITY_MATRIX_AUDIT.md) — historical 2026-08-21 audit trail (provenance only, not current status)
