@@ -1,6 +1,7 @@
 # IMAGE Transmitter 2 capability target matrix
 
-Revision: 2026-08-21
+Revision: 2026-10-07 (content largely from 2026-08-21; the `0x0182` amendment
+below is from 2026-10-06, commit `f3a8ffebf`).
 
 This is the normative target for Pentax development in this fork. It
 consolidates the extraction previously split across `PENTAX_WIRE_PROTOCOL.md`,
@@ -41,9 +42,71 @@ The K-1 II USB identities are separate personalities. `25fb:0183` exposes an
 Imaging/PTP interface and is the only one eligible for the Pentax `ptp2`
 control path. `25fb:0182` exposes only USB Mass Storage class `08/06/50`
 (SCSI transparent, Bulk-Only); it must use the operating-system mounted-volume
-or libgphoto2 Directory Browse path. Never add `0182` to the `ptp2` ability
-table. MSC supports file enumeration, copying, hashing, and metadata reads, but
-not live view, capture, configuration, or focus control.
+or libgphoto2 Directory Browse path. MSC supports file enumeration, copying,
+hashing, and metadata reads, but not live view, capture, configuration, or
+focus control.
+
+**Amended 2026-10-06 (#179).** This section previously said *"never add `0182`
+to the `ptp2` ability table"*. That instruction is superseded: `0x0182` is now
+present as `Pentax:K-1 Mark II (MSC mode, USB id 0182)` with an **empty ability
+set**. The reason is diagnostic, not functional. Every Pentax body declares a
+PID pair in which the first ID is MSC and the second is PTP, so a body
+presenting `0x0182` is in MSC mode; before the row existed such an attachment
+autodetected to *nothing* and the host silently applied hardcoded K-3 III
+abilities. With the row, the failure is a PTP error against the correct model.
+The rule that survives, and the one that actually matters, is: **`0x0182` must
+never carry Pentax control abilities.** Adding it to the table with a non-empty
+ability set would be the original error. The remedy for an MSC-mode body is the
+camera's USB mode setting, not a driver entry. See
+`REAL_HARDWARE_TEST_LOG.md` and commit `f3a8ffebf`.
+
+## Model coverage status — what "supported" means per body
+
+Added 2026-10-07. Asked directly: *does this work on all Pentax cameras?* The
+honest answer is **no, and the gap is measurable.** `camlibs/ptp2/pentax-utils.h`
+declares 11 model IDs and `pentax-utils.c` recognises all 11 from USB strings,
+but only two bodies have any hardware evidence. The other nine are recognised so
+that they fail *correctly*, not so that they work.
+
+| Model | ID | Recognised | Code references¹ | Hardware evidence |
+|---|---:|:--:|:--:|---|
+| K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — the primary development body |
+| K-1 Mark II | 78400 | yes | 3 | **HW-R / HW-W** — second qualified body |
+| K-3 Mark III Monochrome | 78421 | yes | 3 | none; excluded from held-shutter release by the same gate as K-3 III |
+| KP | 78380 | yes | 3 | none. Classified **new-focus** (`0x9017`) by IT2's model table, unverified on hardware |
+| GR III | 78350 | yes | 2 | none. Also classified new-focus, unverified |
+| 645Z | 77840 | yes | 3 | none |
+| K-1 | 77970 | yes | 2 | none |
+| K-3 | 77760 | yes | 2 | none |
+| 645D | 77320 | yes | 2 | none |
+| K-70 | 78370 | yes | 1 | none |
+| KF | 78520 | yes | 1 | none |
+
+¹ Count of `PENTAX_MODEL_*` occurrences in `pentax-utils.c` + `library.c`,
+including the recognition assignment itself. It measures how much code branches
+on the model, not how much of it is verified.
+
+Read this as: **2 of 11 bodies are qualified.** Everything else is
+recognition-plus-fail-closed. The gates themselves are derived from IT2's model
+table (`pentax_model_uses_new_focus`, `pentax_bulb_action_model_supported`, and
+the per-property capability predicates), so they encode what the vendor client
+does, not what each camera has been observed to do.
+
+Two consequences that matter for planning:
+
+1. **The new-focus classification is the highest-risk unverified claim.** It is
+   inferred from IT2, and it decides whether `0x9016` or `0x9017` is sent. If KP
+   or GR III is actually old-focus, focus control sends an opcode the body does
+   not implement. One bounded read-only probe per body settles it.
+2. **Do not advertise support for any body without a row in
+   `REAL_HARDWARE_TEST_LOG.md`.** Recognition in a table is not support, and
+   "it enumerated" is not support. The K-1 II and K-3 III already proved that
+   superficially similar Pentax bodies differ in transfer path, focus family and
+   capability flags.
+
+The per-model sweep required by #52 (`MODEL_SWEEP_PUBLIC_SUMMARY.md`) is the
+correct place to close this; this table is the current honest state, not a
+substitute for that sweep.
 
 ## Vendor operation matrix
 
