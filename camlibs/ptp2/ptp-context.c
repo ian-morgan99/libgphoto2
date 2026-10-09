@@ -99,7 +99,7 @@ ptp_context_probe (const char *where, void *owner, GPContext *context,
 		 (long)ts.tv_sec, (long)(ts.tv_nsec / 1000000),
 		 ++seq, ptp_context_thread_tag (), where, owner,
 		 owner ? ((PTPData *)owner)->context_generation : 0u,
-		 context, detail);
+		 (void *)context, detail);
 	if (context)
 		fprintf (stderr, " pstart=%#lx pupdate=%#lx pstop=%#lx "
 			 "pdata=%#lx ref=%lu",
@@ -128,6 +128,38 @@ ptp_context_owner_init (void *owner)
 	data->context_generation = generation;
 }
 
+/* Replace the contents of one binding slot, keeping the stored context alive
+ * for exactly as long as the slot refers to it (issue #190).
+ *
+ * Callers (the operation entry points) pass a BORROWED context: the closed
+ * Polaris app creates one GPContext at startup and frees it from its camera
+ * teardown, which runs on app-initiated resets and on every failed
+ * re-initialisation, while an operation started by an earlier attempt may
+ * still be inside the USB transport using the bound pointer. Nothing else in
+ * the process ever calls gp_context_ref, so without this reference the
+ * transport's next call through context->progress_start_func lands in freed
+ * heap (confirmed on hardware: identical lr/garbage-callee with a forced
+ * mid-download teardown; see benro-polaris-firmware-patcher#190).
+ *
+ * The ref/unref pair is balanced on every path that stores or drops a
+ * pointer, including generation reclaim and slot reuse. ref_count is not
+ * atomic in the core; the app only unrefs at teardown, when no operation is
+ * starting, so the increment here races only with itself in practice. */
+static void
+ptp_context_replace (unsigned int slot, void *owner, uint32_t generation,
+		     GPContext *context)
+{
+	GPContext *previous = bindings[slot].context;
+
+	if (previous && previous != context)
+		gp_context_unref (previous);
+	if (context && context != previous)
+		gp_context_ref (context);
+	bindings[slot].owner = owner;
+	bindings[slot].generation = generation;
+	bindings[slot].context = context;
+}
+
 void
 ptp_context_set (void *owner, GPContext *context)
 {
@@ -144,23 +176,18 @@ ptp_context_set (void *owner, GPContext *context)
 	for (i = 0; i < PTP_CONTEXT_BINDINGS; i++) {
 		if (bindings[i].owner == owner &&
 		    bindings[i].generation == generation) {
-			if (!context) {
-				bindings[i].owner = NULL;
-				bindings[i].generation = 0;
-				bindings[i].context = NULL;
-			} else {
-				bindings[i].context = context;
-			}
+			if (!context)
+				ptp_context_replace (i, NULL, 0, NULL);
+			else
+				ptp_context_replace (i, owner, generation,
+						     context);
 			return;
 		}
 		/* The same address with a different generation is a new owner
 		 * lifetime. Reclaim this thread's obsolete slot instead of allowing
 		 * repeated camera reconnects to exhaust the fixed TLS table. */
-		if (bindings[i].owner == owner) {
-			bindings[i].owner = NULL;
-			bindings[i].generation = 0;
-			bindings[i].context = NULL;
-		}
+		if (bindings[i].owner == owner)
+			ptp_context_replace (i, NULL, 0, NULL);
 		if (!bindings[i].owner && free_slot == PTP_CONTEXT_BINDINGS)
 			free_slot = i;
 	}
@@ -172,9 +199,7 @@ ptp_context_set (void *owner, GPContext *context)
 		fprintf (stderr, "ptp2: per-thread operation-context table full\n");
 		return;
 	}
-	bindings[free_slot].owner = owner;
-	bindings[free_slot].generation = generation;
-	bindings[free_slot].context = context;
+	ptp_context_replace (free_slot, owner, generation, context);
 }
 
 GPContext *
