@@ -14,4 +14,13 @@ void ptp_context_owner_init (void *owner);
 void ptp_context_set (void *owner, GPContext *context);
 GPContext *ptp_context_get (void *owner);
 
+/* Issue #190 opt-in diagnostics (GP_PTP_CONTEXT_PROBE=1). Read-only: they must
+ * not take a reference or otherwise extend the lifetime of what they observe.
+ * ptp_context_probe() reads the context fields by raw offset so it cannot fault
+ * on a freed context -- only calling through the stored pointer can. */
+int ptp_context_probe_enabled (void);
+unsigned long ptp_context_thread_tag (void);
+void ptp_context_probe (const char *where, void *owner, GPContext *context,
+			unsigned long detail);
+
 #endif
