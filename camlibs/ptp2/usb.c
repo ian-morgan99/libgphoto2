@@ -407,9 +407,12 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp, PTPDataHandler *handler)
 	if (report_progress) {
 		/* Issue #190: the observed fault is the indirect call through
 		 * context->progress_start_func inside gp_context_progress_start.
-		 * Log the exact value that is about to be called through, plus
-		 * the owner generation and thread, immediately before the call.
-		 * Read-only and opt-in; see ptp-context.c. */
+		 * Log the identity of the context we are about to call through,
+		 * plus the owner generation and thread. Identity only: whether
+		 * this object is still alive is exactly what is in question
+		 * here, so reading a field of it would itself be a
+		 * use-after-free candidate. Read-only and opt-in; see
+		 * ptp-context.c. */
 		ptp_context_probe ("download-progress-start", params->data, context,
 				   (unsigned long)(bytes_to_read/CONTEXT_BLOCK_SIZE));
 		progress_id = gp_context_progress_start (context, (bytes_to_read/CONTEXT_BLOCK_SIZE), _("Downloading..."));

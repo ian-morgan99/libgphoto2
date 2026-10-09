@@ -32,36 +32,24 @@
 
 #include <gphoto2/gphoto2-port-log.h>
 
-/**
- * \internal
- **/
-struct _GPContext
-{
-	GPContextIdleFunc     idle_func;
-	void                 *idle_func_data;
+#include "gphoto2-context-struct.h"
 
-	GPContextProgressStartFunc  progress_start_func;
-	GPContextProgressUpdateFunc progress_update_func;
-	GPContextProgressStopFunc   progress_stop_func;
-	void                       *progress_func_data;
-
-	GPContextErrorFunc    error_func;
-	void                 *error_func_data;
-
-	GPContextQuestionFunc question_func;
-	void                 *question_func_data;
-
-	GPContextCancelFunc   cancel_func;
-	void                 *cancel_func_data;
-
-	GPContextStatusFunc   status_func;
-	void                 *status_func_data;
-
-	GPContextMessageFunc  message_func;
-	void                 *message_func_data;
-
-	unsigned int ref_count;
-};
+/* The layout is load-bearing beyond this file: the closed Polaris app
+ * statically links its own copy of these functions and touches ref_count
+ * directly, and the ptp2 progress probe reads the callback fields by offset.
+ * Assert against the real definition, in the same translation unit as it, so
+ * the check fails when the struct changes instead of silently tracking a
+ * hand-copied mirror (benro-polaris-firmware-patcher#190). */
+_Static_assert(__builtin_offsetof(struct _GPContext, progress_start_func) == 2 * sizeof(void *),
+	       "GPContext.progress_start_func moved; ptp2 reads it by offset");
+_Static_assert(__builtin_offsetof(struct _GPContext, progress_update_func) == 3 * sizeof(void *),
+	       "GPContext.progress_update_func moved; ptp2 reads it by offset");
+_Static_assert(__builtin_offsetof(struct _GPContext, progress_stop_func) == 4 * sizeof(void *),
+	       "GPContext.progress_stop_func moved; ptp2 reads it by offset");
+_Static_assert(__builtin_offsetof(struct _GPContext, progress_func_data) == 5 * sizeof(void *),
+	       "GPContext.progress_func_data moved; ptp2 reads it by offset");
+_Static_assert(__builtin_offsetof(struct _GPContext, ref_count) == 16 * sizeof(void *),
+	       "GPContext.ref_count moved; the shipped app decrements it by offset");
 
 /**
  * \brief Creates a new context.
@@ -79,7 +67,7 @@ gp_context_new (void)
 	if (!context)
 		return (NULL);
 
-	context->ref_count = 1;
+	__atomic_store_n(&context->ref_count, 1, __ATOMIC_RELAXED);
 
 	return (context);
 }
@@ -95,7 +83,33 @@ gp_context_ref (GPContext *context)
 	if (!context)
 		return;
 
-	context->ref_count++;
+	/* A reference is now taken from inside the ptp2 camlib while the owning
+	 * frontend may be dropping its own reference from another thread, so the
+	 * count cannot be a plain increment. The field stays a plain unsigned
+	 * int at the same offset: the shipped app's statically linked unref
+	 * decrements it directly, and a lock the camlib holds cannot serialise
+	 * that decrement either. (benro-polaris-firmware-patcher#190) */
+	__atomic_add_fetch(&context->ref_count, 1, __ATOMIC_ACQ_REL);
+}
+
+/**
+ * \brief Reads the reference count of a context.
+ *
+ * \param context a GPContext
+ *
+ * Intended for tests and diagnostics: it lets a caller observe whether a
+ * reference was actually retained without reaching into an opaque object
+ * through a hand-copied field layout.
+ *
+ * \retval the reference count, or 0 for a NULL context.
+ **/
+unsigned int
+gp_context_ref_count (GPContext *context)
+{
+	if (!context)
+		return 0;
+
+	return __atomic_load_n(&context->ref_count, __ATOMIC_ACQUIRE);
 }
 
 static void
@@ -114,11 +128,16 @@ gp_context_free (GPContext *context)
 void
 gp_context_unref (GPContext *context)
 {
+	unsigned int remaining;
+
 	if (!context)
 		return;
 
-	context->ref_count--;
-	if (!context->ref_count)
+	/* Decrement and free must be one atomic step: with a reference held by
+	 * the camlib, two threads can now drop their references concurrently,
+	 * and a plain decrement would free the object twice or not at all. */
+	remaining = __atomic_sub_fetch(&context->ref_count, 1, __ATOMIC_ACQ_REL);
+	if (!remaining)
 		gp_context_free (context);
 }
 

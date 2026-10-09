@@ -37,6 +37,7 @@ libgphoto2_private_headers = files(
   'exif.h',
   'gamma.h',
   'jpeg.h',
+  'gphoto2-context-struct.h',
 )
 
 endian_dic = configuration_data()

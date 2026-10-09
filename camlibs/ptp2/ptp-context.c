@@ -33,8 +33,16 @@ static volatile uint32_t next_context_generation;
  * This probe exists to confirm or refute that on hardware. It is deliberately
  * read-only: it must not take a reference, allocate, or otherwise extend the
  * lifetime of anything it observes, or it would hide the very defect it is
- * looking for. Reading the fields of a freed context is safe (the heap page is
- * still mapped); it is only calling through the pointer that faults.
+ * looking for.
+ *
+ * It is also deliberately limited to *identity*: pointers, thread tag, owner
+ * generation and the transition name. It does not read any field of the
+ * context. At the places it is called the whole question is whether the object
+ * is still alive, and reading a field of a freed object is undefined behaviour
+ * even when the page happens to still be mapped -- it can fault, be raced by
+ * reuse, or report a value that was never real. Anything that wants field
+ * values must use ptp_context_probe_owned(), which is only called where this
+ * module demonstrably holds a reference.
  *
  * Enabled with GP_PTP_CONTEXT_PROBE=1. Off by default and inert when off.
  */
@@ -59,40 +67,16 @@ ptp_context_thread_tag (void)
 	return (unsigned long)(uintptr_t)&bindings[0];
 }
 
-/* GPContext is opaque outside libgphoto2 core, and the app links its own copy
- * of the same layout. Read the fields by raw offset rather than through the
- * type: reading a freed-but-mapped heap chunk is safe, and it is the only way
- * to observe the value that is about to be called through. Offsets verified
- * twice over: against struct _GPContext in libgphoto2/gphoto2-context.c, and
- * against the app's own gp_context_set_progress_funcs, which writes
- * progress_start_func at [r3,#8] and ref_count at [r3,#64]. */
-#define PROBE_OFF_PROGRESS_START	8
-#define PROBE_OFF_PROGRESS_UPDATE	12
-#define PROBE_OFF_PROGRESS_STOP		16
-#define PROBE_OFF_PROGRESS_DATA		20
-#define PROBE_OFF_REF_COUNT		64
-
-static unsigned long
-probe_field (GPContext *context, unsigned int offset)
-{
-	uintptr_t base = (uintptr_t)context;
-	uint32_t word;
-
-	if (!base)
-		return 0;
-	memcpy (&word, (const char *)base + offset, sizeof (word));
-	return word;
-}
-
-void
-ptp_context_probe (const char *where, void *owner, GPContext *context,
-		   unsigned long detail)
+/* Identity-only probe. Safe wherever ownership is uncertain: it never touches
+ * the context object, so it cannot fault on a freed one and cannot observe a
+ * value that was never written. */
+static void
+ptp_probe_line (const char *where, void *owner, GPContext *context,
+		unsigned long detail)
 {
 	struct timespec ts;
 	static unsigned long seq;
 
-	if (!ptp_context_probe_enabled ())
-		return;
 	clock_gettime (CLOCK_MONOTONIC, &ts);
 	fprintf (stderr, "[ctx-probe] t=%ld.%03ld seq=%lu thr=%lx %s "
 		 "owner=%p gen=%u ctx=%p detail=%#lx",
@@ -100,14 +84,32 @@ ptp_context_probe (const char *where, void *owner, GPContext *context,
 		 ++seq, ptp_context_thread_tag (), where, owner,
 		 owner ? ((PTPData *)owner)->context_generation : 0u,
 		 (void *)context, detail);
+}
+
+void
+ptp_context_probe (const char *where, void *owner, GPContext *context,
+		   unsigned long detail)
+{
+	if (!ptp_context_probe_enabled ())
+		return;
+	ptp_probe_line (where, owner, context, detail);
+	fprintf (stderr, "\n");
+	fflush (stderr);
+}
+
+/* Field-reporting probe. Only call this where the context is demonstrably
+ * owned -- here, immediately after this module has taken a reference. The
+ * reference count comes from the core accessor, not from a copied struct
+ * layout, so it cannot silently disagree with the real definition. */
+void
+ptp_context_probe_owned (const char *where, void *owner, GPContext *context,
+			 unsigned long detail)
+{
+	if (!ptp_context_probe_enabled ())
+		return;
+	ptp_probe_line (where, owner, context, detail);
 	if (context)
-		fprintf (stderr, " pstart=%#lx pupdate=%#lx pstop=%#lx "
-			 "pdata=%#lx ref=%lu",
-			 probe_field (context, PROBE_OFF_PROGRESS_START),
-			 probe_field (context, PROBE_OFF_PROGRESS_UPDATE),
-			 probe_field (context, PROBE_OFF_PROGRESS_STOP),
-			 probe_field (context, PROBE_OFF_PROGRESS_DATA),
-			 probe_field (context, PROBE_OFF_REF_COUNT));
+		fprintf (stderr, " ref=%u", gp_context_ref_count (context));
 	fprintf (stderr, "\n");
 	fflush (stderr);
 }
@@ -141,20 +143,44 @@ ptp_context_owner_init (void *owner)
  * heap (confirmed on hardware: identical lr/garbage-callee with a forced
  * mid-download teardown; see benro-polaris-firmware-patcher#190).
  *
- * The ref/unref pair is balanced on every path that stores or drops a
- * pointer, including generation reclaim and slot reuse. ref_count is not
- * atomic in the core; the app only unrefs at teardown, when no operation is
- * starting, so the increment here races only with itself in practice. */
+ * What this does and does not serialise. The reference is taken while the
+ * caller still guarantees the object is live, and from that moment the app's
+ * own release cannot free it while any binding refers to it. The count is
+ * atomic in the core, so our increment cannot race the app's decrement into a
+ * wrong value. What no lock inside this camlib can order is the app's release
+ * itself -- it statically links its own gp_context_unref and touches the count
+ * directly -- so the residual window is a release that lands *before* this
+ * reference is taken. That window is exactly the fault we reproduced; closing
+ * it fully needs the app to stop freeing while an operation is in flight, which
+ * is an integration-side change outside this repository. Everything after the
+ * reference is taken is safe, and every path below is balanced.
+ *
+ * The ledger (ptp_context_held_refs) counts references this module currently
+ * holds. It exists so the balance is observable from a test without reaching
+ * into an opaque object; it is not used for behaviour. */
+static unsigned int held_refs;
+
+unsigned int
+ptp_context_held_refs (void)
+{
+	return __atomic_load_n(&held_refs, __ATOMIC_ACQUIRE);
+}
+
 static void
 ptp_context_replace (unsigned int slot, void *owner, uint32_t generation,
 		     GPContext *context)
 {
 	GPContext *previous = bindings[slot].context;
 
-	if (previous && previous != context)
+	if (previous && previous != context) {
 		gp_context_unref (previous);
-	if (context && context != previous)
+		__atomic_sub_fetch(&held_refs, 1, __ATOMIC_ACQ_REL);
+	}
+	if (context && context != previous) {
 		gp_context_ref (context);
+		__atomic_add_fetch(&held_refs, 1, __ATOMIC_ACQ_REL);
+		ptp_context_probe_owned ("bind-held", owner, context, generation);
+	}
 	bindings[slot].owner = owner;
 	bindings[slot].generation = generation;
 	bindings[slot].context = context;
@@ -218,4 +244,22 @@ ptp_context_get (void *owner)
 		    bindings[i].generation == generation)
 			return bindings[i].context;
 	return NULL;
+}
+
+/* Release every binding belonging to the calling thread.
+ *
+ * The table is thread-local, so this can only reach the calling thread's own
+ * entries -- it is not a global drain and does not claim to be. A caller that
+ * owns a thread's whole lifetime (an operation thread finishing, a wrapper
+ * tearing down its worker) calls this on the way out so a reference cannot be
+ * stranded when the thread goes away. Threads that clear explicitly through
+ * ptp_context_set(owner, NULL) do not need it. */
+void
+ptp_context_release_thread (void)
+{
+	unsigned int i;
+
+	for (i = 0; i < PTP_CONTEXT_BINDINGS; i++)
+		if (bindings[i].owner)
+			ptp_context_replace (i, NULL, 0, NULL);
 }
