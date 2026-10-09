@@ -44,6 +44,7 @@ GPContext *gp_context_new (void);
 
 void gp_context_ref   (GPContext *context);
 void gp_context_unref (GPContext *context);
+unsigned int gp_context_ref_count (GPContext *context);
 
 /**
  * \brief Return codes that can be returned by progress handling.

@@ -64,6 +64,7 @@ gp_context_progress_stop
 gp_context_progress_update
 gp_context_question
 gp_context_ref
+gp_context_ref_count
 gp_context_set_cancel_func
 gp_context_set_error_func
 gp_context_set_idle_func
