@@ -7743,17 +7743,18 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	return GP_ERROR_NOT_SUPPORTED;
 #else
 	PTPParams *params = &camera->pl->params;
+	CameraAbilities abilities;
 	CameraFilePath path;
 	uint16_t ptpres;
 	int ret;
 
-	if (!params->pentax.vendor_mode_enabled ||
-	    !params->pentax.supported_model ||
-	    !pentax_bulb_action_model_supported (params->pentax.model_no)) {
-		if (params->pentax.model_no == PENTAX_MODEL_K3_MARK_III ||
-		    params->pentax.model_no == PENTAX_MODEL_K3_MARK_III_MONO)
-			GP_LOG_E ("pentax-bulb: refusing unqualified K-3 III release-mode-2 action; "
-				"use the camera-timed/Polaris 264 path");
+	if (!params->pentax.vendor_mode_enabled || !params->pentax.supported_model ||
+	    gp_camera_get_abilities (camera, &abilities) < GP_OK)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_bulb_action_model_supported (params->pentax.model_no,
+		abilities.usb_product)) {
+		if (abilities.usb_product == 0x018f)
+			GP_LOG_E ("pentax-bulb: K-3 III Monochrome held-Bulb action remains unqualified");
 		return GP_ERROR_NOT_SUPPORTED;
 	}
 

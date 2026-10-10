@@ -56,6 +56,19 @@ test(
   ],
 )
 
+# Manual direct-hardware probe only. It is built solely with the Pentax
+# research-capture option and is never registered as an automated test.
+if get_option('pentax_research_capture')
+  executable(
+    'pentax-bulb-qualification-probe',
+    'pentax-bulb-qualification-probe.c',
+    '../examples/autodetect.c',
+    include_directories: include_directories('..', '../camlibs/ptp2', '../examples'),
+    c_args: ['-D_GPHOTO2_INTERNAL_CODE'],
+    dependencies: libgphoto2_dep,
+  )
+endif
+
 test_pentax_publication_exe = executable(
   'test-pentax-publication',
   'test-pentax-publication.c',

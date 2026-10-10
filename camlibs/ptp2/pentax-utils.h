@@ -137,7 +137,7 @@ int pentax_bulb_action_mode_supported (uint32_t exposure_mode);
  * 0x2002 and the body can disappear from USB afterwards.  Keep that model
  * out of the generic start/stop widget until a qualified K-3 III trace proves
  * a different held-shutter contract. */
-int pentax_bulb_action_model_supported (uint32_t model_no);
+int pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product);
 
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
