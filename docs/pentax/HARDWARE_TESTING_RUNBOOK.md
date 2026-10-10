@@ -151,13 +151,26 @@ export LD_LIBRARY_PATH=$B/libgphoto2:$B/libgphoto2_port/libgphoto2_port
 Note: sandboxed terminals intermittently show "Read-only file system" for
 `/tmp` — retry, or stage under the workspace instead.
 
-### 4.3 Building a probe harness
+### 4.3 K-3 III held-Bulb qualification status
 
-```bash
-/home/ian/Documents/VSCodeProjects/LibGphoto2/tests/build_bulb_probe.sh ./bulb_probe
-# usage: ./bulb_probe <hold_ms> <port> <release_mode>
-# release_mode=2 is the bulb-open candidate (per K-3 III traces); 0 = verified still path
-```
+Do not run the historical `tests/bulb_probe` binary or infer B-mode behavior
+from a release-mode-2 test in Manual mode. The logged 2026-09-06 rejection was
+in exposure mode 8 (M); IMAGE Transmitter 2 selects release mode 2 only for its
+B/lens-B/Astro family (9/12/20) when the camera's own Bulb timer is disabled.
+
+On 2026-10-10, a one-second direct-PC diagnostic in B mode exercised the exact
+start/stop pair through the research-only libgphoto2 action. InitiateCapture and
+TerminateCapture both returned `0x2001`; the existing output lifecycle
+published DNG and JPEG candidates. This run used a temporary model-gate
+override and an admission-path correction in a diagnostic build of source
+`67843d2248e7e37cfa58c15cc52e0a47bc13d952`; it is **not** a production build
+or a release qualification. The actual production gate remains closed.
+
+The test process did not save the transferred image bytes, so exposure time
+cannot be checked from EXIF and the file is not retained. Before enabling this
+path in a release, follow libgphoto2 issue #95: preserve the output, verify the
+captured duration, and complete the normal/timed control and repeatability
+checks. No second exposure is authorized by this evidence.
 
 ---
 
@@ -309,8 +322,9 @@ capture+transfer+finalize (K-1 II).
 **Queued, in order:**
 1. **Operator action needed:** switch both cameras from MSC back to MTP/PTP
    (§6.3). Everything below is blocked on this.
-2. K-1 II bulb probe: `tests/bulb_probe` with `<hold_ms>=1500`, release_mode=2
-   (operator-approved hold only). Build per §4.3, env per §4.2.
+2. The historical `tests/bulb_probe` instructions are superseded; do not run
+   the stale binary. See §4.3 and libgphoto2 issue #95 for current held-Bulb
+   evidence and remaining qualification requirements.
 3. Duration-aware capture timeout (library.c, committed 2026-08-24) needs its
    first hardware verification — a long-bulb-timer capture that would have
    exceeded the old fixed 60 s budget.
