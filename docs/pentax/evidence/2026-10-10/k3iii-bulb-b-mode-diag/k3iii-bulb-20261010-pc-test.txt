@@ -1,0 +1,6 @@
+selected_model=Pentax K-3 Mark III (MTP mode) usb=25fb:0189 port=usb:001,011
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=9; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=800; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=no; bulb-timer=no; bulb-seconds=0/1; aperture=50/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+This sends the documented K-3 III Bulb start command, holds for one second, then sends its matching stop and lets libgphoto2 finish the file-transfer lifecycle. Type CAPTURE ONE to continue: CAPTURE ONE
+bulb_start_result=-110
+start_not_confirmed=stop_not_sent; do_not_retry
+probe_result=fail result=-110 stop_result=-1

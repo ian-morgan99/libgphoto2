@@ -176,12 +176,22 @@ Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
 release mode 0, focus mode, manual-white-balance mode 0, sync mode 0, and
 aperture-reset 0. The client uses focus mode 3 with autofocus and 2 without it.
 
-Release mode semantics are only partially correlated. Release mode 0 is the
-verified still-capture path above. The Windows Wi-Fi app's bulb flow suggests
-release mode 2 opens the shutter for a held (bulb) exposure, paired with
-`TerminateCapture` (`0x9012`, same release mode) to close it; this has been
-observed in K-3 III traces but is not yet verified on hardware (K-1 II probe
-pending). Treat release modes other than 0 as Unknown-hardware until probed.
+IMAGE Transmitter 2's decompiled `CamRelease` logic selects release mode 2
+when the exposure mode is B/lens-B/Astro (9/12/20) and the camera's own Bulb
+timer is disabled. The first release sends `InitiateCapture` (`0x9011`); a
+later release sends `TerminateCapture` (`0x9012`) with the same mode. When the
+camera's own timer is enabled, the client selects the ordinary timed path
+(release mode 0) instead.
+
+A one-second direct-PC K-3 III test on 2026-10-10, with the camera in B mode
+and its own timer disabled, completed the release=2 start/stop and output
+transfer lifecycle. This was a diagnostic build with a temporary K-3 III model
+gate override; the production gate remains closed pending the remaining #95
+qualification sequence. The earlier 2026-09-06 rejection used exposure mode 8
+(Manual), so it did not test the B-mode sequence selected by IMAGE Transmitter
+2. DNG/JPEG candidates were published in the test process, but their bytes were
+not saved before process exit. No EXIF duration was retained; do not treat this
+as proof of exact exposure timing or production qualification.
 
 The host polls `GetAllConditions` (`0x900f`). The client treats little-endian
 UINT32 byte offset 32 equal to 1 as a transfer candidate and reads its handle at

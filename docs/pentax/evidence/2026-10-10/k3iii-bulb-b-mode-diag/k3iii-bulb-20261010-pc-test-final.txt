@@ -1,0 +1,24 @@
+selected_model=Pentax K-3 Mark III (MTP mode) usb=25fb:0189 port=usb:001,011
+libgphoto_state transfer=0 recovery=1 output_pending=0 bulb_active=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=9; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=800; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=no; bulb-timer=no; bulb-seconds=0/1; aperture=50/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+bulb_widget_type=4 value_before=2
+This sends the documented K-3 III Bulb start command, holds for one second, then sends its matching stop and lets libgphoto2 finish the file-transfer lifecycle. Type CAPTURE ONE to continue: CAPTURE ONE
+bulb_start_widget_value=1
+[pentax-bulb-probe] put-widget value=1
+[pentax-bulb-probe] action enabled=1 model=78420 vendor=1
+[pentax] capture=1 boundary=camlib-enter transfer=0 recovery=1 output_pending=0
+[pentax] capture=1 boundary=preconditions-enter
+[pentax] capture=1 boundary=preconditions-return ptp=0x2001 size=576
+[pentax] capture=1 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=1 boundary=initiate-return ptp=0x2001
+bulb_start_result=0
+[pentax-bulb-probe] put-widget value=0
+[pentax-bulb-probe] action enabled=0 model=78420 vendor=1
+[pentax] capture=2 boundary=camlib-enter transfer=1 recovery=0 output_pending=1
+[pentax] capture=2 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=2 boundary=initiate-return ptp=0x2001
+bulb_stop_and_finalize_result=0
+published_file=IMGP3899.DNG
+published_file=IMGP3899.JPG
+before_file_count=0 after_file_count=2
+one_second_bulb_lifecycle=pass; do not repeat without review

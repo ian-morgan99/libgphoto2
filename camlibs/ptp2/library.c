@@ -7758,9 +7758,11 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	}
 
 	if (enabled) {
+		/* Let the shared capture path run its strict recovery probe. A reused
+		 * session can set recovery_required even when conditions are already
+		 * idle; rejecting here would bypass that safe recovery path forever. */
 		if (params->pentax.bulb_action_active ||
 		    params->pentax.transfer_state != PTP_PENTAX_TRANSFER_IDLE ||
-		    params->pentax.recovery_required ||
 		    params->pentax.capture_output_pending)
 			return GP_ERROR_CAMERA_BUSY;
 		return camera_pentax_capture_internal (camera, NULL, context,

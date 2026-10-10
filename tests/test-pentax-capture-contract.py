@@ -48,6 +48,11 @@ def main() -> int:
             "ordinary camera wrapper must select the timed route")
     require("ptp_pentax_terminate_capture (params," in action,
             "explicit Bulb stop must be the owner of TerminateCapture")
+    require("params->pentax.recovery_required ||" not in action,
+            "Bulb start must reach the shared strict recovery probe")
+    require("camera_pentax_capture_internal (camera, NULL, context" in action and
+            "PENTAX_CAPTURE_BULB_START" in action,
+            "Bulb start must use the shared capture admission/lifecycle path")
     # The shared cleanup path may abort an errored, pre-candidate operation.
     # A successful natural timed completion returns before that error-only
     # branch; the explicit action stop remains the only normal Bulb stop edge.
