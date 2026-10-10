@@ -89,15 +89,25 @@ main (void)
 	check (result == GP_ERROR_CANCEL && fake.edge_count == 2 &&
 	       fake.edges[0] == 1 && fake.edges[1] == 0 &&
 	       state.start_confirmed && !state.shutter_open &&
-	       state.cleanup_stop_attempted && !fake.wait_calls && !fake.collect_calls,
-	       "failure immediately after confirmed start sends one matching cleanup stop");
+	       state.cleanup_stop_attempted && !fake.wait_calls &&
+	       state.collection_attempted && fake.collect_calls == 1,
+	       "failure immediately after start stops and collects outputs");
 
 	fake = (FakeCamera) { .wait_result = GP_ERROR_TIMEOUT };
 	result = run (&fake, &state);
 	check (result == GP_ERROR_TIMEOUT && fake.edge_count == 2 &&
 	       fake.edges[0] == 1 && fake.edges[1] == 0 &&
-	       state.cleanup_stop_attempted && !state.shutter_open && !fake.collect_calls,
-	       "wait failure sends one matching cleanup stop and preserves wait error");
+	       state.cleanup_stop_attempted && !state.shutter_open &&
+	       state.collection_attempted && fake.collect_calls == 1,
+	       "wait failure stops, collects outputs, and preserves the wait error");
+
+	fake = (FakeCamera) { .wait_result = GP_ERROR_TIMEOUT,
+		.collect_result = GP_ERROR_FILE_NOT_FOUND };
+	result = run (&fake, &state);
+	check (result == GP_ERROR_TIMEOUT && state.collection_attempted &&
+	       state.collection_result == GP_ERROR_FILE_NOT_FOUND &&
+	       !state.shutter_open,
+	       "output retrieval error is reported separately without masking wait failure");
 
 	fake = (FakeCamera) { .stop_results = { GP_ERROR_IO, GP_OK } };
 	result = run (&fake, &state);
@@ -106,8 +116,8 @@ main (void)
 	       state.explicit_stop_attempted && state.explicit_stop_result == GP_ERROR_IO &&
 	       state.cleanup_stop_attempted && state.cleanup_stop_result == GP_OK &&
 	       !state.shutter_open && !state.operator_intervention_required &&
-	       !fake.collect_calls,
-	       "failed explicit stop is retried once in unwind without masking original error");
+	       state.collection_attempted && fake.collect_calls == 1,
+	       "failed explicit stop is retried and finalized output is collected");
 
 	fake = (FakeCamera) { .wait_result = GP_ERROR_TIMEOUT,
 		.stop_results = { GP_ERROR_IO } };
@@ -141,6 +151,21 @@ main (void)
 	       !state.shutter_open && !state.operator_intervention_required &&
 	       fake.collect_calls == 1,
 	       "successful lifecycle starts, stops, then retrieves output once");
+
+	fake = (FakeCamera) { .cancel_on_check = 4 };
+	result = run (&fake, &state);
+	check (result == GP_ERROR_CANCEL && state.cancelled_after_collection &&
+	       state.collection_attempted && state.collection_result == GP_OK &&
+	       !state.shutter_open && fake.collect_calls == 1,
+	       "cancellation during output collection is returned after saving output");
+
+	fake = (FakeCamera) { .cancel_on_check = 4,
+		.collect_result = GP_ERROR_FILE_NOT_FOUND };
+	result = run (&fake, &state);
+	check (result == GP_ERROR_CANCEL && state.cancelled_after_collection &&
+	       state.collection_result == GP_ERROR_FILE_NOT_FOUND &&
+	       !state.shutter_open,
+	       "cancellation is preserved and output retrieval failure remains reported separately");
 
 	puts ("test-pentax-bulb-lifecycle: all tests passed");
 	return 0;
