@@ -56,12 +56,26 @@ test(
   ],
 )
 
+# Unit tests use an injected camera API to verify that every failed Bulb path
+# stops an opened shutter before cleanup or exits fail-closed without an
+# unmatched stop when start was not confirmed.
+test_pentax_bulb_lifecycle_exe = executable(
+  'test-pentax-bulb-lifecycle',
+  'test-pentax-bulb-lifecycle.c',
+  'pentax-bulb-lifecycle.c',
+  include_directories: include_directories('..'),
+  dependencies: libgphoto2_dep,
+)
+
+test('test-pentax-bulb-lifecycle', test_pentax_bulb_lifecycle_exe)
+
 # Manual direct-hardware probe only. It is built solely with the Pentax
 # research-capture option and is never registered as an automated test.
 if get_option('pentax_research_capture')
   executable(
     'pentax-bulb-qualification-probe',
     'pentax-bulb-qualification-probe.c',
+    'pentax-bulb-lifecycle.c',
     '../examples/autodetect.c',
     include_directories: include_directories('..', '../camlibs/ptp2', '../examples'),
     c_args: ['-D_GPHOTO2_INTERNAL_CODE'],

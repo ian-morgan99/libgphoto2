@@ -166,6 +166,16 @@ qualification build was research-enabled and used a product-specific K-3 III
 gate (`0x0189`); the Monochrome product remains blocked. This is direct-PC
 hardware evidence, not a packaged Polaris test or release qualification.
 
+The qualification probe now tracks whether start was confirmed and whether the
+shutter is still open. Any failure or signal after a confirmed start unwinds
+through the matching stop action; a failed explicit stop is reported separately
+and gets one cleanup stop attempt. An unconfirmed start or cleanup stop is
+reported as requiring operator inspection, suppresses further shutter actions,
+and does not claim the shutter is closed. A file-list baseline is captured
+before the first exposure so old camera files cannot be mistaken for new output.
+Injected-failure tests cover cancellation immediately after start, wait failure,
+stop failure, output retrieval failure, and unconfirmed start/stop.
+
 The camera-owned timer setting could not be enabled through
 `pentaxdirectshutter` in this B-mode state (`GP_ERROR_NOT_SUPPORTED`); it stayed
 at `00:00` and conditions continued to report `bulb-timer=no`. Follow issue #95

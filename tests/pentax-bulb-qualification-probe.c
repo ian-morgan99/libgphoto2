@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 
 #include <gphoto2/gphoto2.h>
+#include "pentax-bulb-lifecycle.h"
 #include "ptp.h"
 #include "ptp-private.h"
 #include "samples.h"
@@ -122,6 +124,122 @@ save_file (Camera *camera, GPContext *context, const char *output_dir,
 	return GP_OK;
 }
 
+static volatile sig_atomic_t received_signal;
+
+typedef struct {
+	Camera *camera;
+	GPContext *context;
+	CameraWidget *bulb;
+	CameraList **known;
+	const char *output_dir;
+	int shot;
+} BulbCapture;
+
+static void
+handle_signal (int signal_number)
+{
+	received_signal = signal_number;
+}
+
+static int
+install_signal_handlers (void)
+{
+	struct sigaction action;
+	memset (&action, 0, sizeof (action));
+	action.sa_handler = handle_signal;
+	sigemptyset (&action.sa_mask);
+	if (sigaction (SIGINT, &action, NULL) < 0 ||
+	    sigaction (SIGTERM, &action, NULL) < 0)
+		return GP_ERROR_IO;
+	return GP_OK;
+}
+
+static int
+check_cancel (void *opaque)
+{
+	(void)opaque;
+	return received_signal ? GP_ERROR_CANCEL : GP_OK;
+}
+
+static int
+set_bulb_edge (void *opaque, int start)
+{
+	BulbCapture *capture = opaque;
+	int value = -1;
+	int result = gp_widget_set_value (capture->bulb, &start);
+	if (result >= GP_OK)
+		result = gp_widget_get_value (capture->bulb, &value);
+	if (result < GP_OK || value != start)
+		return result < GP_OK ? result : GP_ERROR_BAD_PARAMETERS;
+	printf ("shot=%d edge=%s\n", capture->shot, start ? "start" : "stop");
+	result = gp_camera_set_single_config (capture->camera, "bulb",
+		capture->bulb, capture->context);
+	printf ("shot=%d %s_result=%d\n", capture->shot,
+		start ? "start" : "stop", result);
+	return result;
+}
+
+static int
+wait_one_second (void *opaque)
+{
+	struct timespec remaining = {1, 0};
+	(void)opaque;
+	if (nanosleep (&remaining, NULL) == 0)
+		return GP_OK;
+	return errno == EINTR ? GP_ERROR_CANCEL : GP_ERROR_IO;
+}
+
+static int
+collect_outputs (void *opaque)
+{
+	BulbCapture *capture = opaque;
+	CameraList *after = NULL;
+	int added = 0;
+	int result;
+	if (received_signal)
+		return GP_ERROR_CANCEL;
+	result = gp_list_new (&after);
+	if (result >= GP_OK)
+		result = gp_camera_folder_list_files (capture->camera, "/", after,
+			capture->context);
+	if (result < GP_OK)
+		goto done;
+	for (int i = 0; i < gp_list_count (after); i++) {
+		const char *name = NULL;
+		if (received_signal) {
+			result = GP_ERROR_CANCEL;
+			goto done;
+		}
+		result = gp_list_get_name (after, i, &name);
+		if (result < GP_OK || !name) {
+			result = result < GP_OK ? result : GP_ERROR_CORRUPTED_DATA;
+			goto done;
+		}
+		if (list_contains (*capture->known, name))
+			continue;
+		printf ("shot=%d published_file=%s\n", capture->shot, name);
+		result = save_file (capture->camera, capture->context,
+			capture->output_dir, name);
+		if (result < GP_OK)
+			goto done;
+		added++;
+	}
+	if (!added) {
+		fprintf (stderr, "shot=%d output_not_proven; do_not_retry\n",
+			capture->shot);
+		result = GP_ERROR_FILE_NOT_FOUND;
+		goto done;
+	}
+	gp_list_free (*capture->known);
+	*capture->known = after;
+	after = NULL;
+
+done:
+	if (after)
+		gp_list_free (after);
+	return result;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -129,12 +247,13 @@ main (int argc, char **argv)
 	GPContext *context = NULL;
 	CameraAbilities abilities;
 	CameraWidget *bulb = NULL;
-	CameraList *known = NULL, *after = NULL;
+	CameraList *known = NULL;
 	unsigned int state = 0, mode = 0;
 	int camera_timer = 0, camera_idle = 0;
 	int count, result = GP_OK, initialized = 0, exit_result = GP_OK;
+	int operator_intervention_required = 0;
 	char confirmation[64], expected[64];
-	struct timespec hold = {1, 0};
+	PentaxBulbLifecycleState lifecycle_state = {0};
 
 	if ((argc != 6) || strcmp (argv[1], "--execute") ||
 	    strcmp (argv[2], MODEL) || !isatty (STDIN_FILENO) ||
@@ -179,7 +298,14 @@ main (int argc, char **argv)
 		result = GP_ERROR_CAMERA_BUSY;
 		goto done;
 	}
-	gp_list_new (&known);
+	result = gp_list_new (&known);
+	if (result >= GP_OK)
+		result = gp_camera_folder_list_files (camera, "/", known, context);
+	if (result < GP_OK) {
+		fprintf (stderr, "baseline_file_list=failed result=%d; refusing shutter action\n",
+			result);
+		goto done;
+	}
 	result = gp_camera_get_single_config (camera, "bulb", &bulb, context);
 	if (result < GP_OK) {
 		fprintf (stderr, "bulb_action=unavailable result=%d\n", result);
@@ -196,54 +322,62 @@ main (int argc, char **argv)
 		goto done;
 	}
 
+	result = install_signal_handlers ();
+	if (result < GP_OK)
+		goto done;
 	for (int shot = 1; shot <= count; shot++) {
-		int start = 1, stop = 0, value = 0, added = 0;
-		result = gp_widget_set_value (bulb, &start);
-		if (result >= GP_OK)
-			result = gp_widget_get_value (bulb, &value);
-		if (result < GP_OK || value != 1) {
-			result = GP_ERROR_BAD_PARAMETERS;
+		BulbCapture capture = {
+			.camera = camera,
+			.context = context,
+			.bulb = bulb,
+			.known = &known,
+			.output_dir = argv[4],
+			.shot = shot,
+		};
+		const PentaxBulbLifecycleOps ops = {
+			.opaque = &capture,
+			.set_edge = set_bulb_edge,
+			.check_cancel = check_cancel,
+			.wait = wait_one_second,
+			.collect = collect_outputs,
+		};
+		if (received_signal) {
+			result = GP_ERROR_CANCEL;
 			goto done;
 		}
-		printf ("shot=%d edge=start\n", shot);
-		result = gp_camera_set_single_config (camera, "bulb", bulb, context);
-		printf ("shot=%d start_result=%d\n", shot, result);
-		if (result < GP_OK) {
-			fprintf (stderr, "start_not_confirmed=stop_not_sent; do_not_retry\n");
+		result = pentax_bulb_run_lifecycle (&ops, &lifecycle_state);
+		operator_intervention_required =
+			lifecycle_state.operator_intervention_required;
+		if (lifecycle_state.explicit_stop_attempted &&
+		    lifecycle_state.explicit_stop_result < GP_OK)
+			fprintf (stderr, "shot=%d explicit_stop_unconfirmed=%d\n", shot,
+				lifecycle_state.explicit_stop_result);
+		if (lifecycle_state.cleanup_stop_attempted)
+			fprintf (stderr, "shot=%d cleanup_stop_result=%d shutter_open=%d\n",
+				shot, lifecycle_state.cleanup_stop_result,
+				lifecycle_state.shutter_open);
+		if (operator_intervention_required) {
+			if (lifecycle_state.start_confirmed)
+				fprintf (stderr, "shot=%d OPERATOR_INTERVENTION_REQUIRED "
+					"shutter_open=%d; do not issue another shutter action\n",
+					shot, lifecycle_state.shutter_open);
+			else
+				fprintf (stderr, "shot=%d OPERATOR_INTERVENTION_REQUIRED "
+					"start_unconfirmed=1 shutter_state=unknown; do not issue "
+					"another shutter action\n", shot);
 			goto done;
 		}
-		nanosleep (&hold, NULL);
-		result = gp_widget_set_value (bulb, &stop);
 		if (result < GP_OK)
 			goto done;
-		printf ("shot=%d edge=stop\n", shot);
-		result = gp_camera_set_single_config (camera, "bulb", bulb, context);
-		printf ("shot=%d stop_and_finalize_result=%d\n", shot, result);
-		if (result < GP_OK)
-			goto done;
-		gp_list_new (&after);
-		result = gp_camera_folder_list_files (camera, "/", after, context);
-		if (result < GP_OK)
-			goto done;
-		for (int i = 0; i < gp_list_count (after); i++) {
-			const char *name = NULL;
-			if (gp_list_get_name (after, i, &name) < GP_OK || !name ||
-			    list_contains (known, name))
-				continue;
-			printf ("shot=%d published_file=%s\n", shot, name);
-			result = save_file (camera, context, argv[4], name);
-			if (result < GP_OK)
-				goto done;
-			added++;
-		}
-		if (!added) {
-			fprintf (stderr, "shot=%d output_not_proven; do_not_retry\n", shot);
-			result = GP_ERROR_FILE_NOT_FOUND;
+		result = read_conditions (camera, context, &state, &mode,
+			&camera_timer, &camera_idle);
+		if (result < GP_OK || !camera_idle || mode != 9 || camera_timer) {
+			fprintf (stderr, "shot=%d postflight=not_idle state=%u mode=%u "
+				"timer=%d idle=%d\n", shot, state, mode,
+				camera_timer, camera_idle);
+			result = GP_ERROR_CAMERA_BUSY;
 			goto done;
 		}
-		gp_list_free (known);
-		known = after;
-		after = NULL;
 	}
 	result = read_conditions (camera, context, &state, &mode,
 		&camera_timer, &camera_idle);
@@ -256,7 +390,9 @@ main (int argc, char **argv)
 	printf ("bulb_edge_test=pass shots=%d output_dir=%s\n", count, argv[4]);
 
 done:
-	if (initialized) {
+	if (initialized && operator_intervention_required) {
+		fprintf (stderr, "camera_exit=skipped; shutter/session state requires operator inspection\n");
+	} else if (initialized) {
 		exit_result = gp_camera_exit (camera, context);
 		if (result >= GP_OK && exit_result < GP_OK)
 			result = exit_result;
@@ -265,8 +401,6 @@ done:
 		gp_widget_free (bulb);
 	if (known)
 		gp_list_free (known);
-	if (after)
-		gp_list_free (after);
 	if (camera)
 		gp_camera_unref (camera);
 	if (context)
