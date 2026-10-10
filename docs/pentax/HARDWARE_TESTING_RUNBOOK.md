@@ -151,13 +151,42 @@ export LD_LIBRARY_PATH=$B/libgphoto2:$B/libgphoto2_port/libgphoto2_port
 Note: sandboxed terminals intermittently show "Read-only file system" for
 `/tmp` — retry, or stage under the workspace instead.
 
-### 4.3 Building a probe harness
+### 4.3 Camera-timed K-3 III Bulb probe
 
-```bash
-/home/ian/Documents/VSCodeProjects/LibGphoto2/tests/build_bulb_probe.sh ./bulb_probe
-# usage: ./bulb_probe <hold_ms> <port> <release_mode>
-# release_mode=2 is the bulb-open candidate (per K-3 III traces); 0 = verified still path
+The historical `tests/bulb_probe` directly sent release mode 2. Do not run it
+on the K-3 III: the recorded attempt was rejected with `0x2002` and the camera
+then disappeared from USB. The supported K-3 III route is a normal
+automatically-timed capture (release mode 0); never bypass the model gate with a
+low-level release-mode probe.
+
+`tests/pentax-bulb-timed-probe.c` is a guarded, one-shot probe for the exact
+`.62` source SHA `67843d2248e7e37cfa58c15cc52e0a47bc13d952`. It refuses any other
+source SHA, camera identity, active condition, non-B exposure mode, or timer
+longer than one second. It does not change camera settings or retrieve/delete
+files. A capture error is `OUTCOME UNKNOWN`; inspect the camera/card and do not
+retry. The harness has only been built/self-tested offline; it is not physical
+qualification or approval to expose.
+
+Build against a detached exact-SHA worktree; the probe source stays in the
+working checkout and does not modify the production source tree:
+
+```sh
+git worktree add --detach /tmp/libgphoto2-bulb-guard-67843d 67843d2248e7e37cfa58c15cc52e0a47bc13d952
+meson setup /tmp/libgphoto2-bulb-guard-67843d/_build /tmp/libgphoto2-bulb-guard-67843d
+meson compile -C /tmp/libgphoto2-bulb-guard-67843d/_build
+LIBGPHOTO2_SOURCE=/tmp/libgphoto2-bulb-guard-67843d \
+  LIBGPHOTO2_BUILD=/tmp/libgphoto2-bulb-guard-67843d/_build \
+  tests/build_pentax_bulb_timed_probe.sh /tmp/pentax-bulb-timed-probe
+/tmp/pentax-bulb-timed-probe --self-test
 ```
+
+The builder stages `usb1.so` and `usbscsi.so` from that exact build and emits a
+wrapper that binds `CAMLIBS`, `IOLIBS`, and `LD_LIBRARY_PATH` to the matching
+`.62` artifacts. Use the wrapper, not its `.bin` file. Run `--preflight` first;
+it checks the live camera identity, B mode, idle state, and timer without
+triggering the shutter. A physical capture still requires the camera timer to
+be at most one second and separate operator authorization. `--execute` requires
+an interactive terminal and typing `CAPTURE ONE` before its single capture.
 
 ---
 
@@ -309,8 +338,8 @@ capture+transfer+finalize (K-1 II).
 **Queued, in order:**
 1. **Operator action needed:** switch both cameras from MSC back to MTP/PTP
    (§6.3). Everything below is blocked on this.
-2. K-1 II bulb probe: `tests/bulb_probe` with `<hold_ms>=1500`, release_mode=2
-   (operator-approved hold only). Build per §4.3, env per §4.2.
+2. Camera-timed K-3 III Bulb probe: build and run the offline guard test first;
+   any physical one-second capture remains pending separate operator approval.
 3. Duration-aware capture timeout (library.c, committed 2026-08-24) needs its
    first hardware verification — a long-bulb-timer capture that would have
    exceeded the old fixed 60 s budget.
