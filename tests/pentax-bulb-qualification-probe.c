@@ -353,6 +353,9 @@ main (int argc, char **argv)
 		    lifecycle_state.collection_result < GP_OK)
 			fprintf (stderr, "shot=%d output_collection_error=%d; original_result=%d\n",
 				shot, lifecycle_state.collection_result, result);
+		if (lifecycle_state.cancelled_after_collection)
+			fprintf (stderr, "shot=%d cancelled_after_stop=1 output_collection_result=%d\n",
+				shot, lifecycle_state.collection_result);
 		if (operator_intervention_required) {
 			if (lifecycle_state.start_confirmed)
 				fprintf (stderr, "shot=%d OPERATOR_INTERVENTION_REQUIRED "

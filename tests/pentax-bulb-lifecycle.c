@@ -58,10 +58,19 @@ pentax_bulb_run_lifecycle (const PentaxBulbLifecycleOps *ops,
 	}
 
 	if (!state->shutter_open) {
+		int result_before_collection = result;
+		int cancel_result;
 		state->collection_attempted = 1;
 		state->collection_result = ops->collect (ops->opaque);
 		if (result >= GP_OK && state->collection_result < GP_OK)
 			result = state->collection_result;
+		cancel_result = ops->check_cancel ?
+			ops->check_cancel (ops->opaque) : GP_OK;
+		if (cancel_result < GP_OK) {
+			state->cancelled_after_collection = 1;
+			if (result_before_collection >= GP_OK)
+				result = cancel_result;
+		}
 	}
 
 	return result;

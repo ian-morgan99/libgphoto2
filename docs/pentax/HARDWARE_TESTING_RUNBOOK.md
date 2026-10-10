@@ -173,8 +173,9 @@ and gets one cleanup stop attempt. An unconfirmed start or cleanup stop is
 reported as requiring operator inspection, suppresses further shutter actions,
 and does not claim the shutter is closed. After a confirmed stop—including a
 cleanup stop after an earlier error—the probe still collects newly published
-files while returning the original failure; a collection error is reported
-separately. A file-list baseline is captured before the first exposure so old
+files before returning the original failure. Cancellation during collection is
+reported after collection; collection errors are reported separately. A
+file-list baseline is captured before the first exposure so old
 camera files cannot be mistaken for new output.
 Injected-failure tests cover cancellation immediately after start, wait failure,
 stop failure, output retrieval failure, and unconfirmed start/stop.

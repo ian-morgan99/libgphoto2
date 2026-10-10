@@ -152,6 +152,21 @@ main (void)
 	       fake.collect_calls == 1,
 	       "successful lifecycle starts, stops, then retrieves output once");
 
+	fake = (FakeCamera) { .cancel_on_check = 4 };
+	result = run (&fake, &state);
+	check (result == GP_ERROR_CANCEL && state.cancelled_after_collection &&
+	       state.collection_attempted && state.collection_result == GP_OK &&
+	       !state.shutter_open && fake.collect_calls == 1,
+	       "cancellation during output collection is returned after saving output");
+
+	fake = (FakeCamera) { .cancel_on_check = 4,
+		.collect_result = GP_ERROR_FILE_NOT_FOUND };
+	result = run (&fake, &state);
+	check (result == GP_ERROR_CANCEL && state.cancelled_after_collection &&
+	       state.collection_result == GP_ERROR_FILE_NOT_FOUND &&
+	       !state.shutter_open,
+	       "cancellation is preserved and output retrieval failure remains reported separately");
+
 	puts ("test-pentax-bulb-lifecycle: all tests passed");
 	return 0;
 }
