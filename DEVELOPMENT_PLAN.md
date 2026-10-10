@@ -113,8 +113,15 @@ This list supersedes completed task narratives later in the document.
    requires supervised observation. Never use IT2's focus escalation.
 3. Re-run the K-3 III suite after charging: T4 EV and T6 WB should now pass
    with the range-form getter and 0x800f mapping.
-4. Bulb open-shutter exposure control remains Tier 11: the Bulb *timer setting*
-   write is proven, but an actual open-shutter exposure is a separate gate.
+4. Bulb remains open for Tier 11. Direct-PC K-3 III PID `0x0189` B-mode
+   held-action testing is **PASS only for four one-second starts/stops**, with
+   saved DNG/JPEG output and EXIF 1.064–1.073 s; see
+   `docs/pentax/REAL_HARDWARE_TEST_LOG.md` and the 2026-10-10 evidence summary.
+   The camera-owned timer could not be enabled (`pentaxdirectshutter=00:01`
+   returned `GP_ERROR_NOT_SUPPORTED`); timed natural completion, stop/natural
+   race, following Manual control, and Polaris/pgphoto integration remain
+   **NOT TESTED**. K-3 III Monochrome PID `0x018f` remains withheld. Do not
+   report the camera-timed or Polaris path as qualified from the held-action pass.
 5. Capture/transfer passed once on K-1 II (H1.23); repeat JPEG capture and
    RAW hash comparison remain before Tier 9/10 can close.
 6. White balance raw labels beyond the IT2 table need display correlation on

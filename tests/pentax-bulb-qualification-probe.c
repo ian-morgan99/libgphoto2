@@ -195,10 +195,7 @@ collect_outputs (void *opaque)
 	BulbCapture *capture = opaque;
 	CameraList *after = NULL;
 	int added = 0;
-	int result;
-	if (received_signal)
-		return GP_ERROR_CANCEL;
-	result = gp_list_new (&after);
+	int result = gp_list_new (&after);
 	if (result >= GP_OK)
 		result = gp_camera_folder_list_files (capture->camera, "/", after,
 			capture->context);
@@ -206,10 +203,6 @@ collect_outputs (void *opaque)
 		goto done;
 	for (int i = 0; i < gp_list_count (after); i++) {
 		const char *name = NULL;
-		if (received_signal) {
-			result = GP_ERROR_CANCEL;
-			goto done;
-		}
 		result = gp_list_get_name (after, i, &name);
 		if (result < GP_OK || !name) {
 			result = result < GP_OK ? result : GP_ERROR_CORRUPTED_DATA;
@@ -356,6 +349,10 @@ main (int argc, char **argv)
 			fprintf (stderr, "shot=%d cleanup_stop_result=%d shutter_open=%d\n",
 				shot, lifecycle_state.cleanup_stop_result,
 				lifecycle_state.shutter_open);
+		if (lifecycle_state.collection_attempted &&
+		    lifecycle_state.collection_result < GP_OK)
+			fprintf (stderr, "shot=%d output_collection_error=%d; original_result=%d\n",
+				shot, lifecycle_state.collection_result, result);
 		if (operator_intervention_required) {
 			if (lifecycle_state.start_confirmed)
 				fprintf (stderr, "shot=%d OPERATOR_INTERVENTION_REQUIRED "

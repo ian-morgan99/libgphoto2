@@ -14,6 +14,7 @@ pentax_bulb_run_lifecycle (const PentaxBulbLifecycleOps *ops,
 	memset (state, 0, sizeof (*state));
 	state->explicit_stop_result = GP_OK;
 	state->cleanup_stop_result = GP_OK;
+	state->collection_result = GP_OK;
 
 	if (ops->check_cancel) {
 		result = ops->check_cancel (ops->opaque);
@@ -56,10 +57,12 @@ pentax_bulb_run_lifecycle (const PentaxBulbLifecycleOps *ops,
 			state->operator_intervention_required = 1;
 	}
 
-	if (result >= GP_OK && !state->shutter_open && ops->check_cancel)
-		result = ops->check_cancel (ops->opaque);
-	if (result >= GP_OK && !state->shutter_open)
-		result = ops->collect (ops->opaque);
+	if (!state->shutter_open) {
+		state->collection_attempted = 1;
+		state->collection_result = ops->collect (ops->opaque);
+		if (result >= GP_OK && state->collection_result < GP_OK)
+			result = state->collection_result;
+	}
 
 	return result;
 }

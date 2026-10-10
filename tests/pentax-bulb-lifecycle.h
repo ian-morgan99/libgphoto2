@@ -19,6 +19,8 @@ typedef struct {
 	int explicit_stop_result;
 	int cleanup_stop_attempted;
 	int cleanup_stop_result;
+	int collection_attempted;
+	int collection_result;
 	int operator_intervention_required;
 } PentaxBulbLifecycleState;
 
