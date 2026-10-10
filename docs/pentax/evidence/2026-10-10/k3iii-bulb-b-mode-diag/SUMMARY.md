@@ -28,7 +28,7 @@ captures remain in the local `/tmp` files.
 - `k3iii-bulb-20261010-pc-test-retry.txt` — confirms the action was rejected by the cached recovery flag before `0x9011`; no shutter start. SHA-256 `da29f080f4df490688ef71a43f6d2590aad325f82bd274ce8e4f6450b4b3c948`.
 - `k3iii-bulb-20261010-pc-test-final.txt` — one successful one-second B-mode start/stop and output lifecycle. SHA-256 `ca2077b50d77fcd77ccd992b4ebb8162bf2c1694ae26fb7565a766656b44b9df`.
 
-Diagnostic artifacts (temporary only): `ptp2.so` SHA-256 `da594a8e16fd39e875e82e9265d331f0a5fe5feb38ca94a076b30cc28fac8826`; probe SHA-256 `3a20c0471d454e66eac4acbcb8b6856cf05e95d9c16f5c6ce4ea88dcc690b331`.
+Diagnostic artifacts (temporary only): `ptp2.so` SHA-256 `da594a8e16fd39e875e82e9265d331f0a5fe5feb38ca94a076b30cc28fac8826`; probe SHA-256 `3a20c0471d454e66eac4acbcb8b6856cf05e95d9c16f5c6ce4ea88dcc690b331`. The source harness is `k3iii-bulb-edge-probe.c` (SHA-256 `0bdd1adf60b7bda6e81d07e3707361a67fcbfe3e4e2d353e73f7981b3b59a3a8`). The temporary source overrides are retained locally at `/tmp/k3iii-bulb-diagnostic-overrides.patch` (SHA-256 `8024724af92511dbdd3bbd01444ad7c3e95573f2396fb8966b1c1ff75a82e61b`); they include a test-only model-gate override, the recovery-path change, and diagnostic trace output. Do not apply that patch as a production change.
 
 ## Still required before production support
 
