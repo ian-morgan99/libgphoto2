@@ -1,7 +1,8 @@
 # IMAGE Transmitter 2 capability target matrix
 
-Revision: 2026-10-07 (content largely from 2026-08-21; the `0x0182` amendment
-below is from 2026-10-06, commit `f3a8ffebf`).
+Revision: 2026-10-10 (content largely from 2026-08-21; the `0x0182` amendment
+below is from 2026-10-06, commit `f3a8ffebf`; held-Bulb hardware evidence below
+is from 2026-10-10).
 
 This is the normative target for Pentax development in this fork. It
 consolidates the extraction previously split across `PENTAX_WIRE_PROTOCOL.md`,
@@ -70,9 +71,9 @@ that they fail *correctly*, not so that they work.
 
 | Model | ID | Recognised | Code references¹ | Hardware evidence |
 |---|---:|:--:|:--:|---|
-| K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — the primary development body |
+| K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — primary development body; direct-PC B-mode held Bulb action PASS for four 1 s starts/stops on PTP PID `0x0189`, with saved DNG/JPEG and EXIF 1.064–1.073 s. This qualifies only the experimental held action, not timed natural completion or Polaris. |
 | K-1 Mark II | 78400 | yes | 3 | **HW-R / HW-W** — second qualified body |
-| K-3 Mark III Monochrome | 78421 | yes | 3 | none; excluded from held-shutter release by the same gate as K-3 III |
+| K-3 Mark III Monochrome | 78421 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action |
 | KP | 78380 | yes | 3 | none. Classified **new-focus** (`0x9017`) by IT2's model table, unverified on hardware |
 | GR III | 78350 | yes | 2 | none. Also classified new-focus, unverified |
 | 645Z | 77840 | yes | 3 | none |
@@ -86,11 +87,13 @@ that they fail *correctly*, not so that they work.
 including the recognition assignment itself. It measures how much code branches
 on the model, not how much of it is verified.
 
-Read this as: **2 of 11 bodies are qualified.** Everything else is
-recognition-plus-fail-closed. The gates themselves are derived from IT2's model
-table (`pentax_model_uses_new_focus`, `pentax_bulb_action_model_supported`, and
-the per-property capability predicates), so they encode what the vendor client
-does, not what each camera has been observed to do.
+Read this as: **2 of 11 bodies have general hardware evidence.** Everything
+else is recognition-plus-fail-closed. Most capability predicates remain derived
+from IT2's model table and encode what the vendor client does, not what a body
+has been observed to do. The exception is the experimental held-Bulb product
+gate: standard K-3 III PID `0x0189` is enabled from the direct-PC result above;
+Monochrome PID `0x018f` remains blocked. That one-second held-action pass does
+not qualify the camera-timed or Polaris path.
 
 Two consequences that matter for planning:
 
@@ -126,8 +129,8 @@ substitute for that sweep.
 | `0x900d` | transfer block; requested count; Param1 valid count | Both | Research implemented; 8 MiB safety cap |
 | `0x900e` | finalize/delete candidate, data-in | Both | Research implemented; only after host cache |
 | `0x900f` | all conditions, data-in, no parameters | Both | Read-only implemented; 568-byte HW-R both |
-| `0x9011` | initiate: release, focus, MWB, sync, aperture reset | Both | Research/default-withheld |
-| `0x9012` | terminate with release mode | Both | Research/default-withheld |
+| `0x9011` | initiate: release, focus, MWB, sync, aperture reset | Both | Research-only held action; direct-PC B-mode PASS on K-3 III PTP PID `0x0189` for four 1 s captures; production remains withheld |
+| `0x9012` | terminate with release mode | Both | Research-only matching stop; same bounded direct-PC PASS; natural-completion race and Polaris integration NOT TESTED; PID `0x018f` blocked |
 | `0x9013` | interrupt/Green button | Both | Target; not generic guessed cancellation |
 | `0x9014` | SetLightMeteringMode name only; no active call found | Unknown | Withhold pending call-site/trace |
 | `0x9016` | old focus: amount, direction | K-1 II | Hardware target; no K-1 II focus command yet |
