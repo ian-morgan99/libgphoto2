@@ -81,14 +81,17 @@ pentax_bulb_action_mode_supported (uint32_t exposure_mode)
 }
 
 int
-pentax_bulb_action_model_supported (uint32_t model_no)
+pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {
-	/* The K-3 III probe on 2026-09-06 accepted vendor mode but rejected the
-	 * held-shutter release=2 edge with 0x2002, followed by USB disappearance.
-	 * Do not expose an action that can wedge the body.  This is deliberately a
-	 * model gate, not a claim that ordinary release=0 capture is unsupported. */
-	return model_no != PENTAX_MODEL_K3_MARK_III &&
-	       model_no != PENTAX_MODEL_K3_MARK_III_MONO;
+	/* The standard K-3 III passed two direct-PC B-mode start/stop captures.
+	 * Keep Monochrome out until it has its own hardware pass; model lookup
+	 * currently maps both products to the K-3 III model number. Issue #95
+	 * remains open for natural-completion and stop-race qualification. */
+	if (model_no == PENTAX_MODEL_K3_MARK_III)
+		return usb_product == 0x0189;
+	if (model_no == PENTAX_MODEL_K3_MARK_III_MONO)
+		return 0;
+	return 1;
 }
 
 unsigned int

@@ -158,19 +158,30 @@ from a release-mode-2 test in Manual mode. The logged 2026-09-06 rejection was
 in exposure mode 8 (M); IMAGE Transmitter 2 selects release mode 2 only for its
 B/lens-B/Astro family (9/12/20) when the camera's own Bulb timer is disabled.
 
-On 2026-10-10, a one-second direct-PC diagnostic in B mode exercised the exact
-start/stop pair through the research-only libgphoto2 action. InitiateCapture and
-TerminateCapture both returned `0x2001`; the existing output lifecycle
-published DNG and JPEG candidates. This run used a temporary model-gate
-override and an admission-path correction in a diagnostic build of source
-`67843d2248e7e37cfa58c15cc52e0a47bc13d952`; it is **not** a production build
-or a release qualification. The actual production gate remains closed.
+On 2026-10-10, two consecutive two-shot direct-PC sessions exercised the
+B-mode start/stop path on a K-3 III with its own Bulb timer disabled. Each
+`InitiateCapture` and `TerminateCapture` returned `0x2001`; all four DNG/JPEG
+pairs were saved locally. EXIF durations were 1.064–1.073 seconds. The
+qualification build was research-enabled and used a product-specific K-3 III
+gate (`0x0189`); the Monochrome product remains blocked. This is direct-PC
+hardware evidence, not a packaged Polaris test or release qualification.
 
-The test process did not save the transferred image bytes, so exposure time
-cannot be checked from EXIF and the file is not retained. Before enabling this
-path in a release, follow libgphoto2 issue #95: preserve the output, verify the
-captured duration, and complete the normal/timed control and repeatability
-checks. No second exposure is authorized by this evidence.
+The qualification probe now tracks whether start was confirmed and whether the
+shutter is still open. Any failure or signal after a confirmed start unwinds
+through the matching stop action; a failed explicit stop is reported separately
+and gets one cleanup stop attempt. An unconfirmed start or cleanup stop is
+reported as requiring operator inspection, suppresses further shutter actions,
+and does not claim the shutter is closed. A file-list baseline is captured
+before the first exposure so old camera files cannot be mistaken for new output.
+Injected-failure tests cover cancellation immediately after start, wait failure,
+stop failure, output retrieval failure, and unconfirmed start/stop.
+
+The camera-owned timer setting could not be enabled through
+`pentaxdirectshutter` in this B-mode state (`GP_ERROR_NOT_SUPPORTED`); it stayed
+at `00:00` and conditions continued to report `bulb-timer=no`. Follow issue #95
+for the remaining natural-timed control, stop/natural-completion race, and
+Benro/pgphoto start/stop integration. No firmware candidate has been built,
+installed, or qualified from this test.
 
 ---
 

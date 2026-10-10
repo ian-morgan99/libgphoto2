@@ -183,15 +183,18 @@ later release sends `TerminateCapture` (`0x9012`) with the same mode. When the
 camera's own timer is enabled, the client selects the ordinary timed path
 (release mode 0) instead.
 
-A one-second direct-PC K-3 III test on 2026-10-10, with the camera in B mode
-and its own timer disabled, completed the release=2 start/stop and output
-transfer lifecycle. This was a diagnostic build with a temporary K-3 III model
-gate override; the production gate remains closed pending the remaining #95
-qualification sequence. The earlier 2026-09-06 rejection used exposure mode 8
+Four direct-PC K-3 III captures on 2026-10-10, with B mode and the camera's
+own Bulb timer disabled, completed the release=2 start/stop and output-transfer
+lifecycle in two consecutive two-shot sessions. Both PTP edges returned
+`0x2001`; the DNG/JPEG output pairs were saved locally and EXIF reports
+1.064–1.073 seconds. The issue #95 working change gates the action by USB
+product (`0x0189` K-3 III allowed, `0x018f` Monochrome still blocked). It is not
+yet merged or packaged. The earlier 2026-09-06 rejection used exposure mode 8
 (Manual), so it did not test the B-mode sequence selected by IMAGE Transmitter
-2. DNG/JPEG candidates were published in the test process, but their bytes were
-not saved before process exit. No EXIF duration was retained; do not treat this
-as proof of exact exposure timing or production qualification.
+2. Remaining #95 work includes the camera-timed/natural-completion control,
+the stop/natural-completion race, and wiring the action into the Benro/pgphoto
+path. Do not claim firmware support or release qualification from this direct-PC
+result.
 
 The host polls `GetAllConditions` (`0x900f`). The client treats little-endian
 UINT32 byte offset 32 equal to 1 as a transfer candidate and reads its handle at

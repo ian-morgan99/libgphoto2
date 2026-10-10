@@ -80,7 +80,9 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 - **Exposure control**: direct ISO (`pentaxdirectiso`), shutter speed
   (`pentaxdirectshutter`) and aperture writes, each verified by read-back
   through the camera's live conditions word rather than trusting an OK
-  response; Bulb mode support.
+  response. The K-3 III held-Bulb action is product-gated and has direct-PC
+  B-mode start/stop plus output/EXIF evidence; camera-timed Bulb, stop-race,
+  and Benro/pgphoto integration remain open in issue #95.
 - **Focus drive**: both wire generations — new-focus `0x9017` (K-3 III
   family, KP, GR III) and old-focus `0x9016`. The K-1 II does not advertise
   `0x9016` at all but honours it; `have_prop` now special-cases this, gated

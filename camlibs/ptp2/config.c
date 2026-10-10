@@ -9341,11 +9341,14 @@ _get_Pentax_Bulb(CONFIG_GET_ARGS)
 	return GP_ERROR_NOT_SUPPORTED;
 #else
 	PTPParams *params = &camera->pl->params;
+	CameraAbilities abilities;
 	int val = 2; /* action widgets are edge-triggered and always changed */
 
 	if (!params->pentax.supported_model ||
 	    !params->pentax.vendor_mode_enabled ||
-	    !pentax_bulb_action_model_supported (params->pentax.model_no))
+	    (gp_camera_get_abilities (camera, &abilities) < GP_OK) ||
+	    !pentax_bulb_action_model_supported (params->pentax.model_no,
+		abilities.usb_product))
 		return GP_ERROR_NOT_SUPPORTED;
 	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);

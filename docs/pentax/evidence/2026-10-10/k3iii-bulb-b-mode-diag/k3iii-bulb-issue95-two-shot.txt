@@ -1,0 +1,39 @@
+selected_model=Pentax K-3 Mark III (MTP mode) usb=25fb:0189 port=usb:001,015
+admission_state recovery=1 output_pending=0
+conditions=state=48; astro-phase=inactive/other; exposure-mode-raw=9; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=800; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=no; bulb-timer=no; bulb-seconds=0/1; aperture=50/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+This will make 2 one-second B-mode capture(s), stop each through the Pentax Bulb action, and save every new DNG/JPEG before exit. Type CAPTURE 2
+ to continue: CAPTURE 2
+shot=1 edge=start
+[pentax] capture=1 boundary=camlib-enter transfer=0 recovery=1 output_pending=0
+[pentax] capture=1 boundary=preconditions-enter
+[pentax] capture=1 boundary=preconditions-return ptp=0x2001 size=576
+[pentax] capture=1 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=1 boundary=initiate-return ptp=0x2001
+shot=1 start_result=0
+shot=1 edge=stop
+[pentax] capture=2 boundary=camlib-enter transfer=1 recovery=0 output_pending=1
+[pentax] capture=2 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=2 boundary=initiate-return ptp=0x2001
+shot=1 stop_and_finalize_result=0
+shot=1 published_file=IMGP3902.DNG
+saved_file=/tmp/k3iii-bulb-issue95-outputs/IMGP3902.DNG bytes=30625557
+shot=1 published_file=IMGP3902.JPG
+saved_file=/tmp/k3iii-bulb-issue95-outputs/IMGP3902.JPG bytes=376216
+shot=2 edge=start
+[pentax] capture=3 boundary=camlib-enter transfer=0 recovery=1 output_pending=0
+[pentax] capture=3 boundary=preconditions-enter
+[pentax] capture=3 boundary=preconditions-return ptp=0x2001 size=576
+[pentax] capture=3 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=3 boundary=initiate-return ptp=0x2001
+shot=2 start_result=0
+shot=2 edge=stop
+[pentax] capture=4 boundary=camlib-enter transfer=1 recovery=0 output_pending=1
+[pentax] capture=4 boundary=initiate-enter focus=2 companions=1
+[pentax] capture=4 boundary=initiate-return ptp=0x2001
+shot=2 stop_and_finalize_result=0
+shot=2 published_file=IMGP3903.DNG
+saved_file=/tmp/k3iii-bulb-issue95-outputs/IMGP3903.DNG bytes=30938253
+shot=2 published_file=IMGP3903.JPG
+saved_file=/tmp/k3iii-bulb-issue95-outputs/IMGP3903.JPG bytes=372042
+conditions=state=48; astro-phase=inactive/other; exposure-mode-raw=9; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=800; exposure-step=1; open-av-num=28; shooting=no; processing=no; task-changing=no; Tv-changeable=no; bulb-timer=no; bulb-seconds=0/1; aperture=50/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=0
+bulb_edge_test=pass shots=2 output_dir=/tmp/k3iii-bulb-issue95-outputs

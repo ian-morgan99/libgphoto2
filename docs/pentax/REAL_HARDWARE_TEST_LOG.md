@@ -786,3 +786,26 @@ in `/tmp/k3iii-r1.log` lines 144–353.
 - No larger magnitude, retry, or speculative precondition was sent. Issue #59
   records the exact failure and remains open pending a source-faithful retained
   PC-LV discriminator and physical observation.
+
+### 2026-10-10 — K-3 III B-mode held Bulb start/stop (direct PC)
+
+- Camera: K-3 III `25fb:0189`, directly attached to PC at `usb:001,015`; source
+  base `6b4b3b935ccfde4b3c8a25b1ed131f0a68f70832`, with PR #98 recovery fix and
+  issue #95 product-gate changes in an isolated research-enabled build.
+- Conditions before each run: state 48/0 idle, exposure mode 9 (B), shooting and
+  processing false, camera Bulb timer disabled. A software attempt to set
+  `pentaxdirectshutter=00:01` returned `GP_ERROR_NOT_SUPPORTED`; read-back
+  remained `00:00`, with no setting change.
+- Two separate direct-PC sessions each completed two consecutive one-second
+  Bulb start/stop captures without a camera reboot. All four `0x9011` and
+  `0x9012` calls returned `0x2001`; libgphoto2 transferred/published DNG/JPEG
+  pairs. EXIF `ExposureTime` was 1.073, 1.066, 1.068, and 1.064 s.
+- The first session began with `recovery_required=1`; PR #98's shared strict
+  recovery probe cleared the state before the first start. The second shot in
+  each session also completed without restart.
+- Direct-PC held-Bulb sequence: **PASS** for the tested K-3 III, B mode, and
+  one-second hold. Camera-owned timed-Bulb natural completion, stop-vs-natural
+  race, and Polaris/pgphoto integration are still **NOT TESTED**. This does not
+  qualify or prove the shipped firmware path. K-3 III Monochrome remains gated.
+- Image bytes were saved outside Git under `/tmp/k3iii-bulb-issue95-outputs/`;
+  hashes and transcript are recorded in `docs/pentax/evidence/2026-10-10/`.
