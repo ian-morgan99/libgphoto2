@@ -10568,7 +10568,15 @@ _put_Pentax_CrossProcess (CONFIG_PUT_ARGS)
  * so - exactly as for ExtendedISO above - the widget is built from the
  * camera's own descriptor via _get_INT/_put_INT rather than a hard-coded
  * table.  The descriptor is the only authoritative source of the supported
- * values; a body that does not implement the property fails closed here. */
+ * values; a body that does not implement the property fails closed here.
+ *
+ * A descriptor that advertises no concrete values is not a usable control:
+ * the recorded K-3 III returns empty enumerations for 0xd024-0xd026
+ * (docs/pentax/evidence/2026-08-21/H1.4/README.md), which would otherwise
+ * render a zero-choice radio widget whose manually-supplied values bypass any
+ * source-defined value list.  Such properties are withheld (fail closed) until
+ * a source-derived value list exists, per AGENTS.md ("do not infer support
+ * from ... a GetSet descriptor alone"). */
 static int
 _pentax_prop_get (Camera *camera, CameraWidget **widget,
 	struct submenu *menu, uint16_t code)
@@ -10584,6 +10592,12 @@ _pentax_prop_get (Camera *camera, CameraWidget **widget,
 	ret = ptp_generic_getdevicepropdesc (params, code, &desc);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
+	if ((desc.FormFlag == PTP_DPFF_Enumeration &&
+			desc.FORM.Enum.NumberOfValues == 0) ||
+		desc.FormFlag == PTP_DPFF_None) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
 	result = _get_INT (camera, widget, menu, &desc);
 	ptp_free_devicepropdesc (&desc);
 	return result;
@@ -10596,6 +10610,8 @@ _pentax_prop_put (Camera *camera, CameraWidget *widget,
 	PTPParams *params = &camera->pl->params;
 	PTPDevicePropDesc desc;
 	PTPPropValue value;
+	PTPPropValue readback;
+	unsigned int attempt;
 	uint16_t ret;
 	int result;
 
@@ -10621,8 +10637,57 @@ _pentax_prop_put (Camera *camera, CameraWidget *widget,
 	}
 	if (result == GP_OK) {
 		ret = ptp_setdevicepropvalue (params, code, &value, desc.DataType);
-		if (ret != PTP_RC_OK)
-			result = translate_ptp_result (ret);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK) {
+			/* A PTP 0x2001 acknowledges the write but does not prove the
+			 * camera applied it (AGENTS.md "hardware truth rules"): the
+			 * current white-balance or Custom Image mode can silently
+			 * reject the parameter.  Read the raw value back through
+			 * GetDevicePropValue (uncached) and require it to match,
+			 * mirroring the bounded verification used for ExtendedISO. */
+			result = GP_ERROR;
+			for (attempt = 1; attempt <= 5; attempt++) {
+				if (gp_context_cancel (ptp_context_get (params->data)) ==
+				    GP_CONTEXT_FEEDBACK_CANCEL) {
+					result = GP_ERROR_CANCEL;
+					break;
+				}
+				usleep (100000);
+				memset (&readback, 0, sizeof (readback));
+				ret = ptp_getdevicepropvalue (params, code, &readback,
+					desc.DataType);
+				if (ret != PTP_RC_OK) {
+					result = translate_ptp_result (ret);
+					break;
+				}
+				switch (desc.DataType) {
+				case PTP_DTC_UINT8:
+					result = readback.u8  == value.u8  ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT8:
+					result = readback.i8  == value.i8  ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_UINT16:
+					result = readback.u16 == value.u16 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT16:
+					result = readback.i16 == value.i16 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_UINT32:
+					result = readback.u32 == value.u32 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT32:
+					result = readback.i32 == value.i32 ? GP_OK : GP_ERROR; break;
+				default:
+					/* Non-scalar wire type: there is no scalar to
+					 * compare, so accept the acknowledged write
+					 * rather than guess at a compound encoding. */
+					result = GP_OK;
+					break;
+				}
+				if (result == GP_OK)
+					break;
+			}
+			if (result == GP_ERROR)
+				GP_LOG_E ("Pentax property 0x%04x write was acknowledged "
+					"but the read-back value did not match after "
+					"500 ms.", code);
+		}
 	}
 	ptp_free_devicepropdesc (&desc);
 	return result;
