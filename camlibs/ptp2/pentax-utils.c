@@ -798,6 +798,28 @@ pentax_model_supports_writing_file_format (uint32_t model_no)
 	return pentax_model_is_k3iii_family (model_no);
 }
 
+/* Color-temperature white-balance value (0xd018): IT2 sets
+ * _isColorTempSettingSupported only inside the "PENTAX K-3 Mark III" model
+ * block (MtpDevice.cs:98, model 78420); no other body sets it.  The property
+ * is a plain UINT16 SetDevicePropValue (WBColorTemp, MtpDevice.cs:1110).
+ * Fail closed on the k3iii family only (issue #102). */
+int
+pentax_model_supports_color_temperature (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
+/* Detailed Custom Image parameters (0xd021-0xd029): IT2 sets
+ * _isCIDetailParameterSupported only inside the "PENTAX K-3 Mark III" model
+ * block (MtpDevice.cs:99, model 78420); no other body sets it.  Each is a
+ * single-byte SetDevicePropValue (sbyte/byte, MtpDevice.cs CISaturation et
+ * al.).  Fail closed on the k3iii family only (issue #67). */
+int
+pentax_model_supports_ci_detail (uint32_t model_no)
+{
+	return pentax_model_is_k3iii_family (model_no);
+}
+
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
  * used by IT2 (MtpDevice.cs _camWritingFileFormatCopy):
  *   0 = fine (3-star), 1 = normal (2-star), 2 = basic (1-star).

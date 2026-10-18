@@ -411,6 +411,8 @@ int pentax_parse_legacy_shutter_denominator (const char *value,
 int pentax_session_error_needs_close_reset (uint16_t response,
 		unsigned int attempt);
 int pentax_model_supports_cross_process (uint32_t model_no);
+int pentax_model_supports_color_temperature (uint32_t model_no);
+int pentax_model_supports_ci_detail (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);
 int pentax_wff_quality_byte (const char *value);
