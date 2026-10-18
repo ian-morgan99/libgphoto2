@@ -164,23 +164,23 @@ vendor capture/candidate workflow.
 | `0xd013` | drive mode | K-1 II descriptor is UINT32 enumeration; do not assume one cross-model width | K-1 II HW-R enum 23/current raw 1; K-3 III width re-audit target |
 | `0xd014` | bracket mode | UINT8; K-3 III gate | K-1 II withheld |
 | `0xd015` | bracket step | UINT8 tenths; K-3 III gate | K-1 II withheld |
-| `0xd018` | WB color temperature | UINT16; K-3 III UI gate | Hardware target |
+| `0xd018` | WB color temperature | UINT16; K-3 III UI gate | Descriptor-driven implemented; hardware target |
 | `0xd01b` | file format/size/quality/RAW/card/movie | compound 10/11-byte structure | High-risk: read/trace before any write |
 | `0xd01e` | extended ISO | UINT32 enumeration | K-3 III HW-W restored; K-1 II source-faithful 200→400→200 HW-W restored; verify through live conditions, not descriptor alone |
 | `0xd020` | CI mode | UINT8 | Base-CI source target |
-| `0xd021` | CI saturation | signed byte | Base-CI source target |
-| `0xd022` | CI hue | signed byte | Base-CI source target |
-| `0xd023` | CI high/low key | signed byte | Base-CI source target |
-| `0xd024` | CI filter | UINT8; UI 9 maps to wire 255 | Base-CI source target |
-| `0xd025` | CI monotone toning | signed byte | Base-CI source target |
-| `0xd026` | CI toning | UINT8 | Base-CI source target |
-| `0xd027` | CI fine sharpness | UINT8 | Base-CI source target |
-| `0xd028` | CI highlight contrast | signed byte; detailed-CI gate | K-3 III target; K-1 II withheld |
-| `0xd029` | CI shadow contrast | signed byte; detailed-CI gate | K-3 III target; K-1 II withheld |
+| `0xd021` | CI saturation | signed byte | Descriptor-driven implemented; hardware target |
+| `0xd022` | CI hue | signed byte | Descriptor-driven implemented; hardware target |
+| `0xd023` | CI high/low key | signed byte | Descriptor-driven implemented; hardware target |
+| `0xd024` | CI filter | UINT8; UI 9 maps to wire 255 | Descriptor-driven implemented; hardware target (confirm descriptor enumerates 255) |
+| `0xd025` | CI monotone toning | signed byte | Descriptor-driven implemented; hardware target |
+| `0xd026` | CI toning | UINT8 | Descriptor-driven implemented; hardware target |
+| `0xd027` | CI fine sharpness | UINT8 | Descriptor-driven implemented; hardware target |
+| `0xd028` | CI highlight contrast | signed byte; detailed-CI gate | Descriptor-driven implemented (K-3 III gate); hardware target |
+| `0xd029` | CI shadow contrast | signed byte; detailed-CI gate | Descriptor-driven implemented (K-3 III gate); hardware target |
 | `0xd02a` | composition-adjustment switch | UINT8 boolean; composition gate | K-3 III target |
 | `0xd02b` | focus peaking | IT2 assumes UINT8; K-1 II instead returns stable `0x4004` array-UINT16 descriptor payload and anomalous 4-byte value | K-1 II withheld; K-3 III hardware target |
 | `0xd02c` | CI cross process | encoded UINT8 normal and 32+ ranges | Source target |
-| `0xd02d` | CI user filter | 8-byte signed triplet structure | Trace before write |
+| `0xd02d` | CI user filter | 8-byte signed triplet structure | Read-only descriptor passthrough implemented; write needs array codec |
 | `0xd035` | PC live view | IT2 writes UINT8 boolean; K-1 II descriptor is a datatype-zero six-byte placeholder with empty value | K-3 III HW-W restore; K-1 II source-defined path only, one-frame restore target |
 | `0xd036` | LV AF position | 4-byte response means geometry centre; >=8 bytes has X/Y UINT16 at 4/6; setter is `{2,0,0,0,Xlo,Xhi,Ylo,Yhi}` | Parser/encoder fixtures; K-1 II HW-R 8-byte centre 360,240; bounded write target |
 | `0xd037` | LV zoom | `{4,0,0,0,Xlo,Xhi,Ylo,Yhi,mag,0,0,0}`; disable mag 1 | Encoder fixture; K-1 II HW-R raw 1; public config target; 16x fallback once to 10x only on `0x201c` after hardware gate |

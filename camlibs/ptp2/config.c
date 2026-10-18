@@ -9581,7 +9581,7 @@ _get_Pentax_DirectProperty (CONFIG_GET_ARGS)
 		{ "pentaxpropd01e", 0xd01e }, { "pentaxprop5010", 0x5010 },
 		{ "pentaxprop5008", 0x5008 }, { "pentaxprop5005", 0x5005 },
 		{ "pentaxpropd013", 0xd013 }, { "pentaxpropd02b", 0xd02b },
-		{ "pentaxpropd035", 0xd035 }
+		{ "pentaxpropd02d", 0xd02d }, { "pentaxpropd035", 0xd035 }
 	};
 	PTPParams *params = &camera->pl->params;
 	PTPDevicePropDesc desc;
@@ -10557,6 +10557,180 @@ _put_Pentax_CrossProcess (CONFIG_PUT_ARGS)
 		PTP_DPC_PENTAX_CustomImageCrossProcess,
 		(uint8_t)((v > 3) ? v - 3 + 32 : v + 1));
 }
+
+/* Detailed Custom Image parameters (0xd021-0xd029) and the color-temperature
+ * white-balance value (0xd018) are plain single-value device properties that
+ * IT2 reads and writes directly (MtpDevice.cs CISaturation/CIHue/CIKey/
+ * CIFilterEffect/CIMonotoneToning/CIToning/CIFineSharpness/CIHighlightContrast/
+ * CIShadowContrast and WBColorTemp).  Their ranges and signedness are
+ * camera-defined and differ per parameter (saturation/hue/key are signed,
+ * filter/monotone/toning/fine-sharpness unsigned, color temperature a UINT16),
+ * so - exactly as for ExtendedISO above - the widget is built from the
+ * camera's own descriptor via _get_INT/_put_INT rather than a hard-coded
+ * table.  The descriptor is the only authoritative source of the supported
+ * values; a body that does not implement the property fails closed here.
+ *
+ * A descriptor that advertises no concrete values is not a usable control:
+ * the recorded K-3 III returns empty enumerations for 0xd024-0xd026
+ * (docs/pentax/evidence/2026-08-21/H1.4/README.md), which would otherwise
+ * render a zero-choice radio widget whose manually-supplied values bypass any
+ * source-defined value list.  Such properties are withheld (fail closed) until
+ * a source-derived value list exists, per AGENTS.md ("do not infer support
+ * from ... a GetSet descriptor alone"). */
+static int
+_pentax_prop_get (Camera *camera, CameraWidget **widget,
+	struct submenu *menu, uint16_t code)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	ret = ptp_generic_getdevicepropdesc (params, code, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if ((desc.FormFlag == PTP_DPFF_Enumeration &&
+			desc.FORM.Enum.NumberOfValues == 0) ||
+		desc.FormFlag == PTP_DPFF_None) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	result = _get_INT (camera, widget, menu, &desc);
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+static int
+_pentax_prop_put (Camera *camera, CameraWidget *widget,
+	int *alreadyset, uint16_t code)
+{
+	PTPParams *params = &camera->pl->params;
+	PTPDevicePropDesc desc;
+	PTPPropValue value;
+	PTPPropValue readback;
+	unsigned int attempt;
+	uint16_t ret;
+	int result;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	memset (&desc, 0, sizeof (desc));
+	memset (&value, 0, sizeof (value));
+	ret = ptp_generic_getdevicepropdesc (params, code, &desc);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	if (desc.GetSet != PTP_DPGS_GetSet) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
+	result = _put_INT (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK) {
+		/* These are Custom-Image / white-balance settings, not exposure
+		 * settings mirrored in the conditions block, so (like the other
+		 * non-exposure vendor writes) they need only the shared
+		 * readiness barrier, not a conditions capability bit. */
+		PentaxConditions conditions;
+		result = _pentax_readiness_preflight (params, &conditions);
+	}
+	if (result == GP_OK) {
+		ret = ptp_setdevicepropvalue (params, code, &value, desc.DataType);
+		result = translate_ptp_result (ret);
+		if (result == GP_OK) {
+			/* A PTP 0x2001 acknowledges the write but does not prove the
+			 * camera applied it (AGENTS.md "hardware truth rules"): the
+			 * current white-balance or Custom Image mode can silently
+			 * reject the parameter.  Read the raw value back through
+			 * GetDevicePropValue (uncached) and require it to match,
+			 * mirroring the bounded verification used for ExtendedISO. */
+			result = GP_ERROR;
+			for (attempt = 1; attempt <= 5; attempt++) {
+				if (gp_context_cancel (ptp_context_get (params->data)) ==
+				    GP_CONTEXT_FEEDBACK_CANCEL) {
+					result = GP_ERROR_CANCEL;
+					break;
+				}
+				usleep (100000);
+				memset (&readback, 0, sizeof (readback));
+				ret = ptp_getdevicepropvalue (params, code, &readback,
+					desc.DataType);
+				if (ret != PTP_RC_OK) {
+					result = translate_ptp_result (ret);
+					break;
+				}
+				switch (desc.DataType) {
+				case PTP_DTC_UINT8:
+					result = readback.u8  == value.u8  ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT8:
+					result = readback.i8  == value.i8  ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_UINT16:
+					result = readback.u16 == value.u16 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT16:
+					result = readback.i16 == value.i16 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_UINT32:
+					result = readback.u32 == value.u32 ? GP_OK : GP_ERROR; break;
+				case PTP_DTC_INT32:
+					result = readback.i32 == value.i32 ? GP_OK : GP_ERROR; break;
+				default:
+					/* Non-scalar wire type: there is no scalar to
+					 * compare, so accept the acknowledged write
+					 * rather than guess at a compound encoding. */
+					result = GP_OK;
+					break;
+				}
+				if (result == GP_OK)
+					break;
+			}
+			if (result == GP_ERROR)
+				GP_LOG_E ("Pentax property 0x%04x write was acknowledged "
+					"but the read-back value did not match after "
+					"500 ms.", code);
+		}
+	}
+	ptp_free_devicepropdesc (&desc);
+	return result;
+}
+
+#define PENTAX_DEFINE_PROP_ACCESSORS(fn, code, supports)			\
+static int								\
+_get_Pentax_##fn (CONFIG_GET_ARGS)					\
+{									\
+	if (!pentax_##supports (camera->pl->params.pentax.model_no))	\
+		return GP_ERROR_NOT_SUPPORTED;				\
+	return _pentax_prop_get (camera, widget, menu, (code));		\
+}									\
+static int								\
+_put_Pentax_##fn (CONFIG_PUT_ARGS)					\
+{									\
+	if (!pentax_##supports (camera->pl->params.pentax.model_no))	\
+		return GP_ERROR_NOT_SUPPORTED;				\
+	return _pentax_prop_put (camera, widget, alreadyset, (code));	\
+}
+
+PENTAX_DEFINE_PROP_ACCESSORS (ColorTemperature,
+	PTP_DPC_PENTAX_ColorTemperature, model_supports_color_temperature)
+PENTAX_DEFINE_PROP_ACCESSORS (CISaturation,
+	PTP_DPC_PENTAX_CustomImageSaturation, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIHue,
+	PTP_DPC_PENTAX_CustomImageHue, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIKey,
+	PTP_DPC_PENTAX_CustomImageKey, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIFilterEffect,
+	PTP_DPC_PENTAX_CustomImageFilterEffect, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIMonotoneToning,
+	PTP_DPC_PENTAX_CustomImageMonotoneToning, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIToning,
+	PTP_DPC_PENTAX_CustomImageToning, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIFineSharpness,
+	PTP_DPC_PENTAX_CustomImageFineSharpness, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIHighlightContrast,
+	PTP_DPC_PENTAX_CustomImageHighlightContrast, model_supports_ci_detail)
+PENTAX_DEFINE_PROP_ACCESSORS (CIShadowContrast,
+	PTP_DPC_PENTAX_CustomImageShadowContrast, model_supports_ci_detail)
+
+
 
 /* Movie mode flag (0xd039).  IT2 SetMovieMode: 1-byte boolean. */
 static int
@@ -14196,7 +14370,18 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Exposure Bracketing Step"), "pentaxbracketstep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_BracketStep, _put_Pentax_BracketStep },
 	{ N_("Pentax Custom Image Mode"), "pentaxcimode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CIMode, _put_Pentax_CIMode },
 	{ N_("Pentax Composition Adjustment"), "pentaxcompositionadjust", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CompositionAdjust, _put_Pentax_CompositionAdjust },
-	{ N_("Pentax Cross Process Type"), "pentaxcrossprocess", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CrossProcess, _put_Pentax_CrossProcess },
+	{ N_("Pentax Cross Process Type"), "pentaxcrossprocess", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CrossProcess, _put_Pentax_CrossProcess },
+	{ N_("Pentax Color Temperature"), "pentaxcolortemperature", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_ColorTemperature, _put_Pentax_ColorTemperature },
+	{ N_("Pentax Custom Image Saturation"), "pentaxcisaturation", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CISaturation, _put_Pentax_CISaturation },
+	{ N_("Pentax Custom Image Hue"), "pentaxcihue", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIHue, _put_Pentax_CIHue },
+	{ N_("Pentax Custom Image Key"), "pentaxcikey", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIKey, _put_Pentax_CIKey },
+	{ N_("Pentax Custom Image Filter Effect"), "pentaxcifiltereffect", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIFilterEffect, _put_Pentax_CIFilterEffect },
+	{ N_("Pentax Custom Image Monotone Toning"), "pentaxcimonotonetoning", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIMonotoneToning, _put_Pentax_CIMonotoneToning },
+	{ N_("Pentax Custom Image Toning"), "pentaxcitoning", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIToning, _put_Pentax_CIToning },
+	{ N_("Pentax Custom Image Fine Sharpness"), "pentaxcifinesharpness", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIFineSharpness, _put_Pentax_CIFineSharpness },
+	{ N_("Pentax Custom Image Highlight Contrast"), "pentaxcihighlightcontrast", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIHighlightContrast, _put_Pentax_CIHighlightContrast },
+	{ N_("Pentax Custom Image Shadow Contrast"), "pentaxcishadowcontrast", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_CIShadowContrast, _put_Pentax_CIShadowContrast },
+	{ N_("Pentax Custom Image User Filter Descriptor"), "pentaxpropd02d", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectProperty, _put_None },
 	{ N_("Pentax Movie Mode"), "pentaxmoviemode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_MovieMode, _put_Pentax_MovieMode },
 	{ N_("Pentax Keep Live View"), "pentaxpclvkeep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_KeepLiveView, _put_Pentax_KeepLiveView },
 	{ N_("Pentax Card Writing Mode"), "pentaxcardwritingmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CardWritingMode, _put_Pentax_CardWritingMode },
