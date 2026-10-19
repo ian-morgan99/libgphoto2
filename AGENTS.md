@@ -2,6 +2,23 @@
 
 These instructions apply to all work in this repository.
 
+## Two-agent working agreement
+
+Development is done in the coding session; a separate review/verification agent reads
+content periodically, audits assumptions against source, and posts guidance.
+
+- Guidance arrives as **issues with acceptance criteria** (e.g. patcher `#214`).
+  Implement there and report back in that issue rather than in a commit message.
+- Verification artefacts owned by the review agent — in the patcher repo,
+  `docs/LIBGPHOTO2-ALIGNMENT-AUDIT.md` and evidence reviews — are **read-only**: cite
+  them, do not rewrite them.
+- Check `git status` before starting and leave files you did not author untouched.
+- A hardware or protocol claim is the review agent's to confirm. Do not promote "the
+  build passes" into "this is correct" in issues, commits, or the capability matrix.
+- Any heading that asserts a live finding (e.g. "Current … finding") must carry the date
+  and the exact camera firmware it was observed on, and must be re-checked rather than
+  silently inherited when it stops being true.
+
 ## Normative protocol source
 
 Treat the bundled decompiled IMAGE Transmitter 2 implementation as the
