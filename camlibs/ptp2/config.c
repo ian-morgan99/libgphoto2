@@ -10592,11 +10592,30 @@ _pentax_prop_get (Camera *camera, CameraWidget **widget,
 	ret = ptp_generic_getdevicepropdesc (params, code, &desc);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
-	if ((desc.FormFlag == PTP_DPFF_Enumeration &&
-			desc.FORM.Enum.NumberOfValues == 0) ||
-		desc.FormFlag == PTP_DPFF_None) {
+	if (desc.FormFlag == PTP_DPFF_Enumeration &&
+			desc.FORM.Enum.NumberOfValues == 0) {
 		ptp_free_devicepropdesc (&desc);
 		return GP_ERROR_NOT_SUPPORTED;
+	}
+	/* A form-less descriptor is a usable control only when the body exposes
+	 * it as a writable scalar.  0xd018 is a GetSet UINT16 with no form: the
+	 * generic property path already renders that shape as a plain TEXT widget
+	 * (see the 0xd018 row of docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md,
+	 * "descriptor-driven"), and the K-3 III reads and writes it through that
+	 * raw path.  A read-only or non-scalar form-less descriptor still fails
+	 * closed, so this does not infer support from a GetSet descriptor alone
+	 * (AGENTS.md rule 2). */
+	if (desc.FormFlag == PTP_DPFF_None) {
+		int scalar = (desc.DataType == PTP_DTC_UINT8  ||
+			      desc.DataType == PTP_DTC_INT8   ||
+			      desc.DataType == PTP_DTC_UINT16 ||
+			      desc.DataType == PTP_DTC_INT16  ||
+			      desc.DataType == PTP_DTC_UINT32 ||
+			      desc.DataType == PTP_DTC_INT32);
+		if (desc.GetSet != PTP_DPGS_GetSet || !scalar) {
+			ptp_free_devicepropdesc (&desc);
+			return GP_ERROR_NOT_SUPPORTED;
+		}
 	}
 	result = _get_INT (camera, widget, menu, &desc);
 	ptp_free_devicepropdesc (&desc);

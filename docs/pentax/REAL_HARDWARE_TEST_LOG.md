@@ -809,3 +809,47 @@ in `/tmp/k3iii-r1.log` lines 144–353.
   qualify or prove the shipped firmware path. K-3 III Monochrome remains gated.
 - Image bytes were saved outside Git under `/tmp/k3iii-bulb-issue95-outputs/`;
   hashes and transcript are recorded in `docs/pentax/evidence/2026-10-10/`.
+
+## 2026-10-19 — K-3 III `0xd018` reachable only through the raw path; `0xd021`–`0xd029` round-trip (downstream appliance session)
+
+Executed on the Polaris appliance against the shipped Stage-2 stack (direct
+`gphoto2` CLI, daemon stopped, one chained session, service restored afterwards),
+so it exercises this driver with no Polaris-specific code in the write path.
+Camera: PENTAX K-3 Mark III, firmware 2.20, `25fb:0189`. Driver under test:
+this fork at `6c6142625`, as packaged in firmware `6.0.0.54.67`.
+
+| Test | Result |
+|---|---|
+| `0xd018` read via raw `/main/other/d018` | **HW-R PASS** — `Current: 5000` |
+| `0xd018` write via raw path (`=4000`) | **HW-W PASS** — read-back `4000`, restored to `5000` and verified |
+| `0xd018` through the named `pentaxcolortemperature` control | **FAIL** — get and set both returned `GP_ERROR` (`Error (-1)`); no write was attempted |
+| `0xd021`/`0xd022`/`0xd023`/`0xd027`/`0xd028`/`0xd029` named controls | **HW-W PASS** — each write applied and was confirmed from a fresh process; all restored exactly |
+| `0xd024`–`0xd026` descriptors | Enumerate **nothing** (`NumberOfValues == 0`); no 255 sentinel exists, so the fail-closed withholding is correct |
+| `0xd02b`/`0xd02d` read-only descriptor passthroughs | Render correctly, `Readonly: 1`, refuse writes |
+
+Root cause of the `0xd018` named-control failure: `_pentax_prop_get()` rejected
+every `FormFlag == PTP_DPFF_None` descriptor. That guard exists for the
+empty-enumeration Custom Image properties, but `0xd018` is a `GetSet` scalar
+whose descriptor carries no form at all, so the two shapes were conflated and the
+widget was never instantiated; the write then failed before `_put_INT` was
+reached. Fixed by admitting only a `GetSet` descriptor with a scalar datatype
+when `FormFlag == None`; `Enumeration` with `NumberOfValues == 0` still withholds
+and was re-verified as still withheld. No value range is invented — the
+descriptor supplies none, so the control renders as a plain integer widget.
+
+### Observation: raw `d0XX` is not a usable oracle for the Custom Image properties
+
+For `0xd027`/`0xd028`/`0xd029` the raw property value did not track the named
+widget, and for `0xd027` the two disagreed **before any write was issued**. The
+camera appears to apply (or encode) these properties asynchronously. A
+raw/widget disagreement is therefore **not** evidence of a control failure, and
+assertions must read the named control from a fresh process. This weakens any
+test that asserts immediately after a write, including the bounded read-back in
+`_pentax_prop_put()`, which can pass while a later independent read still shows
+the pre-write value.
+
+### Not qualified by this session
+
+The named `pentaxcolortemperature` control after the #104 fix (requires a build
+containing it), and the K-1 II behaviour of the relaxed branch. Transcripts:
+`benro-polaris-firmware-patcher` `docs/evidence/o-v17b-physical-20261019/`.
