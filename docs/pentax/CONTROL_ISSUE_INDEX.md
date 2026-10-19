@@ -23,6 +23,7 @@ Issues #61–#65 were accidentally created during the same setup window after #5
 - #68 composition-offset movement via `0x9018` (distinct from the existing `0xd02a` enable switch)
 - #69 duplicate `pentaxliveviewafposition` config registration cleanup
 - #70 completed: `archive/CAPABILITY_MATRIX_AUDIT.md` is explicitly historical/provenance-only; #66 owns current reconciliation
+- #104 `pentaxcolortemperature` (`0xd018`) unreachable: `_pentax_prop_get` failed closed on every `FormFlag == None` descriptor, so a `GetSet` scalar with no form was conflated with the empty-enumeration properties that the guard exists to withhold. Relaxation is limited to a writable scalar datatype; `Enumeration` with `NumberOfValues == 0` still withholds. Found on Polaris firmware `6.0.0.54.67` (candidate `o-v17b-ci-colortemp-20261018`); see `benro-polaris-firmware-patcher` `docs/evidence/o-v17b-physical-20261019/`.
 
 ## Reopened evidence / upstream-readiness issues relevant to this programme
 
