@@ -1229,6 +1229,37 @@ pentax_clamp_timeout_ms (uint64_t ms, const char *source)
 	return (unsigned int) ms;
 }
 
+/* Post-exposure processing allowance in milliseconds.
+ *
+ * This is the time the camera still needs AFTER the shutter closes: RAW
+ * conversion, candidate publication, and - when long-exposure noise reduction is
+ * enabled - a dark frame of its own, which takes approximately as long again as
+ * the exposure. A flat margin cannot cover that. The conditions blob exposes no
+ * noise-reduction flag (see the note in the K-3 III capture-budget investigation),
+ * so the allowance is sized for the noise-reduction-ON case: one dark frame per
+ * exposure, plus the flat margin for conversion and transfer.
+ *
+ * Over-budgeting is cheap and under-budgeting is not. The capture wait loop
+ * returns as soon as the candidate appears, so a generous deadline costs nothing
+ * observable on a successful capture; a tight one discards a real photograph.
+ * Both observed failures were budget-bound this way: a 70 s bulb gave up at
+ * 107.4 s against a 101 s budget, and a 40 s bulb at 71.6 s against 71 s, while
+ * the exposure plus dark frame needed roughly twice the exposure. The only real
+ * cost is that a genuinely wedged camera takes longer to be declared failed,
+ * bounded by the absolute ceiling above.
+ *
+ * known_exposure_ms is the exposure duration when the conditions actually report
+ * one, and zero when the caller is falling back to the base timeout as a proxy.
+ * A proxy must not be scaled: doubling a guess would widen the budget for a
+ * short pixel-shift composite that needs no such allowance. */
+static uint64_t
+pentax_processing_allowance_ms (uint64_t known_exposure_ms)
+{
+        if (known_exposure_ms == 0)
+                return PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+        return known_exposure_ms + PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+}
+
 /* Capture timeout budget in milliseconds for the current conditions. The base
  * covers a normal exposure plus processing margin; each special mode widens
  * it, and every result is clamped to the absolute ceiling so no mode can hang
@@ -1245,14 +1276,20 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 			((uint64_t) conditions->astro_limit_seconds + 1) * 1000 : 0;
 		if (limit_ms > timeout)
 			timeout = limit_ms;
-		timeout += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		/* The camera-reported limit IS the exposure duration, so it can carry a
+		 * dark frame; without a reported limit there is no known exposure to
+		 * scale and the flat margin still applies. */
+		timeout += pentax_processing_allowance_ms (conditions->has_astro_limit ?
+			limit_ms : 0);
 		timeout = pentax_clamp_timeout_ms (timeout, "astro limit");
 	}
 
-	/* Bulb: the timer value plus margin. */
+	/* Bulb: the timer value, plus an allowance scaled to that same duration.
+	 * The timer is the exposure, and long-exposure noise reduction would then
+	 * add a dark frame of about the same length again. */
 	if (conditions->bulb_timer_seconds > 0) {
 		uint64_t bulb_ms = ((uint64_t) conditions->bulb_timer_seconds + 1) * 1000;
-		bulb_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		bulb_ms += pentax_processing_allowance_ms (bulb_ms);
 		bulb_ms = pentax_clamp_timeout_ms (bulb_ms, "bulb timer");
 		if (bulb_ms > timeout)
 			timeout = bulb_ms;
@@ -1263,13 +1300,18 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 	if (conditions->activity_flags &
 	    (PENTAX_CONDITION_ACTIVITY_MULTI_MODE | PENTAX_CONDITION_ACTIVITY_MULTI_CAPTURE)) {
 		uint64_t multi_ms;
-		if (conditions->bulb_timer_seconds > 0)
-			multi_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) * 1000) *
-				PENTAX_PIXEL_SHIFT_MULTIPLIER;
-		else
+		uint64_t known_exposure_ms = 0;
+		if (conditions->bulb_timer_seconds > 0) {
+			known_exposure_ms = (((uint64_t) conditions->bulb_timer_seconds + 1) *
+				1000) * PENTAX_PIXEL_SHIFT_MULTIPLIER;
+			multi_ms = known_exposure_ms;
+		} else {
 			multi_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE *
 				PENTAX_PIXEL_SHIFT_MULTIPLIER;
-		multi_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		}
+		/* Each frame can carry its own dark frame, so the allowance scales with
+		 * the total known exposure, not once for the whole composite. */
+		multi_ms += pentax_processing_allowance_ms (known_exposure_ms);
 		multi_ms = pentax_clamp_timeout_ms (multi_ms, "multi-shot composite");
 		if (multi_ms > timeout)
 			timeout = multi_ms;
@@ -1288,11 +1330,14 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 	if (pentax_conditions_in_astro_mode (conditions) &&
 	    !(conditions->astro_status_flags & PENTAX_CONDITION_ASTRO_SHIFT_MODE)) {
 		uint64_t astro_ms;
-		if (conditions->has_astro_limit)
+		if (conditions->has_astro_limit) {
 			astro_ms = ((uint64_t) conditions->astro_limit_seconds + 1) * 1000;
-		else
+			astro_ms += pentax_processing_allowance_ms (astro_ms);
+		} else {
+			/* No reported duration: the base is a proxy, not a known exposure. */
 			astro_ms = (uint64_t) PENTAX_CAPTURE_TIMEOUT_MS_BASE;
-		astro_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+			astro_ms += PENTAX_CAPTURE_PROCESSING_MARGIN_MS;
+		}
 		astro_ms = pentax_clamp_timeout_ms (astro_ms, "astro tracer");
 		if (astro_ms > timeout)
 			timeout = astro_ms;

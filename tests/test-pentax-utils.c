@@ -648,21 +648,25 @@ main (void)
 	CHECK (pentax_capture_timeout_ms (&conditions) ==
 		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
 
-	conditions.bulb_timer_seconds = 120; /* 121s + margin beats the base */
-	CHECK (pentax_capture_timeout_ms (&conditions) == 151000);
+	/* The bulb timer is the exposure duration, so the budget must also carry
+	 * a dark frame of about the same length again: 121s + 121s + 30s. */
+	conditions.bulb_timer_seconds = 120;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 272000);
 
 	memset (&conditions, 0, sizeof (conditions));
 	conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
 	CHECK (pentax_capture_timeout_ms (&conditions) == 270000); /* 4x + margin */
 
+	/* Four 10 s frames, each able to carry a dark frame: 40s + 40s + 30s. */
 	conditions.bulb_timer_seconds = 9; /* bulb + multi-shot composite */
-	CHECK (pentax_capture_timeout_ms (&conditions) == 70000);
+	CHECK (pentax_capture_timeout_ms (&conditions) == 110000);
 
 	memset (&conditions, 0, sizeof (conditions));
 	conditions.astro_status_flags = PENTAX_CONDITION_ASTRO_SHIFT_MODE;
 	conditions.has_astro_limit = 1;
-	conditions.astro_limit_seconds = 300; /* 301s + margin */
-	CHECK (pentax_capture_timeout_ms (&conditions) == 331000);
+	conditions.astro_limit_seconds = 300;
+	/* 301s exposure + 301s dark frame + 30s margin. */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 632000);
 
 	/* Overflow-safe clamp: a corrupt UINT32_MAX limit must not wrap the
 	 * 64-bit math or exceed the ceiling. */
@@ -688,8 +692,32 @@ main (void)
 	memset (&conditions, 0, sizeof (conditions));
 	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
 	conditions.has_astro_limit = 1;
-	conditions.astro_limit_seconds = 300; /* 301s + margin */
-	CHECK (pentax_capture_timeout_ms (&conditions) == 331000);
+	conditions.astro_limit_seconds = 300;
+	/* 301s exposure + 301s dark frame + 30s margin. */
+	CHECK (pentax_capture_timeout_ms (&conditions) == 632000);
+
+	/* Regression: both observed losses were budget-bound, not camera faults. A
+	 * 70 s bulb gave up at 107.4 s against a 101 s budget and a 40 s bulb at
+	 * 71.6 s against 71 s, while the exposure plus its dark frame needs about
+	 * twice the exposure. The wait loop returns as soon as the candidate
+	 * appears, so widening these deadlines costs nothing on a successful
+	 * capture; the old flat 30 s margin discarded real photographs instead. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = 70;
+	CHECK (pentax_capture_timeout_ms (&conditions) >= 146000); /* NR ON worst case */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = 40;
+	CHECK (pentax_capture_timeout_ms (&conditions) >= 85000);
+
+	/* A proxy must not be scaled. With no reported exposure duration the base
+	 * timeout is only a stand-in, so the flat margin still applies and a short
+	 * pixel-shift composite is not widened for an exposure nobody measured. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MULTI_MODE;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 270000); /* 4x base + margin */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.exposure_mode = PENTAX_EXP_MODE_ASTROTRACER;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 90000); /* base + margin */
 
 	/* Exposure-phase budget (issue #111): the time the camera needs to
 	 * complete the exposure itself, before post-exposure processing.  This is
