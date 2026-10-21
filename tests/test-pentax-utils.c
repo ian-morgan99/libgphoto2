@@ -709,6 +709,43 @@ main (void)
 	conditions.bulb_timer_seconds = 40;
 	CHECK (pentax_capture_timeout_ms (&conditions) >= 85000);
 
+	/* Offsets 272/276 are the current shutter speed in EVERY mode, not a
+	 * bulb-only field: IT2 reads that pair as the live Tv value and decodes it
+	 * with ConvertFractionalTvValueToString (den==1 -> "N\"", num==1 -> "1/D",
+	 * else the quotient), and the shutter-verify path in config.c compares the
+	 * requested shutter against the same two words.  The two assertions above
+	 * therefore already cover a non-bulb long exposure: they set only the Tv
+	 * fields and no bulb mode, which is exactly what a timed-mode 40 s capture
+	 * reports.  Observed on hardware: a request carrying no bulb field at all
+	 * gave up at 71 s, and under the pre-23008c229 code (bts+1)+30000 = 71000
+	 * is the only branch that yields that, so offset 272 held 40 while the dial
+	 * was on a timed shutter.
+	 *
+	 * A fractional shutter must not inflate the budget.  1/200 s reports
+	 * numerator 1, so the scaled allowance is 2s + 2s + 30s = 34s, below the
+	 * 60s base, and the base dominates.  Sub-second values can only over-size,
+	 * never under-size, which is the cheap direction. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = 1;
+	conditions.bulb_timer_denominator = 200;
+	CHECK (pentax_capture_timeout_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	/* A whole-second shutter below the base likewise leaves the base in charge:
+	 * 13s + 13s + 30s = 56s < 60s. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = 13;
+	conditions.bulb_timer_denominator = 1;
+	CHECK (pentax_capture_timeout_ms (&conditions) ==
+		PENTAX_CAPTURE_TIMEOUT_MS_BASE);
+
+	/* A long timed shutter is scaled exactly as a bulb would be, because it is
+	 * the same field: 41s + 41s + 30s. */
+	memset (&conditions, 0, sizeof (conditions));
+	conditions.bulb_timer_seconds = 40;
+	conditions.bulb_timer_denominator = 1;
+	CHECK (pentax_capture_timeout_ms (&conditions) == 112000);
+
 	/* A proxy must not be scaled. With no reported exposure duration the base
 	 * timeout is only a stand-in, so the flat margin still applies and a short
 	 * pixel-shift composite is not widened for an exposure nobody measured. */
