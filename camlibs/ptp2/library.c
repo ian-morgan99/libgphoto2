@@ -6317,7 +6317,6 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		GPContext *probe_context = gp_context_new ();
 		int existing;
 		int probe_ret;
-		int written;
 
 		memset (&extra, 0, sizeof (extra));
 		strcpy (extra.folder, "/");
@@ -6337,33 +6336,15 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 			return existing;
 		}
 		if (existing >= GP_OK) {
-			char stem[sizeof (extra.name)];
-			char extension[sizeof (extra.name)];
-			const char *dot = strrchr (extra.name, '.');
+			char original_name[sizeof (extra.name)];
 			int suffix = 1;
 
-			extension[0] = '\0';
-			if (dot)
-				written = snprintf (stem, sizeof (stem), "%.*s",
-					(int)(dot - extra.name), extra.name);
-			else
-				written = snprintf (stem, sizeof (stem), "%s", extra.name);
-			if (written < 0 || (size_t)written >= sizeof (stem))
-				return GP_ERROR_BAD_PARAMETERS;
-			if (dot) {
-				written = snprintf (extension, sizeof (extension), "%s", dot);
-				if (written < 0 || (size_t)written >= sizeof (extension))
-					return GP_ERROR_BAD_PARAMETERS;
-			}
+			memcpy (original_name, extra.name, sizeof (original_name));
 			do {
-				if (dot)
-					written = snprintf (extra.name, sizeof (extra.name),
-						"%s_%d%s", stem, suffix, extension);
-				else
-					written = snprintf (extra.name, sizeof (extra.name),
-						"%s_%d", stem, suffix);
-				if (written < 0 || (size_t)written >= sizeof (extra.name))
-					return GP_ERROR_BAD_PARAMETERS;
+				ret = pentax_collision_suffix_name (original_name,
+					(unsigned int)suffix, extra.name, sizeof (extra.name));
+				if (ret < GP_OK)
+					return ret;
 				suffix++;
 				existing = gp_filesystem_number (rc->camera->fs,
 					extra.folder, extra.name, rc->context);
