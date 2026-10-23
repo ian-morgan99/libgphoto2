@@ -6316,7 +6316,6 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		int slot = params->pentax.extra_capture_count;
 		GPContext *probe_context = gp_context_new ();
 		int existing;
-		int probe_ret;
 
 		memset (&extra, 0, sizeof (extra));
 		strcpy (extra.folder, "/");
