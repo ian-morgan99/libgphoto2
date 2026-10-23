@@ -1373,8 +1373,20 @@ main (void)
 		CHECK (pentax_collision_suffix_name ("IMGP3634.DNG", 999, name,
 			sizeof (name)) == GP_OK);
 		CHECK (!strcmp (name, "IMGP3634_999.DNG"));
+		/* Boundary cases must fail rather than publish truncated names. */
 		CHECK (pentax_collision_suffix_name (long_name, 1, name,
 			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name (NULL, 1, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, NULL,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			0) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			strlen ("IMGP3634_1.JPG")) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			strlen ("IMGP3634_1.JPG") + 1) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_1.JPG"));
 		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
 			8) == GP_ERROR_BAD_PARAMETERS);
 		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 0, name,
