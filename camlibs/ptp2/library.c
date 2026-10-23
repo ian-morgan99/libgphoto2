@@ -6330,8 +6330,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		existing = gp_filesystem_number (rc->camera->fs, extra.folder,
 			extra.name, probe_context);
 		gp_context_unref (probe_context);
-		if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
-			existing != GP_ERROR_BAD_PARAMETERS) {
+		if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND) {
 			GP_LOG_E ("collision probe of companion %s failed (%d); preserving "
 				"candidate", extra.name, existing);
 			return existing;
