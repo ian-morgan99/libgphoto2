@@ -491,6 +491,9 @@ typedef struct {
 
 /* Only a true missing-file result permits a new companion filename. */
 int pentax_companion_collision_probe_allows_publication (int result);
+/* Generate a collision suffix without overlapping source and destination. */
+int pentax_collision_suffix_name (const char *original, unsigned int suffix,
+	char *output, size_t output_size);
 
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 	int max_count, unsigned int max_ms, unsigned int min_count,
