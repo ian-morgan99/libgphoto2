@@ -489,6 +489,9 @@ typedef struct {
 	int (*is_cancelled) (void *user_data);
 } PentaxReconcileOps;
 
+/* Only a true missing-file result permits a new companion filename. */
+int pentax_companion_collision_probe_allows_publication (int result);
+
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 	int max_count, unsigned int max_ms, unsigned int min_count,
 	char (*names)[128], int *reconciled_count);
