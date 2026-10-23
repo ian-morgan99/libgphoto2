@@ -1355,6 +1355,13 @@ main (void)
 	CHECK (!pentax_session_error_needs_close_reset (0x02fa, 3));
 	CHECK (!pentax_session_error_needs_close_reset (0x201e, 1));
 
+	/* Collision probe: only actual absence is safe to publish. */
+	CHECK (pentax_companion_collision_probe_allows_publication (GP_ERROR_FILE_NOT_FOUND));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_ERROR_BAD_PARAMETERS));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_ERROR_IO));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_OK));
+	CHECK (!pentax_companion_collision_probe_allows_publication (1));
+
 	free (buffer.data);
 	return 0;
 }
