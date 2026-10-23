@@ -1355,6 +1355,32 @@ main (void)
 	CHECK (!pentax_session_error_needs_close_reset (0x02fa, 3));
 	CHECK (!pentax_session_error_needs_close_reset (0x201e, 1));
 
+	/* Exercise real collision-name formatting, including repeated retries. */
+	{
+		char name[128];
+		char long_name[128];
+		memset (long_name, 'A', sizeof (long_name));
+		long_name[sizeof (long_name) - 1] = '\0';
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_1.JPG"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 2, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_2.JPG"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634", 3, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_3"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634.DNG", 999, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_999.DNG"));
+		CHECK (pentax_collision_suffix_name (long_name, 1, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			8) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 0, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+	}
+
 	/* Collision probe: only actual absence is safe to publish. */
 	CHECK (pentax_companion_collision_probe_allows_publication (GP_ERROR_FILE_NOT_FOUND));
 	CHECK (!pentax_companion_collision_probe_allows_publication (GP_ERROR_BAD_PARAMETERS));
