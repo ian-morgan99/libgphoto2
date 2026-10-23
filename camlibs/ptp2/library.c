@@ -7762,9 +7762,7 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	 * the output lifecycle can reconcile without blindly replaying 0x9012. */
 	ptpres = ptp_pentax_terminate_capture (params,
 		params->pentax.bulb_action_release_mode);
-	if (ptpres != PTP_RC_OK &&
-	    ptpres != PTP_RC_CaptureAlreadyTerminated &&
-	    !pentax_capture_initiate_response_ambiguous (ptpres)) {
+	if (!pentax_capture_stop_allows_reconciliation (ptpres)) {
 		params->pentax.bulb_action_stop_requested = 1;
 		params->pentax.recovery_required = 1;
 		GP_LOG_E ("pentax-bulb: TerminateCapture rejected (0x%04x); "
