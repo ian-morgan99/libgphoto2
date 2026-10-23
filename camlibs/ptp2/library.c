@@ -7436,22 +7436,41 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		}
 		if (existing >= GP_OK) {
 			char stem[sizeof (path->name)];
-			const char *dot;
+			char extension[sizeof (path->name)];
+			const char *dot = strrchr (path->name, '.');
 			int suffix = 1;
+			int written;
 
-			dot = strrchr (path->name, '.');
+			/* The suffix must not point into path->name while snprintf
+			 * overwrites it: overlapping source/destination is undefined. */
+			extension[0] = '\0';
 			if (dot)
-				snprintf (stem, sizeof (stem), "%.*s",
+				written = snprintf (stem, sizeof (stem), "%.*s",
 					(int)(dot - path->name), path->name);
 			else
-				snprintf (stem, sizeof (stem), "%s", path->name);
+				written = snprintf (stem, sizeof (stem), "%s", path->name);
+			if (written < 0 || (size_t)written >= sizeof (stem)) {
+				ret = GP_ERROR_BAD_PARAMETERS;
+				goto out;
+			}
+			if (dot) {
+				written = snprintf (extension, sizeof (extension), "%s", dot);
+				if (written < 0 || (size_t)written >= sizeof (extension)) {
+					ret = GP_ERROR_BAD_PARAMETERS;
+					goto out;
+				}
+			}
 			do {
 				if (dot)
-					snprintf (path->name, sizeof (path->name),
-						"%s_%d%s", stem, suffix, dot);
+					written = snprintf (path->name, sizeof (path->name),
+						"%s_%d%s", stem, suffix, extension);
 				else
-					snprintf (path->name, sizeof (path->name),
+					written = snprintf (path->name, sizeof (path->name),
 						"%s_%d", stem, suffix);
+				if (written < 0 || (size_t)written >= sizeof (path->name)) {
+					ret = GP_ERROR_BAD_PARAMETERS;
+					goto out;
+				}
 				suffix++;
 				existing = gp_filesystem_number (camera->fs,
 					path->folder, path->name, context);
