@@ -7428,6 +7428,12 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		existing = gp_filesystem_number (camera->fs, path->folder,
 			path->name, probe_context);
 		gp_context_unref (probe_context);
+		if (existing < GP_OK &&
+		    !pentax_companion_collision_probe_allows_publication (existing)) {
+			GP_LOG_E ("primary capture collision probe failed (%d); preserving candidate", existing);
+			ret = existing;
+			goto out;
+		}
 		if (existing >= GP_OK) {
 			char stem[sizeof (path->name)];
 			const char *dot;
@@ -7450,8 +7456,7 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 				existing = gp_filesystem_number (camera->fs,
 					path->folder, path->name, context);
 				if (existing < GP_OK &&
-				    existing != GP_ERROR_FILE_NOT_FOUND &&
-				    existing != GP_ERROR_BAD_PARAMETERS) {
+				    !pentax_companion_collision_probe_allows_publication (existing)) {
 					/* A filesystem error is not proof
 					 * the name is free; publishing
 					 * under it could shadow a real
