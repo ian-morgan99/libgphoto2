@@ -6368,7 +6368,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 				existing = gp_filesystem_number (rc->camera->fs,
 					extra.folder, extra.name, rc->context);
 				if (existing < GP_OK &&
-			!pentax_companion_collision_probe_allows_publication (existing))
+				    !pentax_companion_collision_probe_allows_publication (existing))
 					return existing;
 			} while (existing >= GP_OK && suffix < 1000);
 			if (existing >= GP_OK)
