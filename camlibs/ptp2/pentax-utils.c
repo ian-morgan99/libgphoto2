@@ -17,6 +17,12 @@
 #define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
 
 int
+pentax_companion_collision_probe_allows_publication (int result)
+{
+	return result == GP_ERROR_FILE_NOT_FOUND;
+}
+
+int
 pentax_session_error_needs_close_reset (uint16_t response,
 	unsigned int attempt)
 {
