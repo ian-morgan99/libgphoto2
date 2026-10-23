@@ -166,6 +166,14 @@ pentax_capture_initiate_response_ambiguous (uint16_t response)
 }
 
 int
+pentax_capture_stop_allows_reconciliation (uint16_t response)
+{
+	/* 0x2018: CaptureAlreadyTerminated. A transport error is ambiguous. */
+	return response == 0x2001 || response == 0x2018 ||
+		pentax_capture_initiate_response_ambiguous (response);
+}
+
+int
 pentax_capture_output_contract_known (const unsigned char *data, size_t size)
 {
 	uint32_t format;
