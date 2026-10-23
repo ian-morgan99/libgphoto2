@@ -266,6 +266,8 @@ int pentax_candidate_output_published (int transfer_succeeded,
 int pentax_capture_output_obligation_resolved (int capture_accepted,
 	int primary_published, int all_expected_outputs_published);
 int pentax_capture_initiate_response_ambiguous (uint16_t response);
+/* A stop may have succeeded even if its response was lost; never replay it. */
+int pentax_capture_stop_allows_reconciliation (uint16_t response);
 int pentax_capture_output_contract_known (const unsigned char *data, size_t size);
 
 /* Minimum number of candidates expected after the primary candidate has
