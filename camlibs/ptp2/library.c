@@ -6366,8 +6366,7 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 				suffix++;
 				existing = gp_filesystem_number (rc->camera->fs,
 					extra.folder, extra.name, rc->context);
-				if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
-					existing != GP_ERROR_BAD_PARAMETERS)
+				if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND)
 					return existing;
 			} while (existing >= GP_OK && suffix < 1000);
 			if (existing >= GP_OK)
