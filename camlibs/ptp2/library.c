@@ -7760,8 +7760,26 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	 * explicit 0x2018 means the camera closed the exposure naturally; a
 	 * transport result in the ambiguous range is treated the same way so
 	 * the output lifecycle can reconcile without blindly replaying 0x9012. */
+	/* Correlate the stop edge with the same capture state used by
+	 * InitiateCapture.  Do not log candidate names or image payloads. */
+	fprintf (stderr, "[pentax-bulb] boundary=terminate-enter release=%u "
+		"active=%d stop_requested=%d output_pending=%d recovery=%d transfer=%d\n",
+		params->pentax.bulb_action_release_mode,
+		params->pentax.bulb_action_active,
+		params->pentax.bulb_action_stop_requested,
+		params->pentax.capture_output_pending,
+		params->pentax.recovery_required,
+		params->pentax.transfer_state);
+	fflush (stderr);
 	ptpres = ptp_pentax_terminate_capture (params,
 		params->pentax.bulb_action_release_mode);
+	fprintf (stderr, "[pentax-bulb] boundary=terminate-return ptp=0x%04x "
+		"reconcile=%d output_pending=%d recovery=%d transfer=%d\n",
+		ptpres, pentax_capture_stop_allows_reconciliation (ptpres),
+		params->pentax.capture_output_pending,
+		params->pentax.recovery_required,
+		params->pentax.transfer_state);
+	fflush (stderr);
 	if (!pentax_capture_stop_allows_reconciliation (ptpres)) {
 		params->pentax.bulb_action_stop_requested = 1;
 		params->pentax.recovery_required = 1;
