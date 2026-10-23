@@ -1087,6 +1087,15 @@ main (void)
 	CHECK (pentax_capture_initiate_response_ambiguous (0x02fb));
 	CHECK (pentax_capture_initiate_response_ambiguous (0x02ff));
 	CHECK (!pentax_capture_initiate_response_ambiguous (0x0300));
+	/* Both shutter strategies must treat lost stop replies as ambiguous,
+	 * not as permission to send a second TerminateCapture. */
+	CHECK (pentax_capture_stop_allows_reconciliation (0x2001));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x2018));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x02f9));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x02ff));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x2019));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x2002));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x0300));
 	CHECK (!strcmp (pentax_admission_block_reason_name (
 		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
 		"output-obligation-unresolved"));
