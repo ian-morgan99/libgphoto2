@@ -17,6 +17,41 @@
 #define PENTAX_CAPTURE_MIN_FILE_SIZE ((size_t)1U * 1024U * 1024U)
 
 int
+pentax_companion_collision_probe_allows_publication (int result)
+{
+	return result == GP_ERROR_FILE_NOT_FOUND;
+}
+
+int
+pentax_collision_suffix_name (const char *original, unsigned int suffix,
+	char *output, size_t output_size)
+{
+	char stem[128];
+	const char *dot;
+	int written;
+
+	if (!original || !output || !output_size || !suffix)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* This helper is used for CameraFilePath.name (128 bytes). */
+	if (strlen (original) >= sizeof (stem))
+		return GP_ERROR_BAD_PARAMETERS;
+	dot = strrchr (original, '.');
+	if (dot) {
+		written = snprintf (stem, sizeof (stem), "%.*s",
+			(int)(dot - original), original);
+		if (written < 0 || (size_t)written >= sizeof (stem))
+			return GP_ERROR_BAD_PARAMETERS;
+		written = snprintf (output, output_size, "%s_%u%s",
+			stem, suffix, dot);
+	} else {
+		written = snprintf (output, output_size, "%s_%u", original, suffix);
+	}
+	if (written < 0 || (size_t)written >= output_size)
+		return GP_ERROR_BAD_PARAMETERS;
+	return GP_OK;
+}
+
+int
 pentax_session_error_needs_close_reset (uint16_t response,
 	unsigned int attempt)
 {
@@ -128,6 +163,14 @@ int
 pentax_capture_initiate_response_ambiguous (uint16_t response)
 {
 	return response >= 0x02f9 && response <= 0x02ff;
+}
+
+int
+pentax_capture_stop_allows_reconciliation (uint16_t response)
+{
+	/* 0x2018: CaptureAlreadyTerminated. A transport error is ambiguous. */
+	return response == 0x2001 || response == 0x2018 ||
+		pentax_capture_initiate_response_ambiguous (response);
 }
 
 int

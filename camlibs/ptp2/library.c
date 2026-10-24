@@ -6316,8 +6316,6 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		int slot = params->pentax.extra_capture_count;
 		GPContext *probe_context = gp_context_new ();
 		int existing;
-		int probe_ret;
-		int written;
 
 		memset (&extra, 0, sizeof (extra));
 		strcpy (extra.folder, "/");
@@ -6330,45 +6328,27 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		existing = gp_filesystem_number (rc->camera->fs, extra.folder,
 			extra.name, probe_context);
 		gp_context_unref (probe_context);
-		if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
-			existing != GP_ERROR_BAD_PARAMETERS) {
+		if (existing < GP_OK &&
+			!pentax_companion_collision_probe_allows_publication (existing)) {
 			GP_LOG_E ("collision probe of companion %s failed (%d); preserving "
 				"candidate", extra.name, existing);
 			return existing;
 		}
 		if (existing >= GP_OK) {
-			char stem[sizeof (extra.name)];
-			char extension[sizeof (extra.name)];
-			const char *dot = strrchr (extra.name, '.');
+			char original_name[sizeof (extra.name)];
 			int suffix = 1;
 
-			extension[0] = '\0';
-			if (dot)
-				written = snprintf (stem, sizeof (stem), "%.*s",
-					(int)(dot - extra.name), extra.name);
-			else
-				written = snprintf (stem, sizeof (stem), "%s", extra.name);
-			if (written < 0 || (size_t)written >= sizeof (stem))
-				return GP_ERROR_BAD_PARAMETERS;
-			if (dot) {
-				written = snprintf (extension, sizeof (extension), "%s", dot);
-				if (written < 0 || (size_t)written >= sizeof (extension))
-					return GP_ERROR_BAD_PARAMETERS;
-			}
+			memcpy (original_name, extra.name, sizeof (original_name));
 			do {
-				if (dot)
-					written = snprintf (extra.name, sizeof (extra.name),
-						"%s_%d%s", stem, suffix, extension);
-				else
-					written = snprintf (extra.name, sizeof (extra.name),
-						"%s_%d", stem, suffix);
-				if (written < 0 || (size_t)written >= sizeof (extra.name))
-					return GP_ERROR_BAD_PARAMETERS;
+				ret = pentax_collision_suffix_name (original_name,
+					(unsigned int)suffix, extra.name, sizeof (extra.name));
+				if (ret < GP_OK)
+					return ret;
 				suffix++;
 				existing = gp_filesystem_number (rc->camera->fs,
 					extra.folder, extra.name, rc->context);
-				if (existing < GP_OK && existing != GP_ERROR_FILE_NOT_FOUND &&
-					existing != GP_ERROR_BAD_PARAMETERS)
+				if (existing < GP_OK &&
+				    !pentax_companion_collision_probe_allows_publication (existing))
 					return existing;
 			} while (existing >= GP_OK && suffix < 1000);
 			if (existing >= GP_OK)
@@ -7428,30 +7408,28 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		existing = gp_filesystem_number (camera->fs, path->folder,
 			path->name, probe_context);
 		gp_context_unref (probe_context);
+		if (existing < GP_OK &&
+		    !pentax_companion_collision_probe_allows_publication (existing)) {
+			GP_LOG_E ("primary capture collision probe failed (%d); preserving candidate", existing);
+			ret = existing;
+			goto out;
+		}
 		if (existing >= GP_OK) {
-			char stem[sizeof (path->name)];
-			const char *dot;
+			char original_name[sizeof (path->name)];
 			int suffix = 1;
 
-			dot = strrchr (path->name, '.');
-			if (dot)
-				snprintf (stem, sizeof (stem), "%.*s",
-					(int)(dot - path->name), path->name);
-			else
-				snprintf (stem, sizeof (stem), "%s", path->name);
+			/* Keep the original camera name stable across retries. */
+			memcpy (original_name, path->name, sizeof (original_name));
 			do {
-				if (dot)
-					snprintf (path->name, sizeof (path->name),
-						"%s_%d%s", stem, suffix, dot);
-				else
-					snprintf (path->name, sizeof (path->name),
-						"%s_%d", stem, suffix);
+				ret = pentax_collision_suffix_name (original_name,
+					(unsigned int)suffix, path->name, sizeof (path->name));
+				if (ret < GP_OK)
+					goto out;
 				suffix++;
 				existing = gp_filesystem_number (camera->fs,
 					path->folder, path->name, context);
 				if (existing < GP_OK &&
-				    existing != GP_ERROR_FILE_NOT_FOUND &&
-				    existing != GP_ERROR_BAD_PARAMETERS) {
+				    !pentax_companion_collision_probe_allows_publication (existing)) {
 					/* A filesystem error is not proof
 					 * the name is free; publishing
 					 * under it could shadow a real
@@ -7782,11 +7760,35 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	 * explicit 0x2018 means the camera closed the exposure naturally; a
 	 * transport result in the ambiguous range is treated the same way so
 	 * the output lifecycle can reconcile without blindly replaying 0x9012. */
+	/* Correlate the stop edge with the same capture state used by
+	 * InitiateCapture.  Do not log candidate names or image payloads.
+	 * Gated behind OPENPOLARIS_PENTAX_BULB_TRACE: Clog retains only ~30 s and
+	 * is truncated whenever pgphoto restarts (issue #213), so unconditional
+	 * writes on this edge crowd out the diagnostics a capture depends on. */
+	const int bulb_trace = getenv ("OPENPOLARIS_PENTAX_BULB_TRACE") != NULL;
+	if (bulb_trace) {
+		fprintf (stderr, "[pentax-bulb] boundary=terminate-enter release=%u "
+			"active=%d stop_requested=%d output_pending=%d recovery=%d transfer=%d\n",
+			params->pentax.bulb_action_release_mode,
+			params->pentax.bulb_action_active,
+			params->pentax.bulb_action_stop_requested,
+			params->pentax.capture_output_pending,
+			params->pentax.recovery_required,
+			params->pentax.transfer_state);
+		fflush (stderr);
+	}
 	ptpres = ptp_pentax_terminate_capture (params,
 		params->pentax.bulb_action_release_mode);
-	if (ptpres != PTP_RC_OK &&
-	    ptpres != PTP_RC_CaptureAlreadyTerminated &&
-	    !pentax_capture_initiate_response_ambiguous (ptpres)) {
+	if (bulb_trace) {
+		fprintf (stderr, "[pentax-bulb] boundary=terminate-return ptp=0x%04x "
+			"reconcile=%d output_pending=%d recovery=%d transfer=%d\n",
+			ptpres, pentax_capture_stop_allows_reconciliation (ptpres),
+			params->pentax.capture_output_pending,
+			params->pentax.recovery_required,
+			params->pentax.transfer_state);
+		fflush (stderr);
+	}
+	if (!pentax_capture_stop_allows_reconciliation (ptpres)) {
 		params->pentax.bulb_action_stop_requested = 1;
 		params->pentax.recovery_required = 1;
 		GP_LOG_E ("pentax-bulb: TerminateCapture rejected (0x%04x); "

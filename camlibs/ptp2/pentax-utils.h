@@ -266,6 +266,8 @@ int pentax_candidate_output_published (int transfer_succeeded,
 int pentax_capture_output_obligation_resolved (int capture_accepted,
 	int primary_published, int all_expected_outputs_published);
 int pentax_capture_initiate_response_ambiguous (uint16_t response);
+/* A stop may have succeeded even if its response was lost; never replay it. */
+int pentax_capture_stop_allows_reconciliation (uint16_t response);
 int pentax_capture_output_contract_known (const unsigned char *data, size_t size);
 
 /* Minimum number of candidates expected after the primary candidate has
@@ -488,6 +490,12 @@ typedef struct {
 	/* Cancellation check; return non-zero to stop. */
 	int (*is_cancelled) (void *user_data);
 } PentaxReconcileOps;
+
+/* Only a true missing-file result permits a new companion filename. */
+int pentax_companion_collision_probe_allows_publication (int result);
+/* Generate a collision suffix without overlapping source and destination. */
+int pentax_collision_suffix_name (const char *original, unsigned int suffix,
+	char *output, size_t output_size);
 
 int pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 	int max_count, unsigned int max_ms, unsigned int min_count,

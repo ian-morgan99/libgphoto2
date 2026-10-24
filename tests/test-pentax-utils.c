@@ -1087,6 +1087,15 @@ main (void)
 	CHECK (pentax_capture_initiate_response_ambiguous (0x02fb));
 	CHECK (pentax_capture_initiate_response_ambiguous (0x02ff));
 	CHECK (!pentax_capture_initiate_response_ambiguous (0x0300));
+	/* Both shutter strategies must treat lost stop replies as ambiguous,
+	 * not as permission to send a second TerminateCapture. */
+	CHECK (pentax_capture_stop_allows_reconciliation (0x2001));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x2018));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x02f9));
+	CHECK (pentax_capture_stop_allows_reconciliation (0x02ff));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x2019));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x2002));
+	CHECK (!pentax_capture_stop_allows_reconciliation (0x0300));
 	CHECK (!strcmp (pentax_admission_block_reason_name (
 		PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED),
 		"output-obligation-unresolved"));
@@ -1354,6 +1363,51 @@ main (void)
 	CHECK (pentax_session_error_needs_close_reset (0x02ff, 1));
 	CHECK (!pentax_session_error_needs_close_reset (0x02fa, 3));
 	CHECK (!pentax_session_error_needs_close_reset (0x201e, 1));
+
+	/* Exercise real collision-name formatting, including repeated retries. */
+	{
+		char name[128];
+		char long_name[128];
+		memset (long_name, 'A', sizeof (long_name));
+		long_name[sizeof (long_name) - 1] = '\0';
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_1.JPG"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 2, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_2.JPG"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634", 3, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_3"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634.DNG", 999, name,
+			sizeof (name)) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_999.DNG"));
+		/* Boundary cases must fail rather than publish truncated names. */
+		CHECK (pentax_collision_suffix_name (long_name, 1, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name (NULL, 1, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, NULL,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			0) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			strlen ("IMGP3634_1.JPG")) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			strlen ("IMGP3634_1.JPG") + 1) == GP_OK);
+		CHECK (!strcmp (name, "IMGP3634_1.JPG"));
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 1, name,
+			8) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_collision_suffix_name ("IMGP3634.JPG", 0, name,
+			sizeof (name)) == GP_ERROR_BAD_PARAMETERS);
+	}
+
+	/* Collision probe: only actual absence is safe to publish. */
+	CHECK (pentax_companion_collision_probe_allows_publication (GP_ERROR_FILE_NOT_FOUND));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_ERROR_BAD_PARAMETERS));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_ERROR_IO));
+	CHECK (!pentax_companion_collision_probe_allows_publication (GP_OK));
+	CHECK (!pentax_companion_collision_probe_allows_publication (1));
 
 	free (buffer.data);
 	return 0;
