@@ -56,6 +56,27 @@ test(
   ],
 )
 
+# Source-contract regression for the collision-probe fail-closed change. Every Pentax
+# collision probe must reject anything other than GP_ERROR_FILE_NOT_FOUND, must propagate
+# its own error so the camera candidate is preserved rather than published over a real
+# file, and both retry paths must share one suffix formatter (the pre-change code wrote
+# into the buffer strrchr() was reading from). Mutation-checked: accepting BAD_PARAMETERS
+# in the predicate, or dropping a guard's `ret = existing`, each fails it.
+#
+# This pins the source-level invariants only. The stateful harness the review asked for --
+# injected gp_filesystem_number results plus transfer/delete counters -- does not exist
+# yet: library.c is consumed as text here and is never linked into a C unit test, so
+# review cases 2, 4 and 5 remain open and are stated as such by the script's own output.
+test(
+  'test-pentax-collision-failclosed',
+  python,
+  args: [
+    files('test-pentax-collision-failclosed.py'),
+    meson.project_source_root() / 'camlibs/ptp2/library.c',
+    meson.project_source_root() / 'camlibs/ptp2/pentax-utils.c',
+  ],
+)
+
 # Unit tests use an injected camera API to verify that every failed Bulb path
 # stops an opened shutter before cleanup or exits fail-closed without an
 # unmatched stop when start was not confirmed.
