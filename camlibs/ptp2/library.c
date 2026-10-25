@@ -6663,6 +6663,20 @@ typedef enum {
 	PENTAX_CAPTURE_BULB_FINALIZE
 } PentaxCaptureMode;
 
+/* Monotonic milliseconds, used to measure how long pgphoto holds a Bulb start open.
+ * pgphoto drives the requested exposure length by sleeping between its start and stop
+ * edges rather than passing a duration, so on the camera-timed path the only place the
+ * length becomes observable is the stop edge (Polaris issue #239). */
+static uint64_t
+pentax_monotonic_ms (void)
+{
+	struct timespec ts;
+
+	if (clock_gettime (CLOCK_MONOTONIC, &ts) != 0)
+		return 0;
+	return (uint64_t) ts.tv_sec * 1000 + (uint64_t) ts.tv_nsec / 1000000;
+}
+
 static uint16_t
 pentax_initiate_camera_timed_capture (PTPParams *params, uint32_t focus_mode)
 {
@@ -7102,14 +7116,23 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		if (bulb_action_start &&
 		    (pre_capture_conditions.capability_flags &
 		     PENTAX_CONDITION_BULB_TIMER)) {
-			/* The camera-timed path is intentionally not converted into a
-			 * held-shutter action.  Normal gp_camera_capture() owns that path
-			 * and waits for its natural candidate/output lifecycle. */
-			GP_LOG_D ("pentax-bulb: camera-timed Bulb is active; use timed capture");
+			/* The camera-timed path is intentionally not converted into a held-shutter
+			 * action: the body runs its own countdown and rejects a held start.  Refusing
+			 * outright used to return GP_ERROR_NOT_SUPPORTED, which pgphoto surfaces as
+			 * state:-6 and the app reports as a failed shot -- even though the ordinary
+			 * timed capture being asked for is exactly what this camera can do here
+			 * (Polaris issue #239).
+			 *
+			 * The requested length is not available at this edge: pgphoto drives it by
+			 * sleeping between start and stop.  So record the time, report success for this
+			 * edge, and let the matching stop turn the measured hold into a shutter-speed
+			 * write plus one ordinary camera-timed capture. */
+			params->pentax.bulb_action_timed_fallback = 1;
+			params->pentax.bulb_action_start_ms = pentax_monotonic_ms ();
+			GP_LOG_D ("pentax-bulb: camera-timed Bulb is active; deferring the capture "
+				"to the stop edge instead of refusing with -6");
 			free (bdata);
-			gp_context_error (context,
-				_("Camera-timed Bulb is active; use normal timed capture instead of the start/stop action."));
-			return GP_ERROR_NOT_SUPPORTED;
+			return GP_OK;
 		}
 		free (bdata);
 		GP_LOG_D ("pre-capture output contract: %u companion candidate(s) expected",
@@ -7718,6 +7741,8 @@ out:
 		params->pentax.bulb_action_exposure_phase_ms = 0;
 		params->pentax.bulb_action_needs_idle_wait = 0;
 		params->pentax.bulb_action_release_mode = 0;
+		params->pentax.bulb_action_timed_fallback = 0;
+		params->pentax.bulb_action_start_ms = 0;
 	}
 	SET_CONTEXT_P (params, NULL);
 	GP_LOG_D ("pentax-capture[%llu]: return %d initiated=%d candidate_live=%d",
@@ -7759,6 +7784,15 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	}
 
 	if (enabled) {
+		/* A start edge that was deferred to the camera-timed fallback and never got a
+		 * matching stop leaves the record behind. Discard it rather than letting a later
+		 * stop act on an unrelated timestamp. */
+		if (params->pentax.bulb_action_timed_fallback) {
+			GP_LOG_E ("pentax-bulb: discarding an unclaimed camera-timed fallback "
+				"left by a previous start edge");
+			params->pentax.bulb_action_timed_fallback = 0;
+			params->pentax.bulb_action_start_ms = 0;
+		}
 		/* Let the shared capture path run its strict recovery probe. A reused
 		 * session can set recovery_required even when conditions are already
 		 * idle; rejecting here would bypass that safe recovery path forever. */
@@ -7768,6 +7802,45 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 			return GP_ERROR_CAMERA_BUSY;
 		return camera_pentax_capture_internal (camera, NULL, context,
 			PENTAX_CAPTURE_BULB_START);
+	}
+
+	/* Camera-timed Bulb fallback (Polaris issue #239).  The start edge recorded a
+	 * timestamp instead of arming a held shutter, so there is no 0x9012 to send and
+	 * no held action to reconcile.  Turn the measured hold into the shutter speed the
+	 * caller meant, then run one ordinary camera-timed capture and let its normal
+	 * candidate/output lifecycle own the result. */
+	if (params->pentax.bulb_action_timed_fallback) {
+		uint64_t now_ms = pentax_monotonic_ms ();
+		uint64_t hold_ms = now_ms > params->pentax.bulb_action_start_ms ?
+			now_ms - params->pentax.bulb_action_start_ms : 0;
+		uint32_t seconds = (uint32_t) ((hold_ms + 500) / 1000);
+		PTPPropertyValue propval;
+		uint16_t setres;
+
+		params->pentax.bulb_action_timed_fallback = 0;
+		params->pentax.bulb_action_start_ms = 0;
+		if (seconds < 1)
+			seconds = 1;
+		GP_LOG_D ("pentax-bulb: camera-timed fallback measured a %llu ms hold; "
+			"applying %u s shutter speed", (unsigned long long) hold_ms, seconds);
+		/* Whole-second timer layout, matching _put_Ricoh_ShutterSpeed: numerator in
+		 * the low 32 bits, denominator in the high 32 bits. */
+		propval.u64 = ((uint64_t) 1 << 32) | seconds;
+		setres = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
+			&propval, PTP_DTC_UINT64);
+		if (setres != PTP_RC_OK) {
+			/* Do not fail the shot: the camera still has a usable shutter setting.
+			 * Say so loudly, because the exposure will not be the requested length. */
+			GP_LOG_E ("pentax-bulb: camera-timed fallback shutter write failed "
+				"(ptp 0x%04x); capturing at the camera's current setting", setres);
+			gp_context_error (context,
+				_("Pentax could not apply the %u s Bulb duration (PTP 0x%04x); "
+				  "capturing at the current shutter speed instead."),
+				seconds, setres);
+		}
+		memset (&path, 0, sizeof (path));
+		return camera_pentax_capture_internal (camera, &path, context,
+			PENTAX_CAPTURE_TIMED);
 	}
 
 	if (!params->pentax.bulb_action_active ||

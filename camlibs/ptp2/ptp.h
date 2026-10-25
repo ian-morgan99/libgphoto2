@@ -4091,6 +4091,16 @@ struct _PTPParams {
 		unsigned int bulb_action_exposure_phase_ms;
 		int bulb_action_needs_idle_wait;
 		uint32_t bulb_action_release_mode;
+		/* Camera-timed Bulb fallback (Polaris issue #239).  When the body's own
+		 * Bulb timer Custom Setting is armed, a host-driven held shutter cannot be
+		 * armed: the camera runs its own countdown.  pgphoto still asks for a
+		 * start/stop pair and drives the duration by sleeping between them, so the
+		 * requested length is only observable at the stop edge.  A start in that
+		 * state records the time here instead of refusing with GP_ERROR_NOT_SUPPORTED,
+		 * and the matching stop turns the measured hold into a shutter-speed write
+		 * plus one ordinary camera-timed capture.  Zero means nothing is pending. */
+		int bulb_action_timed_fallback;
+		uint64_t bulb_action_start_ms;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;
