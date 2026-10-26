@@ -4101,8 +4101,10 @@ struct _PTPParams {
 		 * plus one ordinary camera-timed capture.  Zero means nothing is pending. */
 		int bulb_action_timed_fallback;
 		uint64_t bulb_action_start_ms;
-		/* Duration the body reported for a camera-timed Bulb (Polaris #239). */
-		uint32_t bulb_action_timed_seconds;
+		/* Bulb timer the body reported at the pre-shutter probe, diagnostics only.
+		 * At that point it still reflects the PREVIOUS shot, so it must never be used
+		 * as the capture duration (Polaris #243). */
+		uint32_t bulb_action_body_reported_seconds;
 		uint8_t live_view_original_value;
 		int live_view_original_valid;
 		int keep_live_view;
