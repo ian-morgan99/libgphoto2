@@ -7814,7 +7814,7 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 		uint64_t hold_ms = now_ms > params->pentax.bulb_action_start_ms ?
 			now_ms - params->pentax.bulb_action_start_ms : 0;
 		uint32_t seconds = (uint32_t) ((hold_ms + 500) / 1000);
-		PTPPropertyValue propval;
+		PTPPropValue propval;
 		uint16_t setres;
 
 		params->pentax.bulb_action_timed_fallback = 0;
