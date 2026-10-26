@@ -7810,22 +7810,16 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	 * caller meant, then run one ordinary camera-timed capture and let its normal
 	 * candidate/output lifecycle own the result. */
 	if (params->pentax.bulb_action_timed_fallback) {
-		uint64_t now_ms = pentax_monotonic_ms ();
-		uint64_t hold_ms = now_ms > params->pentax.bulb_action_start_ms ?
-			now_ms - params->pentax.bulb_action_start_ms : 0;
-		uint32_t seconds = (uint32_t) ((hold_ms + 500) / 1000);
+		uint32_t seconds = pentax_bulb_hold_to_seconds (
+			params->pentax.bulb_action_start_ms, pentax_monotonic_ms ());
 		PTPPropValue propval;
 		uint16_t setres;
 
 		params->pentax.bulb_action_timed_fallback = 0;
 		params->pentax.bulb_action_start_ms = 0;
-		if (seconds < 1)
-			seconds = 1;
-		GP_LOG_D ("pentax-bulb: camera-timed fallback measured a %llu ms hold; "
-			"applying %u s shutter speed", (unsigned long long) hold_ms, seconds);
-		/* Whole-second timer layout, matching _put_Ricoh_ShutterSpeed: numerator in
-		 * the low 32 bits, denominator in the high 32 bits. */
-		propval.u64 = ((uint64_t) 1 << 32) | seconds;
+		GP_LOG_D ("pentax-bulb: camera-timed fallback applying %u s shutter speed", seconds);
+		/* Whole-second timer layout, matching _put_Ricoh_ShutterSpeed. */
+		propval.u64 = pentax_whole_second_shutter_value (seconds);
 		setres = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
 			&propval, PTP_DTC_UINT64);
 		if (setres != PTP_RC_OK) {

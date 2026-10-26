@@ -80,6 +80,24 @@ pentax_bulb_action_mode_supported (uint32_t exposure_mode)
 	       exposure_mode == PENTAX_EXP_MODE_ASTROTRACER;
 }
 
+uint32_t
+pentax_bulb_hold_to_seconds (uint64_t start_ms, uint64_t now_ms)
+{
+	/* A monotonic clock should never go backwards, but the caller supplies both
+	 * values and a wrapped or zeroed start timestamp must not turn into a huge
+	 * or negative duration. */
+	uint64_t hold_ms = now_ms > start_ms ? now_ms - start_ms : 0;
+	uint32_t seconds = (uint32_t) ((hold_ms + 500) / 1000);
+
+	return seconds < 1 ? 1 : seconds;
+}
+
+uint64_t
+pentax_whole_second_shutter_value (uint32_t seconds)
+{
+	return ((uint64_t) 1 << 32) | seconds;
+}
+
 int
 pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {

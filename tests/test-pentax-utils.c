@@ -138,6 +138,30 @@ main (void)
 	CHECK (pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III, 0x0189));
 	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III, 0x018f));
 	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III_MONO, 0x018f));
+
+	/* Camera-timed Bulb fallback (#239): pgphoto drives "Bulb with seconds
+	 * selected" by sleeping between its start and stop edges, so the requested
+	 * length is only recoverable from the measured hold.  Rounding must land on
+	 * the second the user picked despite scheduling jitter, a sub-second hold can
+	 * never yield a zero shutter speed, and a clock that went backwards (or a
+	 * zeroed start timestamp) must not produce a huge or wrapped duration. */
+	CHECK (pentax_bulb_hold_to_seconds (1000, 3000) == 2);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 3400) == 2);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 3500) == 3);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 6000) == 5);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 12000) == 11);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 1050) == 1);
+	CHECK (pentax_bulb_hold_to_seconds (1000, 1000) == 1);
+	CHECK (pentax_bulb_hold_to_seconds (5000, 1000) == 1);
+	CHECK (pentax_bulb_hold_to_seconds (0, 0) == 1);
+	CHECK (pentax_bulb_hold_to_seconds (UINT64_MAX, 10) == 1);
+
+	/* Whole-second timer layout, matching _put_Ricoh_ShutterSpeed: numerator in
+	 * the low 32 bits, denominator in the high 32 bits. */
+	CHECK (pentax_whole_second_shutter_value (2) == (((uint64_t) 1 << 32) | 2));
+	CHECK (pentax_whole_second_shutter_value (1) == (((uint64_t) 1 << 32) | 1));
+	CHECK ((pentax_whole_second_shutter_value (300) & 0xffffffffu) == 300);
+	CHECK ((pentax_whole_second_shutter_value (300) >> 32) == 1);
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};

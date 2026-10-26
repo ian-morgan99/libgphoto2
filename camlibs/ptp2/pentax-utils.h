@@ -137,6 +137,19 @@ int pentax_bulb_action_mode_supported (uint32_t exposure_mode);
  * remains blocked until separately tested. */
 int pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product);
 
+/* Camera-timed Bulb fallback (Polaris issue #239).  pgphoto drives a "Bulb with
+ * seconds selected" request by sleeping between its start and stop edges rather
+ * than passing a duration, so the requested length is only recoverable from the
+ * measured hold.  Round to the nearest second and never return zero: a zero shutter
+ * speed is not a valid exposure, and a clock that went backwards must not produce
+ * a negative or wrapped duration. */
+uint32_t pentax_bulb_hold_to_seconds (uint64_t start_ms, uint64_t now_ms);
+
+/* Whole-second timer layout for PTP_DPC_PENTAX_ShutterSpeed, matching
+ * _put_Ricoh_ShutterSpeed: numerator in the low 32 bits, denominator in the high
+ * 32 bits. */
+uint64_t pentax_whole_second_shutter_value (uint32_t seconds);
+
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
  * clamped so a corrupt value can never wrap (issue #43 regression coverage). */
