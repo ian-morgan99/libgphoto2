@@ -7123,14 +7123,21 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 			 * timed capture being asked for is exactly what this camera can do here
 			 * (Polaris issue #239).
 			 *
-			 * The requested length is not available at this edge: pgphoto drives it by
-			 * sleeping between start and stop.  So record the time, report success for this
-			 * edge, and let the matching stop turn the measured hold into a shutter-speed
-			 * write plus one ordinary camera-timed capture. */
-			params->pentax.bulb_action_timed_fallback = 1;
-			params->pentax.bulb_action_start_ms = pentax_monotonic_ms ();
-			GP_LOG_D ("pentax-bulb: camera-timed Bulb is active; deferring the capture "
-				"to the stop edge instead of refusing with -6");
+		 * The body already knows the requested length: it is the Bulb timer value in
+		 * the pre-capture conditions.  Record it here and let the matching stop apply
+		 * it as a shutter-speed write plus one ordinary camera-timed capture.
+		 *
+		 * Do NOT derive the length from how long pgphoto slept between the two edges:
+		 * that interval contains the body's own countdown as well as the exposure, so
+		 * measuring it doubles the requested duration (observed on a K-3 III as an
+		 * x-second countdown followed by an x-second capture). */
+		params->pentax.bulb_action_timed_fallback = 1;
+		params->pentax.bulb_action_start_ms = pentax_monotonic_ms ();
+		params->pentax.bulb_action_timed_seconds =
+			pre_capture_conditions.bulb_timer_seconds;
+		GP_LOG_D ("pentax-bulb: camera-timed Bulb is active (%u s reported); "
+			"deferring the capture to the stop edge instead of refusing with -6",
+			pre_capture_conditions.bulb_timer_seconds);
 			free (bdata);
 			return GP_OK;
 		}
@@ -7743,6 +7750,7 @@ out:
 		params->pentax.bulb_action_release_mode = 0;
 		params->pentax.bulb_action_timed_fallback = 0;
 		params->pentax.bulb_action_start_ms = 0;
+		params->pentax.bulb_action_timed_seconds = 0;
 	}
 	SET_CONTEXT_P (params, NULL);
 	GP_LOG_D ("pentax-capture[%llu]: return %d initiated=%d candidate_live=%d",
@@ -7810,13 +7818,19 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 	 * caller meant, then run one ordinary camera-timed capture and let its normal
 	 * candidate/output lifecycle own the result. */
 	if (params->pentax.bulb_action_timed_fallback) {
-		uint32_t seconds = pentax_bulb_hold_to_seconds (
-			params->pentax.bulb_action_start_ms, pentax_monotonic_ms ());
+		/* Prefer the duration the body reported when the start edge was accepted.
+		 * The measured hold is only a fallback: pgphoto sleeps for the countdown
+		 * plus the exposure, so a hold-derived length overshoots. */
+		uint32_t seconds = params->pentax.bulb_action_timed_seconds;
+		if (seconds < 1)
+			seconds = pentax_bulb_hold_to_seconds (
+				params->pentax.bulb_action_start_ms, pentax_monotonic_ms ());
 		PTPPropValue propval;
 		uint16_t setres;
 
 		params->pentax.bulb_action_timed_fallback = 0;
 		params->pentax.bulb_action_start_ms = 0;
+		params->pentax.bulb_action_timed_seconds = 0;
 		GP_LOG_D ("pentax-bulb: camera-timed fallback applying %u s shutter speed", seconds);
 		/* Whole-second timer layout, matching _put_Ricoh_ShutterSpeed. */
 		propval.u64 = pentax_whole_second_shutter_value (seconds);
