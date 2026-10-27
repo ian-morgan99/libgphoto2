@@ -183,6 +183,16 @@ main (void)
 			CHECK (lbl[0] == '0' && lbl[1] == '0' && lbl[2] == ':');
 		}
 	}
+	/* Issue #241 review: the synthesis must be constrained to the body whose
+	 * published list the values came from.  A K-1 II, K-01 or the Monochrome
+	 * K-3 III has its own list and must never be handed these choices. */
+	CHECK (pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_KP));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K70));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (0));
+
 	/* A plain "1/N" shutter speed must not be mistaken for a Bulb entry: it has
 	 * numerator 1 but a large denominator, not denominator 1. */
 	CHECK (!pentax_shutter_value_is_bulb_seconds (((uint64_t) 4000 << 32) | 1));

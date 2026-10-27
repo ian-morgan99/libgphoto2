@@ -163,6 +163,13 @@ extern const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT];
 /* True when a shutter-list value is one of the Bulb/seconds entries. */
 int pentax_shutter_value_is_bulb_seconds (uint64_t value);
 
+/* Whether an empty shutter enumeration may be filled with the Bulb/seconds
+ * entries.  Constrained to the one body whose populated list those values were
+ * read from: the K-3 III.  A K-1 II, K-01 or any other body with a legitimately
+ * empty descriptor must NOT be handed shutter choices that were never its own
+ * (issue #241 review). */
+int pentax_shutter_list_may_synthesise_bulb (uint32_t model_no);
+
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
  * clamped so a corrupt value can never wrap (issue #43 regression coverage). */

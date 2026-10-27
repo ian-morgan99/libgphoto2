@@ -7840,14 +7840,50 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 		setres = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
 			&propval, PTP_DTC_UINT64);
 		if (setres != PTP_RC_OK) {
-			/* Do not fail the shot: the camera still has a usable shutter setting.
-			 * Say so loudly, because the exposure will not be the requested length. */
+			/* FAIL CLOSED (issue #239 review).  The previous code logged
+			 * "capturing at the camera's current setting" and captured anyway,
+			 * so a requested bulb:2 could produce a successful file at an
+			 * unrelated pre-existing shutter speed -- the silent wrong-duration
+			 * failure of #173.  gp_context_error() does not prevent the exposure.
+			 * Refuse instead. */
 			GP_LOG_E ("pentax-bulb: camera-timed fallback shutter write failed "
-				"(ptp 0x%04x); capturing at the camera's current setting", setres);
+				"(ptp 0x%04x); refusing to capture", setres);
 			gp_context_error (context,
 				_("Pentax could not apply the %u s Bulb duration (PTP 0x%04x); "
-				  "capturing at the current shutter speed instead."),
+				  "no capture was started."),
 				seconds, setres);
+			return translate_ptp_result (setres);
+		}
+		/* Verify the write took effect before exposing anything.  A write that
+		 * returns OK but did not change the property would otherwise capture at
+		 * the wrong duration just as silently. */
+		{
+			PTPPropValue readback;
+			uint16_t getres;
+			memset (&readback, 0, sizeof (readback));
+			getres = ptp_getdevicepropvalue (params,
+					PTP_DPC_PENTAX_ShutterSpeed, &readback,
+					PTP_DTC_UINT64);
+			if (getres != PTP_RC_OK) {
+				GP_LOG_E ("pentax-bulb: camera-timed fallback shutter readback "
+						"failed (ptp 0x%04x); refusing to capture", getres);
+				gp_context_error (context,
+						_("Pentax could not verify the %u s Bulb duration "
+						  "(PTP 0x%04x); no capture was started."),
+						seconds, getres);
+				return translate_ptp_result (getres);
+			}
+			if (readback.u64 != propval.u64) {
+				GP_LOG_E ("pentax-bulb: camera-timed fallback shutter readback "
+						"mismatch (wanted 0x%016llx, got 0x%016llx); refusing to capture",
+						(unsigned long long) propval.u64,
+						(unsigned long long) readback.u64);
+				gp_context_error (context,
+						_("Pentax did not accept the %u s Bulb duration "
+						  "(read back a different value); no capture was started."),
+						seconds);
+				return GP_ERROR;
+			}
 		}
 		memset (&path, 0, sizeof (path));
 		return camera_pentax_capture_internal (camera, &path, context,

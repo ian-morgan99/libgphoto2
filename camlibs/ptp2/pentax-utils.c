@@ -109,6 +109,15 @@ const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT] = {
 };
 
 int
+pentax_shutter_list_may_synthesise_bulb (uint32_t model_no)
+{
+	/* Only the K-3 III: the published second-counts were read from its own
+	 * populated list.  The Monochrome variant is a different body with its
+	 * own list and is deliberately excluded. */
+	return model_no == PENTAX_MODEL_K3_MARK_III;
+}
+
+int
 pentax_shutter_value_is_bulb_seconds (uint64_t value)
 {
 	uint32_t denominator = (uint32_t)(value >> 32);

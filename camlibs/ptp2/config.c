@@ -9674,7 +9674,8 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 	 * populated list, so the list is never empty and never carries a bogus
 	 * value.  These are the body's own values, not invented ones. */
 	if (desc.FormFlag == PTP_DPFF_Enumeration &&
-	    desc.FORM.Enum.NumberOfValues == 0) {
+	    desc.FORM.Enum.NumberOfValues == 0 &&
+	    pentax_shutter_list_may_synthesise_bulb (params->pentax.model_no)) {
 		unsigned int added = 0;
 		/* The descriptor's value array is calloc'd to the number of values the
 		 * camera reported, so with zero values it may be NULL.  Allocate it
@@ -9693,6 +9694,14 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 			added++;
 		}
 		desc.FORM.Enum.NumberOfValues = added;
+		/* The camera's current value is not necessarily one of the entries we
+		 * just added (the captured B-mode value is 0, which formats as
+		 * "Auto").  _get_Ricoh_ShutterSpeed ignores the return of
+		 * gp_widget_set_value, so a current value outside the choice list would
+		 * leave the radio with no selected entry.  Point the current value at the
+		 * first synthesised entry so the widget is coherent. */
+		if (!pentax_shutter_value_is_bulb_seconds (desc.CurrentValue.u64))
+			desc.CurrentValue.u64 = desc.FORM.Enum.SupportedValue[0].u64;
 		GP_LOG_D ("pentax-shutter: camera returned an empty shutter list (B mode, "
 			"no JPEG); added %u Bulb/seconds entries", added);
 	}
