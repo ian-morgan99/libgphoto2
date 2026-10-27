@@ -23,6 +23,21 @@ def function_body(source: str, signature: str) -> str:
     raise AssertionError(f"unterminated function: {signature}")
 
 
+def fallback_region(source: str) -> str:
+    """The camera-timed Bulb fallback: shutter write through the timed capture.
+
+    Extracted so a contract can be asserted over *this* stretch alone -- the
+    place where .75 inserted an early return and hung every capture.
+    """
+    action = function_body(source, "ptp2_pentax_bulb_action (Camera *camera")
+    start = action.index("ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed")
+    # End before the capture itself: the fallback's own `return
+    # camera_pentax_capture_internal (...)` is the required outcome, not an early
+    # exit.  Anything returning inside this stretch is a refusal.
+    end = action.index("memset (&path", start)
+    return action[start:end]
+
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -65,6 +80,33 @@ def main() -> int:
             "held research action must remain an explicit separate branch")
     require("bulb_action_start ? 2U : 0U" not in internal,
             "ordinary capture must not use a conditional release-mode shortcut")
+
+    # --- camera-timed Bulb fallback must always reach the capture (issue #239)
+    # .75 made this stretch fail closed: a failed shutter write returned a mapped
+    # PTP error, and a new GetDevicePropValue readback refused on mismatch. Neither
+    # Benro Connect nor pgphoto surfaces a capture error -- they wait for a file that
+    # never arrives -- so every timed capture spun forever. Operator verdict:
+    # "objectively worse than .74". Reverted in df9d72745; these checks keep it out.
+    fallback = fallback_region(source)
+    require("ptp_getdevicepropvalue" not in fallback,
+            "camera-timed fallback must not read back PTP_DPC_PENTAX_ShutterSpeed: "
+            "GetDevicePropValue is not a supported read path for this property "
+            "(config.c reads it only via GetDevicePropDesc CurrentValue)")
+    require("translate_ptp_result (setres)" not in fallback,
+            "camera-timed fallback must not fail closed on the shutter write: the "
+            "caller cannot surface an error and will spin waiting for a file")
+    require("no capture was started" not in fallback,
+            "camera-timed fallback must not refuse to capture")
+    # The only return in the fallback is the timed capture itself. .75 had three
+    # early returns here; any new one re-creates the spinner.
+    returns = [line.strip() for line in fallback.splitlines() if line.strip().startswith("return ")]
+    require(len(returns) == 0,
+            f"camera-timed fallback must not return before the timed capture; found: {returns}")
+    action_full = function_body(source, "ptp2_pentax_bulb_action (Camera *camera")
+    tail = action_full[action_full.index("ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed"):]
+    require("return camera_pentax_capture_internal (camera, &path, context," in tail
+            and "PENTAX_CAPTURE_TIMED" in tail,
+            "camera-timed fallback must reach camera_pentax_capture_internal")
 
     print("test-pentax-capture-contract: all checks passed")
     return 0
