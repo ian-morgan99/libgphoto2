@@ -853,3 +853,27 @@ the pre-write value.
 The named `pentaxcolortemperature` control after the #104 fix (requires a build
 containing it), and the K-1 II behaviour of the relaxed branch. Transcripts:
 `benro-polaris-firmware-patcher` `docs/evidence/o-v17b-physical-20261019/`.
+
+### 2026-10-27 — K-1 II direct-PC capture and control follow-up
+
+Hardware: K-1 II firmware 1.02, USB `25fb:0183`, current checkout
+`387bfea59147a6f5259dd764d9c6c28875f0e9fd`; rebuilt research `ptp2.so`.
+All tests used the exact model/port and clean process exits. The operator
+explicitly authorized capture, writes, and focus testing.
+
+| Gate | Result |
+|---|---|
+| ISO 12800→25600→12800 | **HW-W restored** through live `pentaxconditions`; public widget lagged at 12800 after the target ACK, then conditions reported 25600 and restored 12800 |
+| Aperture f/3.5→f/4→f/3.5 | **HW-W restored** through live conditions; public widget lagged during target read |
+| EV 0→+0.3→0 | **HW-W restored** through live conditions (`exposure-comp=3/10` then `0/10`) |
+| WB daylight→shade | Target ACK did not immediately update the widget; a later fresh session showed the camera restored to daylight. Immediate restore returned `-110` while task-changing |
+| Drive single→continuous-lo→single | Target applied (`drive-mode-raw=6`); immediate restore returned `-110` while task-changing. A later fresh session restored raw drive `0` / single |
+| 5-frame live preview | **PASS**, five valid in-memory JPEGs, 27,930–29,973 bytes, cleanup OK |
+| Still capture/download | **PASS**, `gp_camera_capture` returned success, `/K1II8695.JPG`, JPEG download 12,452,787 bytes, cleanup OK; file was not deleted |
+| Old-family focus near/far | **NOT QUALIFIED**: both live-view probes reached valid preview, then the driver correctly refused `0x9016` because the physical AF/MF switch was not in AF mode; no focus command was sent |
+
+The write results confirm the K-1 II live-condition oracle is required and
+that immediate widget reads are not equivalent to application. Focus requires
+an operator-side AF/MF switch change before the bounded near/far gate can be
+completed. See issue #117 for the comparison update; direct capture evidence
+also updates issue #48.

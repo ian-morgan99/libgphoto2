@@ -806,3 +806,19 @@ is unit-tested and corrected. K-1 II physical manual focus remains FAIL, not
 supported, until a retained-PC-LV test proves lens motion. Do not increase the
 magnitude or add retries without a separately documented source and hardware
 gate.
+
+## 2026-10-27 K-1 II direct-PC integration checkpoint
+
+The attached K-1 II (firmware 1.02, `25fb:0183`) passed direct-PC five-frame
+preview and still capture/download on the current rebuilt checkout. ISO,
+aperture, EV, and drive writes applied according to live `pentaxconditions` and
+were restored in later fresh-session reads. Immediate post-write widget values
+can lag; WB and drive cleanup also returned transient `-110` while the camera
+reported `task-changing`, so restoration must be bounded and independently
+verified after a fresh session. The final fresh-session state was daylight WB,
+single drive, ISO 12800, f/3.5, 1/20, and EV 0.
+
+K-1 II old-family focus was not qualified in this run because the camera's
+physical AF/MF switch was not in AF; the driver fail-closed before sending
+`0x9016`. No focus claim is made until that physical prerequisite is set and
+near/far lens motion is observed.

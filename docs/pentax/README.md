@@ -66,6 +66,14 @@ nothing (K-1 II), depending on what each body chose to advertise.
 
 ## What we have done
 
+The detailed K-1 II/K-3 III parity checklist and ordered execution WBS are
+maintained in the private `PrivateResearch/pentax-ricoh` area, alongside the
+broader model-sweep research. The public implementation source, issue
+acceptance criteria, hardware evidence summary, and upstream-facing
+documentation remain in this repository. Agents must use GitHub issue #131 as
+the public operating pointer and record the exact merge commit on `main`
+before marking WBS work complete.
+
 All work lives in `camlibs/ptp2/` and `docs/pentax/`, hardware-verified per
 the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 (~20 test sessions):
