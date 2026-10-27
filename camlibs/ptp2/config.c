@@ -9656,6 +9656,7 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 	PTPDevicePropDesc desc;
 	uint16_t ret;
 	int result;
+	unsigned int i;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
@@ -9664,6 +9665,37 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 		&desc);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
+	/* Issue #241: the body omits its Bulb/seconds entries from the shutter
+	 * list when it is in B mode and offering no JPEG, so the list comes back
+	 * empty (enum-count=0).  The device then forwards that to the app as
+	 * RD:0;V:0;R:00:00,; -- a one-entry list whose only entry is the bogus
+	 * "00:00" -- and Benro Connect crashes, both in Bulb non-timed and on a
+	 * mode-dial change.  Re-add the entries the body itself publishes in a
+	 * populated list, so the list is never empty and never carries a bogus
+	 * value.  These are the body's own values, not invented ones. */
+	if (desc.FormFlag == PTP_DPFF_Enumeration &&
+	    desc.FORM.Enum.NumberOfValues == 0) {
+		unsigned int added = 0;
+		/* The descriptor's value array is calloc'd to the number of values the
+		 * camera reported, so with zero values it may be NULL.  Allocate it
+		 * before writing, and free whatever the camera did allocate. */
+		if (desc.FORM.Enum.SupportedValue)
+			free (desc.FORM.Enum.SupportedValue);
+		desc.FORM.Enum.SupportedValue = calloc (PENTAX_BULB_LIST_SECONDS_COUNT,
+				sizeof (PTPPropValue));
+		if (!desc.FORM.Enum.SupportedValue)
+			return GP_ERROR_NO_MEMORY;
+		for (i = 0; i < PENTAX_BULB_LIST_SECONDS_COUNT; i++) {
+			PTPPropValue v;
+			v.u64 = pentax_whole_second_shutter_value (
+					pentax_bulb_list_seconds[i]);
+			desc.FORM.Enum.SupportedValue[added] = v;
+			added++;
+		}
+		desc.FORM.Enum.NumberOfValues = added;
+		GP_LOG_D ("pentax-shutter: camera returned an empty shutter list (B mode, "
+			"no JPEG); added %u Bulb/seconds entries", added);
+	}
 	result = _get_Ricoh_ShutterSpeed (camera, widget, menu, &desc);
 	ptp_free_devicepropdesc (&desc);
 	return result;

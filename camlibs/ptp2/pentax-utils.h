@@ -150,6 +150,19 @@ uint32_t pentax_bulb_hold_to_seconds (uint64_t start_ms, uint64_t now_ms);
  * 32 bits. */
 uint64_t pentax_whole_second_shutter_value (uint32_t seconds);
 
+/* The Bulb/seconds entries the K-3 III offers in its shutter list.  The camera
+ * omits them entirely when it is in B mode and offering no JPEG, which leaves
+ * the list empty (enum-count=0) and the app with nothing to select -- the
+ * condition behind the Benro Connect crash in Bulb non-timed and on a mode-dial
+ * change (Polaris issue #241).  These are the values the body itself publishes
+ * in a populated list, so synthesising them keeps the list identical to the
+ * camera's own rather than inventing new ones. */
+#define PENTAX_BULB_LIST_SECONDS_COUNT 13
+extern const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT];
+
+/* True when a shutter-list value is one of the Bulb/seconds entries. */
+int pentax_shutter_value_is_bulb_seconds (uint64_t value);
+
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and
  * clamped so a corrupt value can never wrap (issue #43 regression coverage). */

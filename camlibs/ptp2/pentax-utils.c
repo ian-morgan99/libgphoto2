@@ -98,6 +98,34 @@ pentax_whole_second_shutter_value (uint32_t seconds)
 	return ((uint64_t) 1 << 32) | seconds;
 }
 
+/* The exact second-counts the K-3 III publishes in a populated shutter list,
+ * read from the device's own list payload:
+ *   RD:0;V:55;R:...,00-01,00-02,00-03,00-04,00-05,00-06,00-08,00-10,00-13,
+ *        00-15,00-20,00-25,00-30,...
+ * The device renders these as "00-NN"; libgphoto2's own formatter renders the
+ * same wire values as "MM:SS". */
+const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT] = {
+	1, 2, 3, 4, 5, 6, 8, 10, 13, 15, 20, 25, 30
+};
+
+int
+pentax_shutter_value_is_bulb_seconds (uint64_t value)
+{
+	uint32_t denominator = (uint32_t)(value >> 32);
+	uint32_t numerator = (uint32_t)value;
+	unsigned int i;
+
+	/* Only the whole-second timer layout counts: denominator 1 with a
+	 * numerator in the published set.  A plain "1/N" shutter speed has
+	 * numerator 1 and a large denominator, which must not match. */
+	if (denominator != 1)
+		return 0;
+	for (i = 0; i < PENTAX_BULB_LIST_SECONDS_COUNT; i++)
+		if (pentax_bulb_list_seconds[i] == numerator)
+			return 1;
+	return 0;
+}
+
 int
 pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {

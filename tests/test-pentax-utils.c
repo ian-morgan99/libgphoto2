@@ -162,6 +162,33 @@ main (void)
 	CHECK (pentax_whole_second_shutter_value (1) == (((uint64_t) 1 << 32) | 1));
 	CHECK ((pentax_whole_second_shutter_value (300) & 0xffffffffu) == 300);
 	CHECK ((pentax_whole_second_shutter_value (300) >> 32) == 1);
+
+	/* Issue #241: the Bulb/seconds entries the K-3 III publishes in a populated
+	 * shutter list.  The body omits them entirely in B mode with no JPEG, which
+	 * leaves the list empty and the app with nothing to select.  These are the
+	 * body's own values, so the synthesised list matches a populated one. */
+	CHECK (PENTAX_BULB_LIST_SECONDS_COUNT == 13);
+	CHECK (pentax_bulb_list_seconds[0] == 1);
+	CHECK (pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT - 1] == 30);
+	{
+		unsigned int bi;
+		for (bi = 0; bi < PENTAX_BULB_LIST_SECONDS_COUNT; bi++) {
+			uint64_t v = pentax_whole_second_shutter_value (
+					pentax_bulb_list_seconds[bi]);
+			CHECK (pentax_shutter_value_is_bulb_seconds (v));
+			/* The wire value must round-trip through the formatter the widget
+			 * uses, so the app sees the same label the camera would have sent. */
+			char lbl[32];
+			CHECK (pentax_format_shutter_speed (v, lbl, sizeof (lbl)) == 0);
+			CHECK (lbl[0] == '0' && lbl[1] == '0' && lbl[2] == ':');
+		}
+	}
+	/* A plain "1/N" shutter speed must not be mistaken for a Bulb entry: it has
+	 * numerator 1 but a large denominator, not denominator 1. */
+	CHECK (!pentax_shutter_value_is_bulb_seconds (((uint64_t) 4000 << 32) | 1));
+	CHECK (!pentax_shutter_value_is_bulb_seconds (0));
+	CHECK (!pentax_shutter_value_is_bulb_seconds (
+			pentax_whole_second_shutter_value (7)));   /* 7 s is not in the list */
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};
