@@ -575,6 +575,18 @@ pentax_live_view_frame_should_retry (uint16_t response,
 }
 
 int
+pentax_model_uses_it2_direct_live_view_start (uint32_t model_no)
+{
+	/* IMAGE Transmitter 2's PcLiveViewMode setter is shared by the K-1 and
+	 * K-1 Mark II. It reads 0xd009 (LiveViewArea), sets 0xd035 to 1, and
+	 * starts the 0x9006 frame poll; it does not pre-read 0xd035. Both bodies
+	 * therefore need the same direct-start path here. Keep K-3 III and all
+	 * other models on the existing observed-state path. */
+	return (model_no == PENTAX_MODEL_K1) ||
+		(model_no == PENTAX_MODEL_K1_MARK_II);
+}
+
+int
 pentax_parse_conditions (const unsigned char *data, size_t size,
 		PentaxConditions *conditions)
 {

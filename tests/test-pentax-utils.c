@@ -434,6 +434,12 @@ main (void)
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
 	CHECK (!pentax_model_uses_new_focus (0));
+	/* IMAGE Transmitter 2 starts PC live view directly on both K-1 bodies;
+	 * the K-3 III remains on the observed-state path. */
+	CHECK (pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K1));
+	CHECK (pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_KP));
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III) != NULL);
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->k3iii_family);
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->supports_pc_live_view);
