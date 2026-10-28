@@ -451,6 +451,8 @@ int pentax_live_view_frame_should_retry (uint16_t response,
 	unsigned int data_size);
 int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
+/* True only when the conditions frame permits a vendor-property write. */
+int pentax_conditions_are_idle (const PentaxConditions *conditions);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_old_focus_protocol_direction (int direction,

@@ -495,6 +495,11 @@ main (void)
 	CHECK (!conditions.has_astro_limit);
 	CHECK (pentax_parse_conditions (condition_data, 532, &conditions) == GP_OK);
 	CHECK (conditions.has_astro_limit && (conditions.astro_limit_seconds == 600));
+	CHECK (!pentax_conditions_are_idle (&conditions));
+	conditions.capability_flags &= ~PENTAX_CONDITION_TASK_CHANGING;
+	conditions.activity_flags = 0;
+	CHECK (pentax_conditions_are_idle (&conditions));
+	CHECK (!pentax_conditions_are_idle (NULL));
 	CHECK (pentax_candidate_filename (filename, sizeof (filename), name,
 		sizeof (name)) == GP_OK);
 	CHECK (!strcmp (name, "IMG0001.JPG"));

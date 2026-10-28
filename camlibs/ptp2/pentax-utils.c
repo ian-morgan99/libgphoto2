@@ -611,6 +611,17 @@ pentax_parse_conditions (const unsigned char *data, size_t size,
 }
 
 int
+pentax_conditions_are_idle (const PentaxConditions *conditions)
+{
+	if (!conditions)
+		return 0;
+	return !(conditions->capability_flags & PENTAX_CONDITION_TASK_CHANGING) &&
+		!(conditions->activity_flags &
+		 (PENTAX_CONDITION_ACTIVITY_SHOOTING |
+		  PENTAX_CONDITION_ACTIVITY_PROCESSING));
+}
+
+int
 pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 		int32_t *displacement)
 {
