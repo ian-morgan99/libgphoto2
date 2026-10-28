@@ -199,9 +199,13 @@ actual output reported for SD1/SD2 at conditions offsets 464/468
 mutation is allowed until each body’s returned form is captured and
 fixture-tested. The generic `imageformat` widget for the currently enabled
 K-1/K-1 II/K-3 III/Monochrome path deliberately exposes only `JPEG`, `RAW`,
-and `RAW+JPEG`; PEF/DNG selection belongs to the separate RawKind control.
-TIFF is source-defined for the 645Z UI and is not accepted by the current
-modern-family gate.
+and `RAW+JPEG`; PEF/DNG selection belongs to the separate IT2 `RawKind`
+control and is now exposed as `pentaxrawformat` (`PEF`/`DNG`). A generic
+`imageformat` write changes only 0xd01b bytes 4/5 and preserves byte 8, so a
+client reading `RAW` and writing `RAW` cannot silently convert PEF to DNG.
+The raw-kind write changes only byte 8 and uses the same exact-payload
+read-back gate. TIFF is source-defined for the 645Z UI and is not accepted by
+the current modern-family gate.
 
 ## Complete condition-layout target
 

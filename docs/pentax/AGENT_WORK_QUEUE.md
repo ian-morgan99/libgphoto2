@@ -13,7 +13,7 @@ This file exists to let parallel agents work without duplicating or conflating c
 ## Independent generic-control work
 
 - #53 — `aperture`
-- #54 — `imageformat`
+- #54 — `imageformat` plus lossless PEF/DNG subtype control (`pentaxrawformat`)
 - #55 — `imagequality`
 - #56 — `autofocus` capture policy
 - #57 — `autofocusdrive` immediate AF action

@@ -979,6 +979,30 @@ pentax_wff_format_byte (const char *value)
 	return -1;
 }
 
+/* RawKind is the source-defined PEF/DNG selector in 0xd01b byte 8.  Do not
+ * accept ShootingFormat values here: those are a different enum domain. */
+int
+pentax_wff_raw_kind_byte (const char *value)
+{
+	if (!value)
+		return -1;
+	if (!strcmp (value, "PEF"))
+		return PTP_PENTAX_RAW_KIND_PEF;
+	if (!strcmp (value, "DNG"))
+		return PTP_PENTAX_RAW_KIND_DNG;
+	return -1;
+}
+
+const char *
+pentax_wff_raw_kind_label (uint8_t raw_kind)
+{
+	switch (raw_kind) {
+	case PTP_PENTAX_RAW_KIND_PEF: return "PEF";
+	case PTP_PENTAX_RAW_KIND_DNG: return "DNG";
+	default: return NULL;
+	}
+}
+
 /* Validate the two forms observed for the IT2 0xd01b compound payload.
  * Ten bytes carry the ordinary fields; eleven bytes add current-slot state.
  * The first byte is the source-defined payload marker, and the format and
@@ -998,6 +1022,40 @@ pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
 	if (payload[7] > 2)
 		return 0;
 	return 1;
+}
+
+/* Apply one IT2 field change to an already validated compound payload.  These
+ * helpers make the preservation rule explicit and unit-testable: generic
+ * imageformat changes touch only bytes 4/5, while raw-container changes touch
+ * only byte 8. */
+int
+pentax_wff_set_format (unsigned char *payload, size_t size, const char *value)
+{
+	int format;
+
+	if (!pentax_wff_payload_is_valid (payload, size))
+		return -1;
+	format = pentax_wff_format_byte (value);
+	if (format < 0)
+		return -1;
+	payload[4] = (unsigned char)format;
+	payload[5] = (unsigned char)format;
+	return 0;
+}
+
+int
+pentax_wff_set_raw_kind (unsigned char *payload, size_t size,
+	const char *value)
+{
+	int raw_kind;
+
+	if (!pentax_wff_payload_is_valid (payload, size))
+		return -1;
+	raw_kind = pentax_wff_raw_kind_byte (value);
+	if (raw_kind < 0)
+		return -1;
+	payload[8] = (unsigned char)raw_kind;
+	return 0;
 }
 
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value

@@ -482,8 +482,14 @@ int pentax_model_supports_ci_detail (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);
 int pentax_wff_format_byte (const char *value);
+int pentax_wff_raw_kind_byte (const char *value);
+const char *pentax_wff_raw_kind_label (uint8_t raw_kind);
 int pentax_wff_quality_byte (const char *value);
 int pentax_wff_payload_is_valid (const unsigned char *payload, size_t size);
+int pentax_wff_set_format (unsigned char *payload, size_t size,
+	const char *value);
+int pentax_wff_set_raw_kind (unsigned char *payload, size_t size,
+	const char *value);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,
