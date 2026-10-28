@@ -1,8 +1,10 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "pslr_utils.h"
+#include "pslr_model.h"
 
 #define CHECK_TEST(expression) do { \
 	if (!(expression)) { \
@@ -15,6 +17,22 @@ int
 main (void)
 {
 	pslr_rational_t value;
+	ipslr_model_info_t *k5ii;
+
+	/* The official local K-5 II v1.07 package identifies the body as the
+	 * legacy USB-SCSI model represented by 0x12f70 in the parser table. Keep
+	 * that lookup and its byte-order/status-parser contract covered without
+	 * treating a firmware header as hardware qualification. */
+	k5ii = pslr_find_model_by_id (0x12f70);
+	CHECK_TEST (k5ii != NULL);
+	CHECK_TEST (!strcmp (k5ii->name, "K-5II"));
+	CHECK_TEST (!k5ii->is_little_endian);
+	CHECK_TEST (k5ii->status_buffer_size == 444);
+	CHECK_TEST (k5ii->max_jpeg_stars == 4);
+	CHECK_TEST (k5ii->jpeg_resolutions[0] == 16);
+	CHECK_TEST (k5ii->jpeg_resolutions[3] == 2);
+	CHECK_TEST (k5ii->status_parser_function != NULL);
+	CHECK_TEST (pslr_find_model_by_id (0x25fb0148) == NULL);
 
 	value = parse_aperture ("2.8");
 	CHECK_TEST (value.nom == 28 && value.denom == 10);

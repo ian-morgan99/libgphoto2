@@ -60,7 +60,11 @@ test_pentax_legacy_parsers_exe = executable(
   'test-pentax-legacy-parsers',
   'test-pentax-legacy-parsers.c',
   '../camlibs/pentax/pslr_utils.c',
+  '../camlibs/pentax/pslr_model.c',
+  '../camlibs/pentax/pslr_log.c',
+  '../camlibs/pentax/js0n.c',
   include_directories: include_directories('../camlibs/pentax'),
+  c_args: ['-DPKTDATADIR="/"'],
   dependencies: [libgphoto2_dep, m_dep],
 )
 
