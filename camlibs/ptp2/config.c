@@ -11011,7 +11011,7 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
  * for modern Pentax ptp2 bodies (issues #54 and #55).
  *
  * IT2 (MtpDevice.cs _camWritingFileFormatCopy) uses a 10-byte payload on the
- * K-3 III / K-1 II family:
+ * K-1 / K-1 II / K-3 III family:
  *   byte 0  = 6 (payload length marker)
  *   bytes 4,5 = writing file format (JPEG=0, RAW=1, RAW+JPEG=2, TIFF=3;
  *               IT2 writes the same value to both bytes)
@@ -11025,7 +11025,8 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
  * reads the live camera state from GetAllConditions instead: offset 524
  * carries the writing-format setting (IT2 _camWritingFormatSetting) and
  * offset 140 the JPEG quality (IT2 _jpegQuality), which is what the camera
- * UI actually shows.  Gated to the k3iii family (fail-closed elsewhere);
+ * UI actually shows.  Gated to the source-authorised K-1/K-1 II/K-3 III
+ * family (fail-closed elsewhere);
  * card-writing mode (0x9004, pentaxcardwritingmode) remains a separate
  * widget and is never aliased to file format. */
 #define PENTAX_WFF_PAYLOAD_SIZE 10

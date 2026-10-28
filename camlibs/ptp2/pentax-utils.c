@@ -788,13 +788,13 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * model-number branch. The values intentionally preserve the existing
  * fail-closed predicates until each operation has independent qualification. */
 static const PentaxModelCapabilities pentax_model_capability_table[] = {
-	{ PENTAX_MODEL_K1_MARK_II, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_K1_MARK_II, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 },
 	{ PENTAX_MODEL_K3_MARK_III, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
 	{ PENTAX_MODEL_K3_MARK_III_MONO, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
 	{ PENTAX_MODEL_KP, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 },
 	{ PENTAX_MODEL_K70, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 	{ PENTAX_MODEL_K3, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-	{ PENTAX_MODEL_K1, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_K1, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 },
 	{ PENTAX_MODEL_GR_III, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 	{ PENTAX_MODEL_645D, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
 	{ PENTAX_MODEL_645Z, PENTAX_FOCUS_FAMILY_OLD, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0 },
@@ -869,11 +869,11 @@ pentax_model_supports_card_writing_mode (uint32_t model_no)
 	return capabilities && capabilities->supports_card_writing_mode;
 }
 
-/* Writing file format (0xd01b): the IT2 payload layout for the K-3 III /
- * K-1 II family is the 10-byte form (byte 0 = 6, bytes 4/5 = file format,
+/* Writing file format (0xd01b): the IT2 payload layout for the K-1 / K-1 II /
+ * K-3 III family is the 10-byte form (byte 0 = 6, bytes 4/5 = file format,
  * byte 7 = JPEG quality, byte 8 = RAW kind, byte 9 = card slot).  The KP
  * uses a different 11-byte layout and the K-3 II is not in IT2 at all, so
- * fail closed on the k3iii family only (issues #54 and #55). */
+ * fail closed on this source-authorised family only (issues #54 and #55). */
 int
 pentax_model_supports_writing_file_format (uint32_t model_no)
 {

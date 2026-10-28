@@ -404,6 +404,12 @@ main (void)
 	CHECK (pentax_lookup_model (0x25fb, 0x0183,
 		"PENTAX K-1 Mark II", &model_no, &extension_version));
 	CHECK (!pentax_model_uses_new_focus (model_no));
+	CHECK (pentax_model_supports_writing_file_format (model_no));
+	CHECK (pentax_model_supports_writing_file_format (PENTAX_MODEL_K1));
+	CHECK (pentax_model_supports_writing_file_format (PENTAX_MODEL_K3_MARK_III));
+	CHECK (pentax_model_supports_writing_file_format (
+		PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (!pentax_model_supports_writing_file_format (PENTAX_MODEL_K3));
 	CHECK (!pentax_lookup_model (0x25fb, 0x0189,
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
 	CHECK (!pentax_lookup_model (0x1234, 0x0189, "PENTAX K-3 Mark III",
