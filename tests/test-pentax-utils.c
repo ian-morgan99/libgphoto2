@@ -715,18 +715,19 @@ main (void)
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K3));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_KP));
 
-	/* Research-capable PIDs (issue #19): only the three vendor bodies whose
-	 * capture flow we exercise may enter research paths. K-3 II (0x017b) is
+	/* Research-capable PIDs (issue #19): these are the vendor bodies with an
+	 * exact IMAGE Transmitter 2 model path. K-1 (0x0179) is source-authorised
+	 * but remains hardware-unqualified in this fork; K-3 II (0x017b) is
 	 * deliberately absent from IT2, so it must fail closed here too.
 	 * 0x0182 is the K-1 II's other declared product ID and is the same body as
 	 * 0x0183 (issue #179). */
+	CHECK (pentax_pid_is_research_capable (0x0179)); /* K-1, hardware pending */
 	CHECK (pentax_pid_is_research_capable (0x0183)); /* K-1 II */
 	CHECK (pentax_pid_is_research_capable (0x0182)); /* K-1 II, other PID */
 	CHECK (pentax_pid_is_research_capable (0x0189)); /* K-3 III */
 	CHECK (pentax_pid_is_research_capable (0x018f)); /* K-3 III Mono */
 	CHECK (!pentax_pid_is_research_capable (0x017b));
 	CHECK (!pentax_pid_is_research_capable (0x0185));
-	CHECK (!pentax_pid_is_research_capable (0x0179)); /* original K-1 */
 	CHECK (!pentax_pid_is_research_capable (0));
 
 	/* Transfer-timeout ordering (issue #38): a stalled stream must trip the

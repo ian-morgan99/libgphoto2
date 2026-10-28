@@ -179,7 +179,7 @@ and unknown mode IDs remain numeric.
 
 #### R0 — Contain unverified public capabilities (offline only)
 
-1. Remove `PTP_CAP` and `PTP_CAP_PREVIEW` from both new Pentax ability rows.
+1. Remove `PTP_CAP` and `PTP_CAP_PREVIEW` from the new Pentax ability rows.
 2. Compile-gate the Pentax capture/transfer dispatch off by default while
    retaining parser/state fixtures as offline research code.
 3. Confirm direct calls fail with `GP_ERROR_NOT_SUPPORTED` unless the research
@@ -191,14 +191,20 @@ and unknown mode IDs remain numeric.
 The only research opt-in is the compile-time
 `LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE` macro, for example by supplying
 `-Dc_args=-DLIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1` to a separate Meson
-build directory. There is deliberately no runtime preference. Ability flags
-remain suppressed even in that research build.
+build directory. There is deliberately no runtime preference. The research
+build advertises capture, preview and configuration only for exact Pentax PIDs
+with an IMAGE Transmitter 2 model path. It currently includes K-1
+(`0x0179`), K-1 II (`0x0182`/`0x0183`), K-3 III (`0x0189`) and K-3 III
+Monochrome (`0x018f`). Those flags are source-authorised access, not hardware
+qualification or an upstream support claim; each body still requires its own
+hardware row in the Pentax log.
 
 Exit: **PASS 2026-08-21.** Ordinary abilities suppress capture, preview, and
-trigger capture for both rows; a camera-list regression enforces this; default
-dispatch returns `GP_ERROR_NOT_SUPPORTED`; both camlibs compile together; the
-explicit research variant also compiles. Focused tests pass normally and under
-ASan/UBSan with leak detection. The deliberately restricted two-camlib full
+trigger capture for all research rows; a camera-list regression enforces this;
+default dispatch returns `GP_ERROR_NOT_SUPPORTED`; both camlibs compile
+together; the explicit research variant also compiles and exposes only the
+source-authorised PIDs above. Focused tests pass normally and under ASan/UBSan
+with leak detection. The deliberately restricted two-camlib full
 suite remains 7/10: `test-gp-port` requires host USB semantics,
 `test-gphoto2` expects the omitted Directory Browse camlib, and `test-filesys`
 fails under the same subset. These are recorded limitations, not passes.

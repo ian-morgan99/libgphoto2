@@ -3276,9 +3276,10 @@ camera_abilities (CameraAbilitiesList *list)
 		if (models[i].device_flags & PTP_CAP_PREVIEW)
 			a.operations |= GP_OPERATION_CAPTURE_PREVIEW;
 #ifdef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
-		/* Research builds only: advertise capture for the two
-		 * vendor Pentax bodies (R0 containment keeps them
-		 * suppressed in public builds). See DEVELOPMENT_PLAN.md R0.
+		/* Research builds only: advertise capture for the vendor Pentax
+		 * bodies with an exact IT2 model path (R0 containment keeps them
+		 * suppressed in public builds). Hardware qualification is tracked
+		 * separately; see DEVELOPMENT_PLAN.md R0.
 		 */
 		if ((models[i].usb_vendor == 0x25fb) &&
 		    pentax_pid_is_research_capable (models[i].usb_product)) {

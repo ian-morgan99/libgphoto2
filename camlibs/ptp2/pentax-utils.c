@@ -1231,8 +1231,16 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
 	}
 }
 
-/* Research builds only: the vendor Pentax bodies whose capture flow we
- * exercise. See DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome).
+/* Research builds only: the vendor Pentax bodies whose capture flow is
+ * authorised by the IMAGE Transmitter 2 model path. Hardware qualification
+ * remains a separate gate in the Pentax hardware log; adding a PID here does
+ * not turn an untested body into an upstream support claim. See
+ * DEVELOPMENT_PLAN.md R0 and issue #19 (K-3 III Monochrome).
+ *
+ * K-1 (0x0179) is included because IT2 has an exact model gate for model
+ * 77970, extension 1, new-transfer mode and the old-focus family. It shares
+ * the bounded generic capture path but has not yet had direct hardware
+ * qualification in this fork.
  * 0x0182 is the K-1 II's mass-storage product ID (issue #179).  A body that
  * presents it yet still exposes a PTP interface binds to the camlib as the same
  * hardware as 0x0183, so it must be treated identically here; otherwise it
@@ -1240,8 +1248,10 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
 int
 pentax_pid_is_research_capable (unsigned int pid)
 {
-	return (pid == 0x0182) || (pid == 0x0183) || (pid == 0x0189) ||
-	       (pid == 0x018f);
+	return (pid == 0x0179) || /* K-1 */
+	       (pid == 0x0182) || (pid == 0x0183) || /* K-1 II */
+	       (pid == 0x0189) || /* K-3 III */
+	       (pid == 0x018f);   /* K-3 III Monochrome */
 }
 
 /* A stalled camera (no bytes for a while) is a different failure from one

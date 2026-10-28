@@ -169,8 +169,12 @@ This section describes research code, not an ordinary advertised capability.
 Default builds return `GP_ERROR_NOT_SUPPORTED` from Pentax preview/capture
 dispatch before a vendor capture operation. The code can be reached only in a
 separate build compiled with
-`LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1`; even that build does not advertise
-capture, preview, or trigger-capture abilities.
+`LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1`; that research build advertises
+the source-authorised capture, preview and configuration abilities for the
+exact Pentax PIDs with an IMAGE Transmitter 2 model path. This remains an
+experimental access gate, not a hardware qualification or an upstream support
+claim: K-1, K-1 II, K-3 III and K-3 III Monochrome each require an independent
+hardware evidence row before being called supported.
 
 Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
 release mode 0, focus mode, manual-white-balance mode 0, sync mode 0, and

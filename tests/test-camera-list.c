@@ -299,7 +299,8 @@ main (int argc, char *argv[])
 #ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
 		if (!strcmp (camlib_basename, "ptp2") &&
 		    abilities.usb_vendor == 0x25fb &&
-		    (abilities.usb_product == 0x0182 ||	/* K-1 Mark II */
+		    (abilities.usb_product == 0x0179 ||	/* K-1 */
+		     abilities.usb_product == 0x0182 ||	/* K-1 Mark II */
 		     abilities.usb_product == 0x0183 ||	/* K-1 Mark II */
 		     abilities.usb_product == 0x0189 ||	/* K-3 Mark III */
 		     abilities.usb_product == 0x018f)) {	/* K-3 Mark III Monochrome */
@@ -309,6 +310,28 @@ main (int argc, char *argv[])
 			if (abilities.operations & forbidden) {
 				fprintf (stderr,
 					"Unverified Pentax capture ability advertised: %s (0x%x)\n",
+					abilities.model, abilities.operations);
+				exit (1);
+			}
+		}
+#else
+		/* The research build must advertise the complete source-authorised
+		 * set, including the original K-1.  This checks the public ability
+		 * surface without claiming that any of these bodies is hardware-
+		 * qualified. */
+		if (!strcmp (camlib_basename, "ptp2") &&
+		    abilities.usb_vendor == 0x25fb &&
+		    (abilities.usb_product == 0x0179 ||
+		     abilities.usb_product == 0x0182 ||
+		     abilities.usb_product == 0x0183 ||
+		     abilities.usb_product == 0x0189 ||
+		     abilities.usb_product == 0x018f)) {
+			unsigned int required = GP_OPERATION_CAPTURE_IMAGE |
+				GP_OPERATION_CAPTURE_PREVIEW |
+				GP_OPERATION_CONFIG;
+			if ((abilities.operations & required) != required) {
+				fprintf (stderr,
+					"Research Pentax capture ability missing: %s (0x%x)\n",
 					abilities.model, abilities.operations);
 				exit (1);
 			}
