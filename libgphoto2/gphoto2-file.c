@@ -66,12 +66,19 @@ static void
 polaris_capture_event (const char *filename)
 {
 	const char *ledger;
+	const char *media_root;
 	const char *suffix;
 	struct stat st;
 	FILE *fp;
 	time_t now;
+	size_t root_len;
 
-	if (!filename || strncmp (filename, "/app/sd/", 8))
+	media_root = getenv ("POLARIS_CAPTURE_EVENT_MEDIA_ROOT");
+	if (!media_root || !*media_root)
+		media_root = "/app/sd/";
+	root_len = strlen (media_root);
+	if (!filename || !root_len || media_root[root_len - 1] != '/' ||
+		strncmp (filename, media_root, root_len))
 		return;
 	suffix = strrchr (filename, '.');
 	if (!suffix || (strcasecmp (suffix, ".jpg") && strcasecmp (suffix, ".jpeg")))

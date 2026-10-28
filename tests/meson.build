@@ -215,6 +215,18 @@ test(
   env: gp_test_env,
 )
 
+test_polaris_capture_events_exe = executable(
+  'test-polaris-capture-events',
+  'test-polaris-capture-events.c',
+  dependencies: libgphoto2_dep,
+)
+
+test(
+  'test-polaris-capture-events',
+  test_polaris_capture_events_exe,
+  env: gp_test_env,
+)
+
 test_camera_list_exe = executable(
   'test-camera-list',
   'test-camera-list.c',
