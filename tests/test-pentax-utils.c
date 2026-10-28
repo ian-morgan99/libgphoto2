@@ -400,6 +400,56 @@ main (void)
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->supports_pc_live_view);
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K1_MARK_II)->focus_family ==
 		PENTAX_FOCUS_FAMILY_OLD);
+	/* Keep the source-authorised model boundaries explicit.  These are policy
+	 * fixtures, not claims that an unconnected body has been qualified.  In
+	 * particular, K-1/K-1 II use the old-focus family and dual-slot/file-format
+	 * controls, while the K-3 III family owns the newer live-view/CI controls.
+	 * This prevents a future capability-table edit from silently widening K-3
+	 * controls to the K-1 family or from giving Mono colour-only product gates. */
+	{
+		const PentaxModelCapabilities *k1ii =
+			pentax_model_capabilities (PENTAX_MODEL_K1_MARK_II);
+		const PentaxModelCapabilities *k1 =
+			pentax_model_capabilities (PENTAX_MODEL_K1);
+		const PentaxModelCapabilities *k3 =
+			pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III);
+
+		CHECK (k1ii && !k1ii->k3iii_family);
+		CHECK (k1ii->focus_family == PENTAX_FOCUS_FAMILY_OLD);
+		CHECK (!k1ii->supports_exp_bracket);
+		CHECK (!k1ii->supports_composition_adjust);
+		CHECK (!k1ii->supports_movie_setting);
+		CHECK (!k1ii->supports_pc_live_view);
+		CHECK (!k1ii->supports_cross_process);
+		CHECK (k1ii->supports_card_writing_mode);
+		CHECK (k1ii->supports_writing_file_format);
+		CHECK (!k1ii->supports_color_temperature);
+		CHECK (!k1ii->supports_ci_detail);
+
+		CHECK (k1 && !k1->k3iii_family);
+		CHECK (k1->focus_family == PENTAX_FOCUS_FAMILY_OLD);
+		CHECK (!k1->supports_exp_bracket);
+		CHECK (!k1->supports_composition_adjust);
+		CHECK (!k1->supports_movie_setting);
+		CHECK (!k1->supports_pc_live_view);
+		CHECK (!k1->supports_cross_process);
+		CHECK (k1->supports_card_writing_mode);
+		CHECK (k1->supports_writing_file_format);
+		CHECK (!k1->supports_color_temperature);
+		CHECK (!k1->supports_ci_detail);
+
+		CHECK (k3 && k3->k3iii_family);
+		CHECK (k3->focus_family == PENTAX_FOCUS_FAMILY_NEW);
+		CHECK (k3->supports_exp_bracket);
+		CHECK (k3->supports_composition_adjust);
+		CHECK (k3->supports_movie_setting);
+		CHECK (k3->supports_pc_live_view);
+		CHECK (k3->supports_cross_process);
+		CHECK (k3->supports_card_writing_mode);
+		CHECK (k3->supports_writing_file_format);
+		CHECK (k3->supports_color_temperature);
+		CHECK (k3->supports_ci_detail);
+	}
 	CHECK (pentax_model_capabilities (0) == NULL);
 	/* The Monochrome shares the K-3 III protocol family; IT2 matches it
 	 * with StartsWith("PENTAX K-3 Mark III") so it resolves to the same
