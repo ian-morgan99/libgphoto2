@@ -25,6 +25,8 @@ typedef struct {
 /* IMAGE Transmitter 2 vendor-model identifiers. */
 #define PENTAX_MODEL_K1_MARK_II 78400U
 #define PENTAX_MODEL_K3_MARK_III 78420U
+/* IT2 has a distinct model branch for the K-3 III Monochrome. */
+#define PENTAX_MODEL_K3_MARK_III_MONO 78550U
 #define PENTAX_MODEL_KP 78380U
 #define PENTAX_MODEL_K70 78370U
 #define PENTAX_MODEL_K3 77760U
@@ -451,6 +453,13 @@ int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 /* True only when the conditions frame permits a vendor-property write. */
 int pentax_conditions_are_idle (const PentaxConditions *conditions);
+
+/* Reproduce IMAGE Transmitter 2's live release-mode selection before an
+ * InitiateCapture action.  The AF-only action still uses focus mode 1; this
+ * helper supplies the current release mode rather than assuming normal still
+ * mode for every exposure/drive state. */
+int pentax_it2_release_mode (uint32_t vendor_ext_version,
+	const PentaxConditions *conditions, uint32_t *release_mode);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_old_focus_protocol_direction (int direction,

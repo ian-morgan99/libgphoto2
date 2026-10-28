@@ -12210,11 +12210,11 @@ _put_Sony_Autofocus(CONFIG_PUT_ARGS)
 	return GP_OK;
 }
 
-/* K-1 Mark II (old-focus) manual focus drive via 0x9016.  Image Transmitter
- * 2's FocusFineTune for old-focus models multiplies the UI step by 5 and
- * splits the sign: amount is absolute, direction is parameter 2 with
- * 0 = Near, 1 = Far (re-verified on real hardware 2026-09-14; the 5e5585002
- * mapping had these reversed).  One command per activation, no retries. */
+/* Old-focus manual focus drive via 0x9016.  Image Transmitter 2's
+ * FocusFineTune multiplies the UI step by 5 and splits the sign: amount is
+ * absolute, and its Far button sends direction 0 while its Near button sends
+ * direction 1.  The public action names use +1=Near and -1=Far.  One
+ * command per activation, no retries. */
 static int
 _get_Pentax_OldFocusDrive (CONFIG_GET_ARGS)
 {
@@ -12432,8 +12432,9 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 
 /* IMAGE Transmitter 2 CamAutoFocus: one Pentax InitiateCapture (0x9011)
  * with focus_mode=1. This is an AF-only action, not still capture and not a
- * zero-distance manual-focus command. Initially gate it to the K-3 III family,
- * whose PC-live-view/touch-AF contract is source-backed and field-testable. */
+ * zero-distance manual-focus command. The source passes the live release-mode
+ * selection from GetAllConditions; mwbMode and apertureReset remain zero in
+ * the checked IT2 source because it contains no setters for either field. */
 static int
 _get_Pentax_AutofocusDrive (CONFIG_GET_ARGS)
 {
@@ -12457,6 +12458,7 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	PentaxConditions conditions;
 	unsigned char *data = NULL;
 	unsigned int size = 0, attempt;
+	uint32_t release_mode;
 	uint16_t ptpres;
 	int val, result;
 
@@ -12469,6 +12471,8 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	result = _pentax_readiness_preflight (params, &conditions);
 	if (result < GP_OK)
 		return result;
+	CR (pentax_it2_release_mode (params->pentax.vendor_ext_version,
+		&conditions, &release_mode));
 	memset (&live_view, 0, sizeof (live_view));
 	ptpres = ptp_getdevicepropvalue (params,
 		PTP_DPC_PENTAX_UsbLiveViewMode, &live_view, PTP_DTC_UINT8);
@@ -12479,7 +12483,9 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 			_("Pentax autofocus drive requires active PC live view."));
 		return GP_ERROR_NOT_SUPPORTED;
 	}
-	ptpres = ptp_pentax_initiate_capture (params, 0, 1, 0, 0, 0);
+	GP_LOG_D ("Pentax autofocus drive: release_mode=%u, focus_mode=1, "
+		"mwb_mode=0, sync_mode=0, aperture_reset=0", release_mode);
+	ptpres = ptp_pentax_initiate_capture (params, release_mode, 1, 0, 0, 0);
 	if (ptpres != PTP_RC_OK)
 		return translate_ptp_result (ptpres);
 	/* Bounded proof that AF settles without creating a still-transfer
