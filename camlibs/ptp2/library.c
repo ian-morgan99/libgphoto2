@@ -3781,18 +3781,20 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			return GP_ERROR_NOT_SUPPORTED;
 		SET_CONTEXT_P (params, context);
 		if (!params->inliveview) {
-			ret = ptp_getdevicepropvalue (params,
-				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
-			if (ret != PTP_RC_OK) {
-				gp_context_status (context,
-					_("Pentax preview stage read-PC-LV returned 0x%04x."), ret);
-				if ((params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) &&
-				    (ret == PTP_ERROR_IO)) {
-					/* K-1 II returns an empty 0xd035 value and a datatype-zero
-					 * descriptor.  In a fresh non-live-view session, follow IT2's
-					 * direct start/stop path and restore explicitly to zero. */
-					value.u8 = 0;
-				} else {
+			if (pentax_model_uses_it2_direct_live_view_start (
+					params->pentax.model_no)) {
+				/* IMAGE Transmitter 2 does not GET d035 before starting PC-LV.
+				 * The K-1 family can reject that preliminary read even though
+				 * the source-defined SET d035=1 and 0x9006 frame operation work.
+				 * In a fresh session, IT2's stop path restores d035 explicitly to
+				 * zero. */
+				value.u8 = 0;
+			} else {
+				ret = ptp_getdevicepropvalue (params,
+					PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+				if (ret != PTP_RC_OK) {
+					gp_context_status (context,
+						_("Pentax preview stage read-PC-LV returned 0x%04x."), ret);
 					SET_CONTEXT_P (params, NULL);
 					return translate_ptp_result (ret);
 				}

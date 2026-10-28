@@ -67,8 +67,12 @@ event, and identity revalidation.
   response (`0xa005`, `0x201c`, `0xa00c`, and `0x2019`).
 - Assert the exact operation count and prove no command follows a terminal
   error.
-- For live view, record initial `0xd035`, `0xd036`, and `0xd037`; restore all
-  values even after frame failure, while preserving the first error.
+- For live view, record initial `0xd035`, `0xd036`, and `0xd037` where the
+  source path performs those reads. The IMAGE Transmitter 2 K-1/K-1 II
+  direct-start path deliberately does not pre-read `0xd035`; on a fresh
+  non-live-view session it restores the source-defined zero value after the
+  frame attempt. Restore all observed values even after frame failure, while
+  preserving the first error.
 - Accept only 8-byte-or-longer `0xd036` responses, with X/Y at offsets 4 and 6.
   Reject lengths 0–7 and out-of-area coordinates; never interpret a 4-byte
   response as the geometry centre (no byte-level evidence supports that form).

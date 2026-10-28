@@ -462,6 +462,9 @@ int pentax_model_supports_exp_bracket (uint32_t model_no);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);
+/* IMAGE Transmitter 2 starts PC live view directly on these bodies: it reads
+ * the live-view geometry, sets d035=1, and does not first GET d035. */
+int pentax_model_uses_it2_direct_live_view_start (uint32_t model_no);
 /* Format a shutter-speed UINT64 wire value (high 32 = denominator, low 32 =
  * numerator) for display: "Auto", "<n>s" for whole-second timer values
  * (Bulb timer), "1/<n>" and "<a>/<b>" for fractions.  Returns 0 on success. */
