@@ -142,34 +142,26 @@ int
 pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {
 	/* The standard K-3 III passed two direct-PC B-mode start/stop captures.
-	 * Keep Monochrome out until it has its own hardware pass; model lookup
-	 * currently maps both products to the K-3 III model number. Issue #95
-	 * remains open for natural-completion and stop-race qualification. */
+	 * Keep the Monochrome product out until it has its own hardware pass;
+	 * IMAGE Transmitter 2 maps both products to model 78420, so the USB PID is
+	 * the product-specific discriminator. Issue #95 remains open for natural-
+	 * completion and stop-race qualification. */
 	if (model_no == PENTAX_MODEL_K3_MARK_III)
 		return usb_product == 0x0189;
-	if (model_no == PENTAX_MODEL_K3_MARK_III_MONO)
-		return 0;
-	return 1;
+	return pentax_model_capabilities (model_no) != NULL;
 }
 
 unsigned int
 pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 {
-	/* IMAGE Transmitter 2 ShootingFormat: only PEF+JPEG and DNG+JPEG
-	 * advertise a second output.  In particular, value 2 is DNG-only; the
-	 * old four-value interpretation treated it as RAW+JPEG and caused the
-	 * capture path to wait for a JPEG that the camera was never going to
-	 * publish.  This remains a diagnostic/advisory helper; the capture path
-	 * must reconcile actual candidates rather than trust a stale condition. */
+	/* IMAGE Transmitter 2 WritingFormatSetting: value 2 is RAW+JPEG and
+	 * advertises a second output.  This remains a diagnostic/advisory helper;
+	 * the capture path must reconcile actual candidates rather than trust a
+	 * stale condition. */
 	if (!data || size < 528)
 		return 0;
-	switch (pentax_get_u32le (data + 524)) {
-	case PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG:
-	case PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG:
-		return 1U;
-	default:
-		return 0U;
-	}
+	return pentax_get_u32le (data + 524) ==
+		PTP_PENTAX_WRITING_FORMAT_RAW_JPEG ? 1U : 0U;
 }
 
 int
@@ -206,7 +198,7 @@ pentax_capture_output_contract_known (const unsigned char *data, size_t size)
 	if (!data || size < 528)
 		return 0;
 	format = pentax_get_u32le (data + 524);
-	return format <= PTP_PENTAX_SHOOTING_FORMAT_TIFF;
+	return format <= PTP_PENTAX_WRITING_FORMAT_TIFF;
 }
 
 PentaxAdmissionBlockReason
@@ -809,17 +801,45 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * model-number branch. The values intentionally preserve the existing
  * fail-closed predicates until each operation has independent qualification. */
 static const PentaxModelCapabilities pentax_model_capability_table[] = {
-	{ PENTAX_MODEL_K1_MARK_II, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 },
-	{ PENTAX_MODEL_K3_MARK_III, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-	{ PENTAX_MODEL_K3_MARK_III_MONO, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-	{ PENTAX_MODEL_KP, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 },
-	{ PENTAX_MODEL_K70, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-	{ PENTAX_MODEL_K3, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-	{ PENTAX_MODEL_K1, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 },
-	{ PENTAX_MODEL_GR_III, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-	{ PENTAX_MODEL_645D, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-	{ PENTAX_MODEL_645Z, PENTAX_FOCUS_FAMILY_OLD, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0 },
-	{ PENTAX_MODEL_KF, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+	{ .model_no = PENTAX_MODEL_K1_MARK_II,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_card_writing_mode = 1,
+	  .supports_writing_file_format = 1 },
+	{ .model_no = PENTAX_MODEL_K3_MARK_III,
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .k3iii_family = 1,
+	  .supports_exp_bracket = 1,
+	  .supports_composition_adjust = 1,
+	  .supports_movie_setting = 1,
+	  .supports_pc_live_view = 1,
+	  .supports_cross_process = 1,
+	  .supports_card_writing_mode = 1,
+	  .supports_writing_file_format = 1,
+	  .supports_color_temperature = 1,
+	  .supports_ci_detail = 1 },
+	{ .model_no = PENTAX_MODEL_KP,
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .supports_composition_adjust = 1 },
+	{ .model_no = PENTAX_MODEL_K70,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD },
+	{ .model_no = PENTAX_MODEL_K3,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_card_writing_mode = 1 },
+	{ .model_no = PENTAX_MODEL_K1,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_card_writing_mode = 1,
+	  .supports_writing_file_format = 1 },
+	{ .model_no = PENTAX_MODEL_GR_III,
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW },
+	{ .model_no = PENTAX_MODEL_645D,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_card_writing_mode = 1 },
+	{ .model_no = PENTAX_MODEL_645Z,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_exp_bracket = 1,
+	  .supports_card_writing_mode = 1 },
+	{ .model_no = PENTAX_MODEL_KF,
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD }
 };
 
 const PentaxModelCapabilities *
@@ -928,28 +948,22 @@ pentax_model_supports_ci_detail (uint32_t model_no)
 }
 
 /* Map imageformat labels to the 0xd01b bytes 4/5 values defined by the IT2
- * ShootingFormat contract.  The legacy RAW and RAW+JPEG labels are retained
- * for existing libgphoto2 clients and mean DNG and DNG+JPEG respectively,
- * which is the raw container used by the K-1 II and K-3 III evidence.  The
- * exact PEF/DNG labels are also accepted so a caller that needs the source
- * distinction can select it explicitly. */
+ * WritingFormatSetting contract.  PEF/DNG are not choices in this control:
+ * IT2 selects that raw container independently through RawKind (payload byte
+ * 8 / conditions offset 144). */
 int
 pentax_wff_format_byte (const char *value)
 {
 	if (!value)
 		return -1;
 	if (!strcmp (value, "JPEG"))
-		return PTP_PENTAX_SHOOTING_FORMAT_JPEG;
-	if (!strcmp (value, "PEF"))
-		return PTP_PENTAX_SHOOTING_FORMAT_PEF;
-	if (!strcmp (value, "DNG") || !strcmp (value, "RAW"))
-		return PTP_PENTAX_SHOOTING_FORMAT_DNG;
-	if (!strcmp (value, "PEF+JPEG"))
-		return PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG;
-	if (!strcmp (value, "DNG+JPEG") || !strcmp (value, "RAW+JPEG"))
-		return PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG;
+		return PTP_PENTAX_WRITING_FORMAT_JPEG;
+	if (!strcmp (value, "RAW"))
+		return PTP_PENTAX_WRITING_FORMAT_RAW;
+	if (!strcmp (value, "RAW+JPEG"))
+		return PTP_PENTAX_WRITING_FORMAT_RAW_JPEG;
 	if (!strcmp (value, "TIFF"))
-		return PTP_PENTAX_SHOOTING_FORMAT_TIFF;
+		return PTP_PENTAX_WRITING_FORMAT_TIFF;
 	return -1;
 }
 
@@ -966,8 +980,8 @@ pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
 		return 0;
 	if (payload[0] != (unsigned char)(size - 4))
 		return 0;
-	if (payload[4] > PTP_PENTAX_SHOOTING_FORMAT_TIFF ||
-		payload[5] > PTP_PENTAX_SHOOTING_FORMAT_TIFF)
+	if (payload[4] > PTP_PENTAX_WRITING_FORMAT_TIFF ||
+		payload[5] > PTP_PENTAX_WRITING_FORMAT_TIFF)
 		return 0;
 	if (payload[7] > 2)
 		return 0;
@@ -1307,15 +1321,15 @@ pentax_transfer_run (PentaxCaptureBuffer *buffer,
  * 77970, extension 1, new-transfer mode and the old-focus family. It shares
  * the bounded generic capture path but has not yet had direct hardware
  * qualification in this fork.
- * 0x0182 is the K-1 II's mass-storage product ID (issue #179).  A body that
- * presents it yet still exposes a PTP interface binds to the camlib as the same
- * hardware as 0x0183, so it must be treated identically here; otherwise it
- * misses the issue #33 stale-session recovery gated on pentax_candidate. */
+ * 0x0182 is the K-1 II's mass-storage product ID (issue #179). It is kept
+ * out of this PTP research-capability list because the ability row is
+ * intentionally empty; only the PTP product ID 0x0183 may advertise these
+ * controls. */
 int
 pentax_pid_is_research_capable (unsigned int pid)
 {
 	return (pid == 0x0179) || /* K-1 */
-	       (pid == 0x0182) || (pid == 0x0183) || /* K-1 II */
+	       (pid == 0x0183) || /* K-1 II PTP mode */
 	       (pid == 0x0189) || /* K-3 III */
 	       (pid == 0x018f);   /* K-3 III Monochrome */
 }

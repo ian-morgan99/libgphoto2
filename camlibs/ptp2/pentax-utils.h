@@ -25,10 +25,6 @@ typedef struct {
 /* IMAGE Transmitter 2 vendor-model identifiers. */
 #define PENTAX_MODEL_K1_MARK_II 78400U
 #define PENTAX_MODEL_K3_MARK_III 78420U
-/* Reserved: IT2 treats the Monochrome as model 78420 (StartsWith match);
- * lookup currently maps it to K3_MARK_III.  Keep this ID free until a
- * hardware difference justifies a distinct entry. */
-#define PENTAX_MODEL_K3_MARK_III_MONO 78421U
 #define PENTAX_MODEL_KP 78380U
 #define PENTAX_MODEL_K70 78370U
 #define PENTAX_MODEL_K3 77760U
@@ -332,10 +328,10 @@ int pentax_capture_initiate_response_ambiguous (uint16_t response);
 int pentax_capture_output_contract_known (const unsigned char *data, size_t size);
 
 /* Advisory minimum number of candidates expected after the primary candidate
- * has been finalized, derived from the IT2 ShootingFormat value in
- * GetAllConditions at +524. Values 3 (PEF+JPEG) and 4 (DNG+JPEG) publish two
- * output objects, so one companion remains. The capture path must not use a
- * stale advisory as proof that a companion is owed. */
+ * has been finalized, derived from the IT2 WritingFormatSetting value in
+ * GetAllConditions at +524. Value 2 (RAW+JPEG) indicates one companion. The
+ * capture path must not use a stale advisory as proof that a companion is
+ * owed. */
 unsigned int pentax_expected_extra_candidates (const unsigned char *data,
 	size_t size);
 

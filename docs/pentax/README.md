@@ -80,7 +80,8 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 
 - **Vendor mode enablement** replicating the vendor session handshake.
 - **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x0189),
-  K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D,
+  K-3 Mark III Monochrome (0x018f; IT2 model 78420 shared with K-3 III), KP,
+  K-70, K-3, K-1, GR III, 645D,
   plus firmware-derived entries for 645Z (0x0167) and KF (0x018e). The
   K-3 III standard PTP product ID is `0x0189`; `0x018f` is the independent
   Monochrome product ID.

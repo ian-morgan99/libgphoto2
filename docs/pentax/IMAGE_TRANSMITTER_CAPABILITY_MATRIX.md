@@ -1,8 +1,8 @@
 # IMAGE Transmitter 2 capability target matrix
 
-Revision: 2026-10-10 (content largely from 2026-08-21; the `0x0182` amendment
-below is from 2026-10-06, commit `f3a8ffebf`; held-Bulb hardware evidence below
-is from 2026-10-10).
+Revision: 2026-10-28 (content largely from 2026-08-21; the `0x0182` amendment
+below is from 2026-10-06, commit `f3a8ffebf`; the format-domain correction and
+model-gate audit are from 2026-10-28).
 
 This is the normative target for Pentax development in this fork. It
 consolidates the extraction previously split across `PENTAX_WIRE_PROTOCOL.md`,
@@ -73,7 +73,7 @@ that they fail *correctly*, not so that they work.
 |---|---:|:--:|:--:|---|
 | K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — primary development body; direct-PC B-mode held Bulb action PASS for four 1 s starts/stops on PTP PID `0x0189`, with saved DNG/JPEG and EXIF 1.064–1.073 s. This qualifies only the experimental held action, not timed natural completion or Polaris. |
 | K-1 Mark II | 78400 | yes | 3 | **HW-R / HW-W** — second qualified body |
-| K-3 Mark III Monochrome | 78421 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action |
+| K-3 Mark III Monochrome | 78420 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action; IT2's prefix model gate shares 78420 with the colour body |
 | KP | 78380 | yes | 3 | none. Classified **new-focus** (`0x9017`) by IT2's model table, unverified on hardware |
 | GR III | 78350 | yes | 2 | none. Also classified new-focus, unverified |
 | 645Z | 77840 | yes | 3 | none |
@@ -187,17 +187,21 @@ vendor capture/candidate workflow.
 | `0xd039` | movie mode | UINT8 boolean; movie gate | Both source target |
 
 `0xd01b` offsets are: 0 count/version (6 normally, 7 with current-slot field),
-4 and 5 the IT2 `ShootingFormat` enum (`0=JPEG`, `1=PEF`, `2=DNG`,
-`3=PEF+JPEG`, `4=DNG+JPEG`, `5=TIFF`), 6 still/movie size, 7 JPEG quality
-(`2-UI`), 8 RAW kind or movie frame rate (UI 2 maps to 3), 9 one-based card
-slot, and 10 one-based current slot for K-3 III. `TransFileFormat` is a
-different enum used as the type argument to `0x900b`
+4 and 5 the IT2 `WritingFormatSetting` (`0=JPEG`, `1=RAW`, `2=RAW+JPEG`,
+`3=TIFF`), 6 still/movie size, 7 JPEG quality (`2-UI`), 8 RAW kind or movie
+frame rate (UI 2 maps to 3), 9 one-based card slot, and 10 one-based current
+slot for K-3 III. `ShootingFormat` is a different status enum used for the
+actual output reported for SD1/SD2 at conditions offsets 464/468
+(`0=JPEG`, `1=PEF`, `2=DNG`, `3=PEF+JPEG`, `4=DNG+JPEG`, `5=TIFF`).
+`TransFileFormat` is a third enum used as the type argument to `0x900b`
 (`0=Capture`, `1=JPG`, `2=PEF`, `3=DNG`, `4=TIFF`, `253=Full`, `254=Sub`,
 `255=Thumb`). It requires a fresh, byte-preserving read-modify-write; no
 mutation is allowed until each body’s returned form is captured and
-fixture-tested. Generic `imageformat` keeps the legacy `RAW`/`RAW+JPEG`
-vocabulary for Benro clients, but encodes those aliases as DNG/DNG+JPEG; the
-exact PEF/DNG labels remain available for callers that need the distinction.
+fixture-tested. The generic `imageformat` widget for the currently enabled
+K-1/K-1 II/K-3 III/Monochrome path deliberately exposes only `JPEG`, `RAW`,
+and `RAW+JPEG`; PEF/DNG selection belongs to the separate RawKind control.
+TIFF is source-defined for the 645Z UI and is not accepted by the current
+modern-family gate.
 
 ## Complete condition-layout target
 

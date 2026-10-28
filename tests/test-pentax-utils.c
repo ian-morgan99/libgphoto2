@@ -138,7 +138,7 @@ main (void)
 	CHECK (pentax_bulb_action_model_supported (PENTAX_MODEL_K1_MARK_II, 0x0183));
 	CHECK (pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III, 0x0189));
 	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III, 0x018f));
-	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III_MONO, 0x018f));
+	CHECK (!pentax_bulb_action_model_supported (0, 0));
 
 	/* Camera-timed Bulb fallback (#239): pgphoto drives "Bulb with seconds
 	 * selected" by sleeping between its start and stop edges, so the requested
@@ -193,8 +193,6 @@ main (void)
 		0x018f));
 	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K1_MARK_II,
 		0x0183));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III_MONO,
-		0x018f));
 	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_KP, 0x017f));
 	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K70, 0x017d));
 	CHECK (!pentax_shutter_list_may_synthesise_bulb (0, 0));
@@ -234,8 +232,8 @@ main (void)
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
 
-	/* Keep the wire constants aligned with IMAGE Transmitter 2's MtpOpCode
-	 * and ShootingFormat/TransFileFormat declarations. */
+	/* Keep the wire constants aligned with IMAGE Transmitter 2's MtpOpCode,
+	 * ShootingFormat, WritingFormatSetting, and TransFileFormat declarations. */
 	CHECK (PTP_OC_PENTAX_GetTransferCandidateFileInfo == 0x900b);
 	CHECK (PTP_OC_PENTAX_GetCamFileOperationCommand == 0x900c);
 	CHECK (PTP_OC_PENTAX_GetTransferFileDataBlock == 0x900d);
@@ -250,6 +248,10 @@ main (void)
 	CHECK (PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG == 3);
 	CHECK (PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG == 4);
 	CHECK (PTP_PENTAX_SHOOTING_FORMAT_TIFF == 5);
+	CHECK (PTP_PENTAX_WRITING_FORMAT_JPEG == 0);
+	CHECK (PTP_PENTAX_WRITING_FORMAT_RAW == 1);
+	CHECK (PTP_PENTAX_WRITING_FORMAT_RAW_JPEG == 2);
+	CHECK (PTP_PENTAX_WRITING_FORMAT_TIFF == 3);
 	CHECK (PTP_PENTAX_TRANSFER_FILE_CAPTURE == 0);
 	CHECK (PTP_PENTAX_TRANSFER_FILE_JPEG == 1);
 	CHECK (PTP_PENTAX_TRANSFER_FILE_PEF == 2);
@@ -271,15 +273,14 @@ main (void)
 	CHECK (pentax_wff_quality_byte ("FINE") == -1);   /* case-sensitive */
 	CHECK (pentax_wff_quality_byte (NULL) == -1);
 	CHECK (pentax_wff_format_byte ("JPEG") == 0);
-	CHECK (pentax_wff_format_byte ("PEF") == 1);
-	CHECK (pentax_wff_format_byte ("DNG") == 2);
-	CHECK (pentax_wff_format_byte ("PEF+JPEG") == 3);
-	CHECK (pentax_wff_format_byte ("DNG+JPEG") == 4);
-	CHECK (pentax_wff_format_byte ("TIFF") == 5);
-	/* Legacy generic labels are deliberately DNG-based for the K-1 II/K-3 III
-	 * control surface. */
-	CHECK (pentax_wff_format_byte ("RAW") == 2);
-	CHECK (pentax_wff_format_byte ("RAW+JPEG") == 4);
+	CHECK (pentax_wff_format_byte ("RAW") == 1);
+	CHECK (pentax_wff_format_byte ("RAW+JPEG") == 2);
+	CHECK (pentax_wff_format_byte ("TIFF") == 3);
+	/* PEF/DNG are RawKind values, not imageformat choices. */
+	CHECK (pentax_wff_format_byte ("PEF") == -1);
+	CHECK (pentax_wff_format_byte ("DNG") == -1);
+	CHECK (pentax_wff_format_byte ("PEF+JPEG") == -1);
+	CHECK (pentax_wff_format_byte ("DNG+JPEG") == -1);
 	CHECK (pentax_wff_format_byte ("jpeg") == -1);
 	CHECK (pentax_wff_format_byte (NULL) == -1);
 	{
@@ -289,12 +290,12 @@ main (void)
 		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
 		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		CHECK (pentax_wff_payload_is_valid (wff11, sizeof (wff11)));
+		wff10[4] = 3;
+		wff10[5] = 3;
+		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		wff10[4] = 4;
 		wff10[5] = 4;
-		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
-		wff10[4] = 5;
-		wff10[5] = 5;
-		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
+		CHECK (!pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		malformed_wff[0] = 6;
 		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
 			sizeof (malformed_wff)));
@@ -489,18 +490,18 @@ main (void)
 		CHECK (k3->supports_ci_detail);
 	}
 	CHECK (pentax_model_capabilities (0) == NULL);
-	/* The Monochrome shares the K-3 III protocol family; IT2 matches it
-	 * with StartsWith("PENTAX K-3 Mark III") so it resolves to the same
-	 * model_no 78420 and all K-3 III capability flags. */
+	/* The Monochrome has its own USB product code but shares the K-3 III
+	 * protocol model; IT2 matches it with StartsWith("PENTAX K-3 Mark III")
+	 * so it resolves to model_no 78420 and the shared generic-control flags. */
 	CHECK (pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
 	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
 		(extension_version == 1));
-	/* Test the model ID that the real lookup returns, not the reserved
-	 * distinct enum.  library.c stores this lookup result in params->pentax,
-	 * so that is the ID used by the actual config/focus dispatch.  The product
-	 * ID remains available to product-specific gates, which keep held-Bulb
-	 * fail-closed until the Mono body has its own hardware qualification. */
+	/* Test the model ID that the real lookup returns. library.c stores this
+	 * lookup result in params->pentax, so that is the ID used by the actual
+	 * config/focus dispatch. The product ID remains available to product-
+	 * specific gates, which keep held-Bulb fail-closed until the Mono body has
+	 * its own hardware qualification. */
 	CHECK (pentax_model_supports_exp_bracket (model_no));
 	CHECK (pentax_model_supports_composition_adjust (model_no));
 	CHECK (pentax_model_supports_movie_setting (model_no));
@@ -521,8 +522,6 @@ main (void)
 	CHECK (pentax_model_supports_writing_file_format (model_no));
 	CHECK (pentax_model_supports_writing_file_format (PENTAX_MODEL_K1));
 	CHECK (pentax_model_supports_writing_file_format (PENTAX_MODEL_K3_MARK_III));
-	CHECK (pentax_model_supports_writing_file_format (
-		PENTAX_MODEL_K3_MARK_III_MONO));
 	CHECK (!pentax_model_supports_writing_file_format (PENTAX_MODEL_K3));
 	CHECK (!pentax_lookup_model (0x25fb, 0x0189,
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
@@ -823,7 +822,6 @@ main (void)
 	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K1));
 	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3));
 	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3_MARK_III));
-	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_K3_MARK_III_MONO));
 	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_645D));
 	CHECK (pentax_model_supports_card_writing_mode (PENTAX_MODEL_645Z));
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_KP));
@@ -834,7 +832,6 @@ main (void)
 	/* Cross process (d02c): K-1 II probe (2026-09-02) shows GET/SET
 	 * unsupported even in cross-process mode, so gate on k3iii family. */
 	CHECK (pentax_model_supports_cross_process (PENTAX_MODEL_K3_MARK_III));
-	CHECK (pentax_model_supports_cross_process (PENTAX_MODEL_K3_MARK_III_MONO));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K1_MARK_II));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K1));
 	CHECK (!pentax_model_supports_cross_process (PENTAX_MODEL_K3));
@@ -848,7 +845,7 @@ main (void)
 	 * 0x0183 (issue #179). */
 	CHECK (pentax_pid_is_research_capable (0x0179)); /* K-1, hardware pending */
 	CHECK (pentax_pid_is_research_capable (0x0183)); /* K-1 II */
-	CHECK (pentax_pid_is_research_capable (0x0182)); /* K-1 II, other PID */
+	CHECK (!pentax_pid_is_research_capable (0x0182)); /* K-1 II MSC mode */
 	CHECK (pentax_pid_is_research_capable (0x0189)); /* K-3 III */
 	CHECK (pentax_pid_is_research_capable (0x018f)); /* K-3 III Mono */
 	CHECK (!pentax_pid_is_research_capable (0x017b));
@@ -1322,12 +1319,13 @@ main (void)
 	/* A short/unknown format must not silently become a one-file capture. */
 	CHECK (!pentax_capture_output_contract_known (NULL, 0));
 	CHECK (!pentax_capture_output_contract_known (condition_data, 527));
-	for (i = 0; i <= 5; i++) {
+	for (i = 0; i <= PTP_PENTAX_WRITING_FORMAT_TIFF; i++) {
 		put_u32le (condition_data, 524, i);
 		CHECK (pentax_capture_output_contract_known (condition_data,
 			sizeof (condition_data)));
 		CHECK (pentax_expected_extra_candidates (condition_data,
-			sizeof (condition_data)) == ((i == 3 || i == 4) ? 1U : 0U));
+			sizeof (condition_data)) == (i ==
+			PTP_PENTAX_WRITING_FORMAT_RAW_JPEG ? 1U : 0U));
 	}
 	put_u32le (condition_data, 524, 6);
 	CHECK (!pentax_capture_output_contract_known (condition_data,

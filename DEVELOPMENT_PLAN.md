@@ -192,10 +192,11 @@ The only research opt-in is the compile-time
 `LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE` macro, for example by supplying
 `-Dc_args=-DLIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE=1` to a separate Meson
 build directory. There is deliberately no runtime preference. The research
-build advertises capture, preview and configuration only for exact Pentax PIDs
-with an IMAGE Transmitter 2 model path. It currently includes K-1
-(`0x0179`), K-1 II (`0x0182`/`0x0183`), K-3 III (`0x0189`) and K-3 III
-Monochrome (`0x018f`). Those flags are source-authorised access, not hardware
+build advertises capture, preview and configuration only for exact Pentax PTP
+PIDs with an IMAGE Transmitter 2 model path. It currently includes K-1
+(`0x0179`), K-1 II PTP mode (`0x0183`), K-3 III (`0x0189`) and K-3 III
+Monochrome (`0x018f`). K-1 II `0x0182` is MSC-only and remains an empty
+ability row. Those flags are source-authorised access, not hardware
 qualification or an upstream support claim; each body still requires its own
 hardware row in the Pentax log.
 

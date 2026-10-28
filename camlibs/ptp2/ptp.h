@@ -295,10 +295,10 @@ typedef enum {
 #define PTP_OC_PENTAX_ExecuteDustReduction		0x9022
 #define PTP_OC_PENTAX_GeneralCommand			0x97ff
 
-/* IMAGE Transmitter 2's ShootingFormat values used by the Pentax
- * WritingFileFormatSetting condition and the 0xd01b payload bytes 4/5.  Do
- * not collapse these into the four generic labels used by older callers:
- * PEF and DNG, and their two dual-format variants, are distinct values. */
+/* IMAGE Transmitter 2's ShootingFormat values.  These describe the actual
+ * format reported for a card output slot at GetAllConditions offsets 464/468.
+ * They are not the values used by the generic imageformat control or by the
+ * 0xd01b WritingFileFormatSetting bytes 4/5. */
 enum pentax_shooting_format {
 	PTP_PENTAX_SHOOTING_FORMAT_JPEG = 0,
 	PTP_PENTAX_SHOOTING_FORMAT_PEF = 1,
@@ -306,6 +306,19 @@ enum pentax_shooting_format {
 	PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG = 3,
 	PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG = 4,
 	PTP_PENTAX_SHOOTING_FORMAT_TIFF = 5
+};
+
+/* IMAGE Transmitter 2's WritingFormatSetting values.  These are the generic
+ * FileFormatCbx indices sent to the 0xd01b compound property and reported by
+ * GetAllConditions at offset 524.  Raw container selection (PEF versus DNG)
+ * is a separate RawKind field at offset 144 / payload byte 8.  TIFF is a
+ * source-defined value for the 645Z UI; the currently enabled K-1/K-1 II/
+ * K-3 III/Monochrome controls deliberately expose only 0..2. */
+enum pentax_writing_format_setting {
+	PTP_PENTAX_WRITING_FORMAT_JPEG = 0,
+	PTP_PENTAX_WRITING_FORMAT_RAW = 1,
+	PTP_PENTAX_WRITING_FORMAT_RAW_JPEG = 2,
+	PTP_PENTAX_WRITING_FORMAT_TIFF = 3
 };
 
 /* IMAGE Transmitter 2's type argument for GetTransferCandidateFileInfo.

@@ -11087,8 +11087,9 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
  * The IT2 writing-file-format contract uses a 10- or 11-byte payload
  * on the K-1 / K-1 II / K-3 III family:
  *   byte 0  = 6 (payload length marker)
- *   bytes 4,5 = IT2 ShootingFormat (JPEG=0, PEF=1, DNG=2, PEF+JPEG=3,
- *               DNG+JPEG=4, TIFF=5; IT2 writes the same value to both bytes)
+ *   bytes 4,5 = IT2 WritingFormatSetting (JPEG=0, RAW=1, RAW+JPEG=2,
+ *               TIFF=3; IT2 writes the same value to both bytes).  PEF/DNG
+ *               selection is separate RawKind state in byte 8.
  *   byte 6  = image size code
  *   byte 7  = JPEG quality (IT2: 2 - stars, so 0=fine/3-star, 1=normal,
  *               2=basic/1-star)
@@ -11199,35 +11200,27 @@ _get_Pentax_ImageFormat (CONFIG_GET_ARGS)
 	format = pentax_get_u32le (cdata + 524);
 	free (cdata);
 	switch (format) {
-	case PTP_PENTAX_SHOOTING_FORMAT_PEF:
-	case PTP_PENTAX_SHOOTING_FORMAT_DNG:
-		/* Preserve the generic libgphoto2 value consumed by Benro while
-		 * retaining the exact source value in the debug trace below. */
-		label = "RAW";
-		break;
-	case PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG:
-	case PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG:
-		label = "RAW+JPEG";
-		break;
-	case PTP_PENTAX_SHOOTING_FORMAT_TIFF: label = "TIFF"; break;
-	case PTP_PENTAX_SHOOTING_FORMAT_JPEG: label = "JPEG"; break;
-	default: label = "JPEG"; break;
+	case PTP_PENTAX_WRITING_FORMAT_JPEG: label = "JPEG"; break;
+	case PTP_PENTAX_WRITING_FORMAT_RAW: label = "RAW"; break;
+	case PTP_PENTAX_WRITING_FORMAT_RAW_JPEG: label = "RAW+JPEG"; break;
+	case PTP_PENTAX_WRITING_FORMAT_TIFF:
+		/* TIFF is a source-defined 645Z setting, not a choice exposed by
+		 * the currently enabled K-1/K-1 II/K-3 III family gate. */
+		GP_LOG_E ("Pentax image format: unsupported TIFF writing setting %u",
+			format);
+		return GP_ERROR_NOT_SUPPORTED;
+	default:
+		GP_LOG_E ("Pentax image format: unknown WritingFormatSetting %u",
+			format);
+		return GP_ERROR_CORRUPTED_DATA;
 	}
-	GP_LOG_D ("Pentax image format: IT2 ShootingFormat=%u, generic=%s",
+	GP_LOG_D ("Pentax image format: IT2 WritingFormatSetting=%u, generic=%s",
 		format, label);
 	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
 	gp_widget_add_choice (*widget, "JPEG");
-	/* Keep the old generic choices for Benro/libgphoto2 clients.  The exact
-	 * source-defined choices follow them so callers can distinguish PEF from
-	 * DNG without changing the legacy vocabulary. */
 	gp_widget_add_choice (*widget, "RAW");
 	gp_widget_add_choice (*widget, "RAW+JPEG");
-	gp_widget_add_choice (*widget, "TIFF");
-	gp_widget_add_choice (*widget, "PEF");
-	gp_widget_add_choice (*widget, "DNG");
-	gp_widget_add_choice (*widget, "PEF+JPEG");
-	gp_widget_add_choice (*widget, "DNG+JPEG");
 	gp_widget_set_value (*widget, label);
 	return GP_OK;
 }
@@ -11252,6 +11245,11 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 	format = pentax_wff_format_byte (value);
 	if (format < 0)
 		return GP_ERROR_BAD_PARAMETERS;
+	/* The current model gate exposes the three generic choices only.  Do not
+	 * accept the source-defined 645Z TIFF value until that model has its own
+	 * compound-payload qualification. */
+	if (format == PTP_PENTAX_WRITING_FORMAT_TIFF)
+		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_readiness_preflight (params, &conditions);
 	if (result < GP_OK)
 		return result;

@@ -299,8 +299,7 @@ main (int argc, char *argv[])
 #ifndef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
 		if (!strcmp (camlib_basename, "ptp2") &&
 		    abilities.usb_vendor == 0x25fb &&
-		    (abilities.usb_product == 0x0179 ||	/* K-1 */
-		     abilities.usb_product == 0x0182 ||	/* K-1 Mark II */
+		     (abilities.usb_product == 0x0179 ||	/* K-1 */
 		     abilities.usb_product == 0x0183 ||	/* K-1 Mark II */
 		     abilities.usb_product == 0x0189 ||	/* K-3 Mark III */
 		     abilities.usb_product == 0x018f)) {	/* K-3 Mark III Monochrome */
@@ -322,7 +321,6 @@ main (int argc, char *argv[])
 		if (!strcmp (camlib_basename, "ptp2") &&
 		    abilities.usb_vendor == 0x25fb &&
 		    (abilities.usb_product == 0x0179 ||
-		     abilities.usb_product == 0x0182 ||
 		     abilities.usb_product == 0x0183 ||
 		     abilities.usb_product == 0x0189 ||
 		     abilities.usb_product == 0x018f)) {
@@ -337,6 +335,23 @@ main (int argc, char *argv[])
 			}
 		}
 #endif
+		/* The K-1 II MSC identity must remain a named, empty PTP ability row
+		 * even in a research build. Its storage path is handled by the legacy
+		 * USB-SCSI/Directory Browse support, not by ptp2 controls. */
+		if (!strcmp (camlib_basename, "ptp2") &&
+		    abilities.usb_vendor == 0x25fb &&
+		    abilities.usb_product == 0x0182) {
+			unsigned int forbidden = GP_OPERATION_CAPTURE_IMAGE |
+				GP_OPERATION_CAPTURE_PREVIEW |
+				GP_OPERATION_TRIGGER_CAPTURE |
+				GP_OPERATION_CONFIG;
+			if (abilities.operations & forbidden) {
+				fprintf (stderr,
+					"K-1 II MSC ability row is not empty: %s (0x%x)\n",
+					abilities.model, abilities.operations);
+				exit (1);
+			}
+		}
 		if (!strcmp(lastmodel, abilities.model)) {
 			fprintf(stderr,"Duplicated model name in camera list: %s\n", lastmodel);
 			exit(1);

@@ -57,7 +57,7 @@ typedef struct {
         int short_conditions;        /* successful call with incomplete frame */
         int conditions_empty_first;  /* report empty for the first N reads */
         int active_empty_first;      /* report processing while empty */
-        int writing_format;          /* +524: IT2 ShootingFormat value */
+		int writing_format;          /* +524: IT2 WritingFormatSetting value */
         int conditions_calls;
         int transfer_error;          /* non-zero: transfer_candidate fails */
         int publication_error;       /* transfer succeeded, file publication failed */
@@ -437,8 +437,8 @@ main (void)
         CHECK (count == 0);
         CHECK (mock.conditions_calls == 1);
 
-        /* 12. The IT2 enum is exact: 2=DNG-only, 3=PEF+JPEG, 4=DNG+JPEG.
-         * Pixel Shift exposure count is deliberately irrelevant. */
+		/* 12. +524 is the generic WritingFormatSetting: 2=RAW+JPEG, while
+		 * 0=JPEG, 1=RAW, and 3=TIFF do not advertise a companion. */
         {
                 unsigned char conditions[528] = {0};
                 CHECK (pentax_expected_extra_candidates (conditions, 527) == 0);
@@ -447,11 +447,11 @@ main (void)
                 put_u32le (conditions, 524, 1);
                 CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
                 put_u32le (conditions, 524, 2);
-                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
                 put_u32le (conditions, 524, 3);
-                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
                 put_u32le (conditions, 524, 4);
-                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
                 put_u32le (conditions, 524, 5);
                 CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
         }
