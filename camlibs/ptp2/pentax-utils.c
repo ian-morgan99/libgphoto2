@@ -639,6 +639,39 @@ pentax_conditions_are_idle (const PentaxConditions *conditions)
 }
 
 int
+pentax_it2_release_mode (uint32_t vendor_ext_version,
+	const PentaxConditions *conditions, uint32_t *release_mode)
+{
+	uint32_t mode;
+
+	if (!conditions || !release_mode)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* IT2 leaves the release mode at its initial value for extension version
+	 * zero (the 645D branch).  The later models derive it from live conditions
+	 * before CamAutoFocus and CamRelease send 0x9011. */
+	if (vendor_ext_version == 0) {
+		*release_mode = 0;
+		return GP_OK;
+	}
+	if (((conditions->exposure_mode == 9) ||
+	     (conditions->exposure_mode == 12) ||
+	     (conditions->exposure_mode == PENTAX_EXP_MODE_ASTROTRACER)) &&
+	    !(conditions->capability_flags & PENTAX_CONDITION_BULB_TIMER))
+		mode = 2;
+	else if (conditions->activity_flags & PENTAX_CONDITION_ACTIVITY_MOVIE_MODE)
+		mode = 3;
+	else
+		mode = 0;
+	/* IT2's continuous-drive cases override the exposure/movie selection. */
+	if ((conditions->drive_mode == 4) ||
+	    (conditions->drive_mode == 5) ||
+	    (conditions->drive_mode == 6))
+		mode = 1;
+	*release_mode = mode;
+	return GP_OK;
+}
+
+int
 pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 		int32_t *displacement)
 {
