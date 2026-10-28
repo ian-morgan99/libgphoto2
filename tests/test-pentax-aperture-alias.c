@@ -277,6 +277,25 @@ main (void)
 	CHECK (gp_widget_get_value (capturetarget, &ct_value) == GP_OK);
 	CHECK (ct_value && !strcmp (ct_value, "Internal RAM"));
 
+	/* The generic capture-policy widget is virtual state consumed by the
+	 * capture path; it must be discoverable independently of immediate AF or
+	 * manual lens movement. */
+	CameraWidget *autofocus_policy = NULL;
+	ret = get_single (cam, "autofocus", &autofocus_policy, context);
+	CHECK (ret == GP_OK && autofocus_policy != NULL);
+	CHECK (gp_widget_get_type (autofocus_policy, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	CHECK (gp_widget_count_choices (autofocus_policy) == 2);
+
+	/* The K-1 is a separate old-focus model, but shares this virtual policy
+	 * surface with the K-1 II and must not require a live AF command. */
+	cam->pl->params.pentax.model_no = PENTAX_MODEL_K1;
+	autofocus_policy = NULL;
+	ret = get_single (cam, "autofocus", &autofocus_policy, context);
+	CHECK (ret == GP_OK && autofocus_policy != NULL);
+	CHECK (gp_widget_get_type (autofocus_policy, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+
 	/* The same public generic manual-focus widget must be present on both
 	 * focus families.  The handler chooses 0x9016 or 0x9017 only when the
 	 * action is written; this fixture checks the model-gated widget surface
@@ -308,7 +327,17 @@ main (void)
 	CHECK (ret == GP_OK && autofocus_drive != NULL);
 	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
+	autofocus_policy = NULL;
+	ret = get_single (cam, "autofocus", &autofocus_policy, context);
+	CHECK (ret == GP_OK && autofocus_policy != NULL);
+	CHECK (gp_widget_get_type (autofocus_policy, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
 	cam->pl->params.pentax.usb_product = 0x018f;
+	autofocus_policy = NULL;
+	ret = get_single (cam, "autofocus", &autofocus_policy, context);
+	CHECK (ret == GP_OK && autofocus_policy != NULL);
+	CHECK (gp_widget_get_type (autofocus_policy, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
 	autofocus_drive = NULL;
 	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
 	CHECK (ret == GP_OK && autofocus_drive != NULL);

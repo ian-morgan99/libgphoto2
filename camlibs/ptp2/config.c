@@ -13964,6 +13964,30 @@ _put_Autofocus(CONFIG_PUT_ARGS) {
 	return GP_OK;
 }
 
+/* Pentax uses the same virtual capture-policy setting as the other PTP2
+ * vendors, but it must be bounded by the Pentax vendor-mode/model gate.  This
+ * setting controls whether the later capture path requests AF; it is not an
+ * immediate autofocus action and must not be conflated with autofocusdrive. */
+static int
+_get_Pentax_AutofocusPolicy (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	return _get_Autofocus (camera, widget, menu, dpd);
+}
+
+static int
+_put_Pentax_AutofocusPolicy (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	return _put_Autofocus (camera, widget, propval, dpd, alreadyset);
+}
+
 /* Wifi profiles functions */
 
 static int
@@ -14699,6 +14723,7 @@ static struct submenu camera_settings_menu[] = {
 	{ N_("Capture Target"),         "capturetarget",0,  PTP_VENDOR_PANASONIC,0, _get_CaptureTarget,     _put_CaptureTarget },
 	{ N_("Capture Target"),         "capturetarget",PTP_DPC_SONY_StillImageStoreDestination,  PTP_VENDOR_SONY,0, _get_Sony_CaptureTarget, _put_Sony_CaptureTarget },
 	{ N_("Capture Target"),         "capturetarget",0,  PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropValue, _get_Pentax_CaptureTarget, _put_Pentax_CaptureTarget },
+	{ N_("Autofocus"),              "autofocus",    0,  PTP_VENDOR_PENTAX,  0,  _get_Pentax_AutofocusPolicy, _put_Pentax_AutofocusPolicy },
 	{ N_("CHDK"),                   "chdk",         PTP_OC_CHDK,  PTP_VENDOR_CANON, 0, _get_CHDK,       _put_CHDK },
 	{ N_("Capture"),                "capture",      0,  PTP_VENDOR_CANON,   0,  _get_Canon_CaptureMode, _put_Canon_CaptureMode },
 	{ N_("Remote Mode"),            "remotemode",   PTP_OC_CANON_EOS_SetRemoteMode, PTP_VENDOR_CANON, 0, _get_Canon_RemoteMode, _put_Canon_RemoteMode },
