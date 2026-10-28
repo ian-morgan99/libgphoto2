@@ -39,6 +39,7 @@
 #include "libgphoto2/i18n.h"
 
 #include "pslr.h"
+#include "pslr_utils.h"
 
 
 bool debug = true;
@@ -48,6 +49,45 @@ struct _CameraPrivateLibrary {
 	char		*lastfn;
 	int		capcnt;
 };
+
+static int
+pslr_result_to_gp (int result)
+{
+	if (result == PSLR_OK)
+		return GP_OK;
+	if (result == PSLR_PARAM)
+		return GP_ERROR_BAD_PARAMETERS;
+	return GP_ERROR;
+}
+
+static void
+pslr_add_iso_choices (CameraWidget *widget, pslr_handle_t p, uint32_t current)
+{
+	static const int iso_values[] = {
+		80, 100, 125, 160, 200, 250, 320, 400, 500, 640,
+		800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000,
+		6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000,
+		40000, 51200, 64000, 80000, 102400, 204800, 409600, 819200
+	};
+	int minimum = pslr_get_model_extended_iso_min (p);
+	int maximum = pslr_get_model_extended_iso_max (p);
+	char value[20];
+	unsigned int i;
+	bool current_is_listed = false;
+
+	for (i = 0; i < sizeof (iso_values) / sizeof (iso_values[0]); i++) {
+		if (iso_values[i] < minimum || iso_values[i] > maximum)
+			continue;
+		snprintf (value, sizeof (value), "%d", iso_values[i]);
+		gp_widget_add_choice (widget, value);
+		if ((uint32_t) iso_values[i] == current)
+			current_is_listed = true;
+	}
+	if (current > 0 && !current_is_listed) {
+		snprintf (value, sizeof (value), "%u", current);
+		gp_widget_add_choice (widget, value);
+	}
+}
 
 int
 camera_id (CameraText *id)
@@ -671,10 +711,12 @@ camera_get_config (Camera *camera, CameraWidget **window, GPContext *context)
 		gp_widget_add_choice (t, buf);
 	}
 
-	if (status.jpeg_resolution > 0 && status.jpeg_resolution < MAX_RESOLUTION_SIZE) {
+	if (status.jpeg_resolution < MAX_RESOLUTION_SIZE &&
+	    available_resolutions[status.jpeg_resolution] > 0) {
 		char buf[20];
 
-		sprintf(buf, "%d", status.jpeg_resolution);
+		sprintf(buf, "%d", pslr_get_jpeg_resolution (&camera->pl->pslr,
+								status.jpeg_resolution));
 		gp_widget_set_value (t, buf);
 	} else
 		gp_widget_set_value (t, _("Unknown"));
@@ -693,12 +735,7 @@ camera_get_config (Camera *camera, CameraWidget **window, GPContext *context)
 
 	gp_widget_new (GP_WIDGET_RADIO, _("ISO"), &t);
 	gp_widget_set_name (t, "iso");
-	gp_widget_add_choice (t, "100");
-	gp_widget_add_choice (t, "200");
-	gp_widget_add_choice (t, "400");
-	gp_widget_add_choice (t, "800");
-	gp_widget_add_choice (t, "1600");
-	gp_widget_add_choice (t, "3200");
+	pslr_add_iso_choices (t, &camera->pl->pslr, status.current_iso);
 	sprintf(buf,"%d",status.current_iso);
 	gp_widget_set_value (t, buf);
 	gp_widget_append (section, t);
@@ -818,37 +855,84 @@ camera_set_config (Camera *camera, CameraWidget *window, GPContext *context)
 	pslr_get_status(&camera->pl->pslr, &status);
 
 	gp_log (GP_LOG_DEBUG, "pentax", "*** camera_set_config");
+	ret = gp_widget_get_child_by_label (window, _("Image Format"), &w);
+	if ((ret == GP_OK) && gp_widget_changed (w)) {
+		pslr_image_format_t format;
+		int result;
+
+		gp_widget_get_value (w, &sval);
+		format = PSLR_IMAGE_FORMAT_MAX;
+		if (!strcmp (sval, _("JPEG")))
+			format = PSLR_IMAGE_FORMAT_JPEG;
+		else if (!strcmp (sval, _("RAW")))
+			format = PSLR_IMAGE_FORMAT_RAW;
+		else if (!strcmp (sval, _("RAW+JPEG")))
+			format = PSLR_IMAGE_FORMAT_RAW_PLUS;
+		if (format == PSLR_IMAGE_FORMAT_MAX) {
+			gp_log (GP_LOG_ERROR, "pentax", "Could not decode image format %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
+		}
+
+		result = pslr_set_image_format (&camera->pl->pslr, format);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.image_format != format) {
+			gp_log (GP_LOG_ERROR, "pentax", "Image format did not apply: requested %d, got %d",
+				format, status.image_format);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
+	}
+
 	ret = gp_widget_get_child_by_label (window, _("Image Size"), &w);
 	if ((ret == GP_OK) && (gp_widget_changed (w))) {
-		int i, resolution = -1;
+		int i, resolution = -1, requested_resolution = 0;
 		int *valid_resolutions;
+		char trailing;
 
-		gp_widget_set_changed (w, 0);
 		valid_resolutions = pslr_get_model_jpeg_resolutions (&camera->pl->pslr);
 
 		gp_widget_get_value (w, &sval);
 		for (i = 0; i < MAX_RESOLUTION_SIZE; i++)
 		{
-			int foo;
+			int foo = 0;
 
-			sscanf(sval, "%d", &foo);
-			if (foo != valid_resolutions[i])
+			if (sscanf (sval, "%d%c", &foo, &trailing) == 1 &&
+			    foo == valid_resolutions[i]) {
 				resolution = i;
+				requested_resolution = foo;
+				break;
+			}
 		}
 
 		if (resolution == -1) {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode image size %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
 		} else {
-			pslr_set_jpeg_resolution(&camera->pl->pslr, resolution);
-			pslr_get_status(&camera->pl->pslr, &status);
+			int result = pslr_set_jpeg_resolution (&camera->pl->pslr,
+								 requested_resolution);
+			if (result != PSLR_OK)
+				return pslr_result_to_gp (result);
+			result = pslr_get_status (&camera->pl->pslr, &status);
+			if (result != PSLR_OK)
+				return pslr_result_to_gp (result);
+			if (status.jpeg_resolution != (uint32_t) resolution) {
+				gp_log (GP_LOG_ERROR, "pentax", "Image size did not apply: requested index %d, got %u",
+					resolution, status.jpeg_resolution);
+				return GP_ERROR;
+			}
+			gp_widget_set_changed (w, 0);
 		}
 	}
 
 	ret = gp_widget_get_child_by_label (window, _("Shooting Mode"), &w);
 	if ((ret == GP_OK) && gp_widget_changed (w)) {
 		pslr_exposure_mode_t exposuremode;
+		int result;
 
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &sval);
 
 		exposuremode = PSLR_EXPOSURE_MODE_MAX;
@@ -860,112 +944,151 @@ camera_set_config (Camera *camera, CameraWidget *window, GPContext *context)
 		if (!strcmp(sval,_("TV")))	exposuremode = PSLR_EXPOSURE_MODE_TV;
 		if (!strcmp(sval,_("AV")))	exposuremode = PSLR_EXPOSURE_MODE_AV;
 		if (!strcmp(sval,_("TAV")))	exposuremode = PSLR_EXPOSURE_MODE_TAV;
-		if (!strcmp(sval,_("X")))	exposuremode = PSLR_EXPOSURE_MODE_TAV;
+		if (!strcmp(sval,_("X")))	exposuremode = PSLR_EXPOSURE_MODE_X;
 		if (exposuremode != PSLR_EXPOSURE_MODE_MAX) {
-			pslr_set_exposure_mode(&camera->pl->pslr, exposuremode);
-			pslr_get_status(&camera->pl->pslr, &status);
+			result = pslr_set_exposure_mode (&camera->pl->pslr, exposuremode);
+			if (result != PSLR_OK)
+				return pslr_result_to_gp (result);
+			result = pslr_get_status (&camera->pl->pslr, &status);
+			if (result != PSLR_OK)
+				return pslr_result_to_gp (result);
+			gp_widget_set_changed (w, 0);
 		} else {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode exposuremode %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
 		}
 	}
 
 	ret = gp_widget_get_child_by_label (window, _("ISO"), &w);
 	if ((ret == GP_OK) && gp_widget_changed (w)) {
 		int iso;
+		char trailing;
+		int result;
 
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &sval);
-		if (sscanf(sval, "%d", &iso)) {
-			/* pslr_set_iso(&camera->pl->pslr, iso); */
-			pslr_set_iso(&camera->pl->pslr, iso, 0, 0); /* FIXME: check if 0 is ok */
-			pslr_get_status(&camera->pl->pslr, &status);
-			// FIXME: K-30 iso doesn't get updated immediately
-		} else
+		if (sscanf (sval, "%d%c", &iso, &trailing) != 1 || iso <= 0) {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode iso %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
+		}
+		result = pslr_set_iso (&camera->pl->pslr, iso, 0, 0);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.current_iso != (uint32_t) iso) {
+			gp_log (GP_LOG_ERROR, "pentax", "ISO did not apply: requested %d, got %u",
+				iso, status.current_iso);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
 	}
 
 	gp_widget_get_child_by_label (window, _("Exposure Compensation"), &w);
 	if (gp_widget_changed (w)) {
 		float		fval;
 		pslr_rational_t	rational;
+		int		result;
 
 		gp_widget_get_value (w, &fval);
 		rational.denom = 10;
 		rational.nom = (int)(10 * fval);
 
-		pslr_set_expose_compensation (&camera->pl->pslr, rational);
+		result = pslr_set_expose_compensation (&camera->pl->pslr, rational);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.ec.nom != rational.nom || status.ec.denom != rational.denom) {
+			gp_log (GP_LOG_ERROR, "pentax", "Exposure compensation did not apply: requested %d/%d, got %u/%u",
+				rational.nom, rational.denom, status.ec.nom, status.ec.denom);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
 
 	}
 
 	gp_widget_get_child_by_label (window, _("Image Quality"), &w);
 	if (gp_widget_changed (w)) {
 		int qual;
+		char trailing;
+		int result;
 
 		/* FIXME: decoding is strange. the UI shows number of stars
 		 * on k20d: 4 stars = 3, 3 stars = 0, 2 stars = 1, 1 star = 2
 		 */
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &sval);
-		if (sscanf(sval, "%d", &qual)) {
-			pslr_set_jpeg_stars (&camera->pl->pslr, qual);
-			pslr_get_status (&camera->pl->pslr, &status);
-		} else
+		if (sscanf (sval, "%d%c", &qual, &trailing) != 1) {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode image quality %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
+		}
+		result = pslr_set_jpeg_stars (&camera->pl->pslr, qual);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.jpeg_quality != (uint32_t) qual) {
+			gp_log (GP_LOG_ERROR, "pentax", "Image quality did not apply: requested %d, got %u",
+				qual, status.jpeg_quality);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
 	}
 
 	ret = gp_widget_get_child_by_label (window, _("Shutter Speed"), &w);
 	if ((ret == GP_OK) && gp_widget_changed (w)) {
 		pslr_rational_t speed;
+		int result;
 
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &sval);
-		if (sscanf(sval, "%d/%d", &speed.nom, &speed.denom)) {
-			pslr_set_shutter(&camera->pl->pslr, speed);
-			pslr_get_status(&camera->pl->pslr, &status);
-		} else {
-			char c;
-			if (sscanf(sval, "%d%c", &speed.nom, &c) && (c=='s')) {
-				speed.denom = 1;
-				pslr_set_shutter(&camera->pl->pslr, speed);
-				pslr_get_status(&camera->pl->pslr, &status);
-			} else {
-				gp_log (GP_LOG_ERROR, "pentax", "Could not decode shutterspeed %s", sval);
-			}
+		speed = parse_shutter_speed (sval);
+		if (speed.nom <= 0 || speed.denom <= 0) {
+			gp_log (GP_LOG_ERROR, "pentax", "Could not decode shutterspeed %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
 		}
-		/* parse more? */
+		result = pslr_set_shutter (&camera->pl->pslr, speed);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.set_shutter_speed.nom != speed.nom ||
+		    status.set_shutter_speed.denom != speed.denom) {
+			gp_log (GP_LOG_ERROR, "pentax", "Shutter speed did not apply: requested %d/%d, got %u/%u",
+				speed.nom, speed.denom, status.set_shutter_speed.nom,
+				status.set_shutter_speed.denom);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
 	}
 
 	ret = gp_widget_get_child_by_label (window, _("Aperture"), &w);
 	if ((ret == GP_OK) && gp_widget_changed (w)) {
 		pslr_rational_t aperture;
-		int apt1,apt2;
+		int result;
 
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &sval);
-		if (sscanf(sval, "%d.%d", &apt1, &apt2)) {
-			if (apt1<11) {
-				aperture.nom = apt1*10+apt2;
-				aperture.denom = 10;
-			} else {
-				/* apt2 not in use */
-				aperture.nom = apt1;
-				aperture.denom = 1;
-			}
-			pslr_set_aperture(&camera->pl->pslr, aperture);
-			pslr_get_status(&camera->pl->pslr, &status);
-		} else if (sscanf(sval, "%d", &apt1)) {
-			if (apt1<11) {
-				aperture.nom = apt1*10;
-				aperture.denom = 10;
-			} else {
-				aperture.nom = apt1;
-				aperture.denom = 1;
-			}
-			pslr_set_aperture(&camera->pl->pslr, aperture);
-			pslr_get_status(&camera->pl->pslr, &status);
-		} else {
+		aperture = parse_aperture (sval);
+		if (aperture.nom <= 0 || aperture.denom <= 0) {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode aperture %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
 		}
+		result = pslr_set_aperture (&camera->pl->pslr, aperture);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		result = pslr_get_status (&camera->pl->pslr, &status);
+		if (result != PSLR_OK)
+			return pslr_result_to_gp (result);
+		if (status.set_aperture.nom != aperture.nom ||
+		    status.set_aperture.denom != aperture.denom) {
+			gp_log (GP_LOG_ERROR, "pentax", "Aperture did not apply: requested %d/%d, got %u/%u",
+				aperture.nom, aperture.denom, status.set_aperture.nom,
+				status.set_aperture.denom);
+			return GP_ERROR;
+		}
+		gp_widget_set_changed (w, 0);
 	}
 
 	ret = gp_widget_get_child_by_label (window, _("Bulb"), &w);
@@ -977,12 +1100,17 @@ camera_set_config (Camera *camera, CameraWidget *window, GPContext *context)
 			return GP_ERROR;
 		}
 
-		gp_widget_set_changed (w, 0);
 		gp_widget_get_value (w, &bulb);
-		pslr_bulb (&camera->pl->pslr, bulb);
+		ret = pslr_bulb (&camera->pl->pslr, bulb);
+		if (ret != PSLR_OK)
+			return pslr_result_to_gp (ret);
 
-		if (bulb)	/* also press the shutter */
-			pslr_shutter (&camera->pl->pslr);
+		if (bulb) { /* also press the shutter */
+			ret = pslr_shutter (&camera->pl->pslr);
+			if (ret != PSLR_OK)
+				return pslr_result_to_gp (ret);
+		}
+		gp_widget_set_changed (w, 0);
 	}
 
 	return GP_OK;

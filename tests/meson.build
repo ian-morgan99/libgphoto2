@@ -44,6 +44,16 @@ test(
   env: gp_test_env,
 )
 
+test_pentax_legacy_parsers_exe = executable(
+  'test-pentax-legacy-parsers',
+  'test-pentax-legacy-parsers.c',
+  '../camlibs/pentax/pslr_utils.c',
+  include_directories: include_directories('../camlibs/pentax'),
+  dependencies: [libgphoto2_dep, m_dep],
+)
+
+test('test-pentax-legacy-parsers', test_pentax_legacy_parsers_exe)
+
 # Source-contract regression: ordinary Manual and camera-timed Bulb must use
 # the explicit release=0 route; only the separately gated research action may
 # use release=2, and only its explicit stop edge may call TerminateCapture.

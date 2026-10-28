@@ -36,6 +36,8 @@
 #include <unistd.h>
 #endif
 
+#include <math.h>
+
 #include "pslr.h"
 #include "pslr_utils.h"
 
@@ -52,11 +54,12 @@ void sleep_sec(double sec) {
     usleep(1000000*(sec-floor(sec)));
 }
 
-pslr_rational_t parse_aperture(char *aperture_str) {
+pslr_rational_t parse_aperture(const char *aperture_str) {
     char C;
     float F = 0;
     pslr_rational_t aperture = {0, 0};
-    if (sscanf(aperture_str, "%f%c", &F, &C) != 1) {
+    if (!aperture_str || sscanf(aperture_str, "%f%c", &F, &C) != 1 ||
+        !isfinite(F)) {
         F = 0;
     }
     /*It's unlikely that you want an f-number > 100, even for a pinhole.
@@ -64,24 +67,40 @@ pslr_rational_t parse_aperture(char *aperture_str) {
     if (F > 100 || F < 0.8) {
         F = 0;
     }
-    aperture.nom = F * 10;
-    aperture.denom = 10;
+    if (F >= 11) {
+        aperture.nom = (int32_t) lroundf (F);
+        aperture.denom = 1;
+    } else {
+        aperture.nom = (int32_t) lroundf (F * 10);
+        aperture.denom = 10;
+    }
 
     return aperture;
 }
 
-pslr_rational_t parse_shutter_speed(char *shutter_speed_str) {
+pslr_rational_t parse_shutter_speed(const char *shutter_speed_str) {
     char C;
     float F = 0;
     pslr_rational_t shutter_speed = {0, 0};
-    if (sscanf(shutter_speed_str, "%d/%d%c", &shutter_speed.nom, &shutter_speed.denom, &C) == 2) {
-        // noop
-    } else if ((sscanf(shutter_speed_str, "%d%c", &shutter_speed.nom, &C)) == 1) {
+    if (!shutter_speed_str) {
+        return shutter_speed;
+    }
+    if (sscanf(shutter_speed_str, "%d/%d%c", &shutter_speed.nom,
+               &shutter_speed.denom, &C) == 2 &&
+        shutter_speed.nom > 0 && shutter_speed.denom > 0) {
+        /* Rational form, for example 1/125. */
+    } else if (sscanf(shutter_speed_str, "%d%c", &shutter_speed.nom, &C) == 1 &&
+               shutter_speed.nom > 0) {
         shutter_speed.denom = 1;
-    } else if ((sscanf(shutter_speed_str, "%f%c", &F, &C)) == 1) {
+    } else if (sscanf(shutter_speed_str, "%d%c", &shutter_speed.nom, &C) == 2 &&
+               C == 's' && shutter_speed.nom > 0) {
+        /* Whole-second form used by the legacy widget contract, for example 5s. */
+        shutter_speed.denom = 1;
+    } else if (sscanf(shutter_speed_str, "%f%c", &F, &C) == 1 &&
+               isfinite(F) && F > 0) {
         F = F * 1000;
         shutter_speed.denom = 1000;
-        shutter_speed.nom = F;
+        shutter_speed.nom = (int32_t) lroundf(F);
     } else {
         shutter_speed.nom = 0;
         shutter_speed.denom = 0;
