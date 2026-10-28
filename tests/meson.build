@@ -12,6 +12,18 @@ ptp_context_test = executable(
 
 test('test-ptp-context', ptp_context_test)
 
+# Generic PTP/MTP object-parent regression: both the ordinary PTP root and
+# the MTP storage-root sentinel terminate folder reconstruction.  This must
+# remain independent of Pentax model and capture tests.
+test_ptp_folder_root_exe = executable(
+  'test-ptp-folder-root',
+  'test-ptp-folder-root.c',
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+
+test('test-ptp-folder-root', test_ptp_folder_root_exe)
+
 test_pentax_utils_exe = executable(
   'test-pentax-utils',
   'test-pentax-utils.c',

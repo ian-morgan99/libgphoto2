@@ -3578,7 +3578,7 @@ append_folder_from_handle (Camera *camera, uint32_t storage, uint32_t handle, ch
 	 * while plain PTP commonly uses 0x00000000.  Both terminate the folder
 	 * chain; attempting GetObjectInfo(0xffffffff) loses freshly captured
 	 * objects even though the capture itself succeeded. */
-	if ((handle == PTP_HANDLER_ROOT) || (handle == PTP_HANDLER_SPECIAL))
+	if (ptp_object_parent_is_root (handle))
 		return GP_OK;
 
 	C_PTP (ptp_object_want (params, handle, PTPOBJECT_PARENTOBJECT_LOADED|PTPOBJECT_OBJECTINFO_LOADED, &ob)); // refresh

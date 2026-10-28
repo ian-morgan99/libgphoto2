@@ -1544,6 +1544,15 @@ typedef ArrayU32 PTPObjectHandles;
 #define PTP_HANDLER_SPECIAL	0xffffffff
 #define PTP_HANDLER_ROOT	0x00000000
 
+/* Object-info parent handles use either the ordinary PTP root value or the
+ * MTP storage-root sentinel.  Both terminate folder reconstruction; the
+ * special sentinel is not an object handle to dereference. */
+static inline int
+ptp_object_parent_is_root (uint32_t handle)
+{
+	return handle == PTP_HANDLER_ROOT || handle == PTP_HANDLER_SPECIAL;
+}
+
 
 /* PTP objectinfo structure (returned by GetObjectInfo) */
 
