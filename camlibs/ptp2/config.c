@@ -12210,11 +12210,11 @@ _put_Sony_Autofocus(CONFIG_PUT_ARGS)
 	return GP_OK;
 }
 
-/* K-1 Mark II (old-focus) manual focus drive via 0x9016.  Image Transmitter
- * 2's FocusFineTune for old-focus models multiplies the UI step by 5 and
- * splits the sign: amount is absolute, direction is parameter 2 with
- * 0 = Near, 1 = Far (re-verified on real hardware 2026-09-14; the 5e5585002
- * mapping had these reversed).  One command per activation, no retries. */
+/* Old-focus manual focus drive via 0x9016.  Image Transmitter 2's
+ * FocusFineTune multiplies the UI step by 5 and splits the sign: amount is
+ * absolute, and its Far button sends direction 0 while its Near button sends
+ * direction 1.  The public action names use +1=Near and -1=Far.  One
+ * command per activation, no retries. */
 static int
 _get_Pentax_OldFocusDrive (CONFIG_GET_ARGS)
 {

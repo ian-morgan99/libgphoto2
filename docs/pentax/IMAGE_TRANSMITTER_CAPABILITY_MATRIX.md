@@ -64,16 +64,19 @@ camera's USB mode setting, not a driver entry. See
 ## Model coverage status — what "supported" means per body
 
 Added 2026-10-07. Asked directly: *does this work on all Pentax cameras?* The
-honest answer is **no, and the gap is measurable.** `camlibs/ptp2/pentax-utils.h`
-declares 11 model IDs and `pentax-utils.c` recognises all 11 from USB strings,
-but only two bodies have any hardware evidence. The other nine are recognised so
+honest answer is **no, and the gap is measurable.** The IT2 reference contains
+12 model IDs; `camlibs/ptp2/pentax-utils.h` declares 11 and
+`pentax-utils.c` recognises those 11 from USB strings. G900SE is an IT2/Ricoh
+model with no current libgphoto2 lookup row.
+Only two bodies have any hardware evidence. The other recognised bodies are
+recognised so
 that they fail *correctly*, not so that they work.
 
 | Model | ID | Recognised | Code references¹ | Hardware evidence |
 |---|---:|:--:|:--:|---|
 | K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — primary development body; direct-PC B-mode held Bulb action PASS for four 1 s starts/stops on PTP PID `0x0189`, with saved DNG/JPEG and EXIF 1.064–1.073 s. This qualifies only the experimental held action, not timed natural completion or Polaris. |
 | K-1 Mark II | 78400 | yes | 3 | **HW-R / HW-W** — second qualified body |
-| K-3 Mark III Monochrome | 78420 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action; IT2's prefix model gate shares 78420 with the colour body |
+| K-3 Mark III Monochrome | 78550 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action; IT2 has an explicit Monochrome branch and distinct model number |
 | KP | 78380 | yes | 3 | none. Classified **new-focus** (`0x9017`) by IT2's model table, unverified on hardware |
 | GR III | 78350 | yes | 2 | none. Also classified new-focus, unverified |
 | 645Z | 77840 | yes | 3 | none |
@@ -87,7 +90,9 @@ that they fail *correctly*, not so that they work.
 including the recognition assignment itself. It measures how much code branches
 on the model, not how much of it is verified.
 
-Read this as: **2 of 11 bodies have general hardware evidence.** Everything
+Read this as: **2 of 11 recognised bodies have general hardware evidence; one
+additional IT2 model (G900SE) is not currently represented by a libgphoto2
+lookup row.** Everything
 else is recognition-plus-fail-closed. Most capability predicates remain derived
 from IT2's model table and encode what the vendor client does, not what a body
 has been observed to do. The exception is the experimental held-Bulb product

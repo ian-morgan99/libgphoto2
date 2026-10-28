@@ -25,6 +25,8 @@ typedef struct {
 /* IMAGE Transmitter 2 vendor-model identifiers. */
 #define PENTAX_MODEL_K1_MARK_II 78400U
 #define PENTAX_MODEL_K3_MARK_III 78420U
+/* IT2 has a distinct model branch for the K-3 III Monochrome. */
+#define PENTAX_MODEL_K3_MARK_III_MONO 78550U
 #define PENTAX_MODEL_KP 78380U
 #define PENTAX_MODEL_K70 78370U
 #define PENTAX_MODEL_K3 77760U

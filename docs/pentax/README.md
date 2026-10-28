@@ -80,7 +80,7 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 
 - **Vendor mode enablement** replicating the vendor session handshake.
 - **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x0189),
-  K-3 Mark III Monochrome (0x018f; IT2 model 78420 shared with K-3 III), KP,
+  K-3 Mark III Monochrome (0x018f; IT2 model 78550, distinct from colour K-3 III), KP,
   K-70, K-3, K-1, GR III, 645D,
   plus firmware-derived entries for 645Z (0x0167) and KF (0x018e). The
   K-3 III standard PTP product ID is `0x0189`; `0x018f` is the independent
@@ -147,7 +147,7 @@ body is mostly a matter of its USB ID plus capability flags:
 | **KP** | Already modelled (composition adjust supported); focus drive untested on hardware |
 | **K-70** | ID present; no hardware access yet |
 | **K-1** (original) | ID present; expected old-focus like the K-1 II |
-| **K-3 Mark III Monochrome** | PID `0x018f` is modelled for the shared generic-control family; held-Bulb remains deliberately blocked until independent hardware evidence |
+| **K-3 Mark III Monochrome** | PID `0x018f`, IT2 model 78550; modelled for the shared generic-control family; held-Bulb remains deliberately blocked until independent hardware evidence |
 | **K-5 II** | Legacy USB-SCSI/MSC support already exists in `camlibs/pentax`; its firmware-derived PID `0x0148` is not admitted to the modern Pentax PTP vendor path |
 | **GR III / GR IIIx** | GR III modelled; new-focus family per opcode review |
 | **645Z** | Entry added from its own firmware image (PID 0x0167); needs a bench pass to confirm capability flags |

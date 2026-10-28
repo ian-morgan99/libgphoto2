@@ -450,7 +450,16 @@ main (void)
 	CHECK (!pentax_lookup_model (0x25fb, 0x0182, "PENTAX K-1",
 		&model_no, &extension_version));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
+	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_KP));
+	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_GR_III));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K3));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_645Z));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_645D));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K70));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_KF));
 	CHECK (!pentax_model_uses_new_focus (0));
 	/* IMAGE Transmitter 2 starts PC live view directly on both K-1 bodies;
 	 * the K-3 III remains on the observed-state path. */
@@ -476,6 +485,8 @@ main (void)
 			pentax_model_capabilities (PENTAX_MODEL_K1);
 		const PentaxModelCapabilities *k3 =
 			pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III);
+		const PentaxModelCapabilities *mono =
+			pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III_MONO);
 
 		CHECK (k1ii && !k1ii->k3iii_family);
 		CHECK (k1ii->focus_family == PENTAX_FOCUS_FAMILY_OLD);
@@ -512,14 +523,25 @@ main (void)
 		CHECK (k3->supports_writing_file_format);
 		CHECK (k3->supports_color_temperature);
 		CHECK (k3->supports_ci_detail);
+
+		CHECK (mono && mono->k3iii_family);
+		CHECK (mono->focus_family == PENTAX_FOCUS_FAMILY_NEW);
+		CHECK (mono->supports_exp_bracket);
+		CHECK (mono->supports_composition_adjust);
+		CHECK (mono->supports_movie_setting);
+		CHECK (mono->supports_pc_live_view);
+		CHECK (mono->supports_cross_process);
+		CHECK (mono->supports_card_writing_mode);
+		CHECK (mono->supports_writing_file_format);
+		CHECK (!mono->supports_color_temperature);
+		CHECK (mono->supports_ci_detail);
 	}
 	CHECK (pentax_model_capabilities (0) == NULL);
-	/* The Monochrome has its own USB product code but shares the K-3 III
-	 * protocol model; IT2 matches it with StartsWith("PENTAX K-3 Mark III")
-	 * so it resolves to model_no 78420 and the shared generic-control flags. */
+	/* IT2 has an explicit Monochrome branch before the colour K-3 III branch.
+	 * It shares the new-focus/control family but has model number 78550. */
 	CHECK (pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
-	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
+	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III_MONO) &&
 		(extension_version == 1));
 	/* Test the model ID that the real lookup returns. library.c stores this
 	 * lookup result in params->pentax, so that is the ID used by the actual
@@ -816,13 +838,13 @@ main (void)
 
 	CHECK (pentax_transfer_run (NULL, &transfer_operations) ==
 		GP_ERROR_BAD_PARAMETERS);
-	/* New-focus (0x9017): positive UI direction (Near) sends a negative
-	 * image-plane displacement; Far sends positive (re-verified on K-3 III
-	 * real hardware 2026-09-14). */
+	/* New-focus (0x9017): the public helper uses +1=Near and -1=Far. IT2's
+	 * UI sends -1 for Near and +1 for Far, so its source calculation produces
+	 * positive displacement for Near and negative for Far. */
 	CHECK (pentax_minimum_focus_displacement (35, 1, &displacement) == GP_OK);
-	CHECK (displacement == -29);
-	CHECK (pentax_minimum_focus_displacement (35, -1, &displacement) == GP_OK);
 	CHECK (displacement == 29);
+	CHECK (pentax_minimum_focus_displacement (35, -1, &displacement) == GP_OK);
+	CHECK (displacement == -29);
 	CHECK (pentax_minimum_focus_displacement (0, 1, &displacement) == GP_ERROR_CORRUPTED_DATA);
 	CHECK (pentax_minimum_focus_displacement (35, 0, &displacement) == GP_ERROR_BAD_PARAMETERS);
 	{
@@ -830,10 +852,10 @@ main (void)
 
 		CHECK (pentax_old_focus_protocol_direction (1,
 			&protocol_direction) == GP_OK);
-		CHECK (protocol_direction == 0); /* IT2 Near */
+		CHECK (protocol_direction == 1); /* IT2 Near */
 		CHECK (pentax_old_focus_protocol_direction (-1,
 			&protocol_direction) == GP_OK);
-		CHECK (protocol_direction == 1); /* IT2 Far */
+		CHECK (protocol_direction == 0); /* IT2 Far */
 		CHECK (pentax_old_focus_protocol_direction (0,
 			&protocol_direction) == GP_ERROR_BAD_PARAMETERS);
 		CHECK (pentax_old_focus_protocol_direction (1, NULL) ==

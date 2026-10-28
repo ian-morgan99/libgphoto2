@@ -115,8 +115,8 @@ pentax_shutter_list_may_synthesise_bulb (uint32_t model_no,
 	uint16_t usb_product)
 {
 	/* Only the colour K-3 III: the published second-counts were read from its
-	 * own populated list.  The lookup maps the Monochrome to the shared model
-	 * number, so product identity is required to keep this gate fail-closed. */
+	 * own populated list.  The Monochrome has a distinct IT2 model number and
+	 * its own product identity, so it remains outside this gate. */
 	return model_no == PENTAX_MODEL_K3_MARK_III && usb_product == 0x0189;
 }
 
@@ -142,11 +142,12 @@ int
 pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {
 	/* The standard K-3 III passed two direct-PC B-mode start/stop captures.
-	 * Keep the Monochrome product out until it has its own hardware pass;
-	 * IMAGE Transmitter 2 maps both products to model 78420, so the USB PID is
-	 * the product-specific discriminator. Issue #95 remains open for natural-
-	 * completion and stop-race qualification. */
-	if (model_no == PENTAX_MODEL_K3_MARK_III)
+	 * Keep the Monochrome product out until it has its own hardware pass. IT2
+	 * gives the two products distinct model numbers (78420 and 78550), while
+	 * the USB product remains an additional product-specific discriminator.
+	 * Issue #95 remains open for natural-completion and stop-race qualification. */
+	if ((model_no == PENTAX_MODEL_K3_MARK_III) ||
+	    (model_no == PENTAX_MODEL_K3_MARK_III_MONO))
 		return usb_product == 0x0189;
 	return pentax_model_capabilities (model_no) != NULL;
 }
@@ -645,15 +646,16 @@ pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 
 	if (!displacement || ((direction != -1) && (direction != 1)))
 		return GP_ERROR_BAD_PARAMETERS;
-	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0).  The
-	 * protocol sign convention is inverted relative to the UI: positive
-	 * displacement drives the lens toward Far, negative toward Near.
-	 * (Re-verified on K-3 III real hardware 2026-09-14: the original
-	 * mapping had Near/Far swapped.) */
+	/* Image Transmitter 2 uses (int)(openAvNum * 2.5 / 3.0).  The public
+	 * libgphoto2 convention is +1=Near and -1=Far.  IT2's UI sends -1 for
+	 * Near and +1 for Far, and its signed 0x9017 calculation therefore makes
+	 * positive displacement the Near direction and negative displacement the
+	 * Far direction.  Keep this translation explicit: it is easy to confuse
+	 * the UI value with the public helper's semantic direction. */
 	magnitude = ((uint64_t)open_av_num * 5U) / 6U;
 	if (!magnitude || (magnitude > INT32_MAX))
 		return GP_ERROR_CORRUPTED_DATA;
-	*displacement = direction > 0 ? -(int32_t)magnitude : (int32_t)magnitude;
+	*displacement = direction > 0 ? (int32_t)magnitude : -(int32_t)magnitude;
 	return GP_OK;
 }
 
@@ -663,13 +665,13 @@ pentax_old_focus_protocol_direction (int direction,
 {
 	if (!protocol_direction || ((direction != -1) && (direction != 1)))
 		return GP_ERROR_BAD_PARAMETERS;
-	/* IT2 FocusFineTune (old-focus, opcode 0x9016): protocol direction 0
-	 * drives the lens toward Near and 1 toward Far.  The public helper
-	 * follows the newer focus helper's semantic convention: +1 is Near and
-	 * -1 is Far.  (Re-verified on real hardware 2026-09-14: the 5e5585002
-	 * mapping had the two reversed, so MF moved in the wrong sense while AF
-	 * was unaffected.) */
-	*protocol_direction = direction > 0 ? 0U : 1U;
+	/* IT2 FocusFineTune (old-focus, opcode 0x9016): its Far button sends
+	 * (amount=5, direction=0), while its Near button sends
+	 * (amount=5, direction=1).  The public helper uses +1=Near and -1=Far,
+	 * so retain that source-faithful mapping here.  The earlier implementation
+	 * inverted these labels; the existing hardware log records ACK/continuity
+	 * only and does not override the direct IT2 call path. */
+	*protocol_direction = direction > 0 ? 1U : 0U;
 	return GP_OK;
 }
 
@@ -689,11 +691,13 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		*extension_version = 1;
 		return 1;
 	}
-	/* IT2 matches the Monochrome with StartsWith("PENTAX K-3 Mark III"),
-	 * so it shares model_no 78420 and all K-3 III capability flags. */
+	/* IT2 has an explicit Monochrome branch before the colour K-3 III branch:
+	 * model 78550, extension version 1, and the same focus/transfer family.
+	 * Do not collapse it into the colour model 78420; the model number is sent
+	 * in the vendor-mode handshake and controls later capability decisions. */
 	if ((usb_product == 0x018f) &&
 	    !strncmp (device_model, "PENTAX K-3 Mark III", strlen ("PENTAX K-3 Mark III"))) {
-		*model_no = PENTAX_MODEL_K3_MARK_III;
+		*model_no = PENTAX_MODEL_K3_MARK_III_MONO;
 		*extension_version = 1;
 		return 1;
 	}
@@ -806,7 +810,9 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * Movie mode setting (0xd039): _isMovieSettingSupported only for the
  * K-3 III family; IsMovieSupported alone also covers bodies that accept
  * the movie *state* but not remote movie *settings*.
- * PC live view (0xd035) is source-authorised only for the K-3 III family. */
+ * High-resolution PC live view is source-authorised only for the K-3 III
+ * family.  Ordinary PC live view is a separate path and is implemented by
+ * the shared IT2 PcLiveViewMode setter for recognised models. */
 
 /* IT2 capability metadata for the generic controls below. Keep the matrix in
  * one place so adding a model is a data change rather than another scattered
@@ -828,6 +834,17 @@ static const PentaxModelCapabilities pentax_model_capability_table[] = {
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1,
 	  .supports_color_temperature = 1,
+	  .supports_ci_detail = 1 },
+	{ .model_no = PENTAX_MODEL_K3_MARK_III_MONO,
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .k3iii_family = 1,
+	  .supports_exp_bracket = 1,
+	  .supports_composition_adjust = 1,
+	  .supports_movie_setting = 1,
+	  .supports_pc_live_view = 1,
+	  .supports_cross_process = 1,
+	  .supports_card_writing_mode = 1,
+	  .supports_writing_file_format = 1,
 	  .supports_ci_detail = 1 },
 	{ .model_no = PENTAX_MODEL_KP,
 	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
