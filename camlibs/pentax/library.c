@@ -628,7 +628,13 @@ camera_wait_for_event (Camera *camera, int timeout,
 			/* we also get the fs info for free, so just set it */
 			info.file.fields = GP_FILE_INFO_TYPE |
 					GP_FILE_INFO_SIZE | GP_FILE_INFO_MTIME;
-			strcpy (info.file.type, GP_MIME_JPEG);
+			/* The first implementation always reported JPEG here, even when
+			 * the transferred buffer was a PEF or DNG.  The file object already
+			 * carries the correct MIME type; keep the filesystem metadata in
+			 * agreement so legacy K-5 II RAW and RAW+JPEG consumers do not see a
+			 * RAW file advertised as JPEG. */
+			strncpy (info.file.type, mimes[i], sizeof (info.file.type) - 1);
+			info.file.type[sizeof (info.file.type) - 1] = '\0';
 			info.file.size		= length;
 			info.file.mtime		= time(NULL);
 
