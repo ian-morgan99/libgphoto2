@@ -1,6 +1,6 @@
 # Pentax configuration integration
 
-Revision: 2026-08-21
+Revision: 2026-10-28
 
 Pentax configuration must remain descriptor-driven. Vendor mode does not grant
 permission to invent datatypes or enumerations, and the absence of a widget is
@@ -20,6 +20,8 @@ expected datatype:
 | `focusmode` | FocusMode `0x500a` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
 | `exposurecompensation` | ExposureBiasCompensation `0x5010` | INT16 | Hardware descriptor verified read/write |
 | `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | K-3 III descriptor read; K-1 II direct read verified, but an acknowledged M-mode write was ignored, so general write support is not yet proven |
+| `imageformat` | Pentax WritingFileFormat `0xd01b` | IT2 compound 10/11-byte payload | Source-authorised K-1/K-1 II/K-3 III/Monochrome path; read-modify-write preserves unrelated bytes and requires exact raw read-back; hardware qualification remains open |
+| `imagequality` | Pentax WritingFileFormat `0xd01b`, byte 7 | IT2 quality byte (`0=fine`, `1=normal`, `2=basic`) | Separate source-authorised control over the same compound payload; exact raw read-back and hardware transfer correlation remain open |
 
 The `0xd00f` constant already existed as `PTP_DPC_RICOH_ShutterSpeed`; the new
 Pentax name is an alias for the same wire property. K-1 II does not advertise
@@ -70,8 +72,14 @@ no session retained vendor state into the next.
 - Drive mode `0xd013`
 - Exposure-bracketing mode/step `0xd014`/`0xd015`
 - Color temperature `0xd018`
-- Writing-file-format structure `0xd01b`
 - Live-view zoom/mode `0xd036`/`0xd037`
+
+The writing-file-format structure `0xd01b` is no longer withheld for the
+source-authorised K-1/K-1 II/K-3 III/Monochrome family. The implementation
+accepts only the source-observed 10-byte form or the 11-byte form with current
+slot state, preserves the exact payload length and unrelated fields, and fails
+closed on malformed or unrecognised data. Direct hardware round-trip,
+restoration and capture/transfer qualification remain separate gates.
 
 The Windows client establishes that these codes are used. The H1.2 read-only
 probe establishes several real types and GetSet flags, but not enough to prove

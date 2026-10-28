@@ -1,6 +1,6 @@
 # Pentax/Ricoh generic control compatibility audit
 
-Revision: 2026-09-08
+Revision: 2026-10-28
 
 ## Purpose
 
@@ -17,12 +17,12 @@ Generic aliases or wrappers should therefore be treated as libgphoto2 API compat
 | `iso` | Already exposed generically on modern ptp2 and legacy Pentax | Preserve; regression-test across model families |
 | `shutterspeed` | Already exposed generically on modern ptp2 and legacy Pentax | Preserve; re-verify K-1 II |
 | `aperture` | Legacy Pentax exposes `aperture`; modern ptp2 exposes `f-number` and `pentaxdirectaperture` | Add compatibility alias/wrapper with identical value semantics |
-| `imageformat` | Legacy Pentax exposes JPEG/RAW/RAW+JPEG; modern ptp2 has Pentax `0xd01b WritingFileFormat` but no generic widget | Implement model-gated `imageformat`; do not confuse with card-writing mode |
-| `imagequality` | Requested by pgphoto; not currently represented as a generic modern Pentax widget | Determine the correct Pentax property/compound field before implementation |
+| `imageformat` | Legacy Pentax exposes JPEG/RAW/RAW+JPEG; modern ptp2 exposes a model-gated IT2 `0xd01b WritingFileFormat` compound path | Implemented for source-authorised K-1/K-1 II/K-3 III/Mono family; exact 10/11-byte preservation and read-back are required; hardware qualification remains open |
+| `imagequality` | Legacy Pentax exposes JPEG stars; modern ptp2 exposes IT2 `0xd01b` byte 7 through a separate generic widget | Implemented for the same source-authorised family; hardware correlation, transfer and restoration remain open |
 | `autofocus` | Pentax capture code already reads the `ptp2/autofocus` setting, but the Pentax config surface does not clearly expose the normal virtual policy widget | Add/verify the generic capture-policy widget independently of focus-drive operations |
 | `autofocusdrive` | Missing for Pentax | Implement a real immediate-AF action if protocol semantics are established; never alias to manual near/far drive |
 | `manualfocusdrive` | Pentax has directional model-specific drive widgets (`0x9017` new family; `0x9016` old family) | Add a generic wrapper preserving direction/step semantics and model dispatch |
-| `manualfocus` | Requested by pgphoto; distinct from lens-drive commands | Establish whether this means AF/MF mode selection on supported Pentax models before exposing it |
+| `manualfocus` | Requested by pgphoto; distinct from lens-drive commands. IT2 reads AF/MF state from the conditions block but provides no Pentax setter for it; the K-body `0x500a` focus-mode property is absent on the tested K-1 II/K-3 III path | Intentionally withheld until a source-defined writable AF/MF operation is identified; users must set the physical body/lens AF/MF prerequisite, while `manualfocusdrive` remains separate |
 | `capturetarget` | Missing; pgphoto attempts `capturetarget=1` | Define honest Pentax semantics or make clients tolerate absence; do not invent an SDRAM/card mapping without protocol evidence |
 
 ## Critical semantic constraints
@@ -32,6 +32,7 @@ Generic aliases or wrappers should therefore be treated as libgphoto2 API compat
 3. The K-3 III uses the newer focus family (`0x9017`), while the K-1 II and several older modern-vendor bodies use the older focus family (`0x9016`). Generic wrappers must dispatch by model capability, not by one global Pentax implementation.
 4. The K-01 must be treated as two separate USB paths: legacy `25fb:0130` USB-SCSI via `camlibs/pentax`, and `25fb:0131` generic PTP/MTP via `ptp2`. The latter has hardware evidence of Microsoft MTP DeviceInfo with no Pentax vendor operations and must not inherit modern Pentax vendor-mode claims.
 5. Compatibility work must add aliases/wrappers without removing the existing Pentax-specific diagnostic/config names.
+6. IT2's `AFMode` is a read-only state derived from the conditions response for K bodies; it must not be exposed as a writable `manualfocus` widget by guessing a property or aliasing it to a lens-drive action.
 
 ## Model-family sweep scope
 

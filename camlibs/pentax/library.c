@@ -693,7 +693,7 @@ camera_get_config (Camera *camera, CameraWidget **window, GPContext *context)
 	switch (status.image_format) {
 		case PSLR_IMAGE_FORMAT_JPEG: gp_widget_set_value (t, "JPEG"); break;
 		case PSLR_IMAGE_FORMAT_RAW: gp_widget_set_value (t, "RAW"); break;
-		case PSLR_IMAGE_FORMAT_RAW_PLUS: gp_widget_set_value (t, "RAW+"); break;
+		case PSLR_IMAGE_FORMAT_RAW_PLUS: gp_widget_set_value (t, "RAW+JPEG"); break;
 		default:
 			sprintf(buf, _("Unknown format %d"), status.image_format);
 			gp_widget_set_value (t, buf);
@@ -1021,6 +1021,10 @@ camera_set_config (Camera *camera, CameraWidget *window, GPContext *context)
 		gp_widget_get_value (w, &sval);
 		if (sscanf (sval, "%d%c", &qual, &trailing) != 1) {
 			gp_log (GP_LOG_ERROR, "pentax", "Could not decode image quality %s", sval);
+			return GP_ERROR_BAD_PARAMETERS;
+		}
+		if (qual < 1 || qual > pslr_get_model_max_jpeg_stars (&camera->pl->pslr)) {
+			gp_log (GP_LOG_ERROR, "pentax", "Image quality %d is outside the model range", qual);
 			return GP_ERROR_BAD_PARAMETERS;
 		}
 		result = pslr_set_jpeg_stars (&camera->pl->pslr, qual);

@@ -800,7 +800,7 @@ int pslr_set_jpeg_stars(pslr_handle_t h, int jpeg_stars ) {
     DPRINT("[C]\tpslr_set_jpeg_stars(%X)\n", jpeg_stars);
     int hwqual;
     ipslr_handle_t *p = (ipslr_handle_t *) h;
-    if ( jpeg_stars > p->model->max_jpeg_stars ) {
+    if (jpeg_stars < 1 || jpeg_stars > p->model->max_jpeg_stars) {
         return PSLR_PARAM;
     }
     hwqual = pslr_get_hw_jpeg_quality( p->model, jpeg_stars );
@@ -830,6 +830,10 @@ int pslr_set_jpeg_resolution(pslr_handle_t h, int megapixel) {
     DPRINT("[C]\tpslr_set_jpeg_resolution(%X)\n", megapixel);
     ipslr_handle_t *p = (ipslr_handle_t *) h;
     int hwres = _get_hw_jpeg_resolution( p->model, megapixel );
+    if (megapixel <= 0 || hwres >= MAX_RESOLUTION_SIZE ||
+        p->model->jpeg_resolutions[hwres] != megapixel) {
+        return PSLR_PARAM;
+    }
     return ipslr_handle_command_x18( p, true, X18_JPEG_RESOLUTION, 2, 1, hwres, 0);
 }
 

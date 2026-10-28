@@ -908,6 +908,44 @@ pentax_model_supports_ci_detail (uint32_t model_no)
 	return capabilities && capabilities->supports_ci_detail;
 }
 
+/* Map the generic imageformat labels to the 0xd01b bytes 4/5 value used by
+ * IT2 (MtpDevice.cs _camWritingFileFormatCopy). */
+int
+pentax_wff_format_byte (const char *value)
+{
+	if (!value)
+		return -1;
+	if (!strcmp (value, "JPEG"))
+		return 0;
+	if (!strcmp (value, "RAW"))
+		return 1;
+	if (!strcmp (value, "RAW+JPEG"))
+		return 2;
+	if (!strcmp (value, "TIFF"))
+		return 3;
+	return -1;
+}
+
+/* Validate the two forms observed for the IT2 0xd01b compound payload.
+ * Ten bytes carry the ordinary fields; eleven bytes add current-slot state.
+ * The first byte is the source-defined payload marker, and the format and
+ * JPEG-quality fields must be in the source-defined domains.  Unrelated
+ * fields are deliberately not interpreted here and are preserved verbatim by
+ * the caller. */
+int
+pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
+{
+	if (!payload || (size != 10 && size != 11))
+		return 0;
+	if (payload[0] != (unsigned char)(size - 4))
+		return 0;
+	if (payload[4] > 3 || payload[5] > 3)
+		return 0;
+	if (payload[7] > 2)
+		return 0;
+	return 1;
+}
+
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
  * used by IT2 (MtpDevice.cs _camWritingFileFormatCopy):
  *   0 = fine (3-star), 1 = normal (2-star), 2 = basic (1-star).

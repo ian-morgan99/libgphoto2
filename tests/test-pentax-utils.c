@@ -244,6 +244,32 @@ main (void)
 	CHECK (pentax_wff_quality_byte ("") == -1);
 	CHECK (pentax_wff_quality_byte ("FINE") == -1);   /* case-sensitive */
 	CHECK (pentax_wff_quality_byte (NULL) == -1);
+	CHECK (pentax_wff_format_byte ("JPEG") == 0);
+	CHECK (pentax_wff_format_byte ("RAW") == 1);
+	CHECK (pentax_wff_format_byte ("RAW+JPEG") == 2);
+	CHECK (pentax_wff_format_byte ("TIFF") == 3);
+	CHECK (pentax_wff_format_byte ("jpeg") == -1);
+	CHECK (pentax_wff_format_byte (NULL) == -1);
+	{
+		unsigned char wff10[10] = { 6, 0, 0, 0, 2, 2, 4, 1, 0, 1 };
+		unsigned char wff11[11] = { 7, 0, 0, 0, 2, 2, 4, 1, 0, 1, 2 };
+		unsigned char malformed_wff[11];
+		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
+		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
+		CHECK (pentax_wff_payload_is_valid (wff11, sizeof (wff11)));
+		malformed_wff[0] = 6;
+		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
+			sizeof (malformed_wff)));
+		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
+		malformed_wff[4] = 4;
+		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
+			sizeof (malformed_wff)));
+		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
+		malformed_wff[7] = 3;
+		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
+			sizeof (malformed_wff)));
+		CHECK (!pentax_wff_payload_is_valid (wff10, 9));
+	}
 
 	put_u32le (geometry_data, 4, 480U << 16 | 720U);
 	put_u32le (geometry_data, 8, 400U << 16 | 640U);

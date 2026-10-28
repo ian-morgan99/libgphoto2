@@ -11010,8 +11010,8 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
 /* Writing file format (0xd01b) — generic imageformat / imagequality widgets
  * for modern Pentax ptp2 bodies (issues #54 and #55).
  *
- * IT2 (MtpDevice.cs _camWritingFileFormatCopy) uses a 10-byte payload on the
- * K-1 / K-1 II / K-3 III family:
+ * IT2 (MtpDevice.cs _camWritingFileFormatCopy) uses a 10- or 11-byte payload
+ * on the K-1 / K-1 II / K-3 III family:
  *   byte 0  = 6 (payload length marker)
  *   bytes 4,5 = writing file format (JPEG=0, RAW=1, RAW+JPEG=2, TIFF=3;
  *               IT2 writes the same value to both bytes)
@@ -11029,12 +11029,14 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
  * family (fail-closed elsewhere);
  * card-writing mode (0x9004, pentaxcardwritingmode) remains a separate
  * widget and is never aliased to file format. */
-#define PENTAX_WFF_PAYLOAD_SIZE 10
+#define PENTAX_WFF_MIN_PAYLOAD_SIZE 10
+#define PENTAX_WFF_MAX_PAYLOAD_SIZE 11
 #define PENTAX_WFF_FORMAT_OFFSET 4
 #define PENTAX_WFF_QUALITY_OFFSET 7
 
 static int
-_pentax_wff_read_payload (PTPParams *params, unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE])
+_pentax_wff_read_payload (PTPParams *params,
+	unsigned char payload[PENTAX_WFF_MAX_PAYLOAD_SIZE], size_t *payload_size)
 {
 	unsigned char *data = NULL;
 	unsigned int size = 0;
@@ -11048,14 +11050,49 @@ _pentax_wff_read_payload (PTPParams *params, unsigned char payload[PENTAX_WFF_PA
 	}
 	/* Fail closed: the 0xd01b payload is a compound property whose unrelated
 	 * bytes (image size, RAW kind, card slot, length marker) must be preserved.
-	 * A short or missing payload cannot be safely zero-filled, because that
-	 * would erase those bytes and turn a failed read into a syntactically
-	 * complete but semantically malformed SET (issue #71 / #55). */
-	if (size < PENTAX_WFF_PAYLOAD_SIZE) {
+	 * Preserve the exact 10- or 11-byte form.  A short, long, or malformed
+	 * payload cannot be safely rewritten (issue #54 / #55). */
+	if (size < PENTAX_WFF_MIN_PAYLOAD_SIZE ||
+		size > PENTAX_WFF_MAX_PAYLOAD_SIZE ||
+		!pentax_wff_payload_is_valid (data, size)) {
 		free (data);
 		return GP_ERROR_CORRUPTED_DATA;
 	}
-	memcpy (payload, data, PENTAX_WFF_PAYLOAD_SIZE);
+	memcpy (payload, data, size);
+	*payload_size = size;
+	free (data);
+	return GP_OK;
+}
+
+static int
+_pentax_wff_verify_payload (PTPParams *params,
+	const unsigned char *expected, size_t expected_size)
+{
+	unsigned char *data = NULL;
+	unsigned int size = 0;
+	uint16_t ret;
+	size_t i;
+
+	ret = ptp_pentax_get_device_prop_raw (params,
+		PTP_DPC_PENTAX_WritingFileFormat, &data, &size);
+	if (ret != PTP_RC_OK) {
+		free (data);
+		return translate_ptp_result (ret);
+	}
+	if (size != expected_size ||
+		!pentax_wff_payload_is_valid (data, size)) {
+		free (data);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	for (i = 0; i < expected_size; i++) {
+		if (data[i] != expected[i]) {
+			GP_LOG_E ("Pentax 0xd01b read-back changed byte %lu "
+				"(expected 0x%02x, got 0x%02x).",
+				(unsigned long)i, expected[i], data[i]);
+			free (data);
+			return GP_ERROR;
+		}
+	}
 	free (data);
 	return GP_OK;
 }
@@ -11102,9 +11139,10 @@ static int
 _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
-	unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE];
+	unsigned char payload[PENTAX_WFF_MAX_PAYLOAD_SIZE];
+	size_t payload_size = 0;
 	const char *value;
-	uint8_t format;
+	int format;
 	uint16_t ret;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
@@ -11112,24 +11150,22 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
-	if (!strcmp (value, "JPEG"))
-		format = 0;
-	else if (!strcmp (value, "RAW"))
-		format = 1;
-	else if (!strcmp (value, "RAW+JPEG"))
-		format = 2;
-	else if (!strcmp (value, "TIFF"))
-		format = 3;
-	else
+	format = pentax_wff_format_byte (value);
+	if (format < 0)
 		return GP_ERROR_BAD_PARAMETERS;
-	CR (_pentax_wff_read_payload (params, payload));
+	CR (_pentax_wff_read_payload (params, payload, &payload_size));
 	/* IT2 writes the format to both bytes 4 and 5. */
-	payload[PENTAX_WFF_FORMAT_OFFSET] = format;
-	payload[PENTAX_WFF_FORMAT_OFFSET + 1] = format;
+	payload[PENTAX_WFF_FORMAT_OFFSET] = (unsigned char)format;
+	payload[PENTAX_WFF_FORMAT_OFFSET + 1] = (unsigned char)format;
 	ret = ptp_pentax_set_device_prop_raw (params,
-		PTP_DPC_PENTAX_WritingFileFormat, payload, sizeof (payload));
+		PTP_DPC_PENTAX_WritingFileFormat, payload, payload_size);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
+	{
+		int result = _pentax_wff_verify_payload (params, payload, payload_size);
+		if (result < GP_OK)
+			return result;
+	}
 	if (alreadyset)
 		*alreadyset = 1;
 	return GP_OK;
@@ -11175,7 +11211,8 @@ static int
 _put_Pentax_ImageQuality (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
-	unsigned char payload[PENTAX_WFF_PAYLOAD_SIZE];
+	unsigned char payload[PENTAX_WFF_MAX_PAYLOAD_SIZE];
+	size_t payload_size = 0;
 	const char *value;
 	int quality_byte;
 	uint16_t ret;
@@ -11190,12 +11227,17 @@ _put_Pentax_ImageQuality (CONFIG_PUT_ARGS)
 	quality_byte = pentax_wff_quality_byte (value);
 	if (quality_byte < 0)
 		return GP_ERROR_BAD_PARAMETERS;
-	CR (_pentax_wff_read_payload (params, payload));
+	CR (_pentax_wff_read_payload (params, payload, &payload_size));
 	payload[PENTAX_WFF_QUALITY_OFFSET] = (uint8_t)quality_byte;
 	ret = ptp_pentax_set_device_prop_raw (params,
-		PTP_DPC_PENTAX_WritingFileFormat, payload, sizeof (payload));
+		PTP_DPC_PENTAX_WritingFileFormat, payload, payload_size);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
+	{
+		int result = _pentax_wff_verify_payload (params, payload, payload_size);
+		if (result < GP_OK)
+			return result;
+	}
 	if (alreadyset)
 		*alreadyset = 1;
 	return GP_OK;
