@@ -18,7 +18,7 @@ The bundled IMAGE Transmitter 2 decompilation is the normative source:
 | `RemoteAssistant/MtpDevice.cs`, `Model` setter | Model number, extension version, transfer family, focus family, movie flags, dual-slot flags, high-resolution PC-LV flag, and the explicit K-3 III Monochrome and G900SE branches. |
 | `PcLiveViewMode` | Ordinary PC-LV sequence: read `0xd009` as a 20-byte geometry record, set `0xd035` to one, poll `0x9006`, stop polling, then set `0xd035` to zero. Stop accepts `0xa005` or `0x2001`. There is no model gate in this setter beyond vendor mode. |
 | `FocusFineTune` | Old-focus `0x9016` with amount `abs(value * 5)` and direction `0` for the UI Far button (`value=+1`) or `1` for the UI Near button (`value=-1`). New-focus `0x9017` uses `-(openAvNum * 2.5 / 3.0) * value` and retries `0xa00c` with a bounded square-root escalation. |
-| `CamAutoFocus` | AF-only `0x9011` with focus mode `1`, gated by live AF mode and shutter/movie state, but not by a model-specific branch or an explicit PC-LV property check. |
+| `CamAutoFocus` | AF-only `0x9011` with focus mode `1`, gated by live AF mode and shutter/movie state, but not by a model-specific branch or an explicit PC-LV property check. Its release-mode argument is refreshed from the live exposure, movie, bulb-timer, and drive conditions. |
 | `TouchAF` | `0x9011` with focus mode `1` or `3`, focus-area mode `3`, depending on `TouchAFSwitch`. This is distinct from ordinary AF and from manual focus. |
 | `LiveViewAFPosition` and `FocusPeakingMode` | `0xd036` uses an 8-byte `{2,0,0,0,xlo,xhi,ylo,yhi}` payload; `0xd02b` is a one-byte focus-peaking setting. IT2 keeps focus position client-side when camera read-back is not an exact echo. |
 | `IsReleaseWithAF` | Maps the client policy to `0x9011` focus mode `3` or `2` during the release path. It is not the same setting as `TouchAFSwitch`. |
@@ -124,11 +124,19 @@ test remains required before claiming focus support for any body.
 
 ### AF and “AF With Live View”
 
-The current `autofocusdrive` implementation sends `0x9011` with focus mode 1,
-but additionally requires a successful `d035` read and active PC-LV. IT2's
+The current `autofocusdrive` implementation sends `0x9011` with focus mode 1
+and the source-derived release-mode argument, but additionally requires a
+successful `d035` read and active PC-LV. IT2's
 `CamAutoFocus` instead checks live `AFMode` and shutter/movie state and then
 sends the same operation without a model-specific or explicit PC-LV gate. This
 is a real contract difference and is not closed by the K-3 III result.
+
+The source-derived release mode is now implemented and unit-tested: extension
+version zero uses `0`; later models select `2` for the relevant long-exposure
+modes when the bulb timer is not active, `3` for movie mode, and override that
+with `1` for IT2 continuous-drive values 4, 5, and 6. The AF-only payload still
+uses zero for MWB, sync, and aperture-reset because the checked IT2 source has
+no setters for those private fields and leaves them at their zero defaults.
 
 The safe next step is a direct library contract decision and per-model tests,
 not widening the gate based on an ACK. In particular, distinguish:

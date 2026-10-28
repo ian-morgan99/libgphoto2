@@ -461,6 +461,42 @@ main (void)
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K70));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_KF));
 	CHECK (!pentax_model_uses_new_focus (0));
+	{
+		PentaxConditions conditions;
+		uint32_t release_mode;
+
+		memset (&conditions, 0, sizeof (conditions));
+		conditions.exposure_mode = 8;
+		conditions.drive_mode = 1;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		conditions.exposure_mode = 9;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 2);
+		conditions.capability_flags = PENTAX_CONDITION_BULB_TIMER;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		conditions.capability_flags = 0;
+		conditions.exposure_mode = 8;
+		conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MOVIE_MODE;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 3);
+		conditions.drive_mode = 4;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 1);
+		CHECK (pentax_it2_release_mode (0, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		CHECK (pentax_it2_release_mode (1, NULL, &release_mode) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_it2_release_mode (1, &conditions, NULL) ==
+			GP_ERROR_BAD_PARAMETERS);
+	}
 	/* IMAGE Transmitter 2 starts PC live view directly on both K-1 bodies;
 	 * the K-3 III remains on the observed-state path. */
 	CHECK (pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K1));
