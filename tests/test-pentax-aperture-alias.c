@@ -94,12 +94,14 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 	/* The generic property opcodes must be advertised so the opcode-based
 	 * menu entries pass have_prop(). */
 	if (advertise_ops) {
-		uint16_t *ops = malloc (2 * sizeof (*ops));
+		uint16_t *ops = malloc (3 * sizeof (*ops));
 		if (ops) {
 			ops[0] = PTP_OC_GetDevicePropDesc;
 			ops[1] = PTP_OC_GetDevicePropValue;
+			/* The public Pentax autofocus widget is command-gated. */
+			ops[2] = PTP_OC_PENTAX_InitiateCapture;
 			params->deviceinfo.Operations = ops;
-			params->deviceinfo.Operations_len = 2;
+			params->deviceinfo.Operations_len = 3;
 		}
 	}
 
@@ -274,6 +276,44 @@ main (void)
 	char *ct_value = NULL;
 	CHECK (gp_widget_get_value (capturetarget, &ct_value) == GP_OK);
 	CHECK (ct_value && !strcmp (ct_value, "Internal RAM"));
+
+	/* The same public generic manual-focus widget must be present on both
+	 * focus families.  The handler chooses 0x9016 or 0x9017 only when the
+	 * action is written; this fixture checks the model-gated widget surface
+	 * without issuing a focus command. */
+	CameraWidget *manual_focus = NULL;
+	ret = get_single (cam, "manualfocusdrive", &manual_focus, context);
+	CHECK (ret == GP_OK && manual_focus != NULL);
+	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RANGE);
+
+	/* K-1 is a separate old-focus model, not an accidental K-1 II alias. */
+	cam->pl->params.pentax.model_no = PENTAX_MODEL_K1;
+	manual_focus = NULL;
+	ret = get_single (cam, "manualfocusdrivenear", &manual_focus, context);
+	CHECK (ret == GP_OK && manual_focus != NULL);
+	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_TOGGLE);
+
+	/* K-3 III and its Monochrome product share the new-focus generic surface;
+	 * the independent product gate is exercised by the utility tests. */
+	cam->pl->params.pentax.model_no = PENTAX_MODEL_K3_MARK_III;
+	manual_focus = NULL;
+	ret = get_single (cam, "manualfocusdrivenear", &manual_focus, context);
+	CHECK (ret == GP_OK && manual_focus != NULL);
+	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_TOGGLE);
+	CameraWidget *autofocus_drive = NULL;
+	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
+	CHECK (ret == GP_OK && autofocus_drive != NULL);
+	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_TOGGLE);
+	cam->pl->params.pentax.usb_product = 0x018f;
+	autofocus_drive = NULL;
+	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
+	CHECK (ret == GP_OK && autofocus_drive != NULL);
+	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_TOGGLE);
 
 	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
 	 * fail-closed. Without the vendor match and without the advertised ops,
