@@ -8784,17 +8784,13 @@ camera_trigger_capture (Camera *camera, GPContext *context)
 		return GP_OK;
 	}
 
-	if (	(params->deviceinfo.VendorExtensionID == PTP_VENDOR_PENTAX) &&
-		ptp_operation_issupported (params, PTP_OC_PENTAX_InterruptFunction)
-	) {
-#ifdef LIBGPHOTO2_ENABLE_PENTAX_RESEARCH_CAPTURE
-		/* Research builds only: the vendor "Green button" interrupt 0x9013 is
-		 * IT2's capture trigger (MtpDevice.GreenButton, no data phase). */
-		return translate_ptp_result (ptp_pentax_interrupt (params));
-#else
-		GP_LOG_D ("Pentax Green button interrupt available; "
-			 "using generic InitiateCapture in default build");
-#endif
+	if ((params->deviceinfo.VendorExtensionID == PTP_VENDOR_PENTAX) &&
+	    ptp_operation_issupported (params, PTP_OC_PENTAX_InterruptFunction)) {
+		/* 0x9013 is the separately named Green-button operation.  An
+		 * acknowledgement does not establish that it is equivalent to
+		 * libgphoto2 trigger_capture, so leave it out of the generic trigger
+		 * path until its capture semantics are independently characterized. */
+		GP_LOG_D ("Pentax Green button interrupt is not generic trigger capture");
 	}
 
 	if (!ptp_operation_issupported(params,PTP_OC_InitiateCapture)) {
