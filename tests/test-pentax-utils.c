@@ -349,6 +349,9 @@ main (void)
 	CHECK (pentax_lookup_model (0x25fb, 0x0183, "PENTAX K-1 Mark II",
 		&model_no, &extension_version));
 	CHECK ((model_no == 78400) && (extension_version == 1));
+	CHECK (pentax_lookup_model (0x25fb, 0x0179, "PENTAX K-1",
+		&model_no, &extension_version));
+	CHECK ((model_no == PENTAX_MODEL_K1) && (extension_version == 1));
 	/* The K-1 II declares a second product ID in its own firmware image and it
 	 * has been seen on hardware; it must resolve identically (issue #179). */
 	CHECK (pentax_lookup_model (0x25fb, 0x0182, "PENTAX K-1 Mark II",
@@ -368,11 +371,25 @@ main (void)
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
 	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
 		(extension_version == 1));
+	/* The K-3 III Monochrome uses the same IT2 model block for generic
+	 * controls, but its product ID remains distinct so product-specific
+	 * experimental actions can stay fail-closed. */
+	CHECK (pentax_model_supports_exp_bracket (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (pentax_model_supports_composition_adjust (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (pentax_model_supports_movie_setting (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (pentax_model_supports_pc_live_view (PENTAX_MODEL_K3_MARK_III_MONO));
+	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III_MONO,
+		0x018f));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONO) ==
 		!!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (!pentax_lookup_model (0x25fb, 0x0189,
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
 	CHECK (!pentax_lookup_model (0x1234, 0x0189, "PENTAX K-3 Mark III",
+		&model_no, &extension_version));
+	/* K-5 II is a legacy USB-SCSI/MSC body.  It must not be admitted to the
+	 * modern Pentax vendor/PTP path from a guessed PID or name; its existing
+	 * support remains in camlibs/pentax. */
+	CHECK (!pentax_lookup_model (0x25fb, 0x0148, "PENTAX K-5 II",
 		&model_no, &extension_version));
 	memset (&unchanged, 0xa5, sizeof (unchanged));
 	conditions = unchanged;

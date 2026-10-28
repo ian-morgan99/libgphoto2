@@ -144,6 +144,8 @@ body is mostly a matter of its USB ID plus capability flags:
 | **KP** | Already modelled (composition adjust supported); focus drive untested on hardware |
 | **K-70** | ID present; no hardware access yet |
 | **K-1** (original) | ID present; expected old-focus like the K-1 II |
+| **K-3 Mark III Monochrome** | PID `0x018f` is modelled for the shared generic-control family; held-Bulb remains deliberately blocked until independent hardware evidence |
+| **K-5 II** | Legacy USB-SCSI/MSC support already exists in `camlibs/pentax`; its firmware-derived PID `0x0148` is not admitted to the modern Pentax PTP vendor path |
 | **GR III / GR IIIx** | GR III modelled; new-focus family per opcode review |
 | **645Z** | Entry added from its own firmware image (PID 0x0167); needs a bench pass to confirm capability flags |
 | **KF** | Entry added from its own firmware image (PID 0x018e); needs a bench pass |
