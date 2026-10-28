@@ -8,7 +8,7 @@ against real hardware. It is rebased onto upstream **libgphoto2 v2.5.34**.
 
 ## Branch status (canonical branch)
 
-`master` is the single active branch for all Pentax work in this fork. The
+`main` is the single active branch for all Pentax work in this fork. The
 five legacy branches that predate the ptp2/pentax integration were reviewed
 for issue #40 and classified **superseded**: their unique commits are
 integrated-equivalent on master (e.g. the extra model IDs from the old
@@ -81,7 +81,9 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 - **Vendor mode enablement** replicating the vendor session handshake.
 - **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x018c),
   K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D,
-  plus firmware-derived entries for 645Z (0x0167) and KF (0x018e).
+  plus firmware-derived entries for 645Z (0x0167) and KF (0x018e). The
+  K-3 III standard PTP product ID is `0x0189`; `0x018f` is the independent
+  Monochrome product ID.
 - **Live view**: PC-LV control (`0xd035`) with a `pclvkeep` toggle so
   research harnesses can hold a session open; complete-JPEG-frame validation
   and session-state restore across capture-preview calls.
@@ -151,9 +153,10 @@ body is mostly a matter of its USB ID plus capability flags:
 | **KF** | Entry added from its own firmware image (PID 0x018e); needs a bench pass |
 | **645D** | Modelled from ID evidence only |
 
-The blocking factor is hardware: every capability flag in this fork was set
-from opcode and capability review and then confirmed (or corrected) against a
-physical camera.
+The blocking factor is hardware: capability flags are derived from opcode and
+capability review, but a model is not hardware-qualified merely because it is
+listed here. Current direct qualification is limited to the bodies and
+controls recorded in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md).
 
 ## What we are leaving pointing at the old mechanism
 
