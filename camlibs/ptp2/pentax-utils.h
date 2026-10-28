@@ -35,7 +35,7 @@ typedef struct {
 #define PENTAX_MODEL_K1 77970U
 #define PENTAX_MODEL_GR_III 78350U
 #define PENTAX_MODEL_645D 77320U
-/* From IT2 MtpDevice.cs: 645Z = 77840, KF = 78520. */
+/* IT2 model identifiers: 645Z = 77840, KF = 78520. */
 #define PENTAX_MODEL_645Z 77840U
 #define PENTAX_MODEL_KF 78520U
 /* K-3 II (PID 0x017b) is NOT in IT2: fail-closed, vendor mode stays off.
@@ -140,9 +140,9 @@ typedef struct {
 #define PENTAX_CONDITION_TASK_CHANGING            0x00000020U
 #define PENTAX_CONDITION_BULB_TIMER               0x00000040U
 #define PENTAX_CONDITION_GPS_STATE_MASK           0x00000180U
-/* IT2 ModeEnableInfo.AstroTracer3 (MtpDevice.cs:5926): a CAPABILITY bit in the
- * offset-504 field (capability_flags), NOT an offset-320 astro status bit.  It
- * says "this body can do Astro Tracer", not "it is currently exposing". */
+/* The AstroTracer3 capability is a bit in the offset-504 field
+ * (capability_flags), not an offset-320 astro status bit.  It says that the
+ * body can do Astro Tracer; it is not the current exposure mode. */
 #define PENTAX_CONDITION_ASTROTRACER3              0x00000200U
 
 /* IT2 ExpMode.AstroTracer (ExpMode.cs): the exposure-mode-dial value that

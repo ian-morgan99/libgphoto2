@@ -10670,9 +10670,7 @@ _put_Pentax_CrossProcess (CONFIG_PUT_ARGS)
 
 /* Detailed Custom Image parameters (0xd021-0xd029) and the color-temperature
  * white-balance value (0xd018) are plain single-value device properties that
- * IT2 reads and writes directly (MtpDevice.cs CISaturation/CIHue/CIKey/
- * CIFilterEffect/CIMonotoneToning/CIToning/CIFineSharpness/CIHighlightContrast/
- * CIShadowContrast and WBColorTemp).  Their ranges and signedness are
+ * the IT2 protocol reads and writes directly.  Their ranges and signedness are
  * camera-defined and differ per parameter (saturation/hue/key are signed,
  * filter/monotone/toning/fine-sharpness unsigned, color temperature a UINT16),
  * so - exactly as for ExtendedISO above - the widget is built from the
@@ -10950,9 +10948,8 @@ _put_Pentax_MovieMode (CONFIG_PUT_ARGS)
  * uint bitmask at connect-time settings apply: bit 0 = SD1, bit 1 = SD2.
  * There is no GET opcode, so the get handler reports the session-local cache
  * (zeroed on identify; updated only after a successful set).  On failure the
- * cache keeps its last values, mirroring IT2's fail-closed restore semantics
- * (MtpDevice.cs SDWritingMode setter: restores _sd1/_sd2WritingMode and fires
- * CardWriteModeFailed).  Gated to dual-slot models per IT2 _isDualSlot. */
+ * cache keeps its last values, mirroring the source-defined fail-closed
+ * restore semantics.  Gated to dual-slot models per the IT2 model matrix. */
 static int
 _get_Pentax_CardWritingMode (CONFIG_GET_ARGS)
 {
@@ -11087,7 +11084,7 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
 /* Writing file format (0xd01b) — generic imageformat / imagequality widgets
  * for modern Pentax ptp2 bodies (issues #54 and #55).
  *
- * IT2 (MtpDevice.cs _camWritingFileFormatCopy) uses a 10- or 11-byte payload
+ * The IT2 writing-file-format contract uses a 10- or 11-byte payload
  * on the K-1 / K-1 II / K-3 III family:
  *   byte 0  = 6 (payload length marker)
  *   bytes 4,5 = writing file format (JPEG=0, RAW=1, RAW+JPEG=2, TIFF=3;

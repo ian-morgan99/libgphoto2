@@ -784,15 +784,13 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * surfaces as GP_ERROR_CORRUPTED_DATA.  Fail closed instead.
  *
  * Exposure bracketing (0xd014/0xd015): _isExpBracketSupport is set only
- * for K-3 III family and 645Z (MainWindow.xaml.cs:506).  The fork now has
- * a 645Z entry (PID 0x0167 from its firmware image), so both are covered.
- * Composition adjustment (0xd02a): _isCompositionAdjSupported only for
- * K-3 III family and KP (MtpDevice.cs:96,173).
+ * for K-3 III family and 645Z.  The capability table has a 645Z entry
+ * (PID 0x0167), so both are covered.  Composition adjustment (0xd02a) is
+ * source-authorised only for the K-3 III family and KP.
  * Movie mode setting (0xd039): _isMovieSettingSupported only for the
  * K-3 III family; IsMovieSupported alone also covers bodies that accept
  * the movie *state* but not remote movie *settings*.
- * PC live view (0xd035): _isPcLvHighResolutionSupported only for the
- * K-3 III family (MtpDevice.cs:103). */
+ * PC live view (0xd035) is source-authorised only for the K-3 III family. */
 
 /* IT2 capability metadata for the generic controls below. Keep the matrix in
  * one place so adding a model is a data change rather than another scattered
@@ -868,9 +866,9 @@ pentax_model_supports_cross_process (uint32_t model_no)
 	return capabilities && capabilities->supports_cross_process;
 }
 
-/* Card writing mode (0x9004): IT2's Model property setter sets _isDualSlot
+/* Card writing mode (0x9004): the source model matrix marks _isDualSlot
  * true for the K-1 family, K-3 family and 645D/645Z, and false for KP,
- * K-70, GR III and G900SE (MtpDevice.cs).  The SD-writing-mode UI is only
+ * K-70, GR III and G900SE.  The SD-writing-mode UI is only
  * reachable on dual-slot bodies; fail closed on the single-slot set. */
 int
 pentax_model_supports_card_writing_mode (uint32_t model_no)
@@ -893,10 +891,9 @@ pentax_model_supports_writing_file_format (uint32_t model_no)
 	return capabilities && capabilities->supports_writing_file_format;
 }
 
-/* Color-temperature white-balance value (0xd018): IT2 sets
- * _isColorTempSettingSupported only inside the "PENTAX K-3 Mark III" model
- * block (MtpDevice.cs:98, model 78420); no other body sets it.  The property
- * is a plain UINT16 SetDevicePropValue (WBColorTemp, MtpDevice.cs:1110).
+/* Color-temperature white-balance value (0xd018): the source capability
+ * matrix authorises it only for the K-3 III family (model 78420).  The
+ * property is a plain UINT16 device-property write.
  * Fail closed on the k3iii family only (issue #102). */
 int
 pentax_model_supports_color_temperature (uint32_t model_no)
@@ -906,11 +903,10 @@ pentax_model_supports_color_temperature (uint32_t model_no)
 	return capabilities && capabilities->supports_color_temperature;
 }
 
-/* Detailed Custom Image parameters (0xd021-0xd029): IT2 sets
- * _isCIDetailParameterSupported only inside the "PENTAX K-3 Mark III" model
- * block (MtpDevice.cs:99, model 78420); no other body sets it.  Each is a
- * single-byte SetDevicePropValue (sbyte/byte, MtpDevice.cs CISaturation et
- * al.).  Fail closed on the k3iii family only (issue #67). */
+/* Detailed Custom Image parameters (0xd021-0xd029): the source capability
+ * matrix authorises them only for the K-3 III family (model 78420).  Each is
+ * a single-byte device-property write with camera-defined signedness.  Fail
+ * closed on other model families (issue #67). */
 int
 pentax_model_supports_ci_detail (uint32_t model_no)
 {
@@ -919,8 +915,8 @@ pentax_model_supports_ci_detail (uint32_t model_no)
 	return capabilities && capabilities->supports_ci_detail;
 }
 
-/* Map the generic imageformat labels to the 0xd01b bytes 4/5 value used by
- * IT2 (MtpDevice.cs _camWritingFileFormatCopy). */
+/* Map the generic imageformat labels to the 0xd01b bytes 4/5 values defined
+ * by the IT2 writing-file-format contract. */
 int
 pentax_wff_format_byte (const char *value)
 {
@@ -958,7 +954,7 @@ pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
 }
 
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
- * used by IT2 (MtpDevice.cs _camWritingFileFormatCopy):
+ * defined by the IT2 writing-file-format contract:
  *   0 = fine (3-star), 1 = normal (2-star), 2 = basic (1-star).
  * Returns -1 for an unknown label so callers can fail closed.  Centralised
  * here (rather than inlined in config.c) so the encoding is unit-testable and
@@ -1467,7 +1463,7 @@ pentax_capture_timeout_ms (const PentaxConditions *conditions)
 	/* Astro Tracer without a shift limit: honour the camera's own
 	 * AstroTracerTimeLimit when it reports one, otherwise base + margin.
 	 *
-	 * IT2 parity (MtpDevice.cs / MainWindow.xaml.cs): the "in astro mode"
+	 * IT2 parity: the "in astro mode"
 	 * signal is the exposure-mode dial value (offset 184) == ExpMode.AstroTracer
 	 * (20), and the long-exposure budget comes from AstroTracerTimeLimit
 	 * (offset 528).  The offset-504 capability bit (PENTAX_CONDITION_ASTROTRACER3)
