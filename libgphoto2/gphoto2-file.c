@@ -36,7 +36,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <utime.h>
 #include <unistd.h>
 
@@ -51,6 +53,49 @@
 #ifndef MAX_PATH
 # define MAX_PATH 256
 #endif
+
+/*
+ * gp_file_save() is the common local-publication boundary for CameraFile
+ * data.  Emit a best-effort completion row after the file is committed so the
+ * Polaris Astro watcher can correlate a JPEG with its transfer.  This is
+ * restricted to the Polaris media root and JPEG names; ordinary desktop
+ * gphoto2 saves remain untouched, and telemetry failure never changes a
+ * successful download into a camera error.
+ */
+static void
+polaris_capture_event (const char *filename)
+{
+	const char *ledger;
+	const char *suffix;
+	struct stat st;
+	FILE *fp;
+	time_t now;
+
+	if (!filename || strncmp (filename, "/app/sd/", 8))
+		return;
+	suffix = strrchr (filename, '.');
+	if (!suffix || (strcasecmp (suffix, ".jpg") && strcasecmp (suffix, ".jpeg")))
+		return;
+	if (strpbrk (filename, "\t\r\n"))
+		return;
+	if (stat (filename, &st) < 0)
+		return;
+	ledger = getenv ("POLARIS_CAPTURE_EVENT_LEDGER");
+	if (!ledger || !*ledger)
+		ledger = "/app/sd/polaris-astro/capture-events.tsv";
+	fp = fopen (ledger, "a");
+	if (!fp)
+		return;
+	now = time (NULL);
+	if (fprintf (fp, "%lld\t%s\t%lld\t%lld\n",
+			(long long) now, filename, (long long) st.st_size,
+			(long long) st.st_mtime) < 0 || fflush (fp) != 0)
+		goto done;
+	/* The ledger is evidence for the next process, not a delivery buffer. */
+	(void) fsync (fileno (fp));
+done:
+	fclose (fp);
+}
 
 /*! The internals of the CameraFile struct are private.
  * \internal
@@ -563,6 +608,7 @@ gp_file_save (CameraFile *file, const char *filename)
 		u.modtime = file->mtime;
 		utime (filename, &u);
 	}
+	polaris_capture_event (filename);
 
 	return (GP_OK);
 }
