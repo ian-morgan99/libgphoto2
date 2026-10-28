@@ -379,13 +379,17 @@ main (void)
 		CHECK (u.f (cam, list, context) == GP_OK);
 		int count = gp_list_count (list);
 		int occurrences = 0;
+		int autofocus_occurrences = 0;
 		for (int i = 0; i < count; i++) {
 			const char *nm = NULL;
 			if (gp_list_get_name (list, i, &nm) == GP_OK &&
 			    nm && !strcmp (nm, "pentaxliveviewafposition"))
 				occurrences++;
+			if (nm && !strcmp (nm, "autofocus"))
+				autofocus_occurrences++;
 		}
 		CHECK (occurrences == 1);
+		CHECK (autofocus_occurrences == 1);
 		gp_list_free (list);
 
 		/* A non-Pentax fixture must not surface the entry at all: vendor
@@ -395,18 +399,22 @@ main (void)
 		CHECK (u.f (cam2, list, context) == GP_OK);
 		count = gp_list_count (list);
 		occurrences = 0;
+		autofocus_occurrences = 0;
 		for (int i = 0; i < count; i++) {
 			const char *nm = NULL;
 			if (gp_list_get_name (list, i, &nm) == GP_OK &&
 			    nm && !strcmp (nm, "pentaxliveviewafposition"))
 				occurrences++;
+			if (nm && !strcmp (nm, "autofocus"))
+				autofocus_occurrences++;
 		}
 		CHECK (occurrences == 0);
+		CHECK (autofocus_occurrences == 0);
 		gp_list_free (list);
 	}
 
-	printf ("OK: public generic aperture, shutter and ISO aliases resolve seeded "
+	printf ("OK: public generic aperture, shutter, ISO and autofocus controls resolve seeded "
 	       "Pentax descriptors, stay fail-closed for "
-	       "non-Pentax, and pentaxliveviewafposition is registered exactly once (#69)\n");
+	       "non-Pentax, and Pentax-only controls are registered exactly once (#69)\n");
 	return 0;
 }
