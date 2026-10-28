@@ -403,10 +403,10 @@ Evidence: /tmp/mm.log, /tmp/mmset.log, /tmp/mmoff.log.
 - Analyzed `/home/ian/Downloads/k3III_v220/fwdc233b.bin` (K-3 III v2.20) and previously `/home/ian/Downloads/k1II_v251/fwdc240b.bin` (K-1 II v2.51).
 - Extracted full vendor opcode table from DeviceInfo blob at file offset `0x1f4f8dc`: ops 0x9001–0x9006, 0x900b–0x900d, 0x900f–0x9011, 0x9014–0x9017, 0x9019–0x9024, 0x902d–0x9055 range through 0x907f. Ops 0x901a–0x9024 and beyond are undocumented candidates for astro capture.
 - Found five per-model device property tables at ~0x1e00c1a (0xd0xx–0xd4xx ranges, ~95 props each).
-- String mining found only sparse LZ literals (`AstroTr`, `M6AstroT…`, `AstroCalcFwhm`, menu icons); **no StarAf/ReadAstro strings** — Star AF trigger has no identifiable opcode in either firmware.
+- String mining found sparse LZ literals (`AstroTr`, `M6AstroT…`, `AstroCalcFwhm`, menu icons). The K-1 II image also contains `StarAfReqType:%d` and `StarAfEvent` literals, while the K-3 III scan found no equivalent strings; neither scan identifies an IMAGE Transmitter 2 call path or usable trigger opcode.
 - Both firmwares use custom interleaved compression (entropy ~8.0 bands alternating with CODE/DATA; no standard container magic) — handler analysis blocked without decompression.
-- Conclusion: astro capture path must be found by live-probing undocumented ops 0x901a–0x9024 and d0xx–d4xx props, plus testing standard PTP `0x100E` as alternative to vendor `0x9011` in Astro mode.
-- Full writeup: `docs/pentax/evidence/2026-08-26/k3iii-fw-astro-analysis.md`. Capability matrix updated (Star AF trigger row: confirmed absent in both firmwares).
+- Conclusion: the astro capture and Star AF paths must be identified from live, observable camera behaviour before any control is exposed. The **AF when released** setting remains only the ordinary IT2 capture focus-mode policy; it does not prove or select Star AF. Astro capture probing of undocumented ops 0x901a–0x9024 and d0xx–d4xx props, plus standard PTP `0x100E`, remains separate work.
+- Full writeups: `docs/pentax/evidence/2026-08-26/k3iii-fw-astro-analysis.md` and `docs/pentax/evidence/2026-08-26/firmware-crosscheck-kp-k1ii-k3iii.md`.
 
 ### 2026-08-26 — Outstanding items
 - [ ] K-3 III remained unavailable for probing at session end (init fails; camera busy/state=49 persists across reconnects) — needs physical power cycle before undocumented-op probe run.

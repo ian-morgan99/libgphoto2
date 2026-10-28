@@ -178,7 +178,12 @@ hardware evidence row before being called supported.
 
 Ordinary still capture uses `InitiateCapture` (`0x9011`) with five parameters:
 release mode 0, focus mode, manual-white-balance mode 0, sync mode 0, and
-aperture-reset 0. The client uses focus mode 3 with autofocus and 2 without it.
+aperture-reset 0. The IMAGE Transmitter 2 option labelled **AF when released**
+is an application-side capture policy: enabled selects focus mode 3 and
+disabled selects focus mode 2. It is not a Star AF selector. The separate
+focus-only `CamAutoFocus()` action uses focus mode 1; whether that action or a
+capture with focus mode 3 invokes a camera-selected Star AF sequence remains
+an open hardware qualification question.
 
 IMAGE Transmitter 2's decompiled `CamRelease` logic selects release mode 2
 when the exposure mode is B/lens-B/Astro (9/12/20) and the camera's own Bulb
