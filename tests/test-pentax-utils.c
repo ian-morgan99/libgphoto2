@@ -186,12 +186,17 @@ main (void)
 	/* Issue #241 review: the synthesis must be constrained to the body whose
 	 * published list the values came from.  A K-1 II, K-01 or the Monochrome
 	 * K-3 III has its own list and must never be handed these choices. */
-	CHECK (pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K1_MARK_II));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III_MONO));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_KP));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K70));
-	CHECK (!pentax_shutter_list_may_synthesise_bulb (0));
+	CHECK (pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III,
+		0x0189));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III,
+		0x018f));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K1_MARK_II,
+		0x0183));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K3_MARK_III_MONO,
+		0x018f));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_KP, 0x017f));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (PENTAX_MODEL_K70, 0x017d));
+	CHECK (!pentax_shutter_list_may_synthesise_bulb (0, 0));
 
 	/* A plain "1/N" shutter speed must not be mistaken for a Bulb entry: it has
 	 * numerator 1 but a large denominator, not denominator 1. */
@@ -364,6 +369,12 @@ main (void)
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
 	CHECK (!pentax_model_uses_new_focus (0));
+	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III) != NULL);
+	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->k3iii_family);
+	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->supports_pc_live_view);
+	CHECK (pentax_model_capabilities (PENTAX_MODEL_K1_MARK_II)->focus_family ==
+		PENTAX_FOCUS_FAMILY_OLD);
+	CHECK (pentax_model_capabilities (0) == NULL);
 	/* The Monochrome shares the K-3 III protocol family; IT2 matches it
 	 * with StartsWith("PENTAX K-3 Mark III") so it resolves to the same
 	 * model_no 78420 and all K-3 III capability flags. */

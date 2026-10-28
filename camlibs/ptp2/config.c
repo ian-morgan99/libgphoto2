@@ -9675,7 +9675,8 @@ _get_Pentax_DirectShutter (CONFIG_GET_ARGS)
 	 * value.  These are the body's own values, not invented ones. */
 	if (desc.FormFlag == PTP_DPFF_Enumeration &&
 	    desc.FORM.Enum.NumberOfValues == 0 &&
-	    pentax_shutter_list_may_synthesise_bulb (params->pentax.model_no)) {
+	    pentax_shutter_list_may_synthesise_bulb (params->pentax.model_no,
+		params->pentax.usb_product)) {
 		unsigned int added = 0;
 		/* The descriptor's value array is calloc'd to the number of values the
 		 * camera reported, so with zero values it may be NULL.  Allocate it

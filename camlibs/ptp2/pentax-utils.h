@@ -41,6 +41,33 @@ typedef struct {
 /* K-3 II (PID 0x017b) is NOT in IT2: fail-closed, vendor mode stays off.
  * Revisit only with hardware proof or a newer IT2 build that lists it. */
 
+typedef enum {
+	PENTAX_FOCUS_FAMILY_OLD = 0,
+	PENTAX_FOCUS_FAMILY_NEW = 1
+} PentaxFocusFamily;
+
+/* Model metadata shared by the generic Pentax controls. Product-specific
+ * gates that cannot be inferred from the IT2 model number (for example the
+ * colour K-3 III versus Monochrome held-Bulb distinction) remain explicit and
+ * take the USB product as an additional input. Unknown model numbers return
+ * NULL and must fail closed. */
+typedef struct {
+	uint32_t model_no;
+	PentaxFocusFamily focus_family;
+	int k3iii_family;
+	int supports_exp_bracket;
+	int supports_composition_adjust;
+	int supports_movie_setting;
+	int supports_pc_live_view;
+	int supports_cross_process;
+	int supports_card_writing_mode;
+	int supports_writing_file_format;
+	int supports_color_temperature;
+	int supports_ci_detail;
+} PentaxModelCapabilities;
+
+const PentaxModelCapabilities *pentax_model_capabilities (uint32_t model_no);
+
 /* Parsed subset of the Pentax GetAllConditions response.  Mode values
  * deliberately remain raw until each value has been correlated on hardware. */
 typedef struct {
@@ -164,11 +191,14 @@ extern const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT];
 int pentax_shutter_value_is_bulb_seconds (uint64_t value);
 
 /* Whether an empty shutter enumeration may be filled with the Bulb/seconds
- * entries.  Constrained to the one body whose populated list those values were
- * read from: the K-3 III.  A K-1 II, K-01 or any other body with a legitimately
- * empty descriptor must NOT be handed shutter choices that were never its own
- * (issue #241 review). */
-int pentax_shutter_list_may_synthesise_bulb (uint32_t model_no);
+ * entries.  Constrained to the one product whose populated list those values
+ * were read from: the colour K-3 III.  The Monochrome lookup intentionally
+ * shares the K-3 III model number for generic controls, so the USB product is
+ * part of this product-specific gate.  A K-1 II, K-01, Monochrome or any other
+ * body with a legitimately empty descriptor must NOT be handed shutter choices
+ * that were never its own (issue #241 review). */
+int pentax_shutter_list_may_synthesise_bulb (uint32_t model_no,
+	uint16_t usb_product);
 
 /* Capture-wait budget and transfer-timeout constants. Camera-reported condition
  * values are untrusted protocol input; the timeout is computed in 64-bit and

@@ -3158,6 +3158,7 @@ pentax_identify_supported_model (PTPParams *params, const CameraAbilities *abili
 	memset (&params->pentax, 0, sizeof (params->pentax));
 	if (!abilities)
 		return;
+	params->pentax.usb_product = abilities->usb_product;
 	params->pentax.supported_model = pentax_lookup_model (
 		abilities->usb_vendor, abilities->usb_product, params->deviceinfo.Model,
 		&params->pentax.model_no, &params->pentax.vendor_ext_version);

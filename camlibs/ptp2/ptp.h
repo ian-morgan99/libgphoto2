@@ -4063,6 +4063,7 @@ struct _PTPParams {
 	/* Pentax vendor extension session state. */
 	struct {
 		uint32_t model_no;
+		uint16_t usb_product;
 		uint32_t vendor_ext_version;
 		uint32_t function_flags;
 		int supported_model;

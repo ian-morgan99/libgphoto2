@@ -11,6 +11,7 @@
 #include <gphoto2/gphoto2-result.h>
 #include <gphoto2/gphoto2-port-log.h>
 
+#include "array.h"
 #include "pentax-utils.h"
 
 #define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
@@ -109,12 +110,13 @@ const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT] = {
 };
 
 int
-pentax_shutter_list_may_synthesise_bulb (uint32_t model_no)
+pentax_shutter_list_may_synthesise_bulb (uint32_t model_no,
+	uint16_t usb_product)
 {
-	/* Only the K-3 III: the published second-counts were read from its own
-	 * populated list.  The Monochrome variant is a different body with its
-	 * own list and is deliberately excluded. */
-	return model_no == PENTAX_MODEL_K3_MARK_III;
+	/* Only the colour K-3 III: the published second-counts were read from its
+	 * own populated list.  The lookup maps the Monochrome to the shared model
+	 * number, so product identity is required to keep this gate fail-closed. */
+	return model_no == PENTAX_MODEL_K3_MARK_III && usb_product == 0x0189;
 }
 
 int
@@ -757,12 +759,11 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 int
 pentax_model_uses_new_focus (uint32_t model_no)
 {
-	/* IT2 explicitly selects 0x9017 only for its new-focus models.  The
-	 * K-1 II is an old-focus 0x9016 model and must fail closed here.
-	 * Per IT2 Model setter: new-focus = K-3 III family, KP, GR III. */
-	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
-	       (model_no == PENTAX_MODEL_KP) ||
-	       (model_no == PENTAX_MODEL_GR_III);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+
+	return capabilities &&
+		capabilities->focus_family == PENTAX_FOCUS_FAMILY_NEW;
 }
 
 /* IT2 capability gates for the properties below.  IT2's UI only exposes
@@ -782,38 +783,65 @@ pentax_model_uses_new_focus (uint32_t model_no)
  * PC live view (0xd035): _isPcLvHighResolutionSupported only for the
  * K-3 III family (MtpDevice.cs:103). */
 
-static int
-pentax_model_is_k3iii_family (uint32_t model_no)
+/* IT2 capability metadata for the generic controls below. Keep the matrix in
+ * one place so adding a model is a data change rather than another scattered
+ * model-number branch. The values intentionally preserve the existing
+ * fail-closed predicates until each operation has independent qualification. */
+static const PentaxModelCapabilities pentax_model_capability_table[] = {
+	{ PENTAX_MODEL_K1_MARK_II, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_K3_MARK_III, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+	{ PENTAX_MODEL_K3_MARK_III_MONO, PENTAX_FOCUS_FAMILY_NEW, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+	{ PENTAX_MODEL_KP, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 },
+	{ PENTAX_MODEL_K70, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	{ PENTAX_MODEL_K3, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_K1, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_GR_III, PENTAX_FOCUS_FAMILY_NEW, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	{ PENTAX_MODEL_645D, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_645Z, PENTAX_FOCUS_FAMILY_OLD, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0 },
+	{ PENTAX_MODEL_KF, PENTAX_FOCUS_FAMILY_OLD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+
+const PentaxModelCapabilities *
+pentax_model_capabilities (uint32_t model_no)
 {
-	return (model_no == PENTAX_MODEL_K3_MARK_III) ||
-	       (model_no == PENTAX_MODEL_K3_MARK_III_MONO);
+	unsigned int i;
+
+	for (i = 0; i < ARRAYSIZE (pentax_model_capability_table); i++)
+		if (pentax_model_capability_table[i].model_no == model_no)
+			return &pentax_model_capability_table[i];
+	return NULL;
 }
 
 int
 pentax_model_supports_exp_bracket (uint32_t model_no)
 {
-	/* IT2 MainWindow.xaml.cs:506: 645Z also sets _isExpBracketSupport. */
-	return pentax_model_is_k3iii_family (model_no) ||
-	       (model_no == PENTAX_MODEL_645Z);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_exp_bracket;
 }
 
 int
 pentax_model_supports_composition_adjust (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no) ||
-	       (model_no == PENTAX_MODEL_KP);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_composition_adjust;
 }
 
 int
 pentax_model_supports_movie_setting (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_movie_setting;
 }
 
 int
 pentax_model_supports_pc_live_view (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_pc_live_view;
 }
 
 /* Cross process (d02c): the HW finding that writes work once CI mode d020 is
@@ -824,7 +852,9 @@ pentax_model_supports_pc_live_view (uint32_t model_no)
 int
 pentax_model_supports_cross_process (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_cross_process;
 }
 
 /* Card writing mode (0x9004): IT2's Model property setter sets _isDualSlot
@@ -834,12 +864,9 @@ pentax_model_supports_cross_process (uint32_t model_no)
 int
 pentax_model_supports_card_writing_mode (uint32_t model_no)
 {
-	return (model_no == PENTAX_MODEL_K1_MARK_II) ||
-	       (model_no == PENTAX_MODEL_K1) ||
-	       (model_no == PENTAX_MODEL_K3) ||
-	       pentax_model_is_k3iii_family (model_no) ||
-	       (model_no == PENTAX_MODEL_645D) ||
-	       (model_no == PENTAX_MODEL_645Z);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_card_writing_mode;
 }
 
 /* Writing file format (0xd01b): the IT2 payload layout for the K-3 III /
@@ -850,7 +877,9 @@ pentax_model_supports_card_writing_mode (uint32_t model_no)
 int
 pentax_model_supports_writing_file_format (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_writing_file_format;
 }
 
 /* Color-temperature white-balance value (0xd018): IT2 sets
@@ -861,7 +890,9 @@ pentax_model_supports_writing_file_format (uint32_t model_no)
 int
 pentax_model_supports_color_temperature (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_color_temperature;
 }
 
 /* Detailed Custom Image parameters (0xd021-0xd029): IT2 sets
@@ -872,7 +903,9 @@ pentax_model_supports_color_temperature (uint32_t model_no)
 int
 pentax_model_supports_ci_detail (uint32_t model_no)
 {
-	return pentax_model_is_k3iii_family (model_no);
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->supports_ci_detail;
 }
 
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
