@@ -11108,6 +11108,7 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
 #define PENTAX_WFF_MAX_PAYLOAD_SIZE 11
 #define PENTAX_WFF_FORMAT_OFFSET 4
 #define PENTAX_WFF_QUALITY_OFFSET 7
+#define PENTAX_WFF_RAW_KIND_OFFSET 8
 
 static int
 _pentax_wff_read_payload (PTPParams *params,
@@ -11254,9 +11255,10 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 	if (result < GP_OK)
 		return result;
 	CR (_pentax_wff_read_payload (params, payload, &payload_size));
-	/* IT2 writes the format to both bytes 4 and 5. */
-	payload[PENTAX_WFF_FORMAT_OFFSET] = (unsigned char)format;
-	payload[PENTAX_WFF_FORMAT_OFFSET + 1] = (unsigned char)format;
+	/* IT2 writes the format to both bytes 4 and 5.  The helper deliberately
+	 * leaves byte 8 (PEF/DNG) and all other compound fields unchanged. */
+	if (pentax_wff_set_format (payload, payload_size, value) < 0)
+		return GP_ERROR_CORRUPTED_DATA;
 	ret = ptp_pentax_set_device_prop_raw (params,
 		PTP_DPC_PENTAX_WritingFileFormat, payload, payload_size);
 	if (ret != PTP_RC_OK)
@@ -11266,6 +11268,74 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 		if (result < GP_OK)
 			return result;
 	}
+	if (alreadyset)
+		*alreadyset = 1;
+	return GP_OK;
+}
+
+/* IT2 exposes the PEF/DNG choice as RawKind in the Options window rather than
+ * as a different generic imageformat label.  Keep that split in libgphoto2 so
+ * a client can read or deliberately change the raw container without a
+ * generic RAW round-trip converting PEF to DNG. */
+static int
+_get_Pentax_RawFileFormat (CONFIG_GET_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char payload[PENTAX_WFF_MAX_PAYLOAD_SIZE];
+	const char *label;
+	size_t payload_size = 0;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (_pentax_wff_read_payload (params, payload, &payload_size));
+	(void)payload_size;
+	label = pentax_wff_raw_kind_label (payload[PENTAX_WFF_RAW_KIND_OFFSET]);
+	if (!label) {
+		GP_LOG_E ("Pentax 0xd01b: unknown RawKind %u",
+			payload[PENTAX_WFF_RAW_KIND_OFFSET]);
+		return GP_ERROR_CORRUPTED_DATA;
+	}
+	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
+	gp_widget_set_name (*widget, menu->name);
+	gp_widget_add_choice (*widget, "PEF");
+	gp_widget_add_choice (*widget, "DNG");
+	gp_widget_set_value (*widget, label);
+	return GP_OK;
+}
+
+static int
+_put_Pentax_RawFileFormat (CONFIG_PUT_ARGS)
+{
+	PTPParams *params = &camera->pl->params;
+	unsigned char payload[PENTAX_WFF_MAX_PAYLOAD_SIZE];
+	const char *value;
+	size_t payload_size = 0;
+	PentaxConditions conditions;
+	int result;
+	uint16_t ret;
+
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_model_supports_writing_file_format (params->pentax.model_no))
+		return GP_ERROR_NOT_SUPPORTED;
+	CR (gp_widget_get_value (widget, &value));
+	if (pentax_wff_raw_kind_byte (value) < 0)
+		return GP_ERROR_BAD_PARAMETERS;
+	result = _pentax_readiness_preflight (params, &conditions);
+	if (result < GP_OK)
+		return result;
+	CR (_pentax_wff_read_payload (params, payload, &payload_size));
+	if (pentax_wff_set_raw_kind (payload, payload_size, value) < 0)
+		return GP_ERROR_CORRUPTED_DATA;
+	ret = ptp_pentax_set_device_prop_raw (params,
+		PTP_DPC_PENTAX_WritingFileFormat, payload, payload_size);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = _pentax_wff_verify_payload (params, payload, payload_size);
+	if (result < GP_OK)
+		return result;
 	if (alreadyset)
 		*alreadyset = 1;
 	return GP_OK;
@@ -14623,6 +14693,7 @@ static struct submenu camera_status_menu[] = {
 	{ N_("Pentax Keep Live View"), "pentaxpclvkeep", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_KeepLiveView, _put_Pentax_KeepLiveView },
 	{ N_("Pentax Card Writing Mode"), "pentaxcardwritingmode", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_CardWritingMode, _put_Pentax_CardWritingMode },
 	{ N_("Image Format"),           "imageformat",    0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_ImageFormat, _put_Pentax_ImageFormat },
+	{ N_("Pentax RAW File Format"), "pentaxrawformat", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_RawFileFormat, _put_Pentax_RawFileFormat },
 	{ N_("Image Quality"),          "imagequality",   0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropValue, _get_Pentax_ImageQuality, _put_Pentax_ImageQuality },
 	{ N_("Pentax Direct Shutter Speed"), "pentaxdirectshutter", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectShutter, _put_Pentax_DirectShutter },
 	{ N_("Pentax Direct ISO Speed"), "pentaxdirectiso", 0, PTP_VENDOR_PENTAX, PTP_OC_GetDevicePropDesc, _get_Pentax_DirectISO, _put_Pentax_DirectISO },
