@@ -1710,8 +1710,19 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 		 * serialized conditions sample. RAW+JPEG means one companion must be
 		 * observed after the already-finalized primary. Pixel Shift actuation
 		 * count does not change the number of output objects. */
-		if (pentax_expected_extra_candidates (cdata, csize) > required_count) {
-			required_count = pentax_expected_extra_candidates (cdata, csize);
+		{
+			unsigned int reported_count =
+				pentax_expected_extra_candidates (cdata, csize);
+			GP_LOG_D ("pentax reconciliation conditions +524=%u "
+				"reported-extra=%u required-extra=%u field32=0x%08x "
+				"field36=0x%08x field104=0x%08x",
+				pentax_get_u32le (cdata + 524), reported_count,
+				required_count, pentax_get_u32le (cdata + 32),
+				pentax_get_u32le (cdata + 36), pentax_get_u32le (cdata + 104));
+			if (reported_count > required_count)
+				required_count = reported_count;
+		}
+		if (required_count > min_count) {
 			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
 				required_count);
 		}

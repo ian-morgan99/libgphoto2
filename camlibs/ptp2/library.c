@@ -6733,6 +6733,85 @@ pentax_admission_apply_output_obligation (PTPParams *params,
 	return PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
 }
 
+/* IMAGE Transmitter 2 starts its serialized conditions timer 100 ms after the
+ * initial connection sample.  A single GetAllConditions read immediately
+ * before InitiateCapture can therefore describe the previous image-format
+ * selection when the camera or another client has just changed it.  Refresh
+ * the complete frame before latching the output obligation.  The newest
+ * complete frame is retained even if the body does not settle within the
+ * bounded diagnostic window; the original complete frame remains the safe
+ * fallback when the refresh transport is unavailable.
+ *
+ * This is deliberately Pentax-only.  It does not alter generic PTP2 timing or
+ * the K-3 III companion contract; it makes the source-defined live-condition
+ * polling explicit at the capture boundary and records whether +524 changed.
+ */
+static int
+pentax_refresh_capture_conditions (PTPParams *params, GPContext *context,
+	unsigned long long capture_id, unsigned char **data, unsigned int *size)
+{
+	unsigned char *latest = NULL;
+	unsigned int latest_size = 0;
+	uint32_t initial_format;
+	uint32_t previous_format;
+	int stable_samples = 0;
+	int attempt;
+	int refreshed = 0;
+
+	if (!params || !data || !*data || !size || *size < 528)
+		return 0;
+
+	initial_format = pentax_get_u32le (*data + 524);
+	previous_format = initial_format;
+	for (attempt = 1; attempt <= 3; attempt++) {
+		uint16_t ptpres;
+		uint32_t current_format;
+
+		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
+			return 0;
+		usleep (100 * 1000);
+		ptpres = ptp_pentax_get_all_conditions (params, &latest,
+			&latest_size);
+		if (ptpres != PTP_RC_OK || !latest || latest_size < 528) {
+			GP_LOG_E ("pentax capture format refresh %d/3 failed: "
+				"ptp=0x%04x size=%u", attempt, ptpres, latest_size);
+			free (latest);
+			latest = NULL;
+			latest_size = 0;
+			continue;
+		}
+
+		current_format = pentax_get_u32le (latest + 524);
+		if (current_format == previous_format)
+			stable_samples++;
+		else
+			stable_samples = 1;
+		GP_LOG_D ("pentax capture format refresh capture=%llu attempt=%d/3 "
+			"initial+524=%u current+524=%u stable=%d field32=0x%08x "
+			"field36=0x%08x field104=0x%08x",
+			capture_id, attempt, initial_format, current_format,
+			stable_samples, pentax_get_u32le (latest + 32),
+			pentax_get_u32le (latest + 36), pentax_get_u32le (latest + 104));
+
+		free (*data);
+		*data = latest;
+		*size = latest_size;
+		latest = NULL;
+		latest_size = 0;
+		previous_format = current_format;
+		refreshed = 1;
+		if (stable_samples >= 2)
+			break;
+	}
+
+	if (refreshed && initial_format != previous_format)
+		GP_LOG_D ("pentax capture format refresh changed live output contract "
+			"from +524=%u to +524=%u before InitiateCapture",
+			initial_format, previous_format);
+	free (latest);
+	return refreshed;
+}
+
 static int
 camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	GPContext *context, PentaxCaptureMode mode)
@@ -7032,6 +7111,22 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 				}
 			}
 		}
+		if (pentax_refresh_capture_conditions (params, context, capture_id,
+			&bdata, &bsize)) {
+			/* Re-evaluate readiness against the same refreshed frame used to
+			 * derive the output contract.  A format refresh must not bypass the
+			 * stale-candidate or unsafe-activity admission gate. */
+			baseline_capture = pentax_get_u32le (bdata + 32);
+			baseline_candidate = pentax_get_u32le (bdata + 36);
+			baseline_activity = pentax_get_u32le (bdata + 104);
+			baseline_reason = pentax_admission_block_reason (bdata, bsize,
+				PENTAX_ADMISSION_STRICT);
+			baseline_reason = pentax_admission_apply_output_obligation (
+				params, capture_id, "preconditions-format-refresh",
+				baseline_reason, baseline_capture, baseline_candidate);
+		} else
+			GP_LOG_E ("pentax capture format refresh unavailable; retaining "
+				"the original complete pre-shutter conditions frame");
 		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE) {
 			params->pentax.recovery_required = 1;
 			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
@@ -7084,6 +7179,10 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		 * capture therefore let RAW+JPEG return after its JPEG member. */
 		expected_extra_candidates =
 			pentax_expected_extra_candidates (bdata, bsize);
+		GP_LOG_D ("pentax capture output contract capture=%llu +524=%u "
+			"expected-extra=%u conditions-size=%u",
+			capture_id, pentax_get_u32le (bdata + 524),
+			expected_extra_candidates, bsize);
 		/* Preserve the same complete readiness frame for the exposure wait.
 		 * Once InitiateCapture is accepted, the camera may answer condition
 		 * reads as busy or omit the Bulb timer.  Throwing this frame away
