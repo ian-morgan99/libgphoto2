@@ -11,7 +11,7 @@ against real hardware. It is rebased onto upstream **libgphoto2 v2.5.34**.
 `main` is the single active branch for all Pentax work in this fork. The
 five legacy branches that predate the ptp2/pentax integration were reviewed
 for issue #40 and classified **superseded**: their unique commits are
-integrated-equivalent on master (e.g. the extra model IDs from the old
+integrated-equivalent on main (e.g. the extra model IDs from the old
 `pentaxmodern` camlib — 645D, K-3, 645Z, K-1, K-70, KP, Ricoh G900SE, GR III
 — now live in `camlibs/ptp2/pentax-utils.h`). Each is archived as an
 annotated tag at its 2026-08-27 tip:
@@ -79,7 +79,7 @@ the log in [`REAL_HARDWARE_TEST_LOG.md`](REAL_HARDWARE_TEST_LOG.md)
 (~20 test sessions):
 
 - **Vendor mode enablement** replicating the vendor session handshake.
-- **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x018c),
+- **Model table expansion**: K-1 Mark II (0x0183), K-3 Mark III (0x0189),
   K-3 Mark III Monochrome (0x018f), KP, K-70, K-3, K-1, GR III, 645D,
   plus firmware-derived entries for 645Z (0x0167) and KF (0x018e). The
   K-3 III standard PTP product ID is `0x0189`; `0x018f` is the independent
