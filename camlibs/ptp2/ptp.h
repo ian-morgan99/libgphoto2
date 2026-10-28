@@ -295,6 +295,32 @@ typedef enum {
 #define PTP_OC_PENTAX_ExecuteDustReduction		0x9022
 #define PTP_OC_PENTAX_GeneralCommand			0x97ff
 
+/* IMAGE Transmitter 2's ShootingFormat values used by the Pentax
+ * WritingFileFormatSetting condition and the 0xd01b payload bytes 4/5.  Do
+ * not collapse these into the four generic labels used by older callers:
+ * PEF and DNG, and their two dual-format variants, are distinct values. */
+enum pentax_shooting_format {
+	PTP_PENTAX_SHOOTING_FORMAT_JPEG = 0,
+	PTP_PENTAX_SHOOTING_FORMAT_PEF = 1,
+	PTP_PENTAX_SHOOTING_FORMAT_DNG = 2,
+	PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG = 3,
+	PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG = 4,
+	PTP_PENTAX_SHOOTING_FORMAT_TIFF = 5
+};
+
+/* IMAGE Transmitter 2's type argument for GetTransferCandidateFileInfo.
+ * These values are not interchangeable with pentax_shooting_format. */
+enum pentax_transfer_file_format {
+	PTP_PENTAX_TRANSFER_FILE_CAPTURE = 0,
+	PTP_PENTAX_TRANSFER_FILE_JPEG = 1,
+	PTP_PENTAX_TRANSFER_FILE_PEF = 2,
+	PTP_PENTAX_TRANSFER_FILE_DNG = 3,
+	PTP_PENTAX_TRANSFER_FILE_TIFF = 4,
+	PTP_PENTAX_TRANSFER_FILE_FULL = 253,
+	PTP_PENTAX_TRANSFER_FILE_SUB = 254,
+	PTP_PENTAX_TRANSFER_FILE_THUMB = 255
+};
+
 #define PTP_DPC_PENTAX_LiveViewAreaInfo			0xd009
 #define PTP_DPC_PENTAX_ShutterSpeed			0xd00f
 #define PTP_DPC_PENTAX_DriveMode			0xd013

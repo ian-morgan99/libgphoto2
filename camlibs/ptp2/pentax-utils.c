@@ -12,6 +12,7 @@
 #include <gphoto2/gphoto2-port-log.h>
 
 #include "array.h"
+#include "ptp.h"
 #include "pentax-utils.h"
 
 #define PENTAX_CAPTURE_MAX_FILE_SIZE_DEFAULT ((size_t)2U * 1024U * 1024U * 1024U)
@@ -154,10 +155,21 @@ pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 unsigned int
 pentax_expected_extra_candidates (const unsigned char *data, size_t size)
 {
-	/* IMAGE Transmitter 2: 0=JPEG, 1=RAW, 2=RAW+JPEG, 3=TIFF. */
+	/* IMAGE Transmitter 2 ShootingFormat: only PEF+JPEG and DNG+JPEG
+	 * advertise a second output.  In particular, value 2 is DNG-only; the
+	 * old four-value interpretation treated it as RAW+JPEG and caused the
+	 * capture path to wait for a JPEG that the camera was never going to
+	 * publish.  This remains a diagnostic/advisory helper; the capture path
+	 * must reconcile actual candidates rather than trust a stale condition. */
 	if (!data || size < 528)
 		return 0;
-	return pentax_get_u32le (data + 524) == 2 ? 1U : 0U;
+	switch (pentax_get_u32le (data + 524)) {
+	case PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG:
+	case PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG:
+		return 1U;
+	default:
+		return 0U;
+	}
 }
 
 int
@@ -194,7 +206,7 @@ pentax_capture_output_contract_known (const unsigned char *data, size_t size)
 	if (!data || size < 528)
 		return 0;
 	format = pentax_get_u32le (data + 524);
-	return format <= 3;
+	return format <= PTP_PENTAX_SHOOTING_FORMAT_TIFF;
 }
 
 PentaxAdmissionBlockReason
@@ -915,21 +927,29 @@ pentax_model_supports_ci_detail (uint32_t model_no)
 	return capabilities && capabilities->supports_ci_detail;
 }
 
-/* Map the generic imageformat labels to the 0xd01b bytes 4/5 values defined
- * by the IT2 writing-file-format contract. */
+/* Map imageformat labels to the 0xd01b bytes 4/5 values defined by the IT2
+ * ShootingFormat contract.  The legacy RAW and RAW+JPEG labels are retained
+ * for existing libgphoto2 clients and mean DNG and DNG+JPEG respectively,
+ * which is the raw container used by the K-1 II and K-3 III evidence.  The
+ * exact PEF/DNG labels are also accepted so a caller that needs the source
+ * distinction can select it explicitly. */
 int
 pentax_wff_format_byte (const char *value)
 {
 	if (!value)
 		return -1;
 	if (!strcmp (value, "JPEG"))
-		return 0;
-	if (!strcmp (value, "RAW"))
-		return 1;
-	if (!strcmp (value, "RAW+JPEG"))
-		return 2;
+		return PTP_PENTAX_SHOOTING_FORMAT_JPEG;
+	if (!strcmp (value, "PEF"))
+		return PTP_PENTAX_SHOOTING_FORMAT_PEF;
+	if (!strcmp (value, "DNG") || !strcmp (value, "RAW"))
+		return PTP_PENTAX_SHOOTING_FORMAT_DNG;
+	if (!strcmp (value, "PEF+JPEG"))
+		return PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG;
+	if (!strcmp (value, "DNG+JPEG") || !strcmp (value, "RAW+JPEG"))
+		return PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG;
 	if (!strcmp (value, "TIFF"))
-		return 3;
+		return PTP_PENTAX_SHOOTING_FORMAT_TIFF;
 	return -1;
 }
 
@@ -946,7 +966,8 @@ pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
 		return 0;
 	if (payload[0] != (unsigned char)(size - 4))
 		return 0;
-	if (payload[4] > 3 || payload[5] > 3)
+	if (payload[4] > PTP_PENTAX_SHOOTING_FORMAT_TIFF ||
+		payload[5] > PTP_PENTAX_SHOOTING_FORMAT_TIFF)
 		return 0;
 	if (payload[7] > 2)
 		return 0;
@@ -1628,11 +1649,14 @@ pentax_capture_needs_idle_wait (const PentaxConditions *conditions)
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds). min_count is the
- * minimum companion obligation reported by the camera output configuration.
- * Each iteration:
+ * and max_ms (total wall-clock budget in milliseconds). min_count is an
+ * explicit minimum companion obligation supplied by the caller. The live
+ * writing-file-format field is diagnostic only here: a stale format hint must
+ * not turn a successfully completed RAW-only capture into a phantom RAW+JPEG
+ * obligation. Each iteration:
  *   1. Reads GetAllConditions via get_conditions. An empty response completes
- *      only after min_count candidates have been finalized.
+ *      only after min_count candidates have been finalized and the camera's
+ *      capture/processing state is no longer active.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.
@@ -1706,50 +1730,59 @@ pentax_reconcile_extra_candidates (const PentaxReconcileOps *ops,
 			goto out;
 		}
 
-		/* The output contract and candidate flag are observations from one
-		 * serialized conditions sample. RAW+JPEG means one companion must be
-		 * observed after the already-finalized primary. Pixel Shift actuation
-		 * count does not change the number of output objects. */
+		/* Log the format hint alongside the actual output lifecycle. The hint is
+		 * useful evidence, but is deliberately not promoted into a hard output
+		 * obligation: a stale +524 value was the cause of a valid RAW-only
+		 * capture being held until timeout. */
 		{
 			unsigned int reported_count =
 				pentax_expected_extra_candidates (cdata, csize);
 			GP_LOG_D ("pentax reconciliation conditions +524=%u "
-				"reported-extra=%u required-extra=%u field32=0x%08x "
-				"field36=0x%08x field104=0x%08x",
+				"format-extra-hint=%u explicit-required=%u field32=0x%08x "
+				"field36=0x%08x field104=0x%08x cycle-active=%d",
 				pentax_get_u32le (cdata + 524), reported_count,
 				required_count, pentax_get_u32le (cdata + 32),
-				pentax_get_u32le (cdata + 36), pentax_get_u32le (cdata + 104));
-			if (reported_count > required_count)
-				required_count = reported_count;
-		}
-		if (required_count > min_count) {
-			GP_LOG_D ("camera output contract: %u companion candidate(s) expected",
-				required_count);
+				pentax_get_u32le (cdata + 36), pentax_get_u32le (cdata + 104),
+				(pentax_get_u32le (cdata + 32) != 0) ||
+				(pentax_get_u32le (cdata + 36) != 0) ||
+				((pentax_get_u32le (cdata + 104) &
+				  PENTAX_CONDITION_ACTIVITY_UNSAFE) != 0));
 		}
 		handle = 0;
 		if (csize >= PENTAX_CONDITIONS_MIN_SIZE &&
 		    pentax_get_u32le (cdata + 32) == 1)
 			handle = pentax_get_u32le (cdata + 36);
-		free (cdata);
-		cdata = NULL;
+		{
+			uint32_t capture_state = pentax_get_u32le (cdata + 32);
+			uint32_t candidate_state = pentax_get_u32le (cdata + 36);
+			uint32_t activity = pentax_get_u32le (cdata + 104);
+			int cycle_active = capture_state != 0 || candidate_state != 0 ||
+				(activity & PENTAX_CONDITION_ACTIVITY_UNSAFE) != 0;
 
-		if (!handle) {
-			/* The camera may briefly report no candidate between RAW and JPEG.
-			 * Complete only after the camera-reported output obligation is met. */
-			if ((unsigned int)count >= required_count) {
-				done = 1;
-				goto out;
+			free (cdata);
+			cdata = NULL;
+
+			if (!handle) {
+				/* The post-capture probe is driven by the camera's actual
+				 * lifecycle. A stale +524=RAW+JPEG is not enough to keep a
+				 * RAW-only capture spinning, but an active/processing camera is
+				 * not yet proof that all candidates have been published. */
+				if ((unsigned int)count >= required_count && !cycle_active) {
+					done = 1;
+					goto out;
+				}
+				clock_gettime (CLOCK_MONOTONIC, &now);
+				if ((now.tv_sec - start.tv_sec) * 1000 +
+				    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
+					GP_LOG_E ("reconciliation timed out waiting for actual output "
+						"lifecycle (%d/%u; active=%d)", count,
+						required_count, cycle_active);
+					ret = GP_ERROR_TIMEOUT;
+					goto out;
+				}
+				usleep (200 * 1000);
+				continue;
 			}
-			clock_gettime (CLOCK_MONOTONIC, &now);
-			if ((now.tv_sec - start.tv_sec) * 1000 +
-			    (now.tv_nsec - start.tv_nsec) / 1000000 >= (long)max_ms) {
-				GP_LOG_E ("reconciliation timed out waiting for camera-reported "
-					"output %d/%u", count + 1, required_count + 1);
-				ret = GP_ERROR_TIMEOUT;
-				goto out;
-			}
-			usleep (200 * 1000);
-			continue;
 		}
 
 		/* Bound on candidate count. */

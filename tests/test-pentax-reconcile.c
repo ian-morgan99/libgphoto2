@@ -56,7 +56,8 @@ typedef struct {
         int conditions_fail_first;   /* fail the first N get_conditions calls */
         int short_conditions;        /* successful call with incomplete frame */
         int conditions_empty_first;  /* report empty for the first N reads */
-        int writing_format;          /* +524: 2 means RAW+JPEG */
+        int active_empty_first;      /* report processing while empty */
+        int writing_format;          /* +524: IT2 ShootingFormat value */
         int conditions_calls;
         int transfer_error;          /* non-zero: transfer_candidate fails */
         int publication_error;       /* transfer succeeded, file publication failed */
@@ -97,6 +98,9 @@ mock_get_conditions (void *user_data, unsigned char **data, size_t *size)
         }
         if (mock->writing_format)
                 put_u32le (blob, 524, (uint32_t)mock->writing_format);
+        if (mock->active_empty_first > 0 &&
+            mock->conditions_calls <= mock->active_empty_first)
+                put_u32le (blob, 104, PENTAX_CONDITION_ACTIVITY_PROCESSING);
         *data = blob;
         *size = blob_size;
         return GP_OK;
@@ -265,11 +269,13 @@ main (void)
         CHECK (!strcmp (names[0], "IMG_0001.ARW"));
         CHECK (!strcmp (names[1], "IMG_0001.JPG"));
 
-        /* RAW+JPEG: an initially empty post-primary sample is not completion.
-         * The camera's +524 contract requires the delayed companion. */
+        /* A delayed companion is not complete while the camera still reports
+         * an active processing cycle. The +524 hint is retained only as log
+         * evidence and is not the reason this test waits. */
         mock_reset (&mock);
         mock.writing_format = 2;
         mock.conditions_empty_first = 1;
+        mock.active_empty_first = 1;
         mock.handles[0] = 202;
         mock.handle_count = 1;
         mock.names[0] = "IMG_0002.DNG";
@@ -403,15 +409,17 @@ main (void)
         CHECK (mock.delete_calls == 0);
         CHECK (mock.handle_count == 1);
 
-        /* 11. RAW+JPEG: an empty gap after primary finalization is not
-         * completion. Discover and finalize the delayed companion. */
+        /* 11. A delayed companion is discovered from the capture-cycle
+         * lifecycle, not from the possibly stale format hint. */
         mock_reset (&mock);
         mock.handles[0] = 900;
         mock.handle_count = 1;
         mock.names[0] = "IMG_0002.DNG";
         mock.conditions_empty_first = 3;
+        mock.active_empty_first = 3;
+        mock.writing_format = 2;
         count = -1;
-        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 1, names, &count);
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
         CHECK (ret == GP_OK);
         CHECK (count == 1);
         CHECK (mock.conditions_calls >= 4);
@@ -419,8 +427,18 @@ main (void)
         CHECK (mock.delete_calls == 1);
         CHECK (!strcmp (names[0], "IMG_0002.DNG"));
 
-        /* 12. The camera-reported writing format supplies the minimum output
-         * obligation; Pixel Shift exposure count is deliberately irrelevant. */
+        /* A stale RAW+JPEG hint with no actual companion must not hold a
+         * RAW-only capture until the reconciliation timeout. */
+        mock_reset (&mock);
+        mock.writing_format = 2;
+        count = -1;
+        ret = pentax_reconcile_extra_candidates (&ops, 4, 60000, 0, names, &count);
+        CHECK (ret == GP_OK);
+        CHECK (count == 0);
+        CHECK (mock.conditions_calls == 1);
+
+        /* 12. The IT2 enum is exact: 2=DNG-only, 3=PEF+JPEG, 4=DNG+JPEG.
+         * Pixel Shift exposure count is deliberately irrelevant. */
         {
                 unsigned char conditions[528] = {0};
                 CHECK (pentax_expected_extra_candidates (conditions, 527) == 0);
@@ -429,8 +447,12 @@ main (void)
                 put_u32le (conditions, 524, 1);
                 CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
                 put_u32le (conditions, 524, 2);
-                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
                 put_u32le (conditions, 524, 3);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                put_u32le (conditions, 524, 4);
+                CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 1);
+                put_u32le (conditions, 524, 5);
                 CHECK (pentax_expected_extra_candidates (conditions, sizeof (conditions)) == 0);
         }
 

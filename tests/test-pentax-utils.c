@@ -6,6 +6,7 @@
 
 #include <gphoto2/gphoto2-result.h>
 
+#include "ptp.h"
 #include "pentax-utils.h"
 
 #define CHECK(expression) do { \
@@ -233,6 +234,31 @@ main (void)
 	CHECK (pentax_get_u32le ((const unsigned char *)"\x78\x56\x34\x12") ==
 		0x12345678U);
 
+	/* Keep the wire constants aligned with IMAGE Transmitter 2's MtpOpCode
+	 * and ShootingFormat/TransFileFormat declarations. */
+	CHECK (PTP_OC_PENTAX_GetTransferCandidateFileInfo == 0x900b);
+	CHECK (PTP_OC_PENTAX_GetCamFileOperationCommand == 0x900c);
+	CHECK (PTP_OC_PENTAX_GetTransferFileDataBlock == 0x900d);
+	CHECK (PTP_OC_PENTAX_DeleteTransferCandidate == 0x900e);
+	CHECK (PTP_OC_PENTAX_GetAllConditions == 0x900f);
+	CHECK (PTP_OC_PENTAX_InitiateCapture == 0x9011);
+	CHECK (PTP_OC_PENTAX_TerminateCapture == 0x9012);
+	CHECK (PTP_DPC_PENTAX_WritingFileFormat == 0xd01b);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_JPEG == 0);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_PEF == 1);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_DNG == 2);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG == 3);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG == 4);
+	CHECK (PTP_PENTAX_SHOOTING_FORMAT_TIFF == 5);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_CAPTURE == 0);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_JPEG == 1);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_PEF == 2);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_DNG == 3);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_TIFF == 4);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_FULL == 253);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_SUB == 254);
+	CHECK (PTP_PENTAX_TRANSFER_FILE_THUMB == 255);
+
 	/* Regression: v9g imagequality 0xd01b byte-7 encoding (issue #71 / #55).
 	 * The old code computed (uint8_t)(2 - stars), which produced 0xff for
 	 * "fine" and was off-by-one for the other two. The encoder must map to
@@ -245,9 +271,15 @@ main (void)
 	CHECK (pentax_wff_quality_byte ("FINE") == -1);   /* case-sensitive */
 	CHECK (pentax_wff_quality_byte (NULL) == -1);
 	CHECK (pentax_wff_format_byte ("JPEG") == 0);
-	CHECK (pentax_wff_format_byte ("RAW") == 1);
-	CHECK (pentax_wff_format_byte ("RAW+JPEG") == 2);
-	CHECK (pentax_wff_format_byte ("TIFF") == 3);
+	CHECK (pentax_wff_format_byte ("PEF") == 1);
+	CHECK (pentax_wff_format_byte ("DNG") == 2);
+	CHECK (pentax_wff_format_byte ("PEF+JPEG") == 3);
+	CHECK (pentax_wff_format_byte ("DNG+JPEG") == 4);
+	CHECK (pentax_wff_format_byte ("TIFF") == 5);
+	/* Legacy generic labels are deliberately DNG-based for the K-1 II/K-3 III
+	 * control surface. */
+	CHECK (pentax_wff_format_byte ("RAW") == 2);
+	CHECK (pentax_wff_format_byte ("RAW+JPEG") == 4);
 	CHECK (pentax_wff_format_byte ("jpeg") == -1);
 	CHECK (pentax_wff_format_byte (NULL) == -1);
 	{
@@ -257,11 +289,17 @@ main (void)
 		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
 		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		CHECK (pentax_wff_payload_is_valid (wff11, sizeof (wff11)));
+		wff10[4] = 4;
+		wff10[5] = 4;
+		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
+		wff10[4] = 5;
+		wff10[5] = 5;
+		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		malformed_wff[0] = 6;
 		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
 			sizeof (malformed_wff)));
 		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
-		malformed_wff[4] = 4;
+		malformed_wff[4] = 6;
 		CHECK (!pentax_wff_payload_is_valid (malformed_wff,
 			sizeof (malformed_wff)));
 		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
@@ -1284,14 +1322,14 @@ main (void)
 	/* A short/unknown format must not silently become a one-file capture. */
 	CHECK (!pentax_capture_output_contract_known (NULL, 0));
 	CHECK (!pentax_capture_output_contract_known (condition_data, 527));
-	for (i = 0; i <= 3; i++) {
+	for (i = 0; i <= 5; i++) {
 		put_u32le (condition_data, 524, i);
 		CHECK (pentax_capture_output_contract_known (condition_data,
 			sizeof (condition_data)));
 		CHECK (pentax_expected_extra_candidates (condition_data,
-			sizeof (condition_data)) == (i == 2 ? 1U : 0U));
+			sizeof (condition_data)) == ((i == 3 || i == 4) ? 1U : 0U));
 	}
-	put_u32le (condition_data, 524, 4);
+	put_u32le (condition_data, 524, 6);
 	CHECK (!pentax_capture_output_contract_known (condition_data,
 		sizeof (condition_data)));
 

@@ -6209,7 +6209,8 @@ pentax_reconcile_get_candidate_info (void *user_data, unsigned char **data,
 	unsigned int usize = 0;
 	uint16_t ptpres;
 
-	ptpres = ptp_pentax_get_transfer_candidate_info (rc->params, 0, data,
+	ptpres = ptp_pentax_get_transfer_candidate_info (rc->params,
+		PTP_PENTAX_TRANSFER_FILE_CAPTURE, data,
 		&usize);
 	*size = usize;
 	return ptpres == PTP_RC_OK ? GP_OK : translate_ptp_result (ptpres);
@@ -6260,8 +6261,7 @@ pentax_reconcile_candidate_is_owned (void *user_data, uint32_t handle,
 	(void)handle;
 	(void)info;
 	(void)info_size;
-	return rc && rc->expected_extra_candidates > 0 &&
-		pentax_candidate_is_same_exposure_companion (
+	return rc && pentax_candidate_is_same_exposure_companion (
 		rc->primary_name, name);
 }
 
@@ -6299,7 +6299,8 @@ pentax_reconcile_transfer_candidate (void *user_data, PentaxCaptureBuffer *buffe
 		return ret;
 
 	/* Read the candidate filename while it still exists. */
-	if (PTP_RC_OK == ptp_pentax_get_transfer_candidate_info (params, 0,
+	if (PTP_RC_OK == ptp_pentax_get_transfer_candidate_info (params,
+			PTP_PENTAX_TRANSFER_FILE_CAPTURE,
 		    &cinfo, &cisize)) {
 		if (pentax_candidate_filename (cinfo, cisize, name, sizeof (name)) != GP_OK)
 			name[0] = '\0';
@@ -6733,85 +6734,6 @@ pentax_admission_apply_output_obligation (PTPParams *params,
 	return PENTAX_ADMISSION_BLOCK_OUTPUT_UNRESOLVED;
 }
 
-/* IMAGE Transmitter 2 starts its serialized conditions timer 100 ms after the
- * initial connection sample.  A single GetAllConditions read immediately
- * before InitiateCapture can therefore describe the previous image-format
- * selection when the camera or another client has just changed it.  Refresh
- * the complete frame before latching the output obligation.  The newest
- * complete frame is retained even if the body does not settle within the
- * bounded diagnostic window; the original complete frame remains the safe
- * fallback when the refresh transport is unavailable.
- *
- * This is deliberately Pentax-only.  It does not alter generic PTP2 timing or
- * the K-3 III companion contract; it makes the source-defined live-condition
- * polling explicit at the capture boundary and records whether +524 changed.
- */
-static int
-pentax_refresh_capture_conditions (PTPParams *params, GPContext *context,
-	unsigned long long capture_id, unsigned char **data, unsigned int *size)
-{
-	unsigned char *latest = NULL;
-	unsigned int latest_size = 0;
-	uint32_t initial_format;
-	uint32_t previous_format;
-	int stable_samples = 0;
-	int attempt;
-	int refreshed = 0;
-
-	if (!params || !data || !*data || !size || *size < 528)
-		return 0;
-
-	initial_format = pentax_get_u32le (*data + 524);
-	previous_format = initial_format;
-	for (attempt = 1; attempt <= 3; attempt++) {
-		uint16_t ptpres;
-		uint32_t current_format;
-
-		if (gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL)
-			return 0;
-		usleep (100 * 1000);
-		ptpres = ptp_pentax_get_all_conditions (params, &latest,
-			&latest_size);
-		if (ptpres != PTP_RC_OK || !latest || latest_size < 528) {
-			GP_LOG_E ("pentax capture format refresh %d/3 failed: "
-				"ptp=0x%04x size=%u", attempt, ptpres, latest_size);
-			free (latest);
-			latest = NULL;
-			latest_size = 0;
-			continue;
-		}
-
-		current_format = pentax_get_u32le (latest + 524);
-		if (current_format == previous_format)
-			stable_samples++;
-		else
-			stable_samples = 1;
-		GP_LOG_D ("pentax capture format refresh capture=%llu attempt=%d/3 "
-			"initial+524=%u current+524=%u stable=%d field32=0x%08x "
-			"field36=0x%08x field104=0x%08x",
-			capture_id, attempt, initial_format, current_format,
-			stable_samples, pentax_get_u32le (latest + 32),
-			pentax_get_u32le (latest + 36), pentax_get_u32le (latest + 104));
-
-		free (*data);
-		*data = latest;
-		*size = latest_size;
-		latest = NULL;
-		latest_size = 0;
-		previous_format = current_format;
-		refreshed = 1;
-		if (stable_samples >= 2)
-			break;
-	}
-
-	if (refreshed && initial_format != previous_format)
-		GP_LOG_D ("pentax capture format refresh changed live output contract "
-			"from +524=%u to +524=%u before InitiateCapture",
-			initial_format, previous_format);
-	free (latest);
-	return refreshed;
-}
-
 static int
 camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	GPContext *context, PentaxCaptureMode mode)
@@ -7111,22 +7033,6 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 				}
 			}
 		}
-		if (pentax_refresh_capture_conditions (params, context, capture_id,
-			&bdata, &bsize)) {
-			/* Re-evaluate readiness against the same refreshed frame used to
-			 * derive the output contract.  A format refresh must not bypass the
-			 * stale-candidate or unsafe-activity admission gate. */
-			baseline_capture = pentax_get_u32le (bdata + 32);
-			baseline_candidate = pentax_get_u32le (bdata + 36);
-			baseline_activity = pentax_get_u32le (bdata + 104);
-			baseline_reason = pentax_admission_block_reason (bdata, bsize,
-				PENTAX_ADMISSION_STRICT);
-			baseline_reason = pentax_admission_apply_output_obligation (
-				params, capture_id, "preconditions-format-refresh",
-				baseline_reason, baseline_capture, baseline_candidate);
-		} else
-			GP_LOG_E ("pentax capture format refresh unavailable; retaining "
-				"the original complete pre-shutter conditions frame");
 		if (baseline_reason != PENTAX_ADMISSION_BLOCK_NONE) {
 			params->pentax.recovery_required = 1;
 			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
@@ -7160,27 +7066,13 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 				capture_id, baseline_capture, baseline_candidate,
 				baseline_activity);
 		}
-		if (!pentax_capture_output_contract_known (bdata, bsize)) {
-			params->pentax.recovery_required = 1;
-			fprintf (stderr, "[pentax-recovery] capture=%llu path=pre-shutter "
-				"reason=output-contract-unknown size=%u accepted=0 "
-				"action=hold-shutter; read-complete-supported-output-format; re-probe-before-retry\n",
-				capture_id, bsize);
-			gp_context_error (context,
-				_("Pentax output format is missing or unknown (%u condition bytes); refusing to initiate a capture whose file count cannot be reconciled."),
-				bsize);
-			free (bdata);
-			return GP_ERROR_CAMERA_BUSY;
-		}
-		/* This same mandatory readiness sample also carries the camera's
-		 * writing format.  Preserve its output obligation across the exposure:
-		 * the K-3 III can clear/change +524 after the primary is finalized,
-		 * before reconciliation observes the companion.  Re-reading only after
-		 * capture therefore let RAW+JPEG return after its JPEG member. */
-		expected_extra_candidates =
-			pentax_expected_extra_candidates (bdata, bsize);
+		/* +524 is diagnostic context only. It may lag the body setting and must
+		 * not decide whether this exposure owes a second file. The capture-cycle
+		 * reconciliation below probes actual candidates and lifecycle state. */
+		expected_extra_candidates = pentax_capture_output_contract_known (bdata,
+			bsize) ? pentax_expected_extra_candidates (bdata, bsize) : 0;
 		GP_LOG_D ("pentax capture output contract capture=%llu +524=%u "
-			"expected-extra=%u conditions-size=%u",
+			"format-advisory-extra=%u conditions-size=%u",
 			capture_id, pentax_get_u32le (bdata + 524),
 			expected_extra_candidates, bsize);
 		/* Preserve the same complete readiness frame for the exposure wait.
@@ -7524,7 +7416,8 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 
 	free (data);
 	data = NULL;
-	ptpres = ptp_pentax_get_transfer_candidate_info (params, 0, &data, &size);
+	ptpres = ptp_pentax_get_transfer_candidate_info (params,
+		PTP_PENTAX_TRANSFER_FILE_CAPTURE, &data, &size);
 	if (ptpres != PTP_RC_OK) {
 		ret = translate_ptp_result (ptpres);
 		goto out;
@@ -7674,12 +7567,11 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		snprintf (reconcile_context.primary_name,
 			sizeof (reconcile_context.primary_name), "%s",
 			primary_candidate_name);
-		/* The minimum obligation comes from the already-mandatory pre-capture
-		 * readiness sample; later samples may increase it but may not erase it.
-		 * This is mode-driven, not a time-based guess.  Reconciliation still
-		 * observes, transfers and finalizes each advertised candidate in turn. */
+		/* Do not turn the pre-capture +524 hint into a hard obligation. The
+		 * post-primary loop probes the actual capture cycle and consumes only a
+		 * positively correlated candidate that the camera exposes. */
 		int rret = pentax_reconcile_extra_candidates (&reconcile_ops,
-			8, 120 * 1000, expected_extra_candidates,
+			8, 120 * 1000, 0,
 			extra_names, &reconciled);
 
 		if (rret < GP_OK)
@@ -7691,8 +7583,7 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 			GP_LOG_D ("dual-format reconciliation: %d extra candidate(s) "
 				"consumed and published", reconciled);
 		reconciliation_result = rret;
-		reconciled_output_complete = rret == GP_OK &&
-			(unsigned int)reconciled >= expected_extra_candidates;
+		reconciled_output_complete = rret == GP_OK;
 	}
 
 	/* o-v12e hardware evidence proved that this conditions predicate can remain
@@ -7740,14 +7631,13 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 		ret = reconciliation_result < GP_OK ? reconciliation_result :
 			GP_ERROR_CAMERA_BUSY;
 		fprintf (stderr, "[pentax-recovery] capture=%llu path=publication "
-			"reason=output-obligation-unresolved extras-expected=%u "
+				"reason=output-reconciliation-failed format-advisory-extra=%u "
 			"accepted=1 action=preserve-published-files; keep-next-shutter-blocked; "
 			"recover-remaining-output-with-original-owner\n",
 			capture_id, expected_extra_candidates);
 		gp_context_error (context,
-			_("Pentax capture produced a file, but not every expected output "
-			"has been correlated and published; preserving the result and "
-			"blocking the next shutter."));
+			_("Pentax capture produced a file, but capture-cycle output reconciliation "
+			"failed; preserving the result and blocking the next shutter."));
 		goto out;
 	}
 	params->pentax.transfer_state = PTP_PENTAX_TRANSFER_COMPLETE;

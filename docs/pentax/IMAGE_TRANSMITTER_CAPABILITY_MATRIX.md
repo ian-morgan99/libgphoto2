@@ -187,11 +187,17 @@ vendor capture/candidate workflow.
 | `0xd039` | movie mode | UINT8 boolean; movie gate | Both source target |
 
 `0xd01b` offsets are: 0 count/version (6 normally, 7 with current-slot field),
-4 and 5 writing formats, 6 still/movie size, 7 JPEG quality (`2-UI`), 8 RAW
-kind or movie frame rate (UI 2 maps to 3), 9 one-based card slot, and 10
-one-based current slot for K-3 III. It requires a fresh, byte-preserving
-read-modify-write; no mutation is allowed until each body’s returned form is
-captured and fixture-tested.
+4 and 5 the IT2 `ShootingFormat` enum (`0=JPEG`, `1=PEF`, `2=DNG`,
+`3=PEF+JPEG`, `4=DNG+JPEG`, `5=TIFF`), 6 still/movie size, 7 JPEG quality
+(`2-UI`), 8 RAW kind or movie frame rate (UI 2 maps to 3), 9 one-based card
+slot, and 10 one-based current slot for K-3 III. `TransFileFormat` is a
+different enum used as the type argument to `0x900b`
+(`0=Capture`, `1=JPG`, `2=PEF`, `3=DNG`, `4=TIFF`, `253=Full`, `254=Sub`,
+`255=Thumb`). It requires a fresh, byte-preserving read-modify-write; no
+mutation is allowed until each body’s returned form is captured and
+fixture-tested. Generic `imageformat` keeps the legacy `RAW`/`RAW+JPEG`
+vocabulary for Benro clients, but encodes those aliases as DNG/DNG+JPEG; the
+exact PEF/DNG labels remain available for callers that need the distinction.
 
 ## Complete condition-layout target
 

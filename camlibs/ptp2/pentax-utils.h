@@ -331,9 +331,11 @@ int pentax_capture_output_obligation_resolved (int capture_accepted,
 int pentax_capture_initiate_response_ambiguous (uint16_t response);
 int pentax_capture_output_contract_known (const unsigned char *data, size_t size);
 
-/* Minimum number of candidates expected after the primary candidate has
- * been finalized, derived from GetAllConditions writing format at +524.
- * RAW+JPEG publishes two output objects, so one companion remains. */
+/* Advisory minimum number of candidates expected after the primary candidate
+ * has been finalized, derived from the IT2 ShootingFormat value in
+ * GetAllConditions at +524. Values 3 (PEF+JPEG) and 4 (DNG+JPEG) publish two
+ * output objects, so one companion remains. The capture path must not use a
+ * stale advisory as proof that a companion is owed. */
 unsigned int pentax_expected_extra_candidates (const unsigned char *data,
 	size_t size);
 
@@ -515,12 +517,13 @@ int pentax_transfer_run (PentaxCaptureBuffer *buffer,
  * ready for the next shutter.
  *
  * The loop is bounded by max_count (number of extra candidates to consume)
- * and max_ms (total wall-clock budget in milliseconds). min_count is the
- * minimum companion obligation supplied by the caller. The loop also raises
- * that obligation from writing-file-format in each conditions response; it is
- * never derived from physical exposure count. Each iteration:
+ * and max_ms (total wall-clock budget in milliseconds). min_count is an
+ * optional explicit obligation supplied by the caller. The loop observes the
+ * actual post-capture candidate/lifecycle state; a stale writing-file-format
+ * hint must not create an obligation by itself. Each iteration:
  *   1. Reads GetAllConditions via get_conditions. An empty response completes
- *      only after the discovered required count has been finalized.
+ *      only after the explicit required count is met and the camera lifecycle
+ *      is no longer active.
  *   2. Transfers the pending candidate into a fresh buffer via
  *      transfer_candidate.
  *   3. Finalizes it via delete_candidate.

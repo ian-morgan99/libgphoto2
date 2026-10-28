@@ -11087,8 +11087,8 @@ _put_Pentax_CaptureTarget (CONFIG_PUT_ARGS)
  * The IT2 writing-file-format contract uses a 10- or 11-byte payload
  * on the K-1 / K-1 II / K-3 III family:
  *   byte 0  = 6 (payload length marker)
- *   bytes 4,5 = writing file format (JPEG=0, RAW=1, RAW+JPEG=2, TIFF=3;
- *               IT2 writes the same value to both bytes)
+ *   bytes 4,5 = IT2 ShootingFormat (JPEG=0, PEF=1, DNG=2, PEF+JPEG=3,
+ *               DNG+JPEG=4, TIFF=5; IT2 writes the same value to both bytes)
  *   byte 6  = image size code
  *   byte 7  = JPEG quality (IT2: 2 - stars, so 0=fine/3-star, 1=normal,
  *               2=basic/1-star)
@@ -11176,45 +11176,6 @@ _pentax_wff_verify_payload (PTPParams *params,
 	return GP_OK;
 }
 
-/* A successful 0xd01b read-back proves that the compound property accepted
- * the write, but it does not prove that the live capture conditions have
- * caught up.  IMAGE Transmitter 2 obtains the effective writing format from
- * GetAllConditions, which is also the value used by capture reconciliation.
- * Poll that live field for the bounded 100 ms cadence used by IT2 before
- * reporting an image-format write as complete. */
-static int
-_pentax_wff_verify_live_format (PTPParams *params, int expected_format)
-{
-	unsigned char *data = NULL;
-	unsigned int size = 0;
-	int attempt;
-
-	for (attempt = 1; attempt <= 5; attempt++) {
-		uint16_t ret;
-		uint32_t actual_format;
-
-		ret = ptp_pentax_get_all_conditions (params, &data, &size);
-		if (ret == PTP_RC_OK && data && size >= 528) {
-			actual_format = pentax_get_u32le (data + 524);
-			GP_LOG_D ("Pentax image-format live verification %d/5: "
-				"requested=%d conditions+524=%u size=%u",
-				attempt, expected_format, actual_format, size);
-			free (data);
-			data = NULL;
-			if (actual_format == (uint32_t)expected_format)
-				return GP_OK;
-		} else {
-			GP_LOG_E ("Pentax image-format live verification %d/5 failed: "
-				"ptp=0x%04x size=%u", attempt, ret, size);
-			free (data);
-			data = NULL;
-		}
-		if (attempt < 5)
-			usleep (100 * 1000);
-	}
-	return GP_ERROR_TIMEOUT;
-}
-
 static int
 _get_Pentax_ImageFormat (CONFIG_GET_ARGS)
 {
@@ -11238,17 +11199,35 @@ _get_Pentax_ImageFormat (CONFIG_GET_ARGS)
 	format = pentax_get_u32le (cdata + 524);
 	free (cdata);
 	switch (format) {
-	case 1: label = "RAW"; break;
-	case 2: label = "RAW+JPEG"; break;
-	case 3: label = "TIFF"; break;
+	case PTP_PENTAX_SHOOTING_FORMAT_PEF:
+	case PTP_PENTAX_SHOOTING_FORMAT_DNG:
+		/* Preserve the generic libgphoto2 value consumed by Benro while
+		 * retaining the exact source value in the debug trace below. */
+		label = "RAW";
+		break;
+	case PTP_PENTAX_SHOOTING_FORMAT_PEF_JPEG:
+	case PTP_PENTAX_SHOOTING_FORMAT_DNG_JPEG:
+		label = "RAW+JPEG";
+		break;
+	case PTP_PENTAX_SHOOTING_FORMAT_TIFF: label = "TIFF"; break;
+	case PTP_PENTAX_SHOOTING_FORMAT_JPEG: label = "JPEG"; break;
 	default: label = "JPEG"; break;
 	}
+	GP_LOG_D ("Pentax image format: IT2 ShootingFormat=%u, generic=%s",
+		format, label);
 	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
 	gp_widget_add_choice (*widget, "JPEG");
+	/* Keep the old generic choices for Benro/libgphoto2 clients.  The exact
+	 * source-defined choices follow them so callers can distinguish PEF from
+	 * DNG without changing the legacy vocabulary. */
 	gp_widget_add_choice (*widget, "RAW");
 	gp_widget_add_choice (*widget, "RAW+JPEG");
 	gp_widget_add_choice (*widget, "TIFF");
+	gp_widget_add_choice (*widget, "PEF");
+	gp_widget_add_choice (*widget, "DNG");
+	gp_widget_add_choice (*widget, "PEF+JPEG");
+	gp_widget_add_choice (*widget, "DNG+JPEG");
 	gp_widget_set_value (*widget, label);
 	return GP_OK;
 }
@@ -11286,11 +11265,6 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 		return translate_ptp_result (ret);
 	{
 		int result = _pentax_wff_verify_payload (params, payload, payload_size);
-		if (result < GP_OK)
-			return result;
-	}
-	{
-		int result = _pentax_wff_verify_live_format (params, format);
 		if (result < GP_OK)
 			return result;
 	}
