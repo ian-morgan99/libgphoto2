@@ -371,17 +371,28 @@ main (void)
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
 	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
 		(extension_version == 1));
-	/* The K-3 III Monochrome uses the same IT2 model block for generic
-	 * controls, but its product ID remains distinct so product-specific
-	 * experimental actions can stay fail-closed. */
-	CHECK (pentax_model_supports_exp_bracket (PENTAX_MODEL_K3_MARK_III_MONO));
-	CHECK (pentax_model_supports_composition_adjust (PENTAX_MODEL_K3_MARK_III_MONO));
-	CHECK (pentax_model_supports_movie_setting (PENTAX_MODEL_K3_MARK_III_MONO));
-	CHECK (pentax_model_supports_pc_live_view (PENTAX_MODEL_K3_MARK_III_MONO));
-	CHECK (!pentax_bulb_action_model_supported (PENTAX_MODEL_K3_MARK_III_MONO,
-		0x018f));
-	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONO) ==
-		!!pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
+	/* Test the model ID that the real lookup returns, not the reserved
+	 * distinct enum.  library.c stores this lookup result in params->pentax,
+	 * so that is the ID used by the actual config/focus dispatch.  The product
+	 * ID remains available to product-specific gates, which keep held-Bulb
+	 * fail-closed until the Mono body has its own hardware qualification. */
+	CHECK (pentax_model_supports_exp_bracket (model_no));
+	CHECK (pentax_model_supports_composition_adjust (model_no));
+	CHECK (pentax_model_supports_movie_setting (model_no));
+	CHECK (pentax_model_supports_pc_live_view (model_no));
+	CHECK (pentax_model_uses_new_focus (model_no));
+	CHECK (!pentax_bulb_action_model_supported (model_no, 0x018f));
+	/* Keep the standard K-3 III product path explicit: it shares the model
+	 * block and new-focus dispatch, but only its qualified PID admits the
+	 * held-Bulb action. */
+	CHECK (pentax_lookup_model (0x25fb, 0x0189,
+		"PENTAX K-3 Mark III", &model_no, &extension_version));
+	CHECK (pentax_model_uses_new_focus (model_no));
+	CHECK (pentax_bulb_action_model_supported (model_no, 0x0189));
+	/* K-1 II remains on the old-focus dispatch. */
+	CHECK (pentax_lookup_model (0x25fb, 0x0183,
+		"PENTAX K-1 Mark II", &model_no, &extension_version));
+	CHECK (!pentax_model_uses_new_focus (model_no));
 	CHECK (!pentax_lookup_model (0x25fb, 0x0189,
 		"PENTAX K-3 Mark III v1.9", &model_no, &extension_version));
 	CHECK (!pentax_lookup_model (0x1234, 0x0189, "PENTAX K-3 Mark III",
