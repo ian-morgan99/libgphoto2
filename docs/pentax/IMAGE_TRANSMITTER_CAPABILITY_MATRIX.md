@@ -28,12 +28,48 @@ regression contracts are deliberately split by layer:
 
 | Contract | Evidence and test |
 |---|---|
-| Model identity and IT2 capability flags | IT2 2625 `MtpDevice.Model` gate, recorded in `REFERENCE_CLIENTS.md`; `tests/test-pentax-utils.c` checks K-1 II 78400, K-1 77970, K-3 III 78420, and Monochrome 78550 plus every audited flag |
+| Model identity and IT2 capability flags | IT2 2625 `MtpDevice.Model` gate, recorded in `REFERENCE_CLIENTS.md`; `tests/test-pentax-utils.c` checks all 11 modern non-SCSI IT2 rows, every audited flag, and the generic-only PTP exclusions |
 | Modern format enums and payloads | `ptp.h` keeps `ShootingFormat`, `WritingFormatSetting`, `RawKind`, and `TransFileFormat` separate; `test-pentax-utils` checks their values, TIFF rejection by the modern widget contract, 10/11-byte validation, and byte-preserving format/raw-kind changes |
 | K-5 II format contract | `tests/test-pentax-legacy-parsers.c` checks the legacy USB-SCSI model identity and its independent JPEG/RAW/RAW+JPEG and PEF/DNG enum domains; no K-5 II row is added to the modern PTP model table |
 | Focus and AF | `test-pentax-utils` checks old `0x9016` versus new `0x9017` dispatch and direction semantics; `test-pentax-aperture-alias` checks the generic policy/manual-focus/immediate-AF widget contract for old and new families |
 | StarAF | The public control test asserts that no speculative `staraf`, `starafmode`, `starafdrive`, or `afwithliveview` widget is registered. IT2's AF-when-released/TouchAF policy remains distinct from an identified StarAF command |
 | Colour-only control boundary | The public fixture seeds a valid `0xd018` descriptor and proves the colour K-3 III exposes `pentaxcolortemperature` while model 78550 Monochrome rejects it |
+
+### Complete non-SCSI model sweep
+
+This is the complete static sweep of the Pentax/Ricoh PTP rows currently in
+`camlibs/ptp2/library.c`. It repeats the K-1 process—USB identity, IT2 model
+number, extension version, focus family, and every capability-table flag—for
+each model. “Static IT2” means that the source gate and regression contract
+are present; it is not a claim that the body has been connected or qualified.
+
+| Body | PTP VID:PID | IT2 model / extension | Focus family | Static disposition |
+|---|---|---:|---|---|
+| K-3 | `25fb:0165` | 77760 / 1 | Old `0x9016` | IT2 contract covered; hardware pending |
+| K-1 | `25fb:0179` | 77970 / 1 | Old `0x9016` | IT2 contract covered; hardware pending |
+| K-70 | `25fb:017d` | 78370 / 1 | Old `0x9016` | IT2 contract covered; hardware pending |
+| KP | `25fb:017f` | 78380 / 1 | New `0x9017` | IT2 contract covered; hardware pending |
+| K-3 III Monochrome | `25fb:018f` | 78550 / 1 | New `0x9017` | Separate IT2 gate; colour temperature disabled; hardware pending |
+| K-1 Mark II | `25fb:0183` | 78400 / 1 | Old `0x9016` | IT2 contract covered; hardware evidence exists separately |
+| K-3 Mark III | `25fb:0189` | 78420 / 1 | New `0x9017` | IT2 contract covered; hardware evidence exists separately |
+| 645D | `25fb:0130` | 77320 / 0 | Old `0x9016` | IT2 contract covered; hardware pending |
+| 645Z | `25fb:0167` | 77840 / 1 | Old `0x9016` | IT2 contract covered from firmware/source evidence; hardware pending |
+| KF | `25fb:018e` | 78520 / 1 | Old `0x9016` | IT2 contract covered from firmware/source evidence; hardware pending |
+| GR III | `25fb:210f` | 78350 / 1 | New `0x9017` | IT2 contract covered; hardware pending |
+
+The following PTP rows are deliberately not in the IT2 contract table and are
+tested as generic-only: K-3 II (`25fb:017b`), K-01 (`25fb:0131`), and GR IIIx
+(`25fb:2115`). Optio W90 is also a generic PTP row. K-1 II `25fb:0182`, K-5
+II, and the other legacy bodies are MSC/SCSI paths and are outside this
+non-SCSI sweep. The later IT2 decompile mentions G900SE, but no matching
+`ptp2` ability row and no validated USB identity are present here, so it is
+not silently admitted. These boundaries are enforced by the unit test rather
+than by a speculative model alias.
+
+No physical camera was used for this sweep. The next step for any row is a
+direct, read-only identity/descriptor/focus-family gate followed by one
+variable-at-a-time control tests; do not treat this static pass as permission
+to enable capture or new vendor abilities.
 
 ## Model gates
 

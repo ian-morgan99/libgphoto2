@@ -459,6 +459,153 @@ main (void)
 	 * through either K-1 II PID. */
 	CHECK (!pentax_lookup_model (0x25fb, 0x0182, "PENTAX K-1",
 		&model_no, &extension_version));
+	/* Repeat the K-1 identity-and-contract check for every other modern
+	 * non-SCSI row that is present in the ptp2 ability list.  The expected
+	 * flags are the IT2 2625 model-gate values, not a claim of hardware
+	 * qualification.  Keeping the complete table here prevents a future
+	 * model addition from silently inheriting the K-3 III or K-1 contract. */
+	{
+		struct expected_model {
+			uint16_t usb_product;
+			const char *device_model;
+			uint32_t model_no;
+			uint32_t extension_version;
+			PentaxModelCapabilities capabilities;
+		};
+		static const struct expected_model models[] = {
+			{ 0x0165, "PENTAX K-3", PENTAX_MODEL_K3, 1,
+			  { .model_no = PENTAX_MODEL_K3,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_dual_slot = 1,
+			    .supports_card_writing_mode = 1 } },
+			{ 0x0179, "PENTAX K-1", PENTAX_MODEL_K1, 1,
+			  { .model_no = PENTAX_MODEL_K1,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_dual_slot = 1,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .uses_it2_direct_live_view_start = 1,
+			    .supports_card_writing_mode = 1,
+			    .supports_writing_file_format = 1 } },
+			{ 0x017d, "PENTAX K-70", PENTAX_MODEL_K70, 1,
+			  { .model_no = PENTAX_MODEL_K70,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1 } },
+			{ 0x017f, "PENTAX KP", PENTAX_MODEL_KP, 1,
+			  { .model_no = PENTAX_MODEL_KP,
+			    .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .supports_tv_bracket = 1,
+			    .supports_av_bracket = 1,
+			    .supports_composition_adjust = 1 } },
+			{ 0x018f, "PENTAX K-3 Mark III Monochrome",
+			  PENTAX_MODEL_K3_MARK_III_MONOCHROME, 1,
+			  { .model_no = PENTAX_MODEL_K3_MARK_III_MONOCHROME,
+			    .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+			    .supports_dual_slot = 1,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .supports_movie_sub_image = 1,
+			    .supports_tv_bracket = 1,
+			    .supports_av_bracket = 1,
+			    .k3iii_family = 1,
+			    .supports_exp_bracket = 1,
+			    .supports_composition_adjust = 1,
+			    .supports_movie_setting = 1,
+			    .supports_aperture_keep = 1,
+			    .supports_pc_live_view = 1,
+			    .supports_card_writing_mode = 1,
+			    .supports_writing_file_format = 1,
+			    .supports_ci_detail = 1,
+			    .supports_self_timer_continuous_new = 1,
+			    .supports_remote_continuous_new = 1,
+			    .supports_slot_change = 1,
+			    .is_monochrome = 1 } },
+			{ 0x0183, "PENTAX K-1 Mark II", PENTAX_MODEL_K1_MARK_II, 1,
+			  { .model_no = PENTAX_MODEL_K1_MARK_II,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_dual_slot = 1,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .uses_it2_direct_live_view_start = 1,
+			    .supports_card_writing_mode = 1,
+			    .supports_writing_file_format = 1 } },
+			{ 0x0189, "PENTAX K-3 Mark III", PENTAX_MODEL_K3_MARK_III, 1,
+			  { .model_no = PENTAX_MODEL_K3_MARK_III,
+			    .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+			    .supports_dual_slot = 1,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .supports_movie_sub_image = 1,
+			    .supports_tv_bracket = 1,
+			    .supports_av_bracket = 1,
+			    .k3iii_family = 1,
+			    .supports_exp_bracket = 1,
+			    .supports_composition_adjust = 1,
+			    .supports_movie_setting = 1,
+			    .supports_aperture_keep = 1,
+			    .supports_pc_live_view = 1,
+			    .supports_cross_process = 1,
+			    .supports_card_writing_mode = 1,
+			    .supports_writing_file_format = 1,
+			    .supports_color_temperature = 1,
+			    .supports_ci_detail = 1,
+			    .supports_self_timer_continuous_new = 1,
+			    .supports_remote_continuous_new = 1,
+			    .supports_slot_change = 1 } },
+			{ 0x0130, "645D", PENTAX_MODEL_645D, 0,
+			  { .model_no = PENTAX_MODEL_645D,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_dual_slot = 1,
+			    .supports_card_writing_mode = 1 } },
+			{ 0x0167, "645Z", PENTAX_MODEL_645Z, 1,
+			  { .model_no = PENTAX_MODEL_645Z,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_dual_slot = 1,
+			    .supports_exp_bracket = 1,
+			    .supports_card_writing_mode = 1 } },
+			{ 0x018e, "PENTAX KF", PENTAX_MODEL_KF, 1,
+			  { .model_no = PENTAX_MODEL_KF,
+			    .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1 } },
+			{ 0x210f, "RICOH GR III", PENTAX_MODEL_GR_III, 1,
+			  { .model_no = PENTAX_MODEL_GR_III,
+			    .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+			    .supports_new_transfer = 1,
+			    .supports_movie = 1,
+			    .supports_tv_bracket = 1,
+			    .supports_av_bracket = 1 } }
+		};
+		unsigned int i;
+
+		for (i = 0; i < sizeof (models) / sizeof (models[0]); i++) {
+			const PentaxModelCapabilities *actual;
+
+			CHECK (pentax_lookup_model (0x25fb, models[i].usb_product,
+				models[i].device_model, &model_no, &extension_version));
+			CHECK (model_no == models[i].model_no);
+			CHECK (extension_version == models[i].extension_version);
+			actual = pentax_model_capabilities (model_no);
+			CHECK (actual != NULL);
+			CHECK (!memcmp (actual, &models[i].capabilities,
+				sizeof (models[i].capabilities)));
+		}
+	}
+	/* PTP rows that are present in the camera list but absent from IT2 must
+	 * remain generic-only.  In particular, a shared Pentax VID or a similar
+	 * product name must not make K-3 II, K-01 PTP, or GR IIIx inherit a
+	 * modern vendor contract. */
+	CHECK (!pentax_lookup_model (0x25fb, 0x017b, "PENTAX K-3 Mark II",
+		&model_no, &extension_version));
+	CHECK (!pentax_lookup_model (0x25fb, 0x0131, "PENTAX K-01",
+		&model_no, &extension_version));
+	CHECK (!pentax_lookup_model (0x25fb, 0x2115, "RICOH GR IIIx",
+		&model_no, &extension_version));
+	CHECK (!pentax_lookup_model (0x0a17, 0x00f7, "PENTAX Optio W90",
+		&model_no, &extension_version));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONOCHROME));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));

@@ -321,6 +321,15 @@ enum pentax_writing_format_setting {
 	PTP_PENTAX_WRITING_FORMAT_TIFF = 3
 };
 
+/* IMAGE Transmitter 2's RawKind values.  This is the raw-container selector
+ * in GetAllConditions offset 144 / 0xd01b payload byte 8.  It is deliberately
+ * separate from both ShootingFormat and WritingFormatSetting: changing the
+ * generic imageformat control must not silently change PEF into DNG. */
+enum pentax_raw_kind {
+	PTP_PENTAX_RAW_KIND_PEF = 0,
+	PTP_PENTAX_RAW_KIND_DNG = 1
+};
+
 /* IMAGE Transmitter 2's type argument for GetTransferCandidateFileInfo.
  * These values are not interchangeable with pentax_shooting_format. */
 enum pentax_transfer_file_format {

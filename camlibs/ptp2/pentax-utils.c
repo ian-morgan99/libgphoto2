@@ -586,6 +586,8 @@ pentax_model_uses_it2_direct_live_view_start (uint32_t model_no)
 	 * the observed-state path until their own source contract says otherwise. */
 	return capabilities && capabilities->uses_it2_direct_live_view_start;
 }
+
+int
 pentax_parse_conditions (const unsigned char *data, size_t size,
 		PentaxConditions *conditions)
 {
@@ -1097,6 +1099,40 @@ pentax_wff_payload_is_valid (const unsigned char *payload, size_t size)
 	if (payload[7] > 2)
 		return 0;
 	return 1;
+}
+
+/* Apply one IT2 field change to an already validated compound payload.  These
+ * helpers make the preservation rule explicit and unit-testable: generic
+ * imageformat changes touch only bytes 4/5, while raw-container changes touch
+ * only byte 8. */
+int
+pentax_wff_set_format (unsigned char *payload, size_t size, const char *value)
+{
+	int format;
+
+	if (!pentax_wff_payload_is_valid (payload, size))
+		return -1;
+	format = pentax_wff_format_byte (value);
+	if (format < 0)
+		return -1;
+	payload[4] = (unsigned char)format;
+	payload[5] = (unsigned char)format;
+	return 0;
+}
+
+int
+pentax_wff_set_raw_kind (unsigned char *payload, size_t size,
+	const char *value)
+{
+	int raw_kind;
+
+	if (!pentax_wff_payload_is_valid (payload, size))
+		return -1;
+	raw_kind = pentax_wff_raw_kind_byte (value);
+	if (raw_kind < 0)
+		return -1;
+	payload[8] = (unsigned char)raw_kind;
+	return 0;
 }
 
 /* Map the generic imagequality label to the 0xd01b byte-7 JPEG-quality value
