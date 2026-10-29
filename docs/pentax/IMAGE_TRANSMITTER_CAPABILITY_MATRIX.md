@@ -134,9 +134,25 @@ It is nevertheless a separate product gate: colour temperature is explicitly
 disabled and the model number must remain 78550 rather than being collapsed
 to 78420. The capability fixture pins that distinction, including the
 Monochrome flag and the absence of cross-process/colour-temperature support.
+
 The existing held-Bulb admission policy is also product-specific and remains
 separate from this static control audit. Hardware qualification is still
 pending.
+
+#### Individual audit: Pentax 645D
+
+The 645D PTP row is `25fb:0130`, but that product ID is also used by the
+legacy K-01 MSC/SCSI personality. The model string is therefore part of the
+identity contract: IT2's `StartsWith("645D")` branch assigns model 77320 and
+extension version 0. It enables dual slot and the old-focus `0x9016` family,
+but keeps new transfer, movie, new focus, PC live view, composition,
+bracketing, and modern file-format controls off.
+
+The lookup accepts the source form `645D` and the host-prefixed
+`PENTAX 645D`, while the capability fixture pins the extension version 0 and
+the dual-slot/card-writing boundary. This is a static/source pass only; the
+shared PID must be rechecked from live DeviceInfo before any 645D control is
+used.
 
 ## Model gates
 
