@@ -249,6 +249,17 @@ The 43WR therefore remains generic PTP only. No modern focus, file-format,
 live-view, capture, or transfer contract is inferred from its Pentax branding;
 the negative lookup is covered by the static model tests.
 
+#### Individual audit: Pentax Optio W90 PTP personality
+
+The PTP list contains `0a17:00f7` as `Pentax:Optio W90`. Like the 43WR, it
+has no IT2 2625 model branch and no modern `25fb` Pentax vendor identity. The
+lookup rejects it before model capabilities or Pentax vendor operations are
+considered.
+
+The W90 remains generic PTP only. No modern focus, format, live-view,
+capture, or transfer semantics are claimed; its negative lookup is pinned by
+the static model test.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
