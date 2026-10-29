@@ -184,6 +184,21 @@ The KF is source/firmware-derived in this repository, not hardware-qualified;
 its first live gate is read-only identity and descriptor discovery followed by
 an old-focus-family check.
 
+#### Individual audit: Ricoh GR III
+
+The GR III PTP row is `25fb:210f`. IT2's `StartsWith("RICOH GR III")` branch
+assigns model 78350 and extension version 1, with single-slot, new-transfer,
+new-focus `0x9017`, movie, and Tv/Av bracketing support. It does not enable
+dual-slot/card-writing, the K-1 writing-file-format path, composition, movie
+settings, high-resolution PC live view, detailed CI, colour temperature, or
+slot-change controls.
+
+The shared Pentax/Ricoh capability table keeps GR III on that limited
+new-focus contract; the camera name must not cause it to inherit K-3 III
+family controls. This is source/static evidence only. A GR III hardware pass
+must separately confirm its Ricoh transport, descriptors, conditions, and
+`0x9017` behaviour before any capture or transfer claim.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
