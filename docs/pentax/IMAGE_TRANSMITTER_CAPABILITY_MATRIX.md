@@ -107,6 +107,19 @@ exposure controls, and one capture/transfer; it does not close the old-focus,
 repeat-capture, or all-format hardware gates. No additional hardware claim
 is made by this individual static pass.
 
+#### Individual audit: Pentax K-1 Mark II MSC personality (`25fb:0182`)
+
+This row is present in the `ptp2` camera list so a storage-mode attachment is
+named correctly, but it is not a non-SCSI PTP control personality. The K-1 II
+firmware declares `0182` as the MSC/storage PID and `0183` as the PTP PID.
+The current research-capable lookup consequently rejects `0182` for vendor
+control rather than assigning it the `0183` IT2 contract.
+
+This boundary prevents a storage-mode body from inheriting PTP settings,
+focus, live-view, capture, or transfer semantics. It is covered by the
+identity tests and is intentionally not promoted by the non-SCSI IT2 sweep;
+the correct control test is to reconnect the body in its `0183` PTP mode.
+
 #### Individual audit: Pentax K-3 Mark III
 
 The K-3 III PTP row is `25fb:0189`. IT2's exact model branch assigns model
