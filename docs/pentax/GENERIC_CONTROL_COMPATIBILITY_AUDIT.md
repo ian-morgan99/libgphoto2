@@ -1,6 +1,6 @@
 # Pentax/Ricoh generic control compatibility audit
 
-Revision: 2026-10-28
+Revision: 2026-10-29
 
 ## Purpose
 
@@ -17,11 +17,11 @@ Generic aliases or wrappers should therefore be treated as libgphoto2 API compat
 | `iso` | Already exposed generically on modern ptp2 and legacy Pentax | Preserve; regression-test across model families |
 | `shutterspeed` | Already exposed generically on modern ptp2 and legacy Pentax | Preserve; re-verify K-1 II |
 | `aperture` | Legacy Pentax exposes `aperture`; modern ptp2 exposes `f-number` and `pentaxdirectaperture` | Add compatibility alias/wrapper with identical value semantics |
-| `imageformat` | Legacy Pentax exposes JPEG/RAW/RAW+JPEG; modern ptp2 exposes a model-gated IT2 `0xd01b WritingFileFormat` compound path | Implemented for source-authorised K-1/K-1 II/K-3 III/Mono family; exact 10/11-byte preservation and read-back are required; generic writes preserve the separate PEF/DNG byte; hardware qualification remains open |
+| `imageformat` | Legacy Pentax exposes JPEG/RAW/RAW+JPEG; modern ptp2 exposes a model-gated IT2 `0xd01b WritingFileFormat` compound path | Implemented for source-authorised K-1/K-1 II/K-3 III/Mono family; exact 10/11-byte preservation and read-back are required; generic writes preserve the separate PEF/DNG byte; hardware qualification remains open. IT2 2625 gives Mono model 78550, but does not enable colour temperature. |
 | `pentaxrawformat` | IT2 exposes PEF/DNG as the separate `RawKind` option, not as a different generic `imageformat` value | Implemented as a model-gated PEF/DNG radio over 0xd01b byte 8; exact payload preservation/read-back and hardware qualification remain open |
 | `imagequality` | Legacy Pentax exposes JPEG stars; modern ptp2 exposes IT2 `0xd01b` byte 7 through a separate generic widget | Implemented for the same source-authorised family; hardware correlation, transfer and restoration remain open |
 | `autofocus` | Pentax capture code reads the `ptp2/autofocus` setting; the generic virtual policy widget is now exposed through a Pentax model/vendor-gated wrapper | Implemented as a virtual on/off policy, independent of immediate AF and manual lens drive; public widget fixture covers K-1 II, K-1, K-3 III and the Mono USB product; direct capture-policy hardware verification remains open |
-| `autofocusdrive` | Model-gated Pentax immediate-AF action is exposed for the source-authorised PC-live-view family (K-3 III and the Mono product) | Implemented as a distinct `0x9011` focus action with readiness/candidate barriers; public fixture covers colour and Mono widget presence, while direct AF/settling hardware verification remains open; never alias to manual near/far drive |
+| `autofocusdrive` | Model-gated Pentax immediate-AF action is exposed for the source-authorised PC-live-view family (K-3 III and the Mono product) | Implemented as a distinct `0x9011` focus action with readiness/candidate barriers; public fixture covers colour and Mono widget presence, while direct AF/settling hardware verification remains open; K-1/K-1 II intentionally do not expose this immediate-AF widget; never alias to manual near/far drive |
 | `manualfocusdrive` | Model-dispatched generic wrapper now selects the old-focus `0x9016` path for K-1/K-1 II and the new-focus `0x9017` path for K-3 III-family models; directional aliases remain available | Implemented with bounded direction/step semantics and public old/new-family fixtures; physical movement and K-1/K-1 II fresh-session verification remain open |
 | `manualfocus` | Requested by pgphoto; distinct from lens-drive commands. IT2 reads AF/MF state from the conditions block but provides no Pentax setter for it; the K-body `0x500a` focus-mode property is absent on the tested K-1 II/K-3 III path | Intentionally withheld until a source-defined writable AF/MF operation is identified; users must set the physical body/lens AF/MF prerequisite, while `manualfocusdrive` remains separate |
 | `capturetarget` | Model-gated compatibility widget is exposed for IT2 dual-slot bodies; Pentax has no independent destination property | Implemented as an explicitly documented compatibility mapping to the `0x9004` card-writing bitmask (`Internal RAM`/`Memory card`), with session-local cache and fail-closed model gate; hardware write/read-back verification remains open; do not describe it as an independent SDRAM/card destination property |
@@ -32,8 +32,9 @@ Generic aliases or wrappers should therefore be treated as libgphoto2 API compat
 2. `autofocus`, `autofocusdrive`, and `manualfocusdrive` are separate concepts in libgphoto2. Do not implement one as an alias of another.
 3. The K-3 III uses the newer focus family (`0x9017`), while the K-1 II and several older modern-vendor bodies use the older focus family (`0x9016`). Generic wrappers must dispatch by model capability, not by one global Pentax implementation.
 4. The K-01 must be treated as two separate USB paths: legacy `25fb:0130` USB-SCSI via `camlibs/pentax`, and `25fb:0131` generic PTP/MTP via `ptp2`. The latter has hardware evidence of Microsoft MTP DeviceInfo with no Pentax vendor operations and must not inherit modern Pentax vendor-mode claims.
-5. Compatibility work must add aliases/wrappers without removing the existing Pentax-specific diagnostic/config names.
-6. IT2's `AFMode` is a read-only state derived from the conditions response for K bodies; it must not be exposed as a writable `manualfocus` widget by guessing a property or aliasing it to a lens-drive action.
+5. The K-3 III Monochrome is a distinct IT2 model gate (78550), despite sharing the K-3 III operation family. Its colour-temperature control is disabled by the source model flags; do not infer it from the shared operation codes.
+6. Compatibility work must add aliases/wrappers without removing the existing Pentax-specific diagnostic/config names.
+7. IT2's `AFMode` is a read-only state derived from the conditions response for K bodies; it must not be exposed as a writable `manualfocus` widget by guessing a property or aliasing it to a lens-drive action.
 
 ## Model-family sweep scope
 

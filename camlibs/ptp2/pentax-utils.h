@@ -25,6 +25,10 @@ typedef struct {
 /* IMAGE Transmitter 2 vendor-model identifiers. */
 #define PENTAX_MODEL_K1_MARK_II 78400U
 #define PENTAX_MODEL_K3_MARK_III 78420U
+/* IT2 2625 gives the K-3 III Monochrome its own model gate.  It must not be
+ * collapsed into the colour K-3 III: colour-temperature support and the
+ * held-Bulb qualification gate are product-specific. */
+#define PENTAX_MODEL_K3_MARK_III_MONOCHROME 78550U
 #define PENTAX_MODEL_KP 78380U
 #define PENTAX_MODEL_K70 78370U
 #define PENTAX_MODEL_K3 77760U
@@ -50,16 +54,27 @@ typedef enum {
 typedef struct {
 	uint32_t model_no;
 	PentaxFocusFamily focus_family;
+	int supports_dual_slot;
+	int supports_new_transfer;
+	int supports_movie;
+	int supports_movie_sub_image;
+	int supports_tv_bracket;
+	int supports_av_bracket;
 	int k3iii_family;
 	int supports_exp_bracket;
 	int supports_composition_adjust;
 	int supports_movie_setting;
+	int supports_aperture_keep;
 	int supports_pc_live_view;
 	int supports_cross_process;
 	int supports_card_writing_mode;
 	int supports_writing_file_format;
 	int supports_color_temperature;
 	int supports_ci_detail;
+	int supports_self_timer_continuous_new;
+	int supports_remote_continuous_new;
+	int supports_slot_change;
+	int is_monochrome;
 } PentaxModelCapabilities;
 
 const PentaxModelCapabilities *pentax_model_capabilities (uint32_t model_no);
@@ -482,6 +497,7 @@ int pentax_model_supports_ci_detail (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);
 int pentax_wff_format_byte (const char *value);
+int pentax_wff_format_supported (uint32_t model_no, const char *value);
 int pentax_wff_raw_kind_byte (const char *value);
 const char *pentax_wff_raw_kind_label (uint8_t raw_kind);
 int pentax_wff_quality_byte (const char *value);

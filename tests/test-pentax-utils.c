@@ -241,6 +241,8 @@ main (void)
 	CHECK (PTP_OC_PENTAX_GetAllConditions == 0x900f);
 	CHECK (PTP_OC_PENTAX_InitiateCapture == 0x9011);
 	CHECK (PTP_OC_PENTAX_TerminateCapture == 0x9012);
+	CHECK (PTP_OC_PENTAX_FocusControl == 0x9016);
+	CHECK (PTP_OC_PENTAX_FocusControlNew == 0x9017);
 	CHECK (PTP_DPC_PENTAX_WritingFileFormat == 0xd01b);
 	CHECK (PTP_PENTAX_SHOOTING_FORMAT_JPEG == 0);
 	CHECK (PTP_PENTAX_SHOOTING_FORMAT_PEF == 1);
@@ -260,6 +262,17 @@ main (void)
 	CHECK (PTP_PENTAX_TRANSFER_FILE_FULL == 253);
 	CHECK (PTP_PENTAX_TRANSFER_FILE_SUB == 254);
 	CHECK (PTP_PENTAX_TRANSFER_FILE_THUMB == 255);
+	/* The three IT2 enum domains intentionally overlap at zero but have
+	 * different meanings.  These guards stop a future refactor from using a
+	 * ShootingFormat or transfer-file value as a WritingFormatSetting. */
+	CHECK ((int)PTP_PENTAX_SHOOTING_FORMAT_PEF ==
+		(int)PTP_PENTAX_WRITING_FORMAT_RAW);
+	CHECK ((int)PTP_PENTAX_SHOOTING_FORMAT_DNG ==
+		(int)PTP_PENTAX_WRITING_FORMAT_RAW_JPEG);
+	CHECK ((int)PTP_PENTAX_TRANSFER_FILE_CAPTURE ==
+		(int)PTP_PENTAX_WRITING_FORMAT_JPEG);
+	CHECK ((int)PTP_PENTAX_TRANSFER_FILE_PEF !=
+		(int)PTP_PENTAX_SHOOTING_FORMAT_PEF);
 
 	/* Regression: v9g imagequality 0xd01b byte-7 encoding (issue #71 / #55).
 	 * The old code computed (uint8_t)(2 - stars), which produced 0xff for
@@ -283,6 +296,15 @@ main (void)
 	CHECK (pentax_wff_format_byte ("DNG+JPEG") == -1);
 	CHECK (pentax_wff_format_byte ("jpeg") == -1);
 	CHECK (pentax_wff_format_byte (NULL) == -1);
+	CHECK (pentax_wff_format_supported (PENTAX_MODEL_K1_MARK_II, "JPEG"));
+	CHECK (pentax_wff_format_supported (PENTAX_MODEL_K1, "RAW"));
+	CHECK (pentax_wff_format_supported (PENTAX_MODEL_K3_MARK_III,
+		"RAW+JPEG"));
+	CHECK (pentax_wff_format_supported (
+		PENTAX_MODEL_K3_MARK_III_MONOCHROME, "JPEG"));
+	CHECK (!pentax_wff_format_supported (PENTAX_MODEL_K1_MARK_II, "TIFF"));
+	CHECK (!pentax_wff_format_supported (PENTAX_MODEL_K3_MARK_III, "PEF"));
+	CHECK (!pentax_wff_format_supported (0, "JPEG"));
 	CHECK (pentax_wff_raw_kind_byte ("PEF") == PTP_PENTAX_RAW_KIND_PEF);
 	CHECK (pentax_wff_raw_kind_byte ("DNG") == PTP_PENTAX_RAW_KIND_DNG);
 	CHECK (!strcmp (pentax_wff_raw_kind_label (PTP_PENTAX_RAW_KIND_PEF), "PEF"));
@@ -450,7 +472,9 @@ main (void)
 	CHECK (!pentax_lookup_model (0x25fb, 0x0182, "PENTAX K-1",
 		&model_no, &extension_version));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
+	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONOCHROME));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1));
 	CHECK (!pentax_model_uses_new_focus (0));
 	/* IMAGE Transmitter 2 starts PC live view directly on both K-1 bodies;
 	 * the K-3 III remains on the observed-state path. */
@@ -476,9 +500,17 @@ main (void)
 			pentax_model_capabilities (PENTAX_MODEL_K1);
 		const PentaxModelCapabilities *k3 =
 			pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III);
+		const PentaxModelCapabilities *mono =
+			pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III_MONOCHROME);
 
 		CHECK (k1ii && !k1ii->k3iii_family);
 		CHECK (k1ii->focus_family == PENTAX_FOCUS_FAMILY_OLD);
+		CHECK (k1ii->supports_dual_slot);
+		CHECK (k1ii->supports_new_transfer);
+		CHECK (k1ii->supports_movie);
+		CHECK (!k1ii->supports_movie_sub_image);
+		CHECK (!k1ii->supports_tv_bracket);
+		CHECK (!k1ii->supports_av_bracket);
 		CHECK (!k1ii->supports_exp_bracket);
 		CHECK (!k1ii->supports_composition_adjust);
 		CHECK (!k1ii->supports_movie_setting);
@@ -491,6 +523,12 @@ main (void)
 
 		CHECK (k1 && !k1->k3iii_family);
 		CHECK (k1->focus_family == PENTAX_FOCUS_FAMILY_OLD);
+		CHECK (k1->supports_dual_slot);
+		CHECK (k1->supports_new_transfer);
+		CHECK (k1->supports_movie);
+		CHECK (!k1->supports_movie_sub_image);
+		CHECK (!k1->supports_tv_bracket);
+		CHECK (!k1->supports_av_bracket);
 		CHECK (!k1->supports_exp_bracket);
 		CHECK (!k1->supports_composition_adjust);
 		CHECK (!k1->supports_movie_setting);
@@ -503,6 +541,12 @@ main (void)
 
 		CHECK (k3 && k3->k3iii_family);
 		CHECK (k3->focus_family == PENTAX_FOCUS_FAMILY_NEW);
+		CHECK (k3->supports_dual_slot);
+		CHECK (k3->supports_new_transfer);
+		CHECK (k3->supports_movie);
+		CHECK (k3->supports_movie_sub_image);
+		CHECK (k3->supports_tv_bracket);
+		CHECK (k3->supports_av_bracket);
 		CHECK (k3->supports_exp_bracket);
 		CHECK (k3->supports_composition_adjust);
 		CHECK (k3->supports_movie_setting);
@@ -512,25 +556,56 @@ main (void)
 		CHECK (k3->supports_writing_file_format);
 		CHECK (k3->supports_color_temperature);
 		CHECK (k3->supports_ci_detail);
+		CHECK (k3->supports_self_timer_continuous_new);
+		CHECK (k3->supports_remote_continuous_new);
+		CHECK (k3->supports_slot_change);
+		CHECK (!k3->is_monochrome);
+
+		/* IT2 2625's explicit Monochrome gate is almost the same as the
+		 * colour K-3 III, except for the product-specific colour-temperature
+		 * control and its identity. */
+		CHECK (mono && mono->k3iii_family);
+		CHECK (mono->focus_family == PENTAX_FOCUS_FAMILY_NEW);
+		CHECK (mono->supports_dual_slot);
+		CHECK (mono->supports_new_transfer);
+		CHECK (mono->supports_movie);
+		CHECK (mono->supports_movie_sub_image);
+		CHECK (mono->supports_tv_bracket);
+		CHECK (mono->supports_av_bracket);
+		CHECK (mono->supports_exp_bracket);
+		CHECK (mono->supports_composition_adjust);
+		CHECK (mono->supports_movie_setting);
+		CHECK (mono->supports_aperture_keep);
+		CHECK (mono->supports_pc_live_view);
+		CHECK (!mono->supports_cross_process);
+		CHECK (mono->supports_card_writing_mode);
+		CHECK (mono->supports_writing_file_format);
+		CHECK (!mono->supports_color_temperature);
+		CHECK (mono->supports_ci_detail);
+		CHECK (mono->supports_self_timer_continuous_new);
+		CHECK (mono->supports_remote_continuous_new);
+		CHECK (mono->supports_slot_change);
+		CHECK (mono->is_monochrome);
 	}
 	CHECK (pentax_model_capabilities (0) == NULL);
-	/* The Monochrome has its own USB product code but shares the K-3 III
-	 * protocol model; IT2 matches it with StartsWith("PENTAX K-3 Mark III")
-	 * so it resolves to model_no 78420 and the shared generic-control flags. */
+	/* The later IT2 2625 decompile has a specific Monochrome branch before
+	 * the colour K-3 III prefix: model 78550, new focus, and all shared K-3 III
+	 * controls except colour temperature. */
 	CHECK (pentax_lookup_model (0x25fb, 0x018f,
 		"PENTAX K-3 Mark III Monochrome", &model_no, &extension_version));
-	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III) &&
+	CHECK ((model_no == PENTAX_MODEL_K3_MARK_III_MONOCHROME) &&
 		(extension_version == 1));
 	/* Test the model ID that the real lookup returns. library.c stores this
 	 * lookup result in params->pentax, so that is the ID used by the actual
-	 * config/focus dispatch. The product ID remains available to product-
-	 * specific gates, which keep held-Bulb fail-closed until the Mono body has
-	 * its own hardware qualification. */
+	 * config/focus dispatch. The separate model row keeps the colour-only
+	 * controls gated, while the product remains held-Bulb fail-closed until
+	 * the Mono body has its own hardware qualification. */
 	CHECK (pentax_model_supports_exp_bracket (model_no));
 	CHECK (pentax_model_supports_composition_adjust (model_no));
 	CHECK (pentax_model_supports_movie_setting (model_no));
 	CHECK (pentax_model_supports_pc_live_view (model_no));
 	CHECK (pentax_model_uses_new_focus (model_no));
+	CHECK (!pentax_model_supports_color_temperature (model_no));
 	CHECK (!pentax_bulb_action_model_supported (model_no, 0x018f));
 	/* Keep the standard K-3 III product path explicit: it shares the model
 	 * block and new-focus dispatch, but only its qualified PID admits the
@@ -556,6 +631,7 @@ main (void)
 	 * support remains in camlibs/pentax. */
 	CHECK (!pentax_lookup_model (0x25fb, 0x0148, "PENTAX K-5 II",
 		&model_no, &extension_version));
+	CHECK (pentax_model_capabilities (model_no) == NULL);
 	memset (&unchanged, 0xa5, sizeof (unchanged));
 	conditions = unchanged;
 	CHECK (pentax_parse_conditions (condition_data, 507, &conditions) ==

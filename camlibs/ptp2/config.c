@@ -11249,8 +11249,9 @@ _put_Pentax_ImageFormat (CONFIG_PUT_ARGS)
 	/* The current model gate exposes the three generic choices only.  Do not
 	 * accept the source-defined 645Z TIFF value until that model has its own
 	 * compound-payload qualification. */
-	if (format == PTP_PENTAX_WRITING_FORMAT_TIFF)
-		return GP_ERROR_NOT_SUPPORTED;
+	if (!pentax_wff_format_supported (params->pentax.model_no, value))
+		return format == PTP_PENTAX_WRITING_FORMAT_TIFF ?
+			GP_ERROR_NOT_SUPPORTED : GP_ERROR_BAD_PARAMETERS;
 	result = _pentax_readiness_preflight (params, &conditions);
 	if (result < GP_OK)
 		return result;

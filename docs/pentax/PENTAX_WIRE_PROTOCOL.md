@@ -1,6 +1,6 @@
 # Pentax tethering wire protocol
 
-Revision: 2026-08-21
+Revision: 2026-10-29
 
 This document distinguishes facts visible in the IMAGE Transmitter 2 client's
 published behaviour (observed from its public interfaces) from facts that still
@@ -24,9 +24,17 @@ records pass.
 |---|---|---:|---:|---|
 | `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo + Observed-client |
 | `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Hardware-confirmed PC-P identity; model number/version remain Observed-client |
+| `25fb:0179` | `PENTAX K-1` | 77970 | 1 | IT2 2625 model gate; hardware qualification pending |
+| `25fb:018f` | `PENTAX K-3 Mark III Monochrome` | 78550 | 1 | IT2 2625 explicit model gate; hardware qualification pending |
 
 Both USB identity and the exact DeviceInfo string must match before vendor
 commands are sent. Other Pentax devices retain generic PTP behavior.
+
+The model number for the Monochrome is not 78420. The older local IT2
+decompile used a broad K-3 Mark III prefix, but IT2 2625 checks the specific
+Monochrome prefix first and assigns 78550. The separate row matters because
+the client disables colour-temperature support for that model. This is static
+client evidence only; it does not claim hardware qualification.
 
 On firmware 2.20 the K-3 III must be configured for MTP and reports Microsoft
 MTP VendorExtensionID `0x6`; `25fb:018a` is CD-ROM installer mode. Therefore

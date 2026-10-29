@@ -115,8 +115,8 @@ pentax_shutter_list_may_synthesise_bulb (uint32_t model_no,
 	uint16_t usb_product)
 {
 	/* Only the colour K-3 III: the published second-counts were read from its
-	 * own populated list.  The lookup maps the Monochrome to the shared model
-	 * number, so product identity is required to keep this gate fail-closed. */
+	 * own populated list.  The Monochrome has a distinct IT2 model number and
+	 * remains outside this hardware-derived synthesis gate. */
 	return model_no == PENTAX_MODEL_K3_MARK_III && usb_product == 0x0189;
 }
 
@@ -142,12 +142,13 @@ int
 pentax_bulb_action_model_supported (uint32_t model_no, uint16_t usb_product)
 {
 	/* The standard K-3 III passed two direct-PC B-mode start/stop captures.
-	 * Keep the Monochrome product out until it has its own hardware pass;
-	 * IMAGE Transmitter 2 maps both products to model 78420, so the USB PID is
-	 * the product-specific discriminator. Issue #95 remains open for natural-
-	 * completion and stop-race qualification. */
+	 * Keep the Monochrome out until it has its own hardware pass.  The later
+	 * IT2 2625 model gate gives it model 78550, so do not let the generic
+	 * capability fallback accidentally enable the action. */
 	if (model_no == PENTAX_MODEL_K3_MARK_III)
 		return usb_product == 0x0189;
+	if (model_no == PENTAX_MODEL_K3_MARK_III_MONOCHROME)
+		return 0;
 	return pentax_model_capabilities (model_no) != NULL;
 }
 
@@ -689,11 +690,14 @@ pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		*extension_version = 1;
 		return 1;
 	}
-	/* IT2 matches the Monochrome with StartsWith("PENTAX K-3 Mark III"),
-	 * so it shares model_no 78420 and all K-3 III capability flags. */
+	/* IT2 2625 checks the more specific Monochrome prefix before the colour
+	 * K-3 III prefix and assigns model 78550.  The older local decompile used
+	 * only the shorter prefix; retaining that historical result would expose
+	 * colour-only controls such as WB colour temperature. */
 	if ((usb_product == 0x018f) &&
-	    !strncmp (device_model, "PENTAX K-3 Mark III", strlen ("PENTAX K-3 Mark III"))) {
-		*model_no = PENTAX_MODEL_K3_MARK_III;
+	    !strncmp (device_model, "PENTAX K-3 Mark III Monochrome",
+		strlen ("PENTAX K-3 Mark III Monochrome"))) {
+		*model_no = PENTAX_MODEL_K3_MARK_III_MONOCHROME;
 		*extension_version = 1;
 		return 1;
 	}
@@ -810,48 +814,101 @@ pentax_model_uses_new_focus (uint32_t model_no)
 
 /* IT2 capability metadata for the generic controls below. Keep the matrix in
  * one place so adding a model is a data change rather than another scattered
- * model-number branch. The values intentionally preserve the existing
- * fail-closed predicates until each operation has independent qualification. */
+ * model-number branch. The source-only flags mirror the IT2 2625 model
+ * setter; the existing runtime predicates still fail closed until each
+ * operation has independent qualification. */
 static const PentaxModelCapabilities pentax_model_capability_table[] = {
 	{ .model_no = PENTAX_MODEL_K1_MARK_II,
 	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_dual_slot = 1,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1,
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1 },
 	{ .model_no = PENTAX_MODEL_K3_MARK_III,
 	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .supports_dual_slot = 1,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1,
+	  .supports_movie_sub_image = 1,
+	  .supports_tv_bracket = 1,
+	  .supports_av_bracket = 1,
 	  .k3iii_family = 1,
 	  .supports_exp_bracket = 1,
 	  .supports_composition_adjust = 1,
 	  .supports_movie_setting = 1,
+	  .supports_aperture_keep = 1,
 	  .supports_pc_live_view = 1,
 	  .supports_cross_process = 1,
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1,
 	  .supports_color_temperature = 1,
-	  .supports_ci_detail = 1 },
+	  .supports_ci_detail = 1,
+	  .supports_self_timer_continuous_new = 1,
+	  .supports_remote_continuous_new = 1,
+	  .supports_slot_change = 1 },
+	{ .model_no = PENTAX_MODEL_K3_MARK_III_MONOCHROME,
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .supports_dual_slot = 1,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1,
+	  .supports_movie_sub_image = 1,
+	  .supports_tv_bracket = 1,
+	  .supports_av_bracket = 1,
+	  .k3iii_family = 1,
+	  .supports_exp_bracket = 1,
+	  .supports_composition_adjust = 1,
+	  .supports_movie_setting = 1,
+	  .supports_aperture_keep = 1,
+	  .supports_pc_live_view = 1,
+	  .supports_card_writing_mode = 1,
+	  .supports_writing_file_format = 1,
+	  .supports_ci_detail = 1,
+	  .supports_self_timer_continuous_new = 1,
+	  .supports_remote_continuous_new = 1,
+	  .supports_slot_change = 1,
+	  .is_monochrome = 1 },
 	{ .model_no = PENTAX_MODEL_KP,
 	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .supports_new_transfer = 1,
+	  .supports_tv_bracket = 1,
+	  .supports_av_bracket = 1,
+	  .supports_movie = 1,
 	  .supports_composition_adjust = 1 },
 	{ .model_no = PENTAX_MODEL_K70,
-	  .focus_family = PENTAX_FOCUS_FAMILY_OLD },
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1 },
 	{ .model_no = PENTAX_MODEL_K3,
 	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_dual_slot = 1,
 	  .supports_card_writing_mode = 1 },
 	{ .model_no = PENTAX_MODEL_K1,
 	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_dual_slot = 1,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1,
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1 },
 	{ .model_no = PENTAX_MODEL_GR_III,
-	  .focus_family = PENTAX_FOCUS_FAMILY_NEW },
+	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
+	  .supports_new_transfer = 1,
+	  .supports_tv_bracket = 1,
+	  .supports_av_bracket = 1,
+	  .supports_movie = 1 },
 	{ .model_no = PENTAX_MODEL_645D,
 	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_dual_slot = 1,
 	  .supports_card_writing_mode = 1 },
 	{ .model_no = PENTAX_MODEL_645Z,
 	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_dual_slot = 1,
 	  .supports_exp_bracket = 1,
 	  .supports_card_writing_mode = 1 },
 	{ .model_no = PENTAX_MODEL_KF,
-	  .focus_family = PENTAX_FOCUS_FAMILY_OLD }
+	  .focus_family = PENTAX_FOCUS_FAMILY_OLD,
+	  .supports_new_transfer = 1,
+	  .supports_movie = 1 }
 };
 
 const PentaxModelCapabilities *
@@ -936,8 +993,9 @@ pentax_model_supports_writing_file_format (uint32_t model_no)
 }
 
 /* Color-temperature white-balance value (0xd018): the source capability
- * matrix authorises it only for the K-3 III family (model 78420).  The
- * property is a plain UINT16 device-property write.
+ * matrix authorises it only for the colour K-3 III model (78420).  The
+ * Monochrome model 78550 explicitly disables this control. The property is a
+ * plain UINT16 device-property write.
  * Fail closed on the k3iii family only (issue #102). */
 int
 pentax_model_supports_color_temperature (uint32_t model_no)
@@ -948,8 +1006,8 @@ pentax_model_supports_color_temperature (uint32_t model_no)
 }
 
 /* Detailed Custom Image parameters (0xd021-0xd029): the source capability
- * matrix authorises them only for the K-3 III family (model 78420).  Each is
- * a single-byte device-property write with camera-defined signedness.  Fail
+ * matrix authorises them for the K-3 III family, including model 78550. Each
+ * is a single-byte device-property write with camera-defined signedness. Fail
  * closed on other model families (issue #67). */
 int
 pentax_model_supports_ci_detail (uint32_t model_no)
@@ -977,6 +1035,24 @@ pentax_wff_format_byte (const char *value)
 	if (!strcmp (value, "TIFF"))
 		return PTP_PENTAX_WRITING_FORMAT_TIFF;
 	return -1;
+}
+
+/* The source-defined TIFF value belongs to the WritingFormatSetting enum,
+ * but the current modern-family widget contract deliberately exposes only
+ * JPEG, RAW and RAW+JPEG.  Keep that model-and-value gate testable outside
+ * config.c so a future control alias cannot accidentally re-enable TIFF or
+ * collapse the K-5 II legacy path into the IT2 path. */
+int
+pentax_wff_format_supported (uint32_t model_no, const char *value)
+{
+	int format;
+
+	if (!pentax_model_supports_writing_file_format (model_no))
+		return 0;
+	format = pentax_wff_format_byte (value);
+	return format == PTP_PENTAX_WRITING_FORMAT_JPEG ||
+		format == PTP_PENTAX_WRITING_FORMAT_RAW ||
+		format == PTP_PENTAX_WRITING_FORMAT_RAW_JPEG;
 }
 
 /* RawKind is the source-defined PEF/DNG selector in 0xd01b byte 8.  Do not

@@ -1,6 +1,6 @@
 # Pentax configuration integration
 
-Revision: 2026-10-28
+Revision: 2026-10-29
 
 Pentax configuration must remain descriptor-driven. Vendor mode does not grant
 permission to invent datatypes or enumerations, and the absence of a widget is
@@ -23,6 +23,12 @@ expected datatype:
 | `imageformat` | Pentax WritingFileFormat `0xd01b` | IT2 compound 10/11-byte payload | Source-authorised K-1/K-1 II/K-3 III/Monochrome path; read-modify-write preserves unrelated bytes and requires exact raw read-back; hardware qualification remains open |
 | `pentaxrawformat` | Pentax WritingFileFormat `0xd01b`, RawKind byte 8 | `PEF` / `DNG` radio | Source-authorised K-1/K-1 II/K-3 III/Monochrome path; changes only byte 8 and requires exact raw read-back; hardware qualification remains open |
 | `imagequality` | Pentax WritingFileFormat `0xd01b`, byte 7 | IT2 quality byte (`0=fine`, `1=normal`, `2=basic`) | Separate source-authorised control over the same compound payload; exact raw read-back and hardware transfer correlation remain open |
+
+The IT2 2625 model gate assigns K-1 model 77970 and K-3 III Monochrome model
+78550. The Monochrome shares the K-3 III format, focus and live-view family,
+but its source capability flags disable colour temperature; do not widen the
+`pentaxcolortemperature` gate merely because the operation/property codes are
+otherwise shared.
 
 The `0xd00f` constant already existed as `PTP_DPC_RICOH_ShutterSpeed`; the new
 Pentax name is an alias for the same wire property. K-1 II does not advertise

@@ -1,6 +1,6 @@
 # Reference clients: what the working Pentax apps actually do
 
-Revision: 2026-10-07.
+Revision: 2026-10-29.
 
 Ricoh ships tethering software that works on hardware where our support is
 partial. Those clients are the closest thing we have to a specification of
@@ -41,6 +41,26 @@ citing it:
 Key files: `MtpDevice.cs` (all PTP traffic and the `GetAllConditions` decoder),
 `ConditionIndex.cs` (the field index → name table), `ExpMode.cs` (exposure-mode
 IDs), `MainWindow.xaml.cs` (UI-driven timing: release, Bulb timer, live view).
+
+### IT2 2625 model-gate amendment
+
+The workspace also contains a later decompile of the IT2 2625 client at
+`IT2_2625_decompile/RemoteAssistant/MtpDevice.cs`, SHA-256
+`e8d11ed772aad3731d7eabd0c06fb0174aae859c5a1f6d241bf73b6d046de059`.
+For model/capability work this later source takes precedence over the older
+`ImageTransmitter2/IMAGETransmitter2/MtpDevice.cs` copy above.  The older copy
+matches `PENTAX K-3 Mark III Monochrome` with the shorter colour-body prefix
+and therefore collapses it into model 78420.  IT2 2625 checks the specific
+Monochrome prefix first, assigns model **78550**, and sets the corresponding
+capability flags, including `IsColorTempSettingSupported = false` and
+`IsMonochromeModel = true`.  The distinction is now part of the libgphoto2
+static contract and must not be removed without a newer source artifact that
+explicitly supersedes it.
+
+This is still static client evidence, not camera qualification.  The K-5 II
+does not have a model branch in either IT2 source tree; its support remains in
+the legacy USB-SCSI/MSC `camlibs/pentax` path and must not be promoted into the
+modern PTP vendor table by analogy.
 
 Citations in `PENTAX_WIRE_PROTOCOL.md`, `IMAGE_TRANSMITTER_*.md` and
 `K3III-CAPTURE-MODE-DIAGNOSTICS.md` are against this tree. Line numbers drift
