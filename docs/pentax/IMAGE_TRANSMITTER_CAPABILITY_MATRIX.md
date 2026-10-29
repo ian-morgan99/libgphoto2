@@ -170,6 +170,20 @@ withheld for this model rather than guessing from the enum. The 645Z row is
 covered for identity and capability flags; direct read-only descriptor and
 format-payload evidence are required before exposing that control.
 
+#### Individual audit: Pentax KF
+
+The KF PTP row is `25fb:018e`. IT2's `StartsWith("PENTAX KF")` branch assigns
+model 78520 and extension version 1, with single-slot, new-transfer,
+old-focus `0x9016`, and movie support. It does not enable dual-slot/card
+writing, new focus `0x9017`, PC live view, bracketing, composition, movie
+settings, detailed CI, colour temperature, or the K-1/K-3 III writing-file
+format contract.
+
+The current capability table and model fixture retain that narrow contract.
+The KF is source/firmware-derived in this repository, not hardware-qualified;
+its first live gate is read-only identity and descriptor discovery followed by
+an old-focus-family check.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their

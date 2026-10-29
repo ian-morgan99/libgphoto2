@@ -15,6 +15,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 
 | Date | Work | Result | Evidence / next gate |
 |---|---|---|---|
+| 2026-10-29 | Individual static audit: Pentax KF (`25fb:018e`, IT2 78520) | PASS / HARDWARE OPEN | IT2 single-slot/new-transfer/movie and old-focus flags match; dual-slot, PC-LV, bracketing, composition, CI, colour, and writing-file-format gates remain off. Next gate is direct read-only identity/descriptor/focus verification. |
 | 2026-10-29 | Individual static audit: Pentax 645Z (`25fb:0167`, IT2 77840) | PARTIAL / FORMAT GATE OPEN | IT2 dual-slot/old-focus/exposure-bracket contract matches. The generic `CamWritingFileFormat` and TIFF enum are source evidence only; current libgphoto2 keeps the `0xd01b` widget withheld pending a direct descriptor/payload audit. |
 | 2026-10-29 | Individual static audit: Pentax 645D (`25fb:0130`, IT2 77320) | PASS / HARDWARE OPEN | IT2 `645D` branch matches extension 0, dual-slot, and old-focus/card-writing flags; the shared K-01 MSC/SCSI PID is kept name-gated. Next gate is direct read-only identity/descriptor verification. |
 | 2026-10-29 | Individual static audit: K-3 III Monochrome (`25fb:018f`, IT2 78550) | PASS / HARDWARE OPEN | Specific IT2 branch and K-3 III-family controls match; colour temperature remains disabled and the model is not collapsed into 78420. Covered by the model contract and public colour-control fixture; next gate is direct read-only identity/descriptor/focus verification. |
