@@ -90,6 +90,21 @@ full zero/non-zero capability contract are independently pinned in
 connected K-3 still needs the read-only identity, descriptor, conditions,
 and focus-family gate before any control is hardware-qualified.
 
+#### Individual audit: Pentax K-70
+
+The K-70 PTP row is `25fb:017d`. IT2's `MtpDevice.Model` branch
+`StartsWith("PENTAX K-70")` assigns model 78370 and extension version 1, with
+single-slot, new-transfer, old-focus, and movie support. It does not enable
+dual-slot/card-writing, the K-1 writing-file-format path, new focus `0x9017`,
+PC live view, bracketing, composition, movie settings, or the K-3 III CI and
+colour controls.
+
+The shared capability table and the model contract fixture therefore expose
+only those source flags; no K-1 or K-3 III controls are inferred from the
+shared Pentax VID. This remains a static/source pass. A K-70 connection still
+requires its own read-only identity, descriptor, conditions, and old-focus
+gate before any write, preview, capture, or transfer claim is made.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
