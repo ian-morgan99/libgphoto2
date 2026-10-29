@@ -260,6 +260,17 @@ The W90 remains generic PTP only. No modern focus, format, live-view,
 capture, or transfer semantics are claimed; its negative lookup is pinned by
 the static model test.
 
+#### Individual audit: Ricoh WG-M2 PTP personality
+
+The PTP list contains `25fb:210b` as `Ricoh:WG-M2 (PTP mode)`. The shared
+Ricoh/Pentax VID does not make it an IT2 camera: IT2 2625 has no WG-M2 model
+branch, and the lookup rejects the row before a Pentax vendor capability can
+be selected.
+
+The WG-M2 remains generic PTP only. No GR III or Pentax focus, file-format,
+live-view, capture, or transfer contract is inferred; the negative lookup is
+covered by the static model test.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their

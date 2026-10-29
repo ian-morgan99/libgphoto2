@@ -15,6 +15,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 
 | Date | Work | Result | Evidence / next gate |
 |---|---|---|---|
+| 2026-10-29 | Individual static audit: Ricoh WG-M2 PTP (`25fb:210b`) | FAIL-CLOSED / GENERIC ONLY | No IT2 2625 model branch exists. Shared VID/name similarity cannot inherit GR III or Pentax controls; the lookup rejects it before vendor capability selection. |
 | 2026-10-29 | Individual static audit: Pentax Optio W90 PTP (`0a17:00f7`) | FAIL-CLOSED / GENERIC ONLY | No IT2 2625 model branch or modern Pentax vendor identity exists. The lookup rejects it before any modern capability or opcode path is selected. |
 | 2026-10-29 | Individual static audit: Pentax Optio 43WR PTP (`0a17:000d`) | FAIL-CLOSED / GENERIC ONLY | No IT2 model branch or modern Pentax vendor identity exists. The lookup rejects it before any modern capability or opcode path is selected. |
 | 2026-10-29 | Individual static audit: Ricoh GR IIIx PTP (`25fb:2115`) | FAIL-CLOSED / GENERIC ONLY | IT2 lists only GR III model 78350 and the known `0x210f` PID. GR IIIx does not inherit the `0x9017` contract from a name prefix; support requires a distinct source or hardware audit. |
