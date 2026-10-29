@@ -105,6 +105,22 @@ shared Pentax VID. This remains a static/source pass. A K-70 connection still
 requires its own read-only identity, descriptor, conditions, and old-focus
 gate before any write, preview, capture, or transfer claim is made.
 
+#### Individual audit: Pentax KP
+
+The KP PTP row is `25fb:017f`. IT2's `MtpDevice.Model` branch
+`StartsWith("PENTAX KP")` assigns model 78380 and extension version 1. The
+source contract is single-slot, new-transfer, new-focus `0x9017`, movie,
+Tv/Av bracketing, and composition adjustment. It does not enable the
+dual-slot/card-writing or K-1 writing-file-format paths, movie settings,
+high-resolution PC live view, detailed CI, colour temperature, or the K-3 III
+family controls.
+
+The capability table and model contract fixture keep those boundaries
+explicit. In particular, KP must not inherit K-3 III's high-resolution live
+view or colour controls merely because it shares the new-transfer and
+new-focus families. Hardware remains unqualified; the next gate is a direct
+read-only identity, descriptor, conditions, and `0x9017` focus-family check.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
