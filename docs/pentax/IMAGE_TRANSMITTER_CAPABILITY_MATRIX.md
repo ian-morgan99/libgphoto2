@@ -121,6 +121,23 @@ view or colour controls merely because it shares the new-transfer and
 new-focus families. Hardware remains unqualified; the next gate is a direct
 read-only identity, descriptor, conditions, and `0x9017` focus-family check.
 
+#### Individual audit: Pentax K-3 III Monochrome
+
+The Monochrome PTP row is `25fb:018f`. IT2 checks the more specific model
+prefix before the colour K-3 III branch and assigns model 78550 and extension
+version 1. Its source contract enables dual slot, new transfer, new focus
+`0x9017`, movie, movie settings, movie sub-image, Tv/Av/exposure bracketing,
+composition adjustment, aperture keep, detailed CI, the new timer/remote
+continuous modes, slot change, and high-resolution PC live view.
+
+It is nevertheless a separate product gate: colour temperature is explicitly
+disabled and the model number must remain 78550 rather than being collapsed
+to 78420. The capability fixture pins that distinction, including the
+Monochrome flag and the absence of cross-process/colour-temperature support.
+The existing held-Bulb admission policy is also product-specific and remains
+separate from this static control audit. Hardware qualification is still
+pending.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
