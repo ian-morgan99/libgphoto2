@@ -154,6 +154,22 @@ the dual-slot/card-writing boundary. This is a static/source pass only; the
 shared PID must be rechecked from live DeviceInfo before any 645D control is
 used.
 
+#### Individual audit: Pentax 645Z
+
+The 645Z PTP row is `25fb:0167`. IT2's `StartsWith("PENTAX 645Z")` branch
+assigns model 77840 and extension version 1, with dual-slot, old-focus
+`0x9016`, exposure-bracketing support, and no new-transfer or movie support.
+It does not enable the K-3 III live-view, new-focus, composition, CI, or
+colour-temperature gates.
+
+The IT2 client has a general `CamWritingFileFormat` property and defines a
+TIFF shooting/transfer enum, but the model branch alone does not prove that
+the modern libgphoto2 `0xd01b` widget contract and its payload layout are safe
+for 645Z. The current driver therefore keeps writing-file-format controls
+withheld for this model rather than guessing from the enum. The 645Z row is
+covered for identity and capability flags; direct read-only descriptor and
+format-payload evidence are required before exposing that control.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
