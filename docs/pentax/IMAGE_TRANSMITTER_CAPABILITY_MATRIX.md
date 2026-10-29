@@ -71,6 +71,24 @@ direct, read-only identity/descriptor/focus-family gate followed by one
 variable-at-a-time control tests; do not treat this static pass as permission
 to enable capture or new vendor abilities.
 
+#### Individual audit: Pentax K-1
+
+The K-1 PTP row is `25fb:0179`. IT2's `StartsWith("PENTAX K-1")` branch
+assigns model 77970 and extension version 1. Its source contract is dual-slot,
+new-transfer, movie, old-focus `0x9016`, direct live-view start, card writing,
+and writing-file-format support. It does not enable the new-focus `0x9017`,
+K-3 III family, bracketing, composition, detailed CI, or colour-temperature
+paths.
+
+The implementation keeps that contract separate from both K-1 II USB
+personalities and from K-3 III's newer focus/live-view controls. The exact
+identity, model number, extension, focus family, and capability flags are
+pinned by the model contract fixture; the table-driven direct live-view path
+is shared only where the IT2 contract says it is. This individual pass adds
+no new hardware claim. A connected K-1 still needs its own read-only
+identity/descriptor/conditions gate and supervised old-focus check before
+control or capture qualification.
+
 #### Individual audit: Pentax K-3
 
 The K-3 is the first remaining body in the PTP list processed independently
