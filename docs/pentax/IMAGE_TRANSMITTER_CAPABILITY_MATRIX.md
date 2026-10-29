@@ -89,6 +89,24 @@ no new hardware claim. A connected K-1 still needs its own read-only
 identity/descriptor/conditions gate and supervised old-focus check before
 control or capture qualification.
 
+#### Individual audit: Pentax K-1 Mark II
+
+The K-1 II's PTP personality is `25fb:0183`; IT2 assigns model 78400 and
+extension version 1. The source contract is dual-slot, new-transfer, movie,
+old-focus `0x9016`, direct live-view start, card writing, and
+writing-file-format support. The separate `25fb:0182` personality is the
+camera's MSC/storage path and must not be treated as a second PTP control
+identity.
+
+The implementation therefore keeps `0183` and `0182` distinct: the former
+can enter the Pentax vendor model contract, while the latter is rejected by
+the research-capable PTP gate and remains storage-only. The model fixture
+pins the K-1 II identity, source flags, old-focus family, and file-format
+boundary. Existing direct-PC evidence covers K-1 II lifecycle, preview, core
+exposure controls, and one capture/transfer; it does not close the old-focus,
+repeat-capture, or all-format hardware gates. No additional hardware claim
+is made by this individual static pass.
+
 #### Individual audit: Pentax K-3
 
 The K-3 is the first remaining body in the PTP list processed independently
