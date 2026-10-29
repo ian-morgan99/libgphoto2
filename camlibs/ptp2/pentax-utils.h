@@ -66,6 +66,9 @@ typedef struct {
 	int supports_movie_setting;
 	int supports_aperture_keep;
 	int supports_pc_live_view;
+	/* IT2 starts PC live view directly after reading d009 and does not
+	 * pre-read d035 on both K-1 bodies. */
+	int uses_it2_direct_live_view_start;
 	int supports_cross_process;
 	int supports_card_writing_mode;
 	int supports_writing_file_format;

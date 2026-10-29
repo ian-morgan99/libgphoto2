@@ -576,6 +576,16 @@ pentax_live_view_frame_should_retry (uint16_t response,
 }
 
 int
+pentax_model_uses_it2_direct_live_view_start (uint32_t model_no)
+{
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+
+	/* This is a model capability, not a second runtime implementation.  The
+	 * table records the shared IT2 K-1/K-1 II path; all other models remain on
+	 * the observed-state path until their own source contract says otherwise. */
+	return capabilities && capabilities->uses_it2_direct_live_view_start;
+}
 pentax_parse_conditions (const unsigned char *data, size_t size,
 		PentaxConditions *conditions)
 {
@@ -811,6 +821,7 @@ static const PentaxModelCapabilities pentax_model_capability_table[] = {
 	  .supports_dual_slot = 1,
 	  .supports_new_transfer = 1,
 	  .supports_movie = 1,
+	  .uses_it2_direct_live_view_start = 1,
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1 },
 	{ .model_no = PENTAX_MODEL_K3_MARK_III,
@@ -876,6 +887,7 @@ static const PentaxModelCapabilities pentax_model_capability_table[] = {
 	  .supports_dual_slot = 1,
 	  .supports_new_transfer = 1,
 	  .supports_movie = 1,
+	  .uses_it2_direct_live_view_start = 1,
 	  .supports_card_writing_mode = 1,
 	  .supports_writing_file_format = 1 },
 	{ .model_no = PENTAX_MODEL_GR_III,
