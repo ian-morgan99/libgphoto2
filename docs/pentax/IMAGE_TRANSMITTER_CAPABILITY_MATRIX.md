@@ -203,7 +203,7 @@ vendor capture/candidate workflow.
 | `0xd02b` | focus peaking | IT2 assumes UINT8; K-1 II instead returns stable `0x4004` array-UINT16 descriptor payload and anomalous 4-byte value | K-1 II withheld; K-3 III hardware target |
 | `0xd02c` | CI cross process | encoded UINT8 normal and 32+ ranges | Source target |
 | `0xd02d` | CI user filter | 8-byte signed triplet structure | Read-only descriptor passthrough implemented; write needs array codec |
-| `0xd035` | PC live view | IT2 writes UINT8 boolean for both K-1 and K-1 II; the K-1 II descriptor is a datatype-zero six-byte placeholder with empty value, so IT2 starts directly without a preliminary GET | K-3 III HW-W restore; K-1/K-1 II direct-start path now follows IT2, with one-frame restore target; K-1 hardware qualification remains pending |
+| `0xd035` | PC live view | IT2 writes UINT8 boolean for both K-1 and K-1 II; the K-1 II descriptor is a datatype-zero six-byte placeholder with empty value, so IT2 starts directly without a preliminary GET | K-3 III HW-W restore; K-1/K-1 II share one table-driven direct-start path, with one-frame restore target; K-1 hardware qualification remains pending |
 | `0xd036` | LV AF position | 4-byte response means geometry centre; >=8 bytes has X/Y UINT16 at 4/6; setter is `{2,0,0,0,Xlo,Xhi,Ylo,Yhi}` | Parser/encoder fixtures; K-1 II HW-R 8-byte centre 360,240; bounded write target |
 | `0xd037` | LV zoom | `{4,0,0,0,Xlo,Xhi,Ylo,Yhi,mag,0,0,0}`; disable mag 1 | Encoder fixture; K-1 II HW-R raw 1; public config target; 16x fallback once to 10x only on `0x201c` after hardware gate |
 | `0xd039` | movie mode | UINT8 boolean; movie gate | Both source target |

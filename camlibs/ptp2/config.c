@@ -86,7 +86,7 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 		}
 	}
 	if ((prop & 0x7000) == 0x1000) { /* commands */
-		/* The K-1 II does not advertise PTP_OC_PENTAX_FocusControl
+		/* The K-1 family does not advertise PTP_OC_PENTAX_FocusControl
 		 * (0x9016) in DeviceInfo, but Image Transmitter 2 sends it
 		 * anyway and the hardware honours it.  Let the old-focus
 		 * drive widgets through the gate; the put function still
@@ -10262,9 +10262,11 @@ _get_Pentax_UsbLiveViewMode (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
-	/* IT2 only drives PC live view when _isPcLvHighResolutionSupported
-	 * is set (K-3 III family); the K-1 II answers with an empty data
-	 * phase (HW finding). */
+	/* IT2 only drives high-resolution PC live view when
+	 * _isPcLvHighResolutionSupported is set (K-3 III family).  The K-1
+	 * family uses the separate direct-start preview path instead; the
+	 * K-1 II answers with an empty data phase if this property is read
+	 * as though it were a high-resolution PC-LV body (HW finding). */
 	if (!pentax_model_supports_pc_live_view (params->pentax.model_no))
 		return GP_ERROR_NOT_SUPPORTED;
 	ret = ptp_pentax_get_device_prop_raw (params,
@@ -12342,7 +12344,7 @@ _put_Pentax_ModelAwareFocusDrive (CONFIG_PUT_ARGS)
 /* Generic `manualfocusdrive` wrapper for Pentax (issue #59).
  * Dispatches to the correct focus-control opcode by model family:
  *   - new-focus models (K-3 III, etc.) -> 0x9017 via ptp_pentax_focus_control_new
- *   - old-focus models (K-1 II, etc.)  -> 0x9016 via ptp_pentax_focus_control
+ *   - old-focus models (K-1/K-1 II, etc.) -> 0x9016 via ptp_pentax_focus_control
  * The widget value is a signed step: positive = near, negative = far.
  * A single bounded movement per invocation; no retry escalation. */
 static int
@@ -12410,7 +12412,7 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 			gp_context_status (ptp_context_get (params->data),
 				_("Pentax manual focus drive (new) returned response 0x%04x."), ret);
 	} else {
-		/* Old-focus family (K-1 II): 0x9016 with amount=5 and the
+		/* Old-focus family (K-1/K-1 II): 0x9016 with amount=5 and the
 		 * source-backed protocol direction mapping. */
 		uint32_t amount = 5U;
 		uint32_t old_direction;

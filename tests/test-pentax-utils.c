@@ -508,6 +508,7 @@ main (void)
 		CHECK (k1ii->supports_dual_slot);
 		CHECK (k1ii->supports_new_transfer);
 		CHECK (k1ii->supports_movie);
+		CHECK (k1ii->uses_it2_direct_live_view_start);
 		CHECK (!k1ii->supports_movie_sub_image);
 		CHECK (!k1ii->supports_tv_bracket);
 		CHECK (!k1ii->supports_av_bracket);
@@ -526,6 +527,7 @@ main (void)
 		CHECK (k1->supports_dual_slot);
 		CHECK (k1->supports_new_transfer);
 		CHECK (k1->supports_movie);
+		CHECK (k1->uses_it2_direct_live_view_start);
 		CHECK (!k1->supports_movie_sub_image);
 		CHECK (!k1->supports_tv_bracket);
 		CHECK (!k1->supports_av_bracket);
@@ -538,6 +540,39 @@ main (void)
 		CHECK (k1->supports_writing_file_format);
 		CHECK (!k1->supports_color_temperature);
 		CHECK (!k1->supports_ci_detail);
+		/* The original K-1 and K-1 II must share the same IT2 control
+		 * contract.  Their model numbers and USB identities remain distinct,
+		 * but no accidental per-body fork is permitted here. */
+		CHECK (k1->focus_family == k1ii->focus_family);
+		CHECK (k1->supports_dual_slot == k1ii->supports_dual_slot);
+		CHECK (k1->supports_new_transfer == k1ii->supports_new_transfer);
+		CHECK (k1->supports_movie == k1ii->supports_movie);
+		CHECK (k1->supports_movie_sub_image == k1ii->supports_movie_sub_image);
+		CHECK (k1->supports_tv_bracket == k1ii->supports_tv_bracket);
+		CHECK (k1->supports_av_bracket == k1ii->supports_av_bracket);
+		CHECK (k1->k3iii_family == k1ii->k3iii_family);
+		CHECK (k1->supports_exp_bracket == k1ii->supports_exp_bracket);
+		CHECK (k1->supports_composition_adjust ==
+			k1ii->supports_composition_adjust);
+		CHECK (k1->supports_movie_setting == k1ii->supports_movie_setting);
+		CHECK (k1->supports_aperture_keep == k1ii->supports_aperture_keep);
+		CHECK (k1->supports_pc_live_view == k1ii->supports_pc_live_view);
+		CHECK (k1->uses_it2_direct_live_view_start ==
+			k1ii->uses_it2_direct_live_view_start);
+		CHECK (k1->supports_cross_process == k1ii->supports_cross_process);
+		CHECK (k1->supports_card_writing_mode ==
+			k1ii->supports_card_writing_mode);
+		CHECK (k1->supports_writing_file_format ==
+			k1ii->supports_writing_file_format);
+		CHECK (k1->supports_color_temperature ==
+			k1ii->supports_color_temperature);
+		CHECK (k1->supports_ci_detail == k1ii->supports_ci_detail);
+		CHECK (k1->supports_self_timer_continuous_new ==
+			k1ii->supports_self_timer_continuous_new);
+		CHECK (k1->supports_remote_continuous_new ==
+			k1ii->supports_remote_continuous_new);
+		CHECK (k1->supports_slot_change == k1ii->supports_slot_change);
+		CHECK (k1->is_monochrome == k1ii->is_monochrome);
 
 		CHECK (k3 && k3->k3iii_family);
 		CHECK (k3->focus_family == PENTAX_FOCUS_FAMILY_NEW);
