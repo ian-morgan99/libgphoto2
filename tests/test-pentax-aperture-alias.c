@@ -107,7 +107,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
 	 * resolves from this value with no wire IO (cache-hit path). */
-	PTPDevicePropDesc *dpd = calloc (4, sizeof (*dpd));
+	PTPDevicePropDesc *dpd = calloc (5, sizeof (*dpd));
 	if (dpd) {
 		memset (dpd, 0, sizeof (*dpd));
 		dpd->DevicePropCode = PTP_DPC_FNumber;
@@ -149,8 +149,20 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		dpd[3].FormFlag       = PTP_DPFF_None;
 		dpd[3].CurrentValue.u16 = 5000;
 		dpd[3].timestamp = time (NULL);
+		dpd[4].DevicePropCode = PTP_DPC_WhiteBalance;
+		dpd[4].DataType       = PTP_DTC_UINT16;
+		dpd[4].GetSet         = PTP_DPGS_GetSet;
+		dpd[4].FormFlag       = PTP_DPFF_Enumeration;
+		dpd[4].FORM.Enum.NumberOfValues = 2;
+		dpd[4].FORM.Enum.SupportedValue = calloc (2, sizeof (PTPPropValue));
+		if (dpd[4].FORM.Enum.SupportedValue) {
+			dpd[4].FORM.Enum.SupportedValue[0].u16 = 2;
+			dpd[4].FORM.Enum.SupportedValue[1].u16 = 32783;
+		}
+		dpd[4].CurrentValue.u16 = 32783;
+		dpd[4].timestamp = time (NULL);
 		params->dpd_cache.val = dpd;
-		params->dpd_cache.len = 4;
+		params->dpd_cache.len = 5;
 	}
 }
 
@@ -264,6 +276,33 @@ main (void)
 	char *iso_value = NULL;
 	CHECK (gp_widget_get_value (iso, &iso_value) == GP_OK);
 	CHECK (iso_value && !strcmp (iso_value, "200"));
+
+	/* K-1 II firmware can omit 0x5005 from DeviceInfo.  The public
+	 * "whitebalance" name must nevertheless resolve through the Pentax direct
+	 * handler and expose the complete IT2 list-index contract. */
+	CameraWidget *whitebalance = NULL;
+	ret = get_single (cam, "whitebalance", &whitebalance, context);
+	CHECK (ret == GP_OK && whitebalance != NULL);
+	CHECK (gp_widget_get_name (whitebalance, &name) == GP_OK);
+	CHECK (name && !strcmp (name, "whitebalance"));
+	CHECK (gp_widget_get_type (whitebalance, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	CHECK (gp_widget_count_choices (whitebalance) == 18);
+	CHECK (gp_widget_get_value (whitebalance, &iso_value) == GP_OK);
+	CHECK (iso_value && !strcmp (iso_value, "multi-auto"));
+	{
+		const char *choice = NULL;
+		CHECK (gp_widget_get_choice (whitebalance, 0, &choice) == GP_OK);
+		CHECK (choice && !strcmp (choice, "auto"));
+		CHECK (gp_widget_get_choice (whitebalance, 1, &choice) == GP_OK);
+		CHECK (choice && !strcmp (choice, "multi-auto"));
+		CHECK (gp_widget_get_choice (whitebalance, 8, &choice) == GP_OK);
+		CHECK (choice && !strcmp (choice, "fluorescent-l"));
+		CHECK (gp_widget_get_choice (whitebalance, 11, &choice) == GP_OK);
+		CHECK (choice && !strcmp (choice, "cte"));
+		CHECK (gp_widget_get_choice (whitebalance, 17, &choice) == GP_OK);
+		CHECK (choice && !strcmp (choice, "color-temp-3"));
+	}
 
 	/* The generic capturetarget name must resolve on a Pentax dual-slot
 	 * model (issue #59): the Polaris app polls it every ~5 s and mapped
@@ -387,6 +426,9 @@ main (void)
 	 * duplicate registration would surface as two identical names in the
 	 * camera_list_config output; assert exactly one occurrence on Pentax and
 	 * none on a non-Pentax fixture (no new production export needed). */
+	uint16_t advertised_whitebalance = PTP_DPC_WhiteBalance;
+	cam->pl->params.deviceinfo.DeviceProps = &advertised_whitebalance;
+	cam->pl->params.deviceinfo.DeviceProps_len = 1;
 	typedef int (*cam_list_config_fn)(Camera *camera, CameraList *list,
 	                                  GPContext *context);
 	{
@@ -405,6 +447,7 @@ main (void)
 		int occurrences = 0;
 		int autofocus_occurrences = 0;
 		int staraf_occurrences = 0;
+		int whitebalance_occurrences = 0;
 		for (int i = 0; i < count; i++) {
 			const char *nm = NULL;
 			if (gp_list_get_name (list, i, &nm) == GP_OK &&
@@ -417,9 +460,12 @@ main (void)
 				!strcmp (nm, "starafdrive") ||
 				!strcmp (nm, "afwithliveview")))
 				staraf_occurrences++;
+			if (nm && !strcmp (nm, "whitebalance"))
+				whitebalance_occurrences++;
 		}
 		CHECK (occurrences == 1);
 		CHECK (autofocus_occurrences == 1);
+		CHECK (whitebalance_occurrences == 1);
 		/* IT2 exposes AF-when-released/TouchAF policy, but no identified
 		 * StarAF command.  Do not publish a speculative StarAF widget. */
 		CHECK (staraf_occurrences == 0);

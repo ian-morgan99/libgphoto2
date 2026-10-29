@@ -11712,32 +11712,29 @@ _put_Pentax_DirectDriveMode (CONFIG_PUT_ARGS)
 	return result;
 }
 
-/* White balance write (0x5005, UINT16).  The nominal->wire mapping is
- * Image Transmitter 2's _camToMtpWBTable applied over its WB combo box
- * order: Auto, Multi-Auto, Daylight, Shade, Cloudy, Fluorescent D/N/W/L,
- * Tungsten, Flash, CTE, Manual 1-3, Color Temp 1-3.  Writes are verified
- * through the live conditions white-balance field at offset 120 once that
- * offset is parsed; until then verification is descriptor read-back. */
+/* White balance read/write (0x5005, UINT16).  This is Image Transmitter 2's
+ * _camToMtpWBTable in the same order as its WB combo box.  Polaris sends the
+ * selected list index, so this order is part of the public contract; it is
+ * not safe to expose only the modes currently seen on one body. */
 static const struct { unsigned int wire; const char *label; } pentax_wb_modes[] = {
 	{ 2U,	"auto" },
+	{ 32783U, "multi-auto" },
 	{ 4U,	"daylight" },
 	{ 32770U, "shade" },
 	{ 32771U, "cloudy" },
 	{ 32772U, "fluorescent-d" },
 	{ 32773U, "fluorescent-n" },
 	{ 32774U, "fluorescent-w" },
+	{ 32781U, "fluorescent-l" },
 	{ 6U,	"tungsten" },
 	{ 7U,	"flash" },
+	{ 32782U, "cte" },
 	{ 32775U, "manual-1" },
 	{ 32776U, "manual-2" },
 	{ 32777U, "manual-3" },
 	{ 32778U, "color-temp-1" },
 	{ 32779U, "color-temp-2" },
 	{ 32780U, "color-temp-3" },
-	/* K-3 III firmware 2.20 reports 0x800f as its Auto WB wire value;
-	 * IT2's table lacks it.  Label it explicitly instead of failing the
-	 * getter when the camera is set to Auto. */
-	{ 32783U, "auto-800f" },
 };
 #define PENTAX_WB_MODE_COUNT ARRAYSIZE (pentax_wb_modes)
 
@@ -14864,6 +14861,11 @@ static struct submenu image_settings_menu[] = {
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_FUJI_ColorTemperature,          PTP_VENDOR_FUJI,    PTP_DTC_UINT16, _get_INT,                       _put_INT },
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_SONY_ColorTemp,                 PTP_VENDOR_SONY,    PTP_DTC_UINT16, _get_INT,                       _put_INT },
 	{ N_("Color Temperature"),      "colortemperature",     PTP_DPC_OLYMPUS_ColorTemperature,       PTP_VENDOR_GP_OLYMPUS_OMD,    PTP_DTC_UINT16, _get_INT,             _put_INT },
+	/* Modern Pentax bodies can omit 0x5005 from DeviceInfo even though
+	 * GetDevicePropDesc/GetDevicePropValue work in Pentax vendor mode.  Keep
+	 * the public name used by consumers and route it through the IT2-faithful
+	 * Pentax handler. */
+	{ N_("WhiteBalance"),           "whitebalance",         0,                                      PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropDesc, _get_Pentax_DirectWB,          _put_Pentax_DirectWB },
 	{ N_("WhiteBalance"),           "whitebalance",         PTP_DPC_WhiteBalance,                   0,                  PTP_DTC_UINT16, _get_WhiteBalance,              _put_WhiteBalance },
 	{ N_("WhiteBalance"),           "whitebalance",         PTP_DPC_NIKON_1_WhiteBalance,           PTP_VENDOR_NIKON,   PTP_DTC_UINT8,  _get_Nikon_1_WhiteBalance,      _put_Nikon_1_WhiteBalance },
 	{ N_("WhiteBalance Adjust A"),  "whitebalanceadjusta",  PTP_DPC_CANON_EOS_WhiteBalanceAdjustA,  PTP_VENDOR_CANON,   PTP_DTC_INT32,  _get_Canon_EOS_WBAdjust,        _put_Canon_EOS_WBAdjust },
@@ -15469,6 +15471,13 @@ _get_config (Camera *camera, const char *confname, CameraWidget **outwidget, Cam
 							continue;
 						}
 					} else if (mode == MODE_LIST) {
+						/* The Pentax vendor alias above is the canonical public
+						 * whitebalance control.  Do not list the generic 0x5005
+						 * row a second time when a body also advertises the
+						 * property in DeviceInfo. */
+						if (cursub->propid == PTP_DPC_WhiteBalance &&
+						    config_vendor_matches (camera, PTP_VENDOR_PENTAX))
+							continue;
 						gp_list_append (list, cursub->name, NULL);
 						continue;
 					}

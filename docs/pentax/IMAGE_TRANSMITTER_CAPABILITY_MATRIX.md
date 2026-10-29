@@ -173,7 +173,7 @@ vendor capture/candidate workflow.
 | Code | IT2 logical control | Wire representation and gate | Current target status |
 |---:|---|---|---|
 | `0x5001` | battery level | UINT8 on LS path; K bodies primarily use conditions | Generic/aggregate status target |
-| `0x5005` | white balance | UINT16; source LUT; both | K-3 III HW-R; K-1 II direct descriptor target |
+| `0x5005` | white balance | UINT16; source LUT; both | Public Pentax-gated `whitebalance` alias uses the complete 18-entry IT2 list-index mapping; K-1 II/K-1 hardware re-qualification pending |
 | `0x5007` | aperture | UINT16 hundredths; both | K-3 III HW-R; K-1 II target |
 | `0x5008` | focal length | UINT32 hundredths; status on K bodies | K-1 II lens correlation target |
 | `0x500a` | LS focus mode | UINT16; LS only | Never substitute for K-body AF mode |
