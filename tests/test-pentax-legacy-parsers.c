@@ -5,6 +5,7 @@
 
 #include "pslr_utils.h"
 #include "pslr_model.h"
+#include "pslr_enum.h"
 
 #define CHECK_TEST(expression) do { \
 	if (!(expression)) { \
@@ -33,6 +34,15 @@ main (void)
 	CHECK_TEST (k5ii->jpeg_resolutions[3] == 2);
 	CHECK_TEST (k5ii->status_parser_function != NULL);
 	CHECK_TEST (pslr_find_model_by_id (0x25fb0148) == NULL);
+	/* K-5 II uses the legacy X18 control domains.  Keep these separate from
+	 * the modern IT2 ShootingFormat/WritingFormatSetting/RawKind domains. */
+	CHECK_TEST (PSLR_IMAGE_FORMAT_JPEG == 0);
+	CHECK_TEST (PSLR_IMAGE_FORMAT_RAW == 1);
+	CHECK_TEST (PSLR_IMAGE_FORMAT_RAW_PLUS == 2);
+	CHECK_TEST (PSLR_IMAGE_FORMAT_MAX == 3);
+	CHECK_TEST (PSLR_RAW_FORMAT_PEF == 0);
+	CHECK_TEST (PSLR_RAW_FORMAT_DNG == 1);
+	CHECK_TEST (PSLR_RAW_FORMAT_MAX == 2);
 
 	value = parse_aperture ("2.8");
 	CHECK_TEST (value.nom == 28 && value.denom == 10);

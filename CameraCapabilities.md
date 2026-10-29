@@ -22,14 +22,18 @@ Vendor commands are enabled only when all three identity fields match:
 |---|---|---:|---:|---|
 | `25fb:0189` | `PENTAX K-3 Mark III` | 78420 | 1 | Hardware USB/DeviceInfo verified on firmware 2.20 |
 | `25fb:0183` | `PENTAX K-1 Mark II` | 78400 | 1 | Hardware-confirmed PC-P identity; initial read-only lifecycle pass |
+| `25fb:0179` | `PENTAX K-1` | 77970 | 1 | IT2 2625 static model gate; hardware qualification pending |
+| `25fb:018f` | `PENTAX K-3 Mark III Monochrome` | 78550 | 1 | IT2 2625 static model gate; hardware qualification pending |
 
 The K-3 III exposes Microsoft MTP VendorExtensionID `0x6`; exact USB and
 DeviceInfo identity, rather than that generic extension ID, gates Pentax vendor
 mode. `25fb:018a` is its CD-ROM installer mode and is excluded.
 
-`25fb:018f` is the K-3 Mark III Monochrome entry and is deliberately excluded
-from this vendor implementation. All unmatched identities remain on generic
-PTP and receive no Pentax vendor operations.
+`25fb:018f` is admitted to the source-authorised Pentax model table as IT2
+model 78550, but remains hardware-unqualified and held-Bulb-gated. Its
+colour-temperature control is deliberately excluded by the source capability
+flags. All unmatched identities remain on generic PTP and receive no Pentax
+vendor operations.
 
 ## Acceptance status
 
@@ -54,7 +58,7 @@ does not mean camera-verified.
 ## Explicitly not claimed
 
 Movie transfer, composition adjustment, Astrotracer, dust reduction, pixel
-shift, detailed custom-image controls, K-3 III Monochrome, KP, 645-series, GR,
+shift, detailed custom-image controls, KP, 645-series, GR,
 and G900SE vendor control are outside the accepted scope. Their observed names
 or opcodes are not sufficient evidence to implement them.
 

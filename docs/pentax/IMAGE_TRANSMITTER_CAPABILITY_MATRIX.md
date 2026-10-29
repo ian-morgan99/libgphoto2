@@ -1,8 +1,9 @@
 # IMAGE Transmitter 2 capability target matrix
 
-Revision: 2026-10-28 (content largely from 2026-08-21; the `0x0182` amendment
+Revision: 2026-10-29 (content largely from 2026-08-21; the `0x0182` amendment
 below is from 2026-10-06, commit `f3a8ffebf`; the format-domain correction and
-model-gate audit are from 2026-10-28).
+model-gate audit are from 2026-10-28; the IT2 2625 Monochrome correction is
+from 2026-10-29).
 
 This is the normative target for Pentax development in this fork. It
 consolidates the extraction previously split across `PENTAX_WIRE_PROTOCOL.md`,
@@ -20,21 +21,40 @@ available through ordinary libgphoto2 APIs. Source anchors are member names in
 `MtpDevice`, `MtpOpCode`, `ConditionIndex`, `ModeEnableInfo`, `ExpMode`, and
 `DriveModeLUT`; line numbers are intentionally avoided.
 
+## Static audit and test coverage
+
+The 2026-10-29 audit is host-side and does not replace a camera test. Its
+regression contracts are deliberately split by layer:
+
+| Contract | Evidence and test |
+|---|---|
+| Model identity and IT2 capability flags | IT2 2625 `MtpDevice.Model` gate, recorded in `REFERENCE_CLIENTS.md`; `tests/test-pentax-utils.c` checks K-1 II 78400, K-1 77970, K-3 III 78420, and Monochrome 78550 plus every audited flag |
+| Modern format enums and payloads | `ptp.h` keeps `ShootingFormat`, `WritingFormatSetting`, `RawKind`, and `TransFileFormat` separate; `test-pentax-utils` checks their values, TIFF rejection by the modern widget contract, 10/11-byte validation, and byte-preserving format/raw-kind changes |
+| K-5 II format contract | `tests/test-pentax-legacy-parsers.c` checks the legacy USB-SCSI model identity and its independent JPEG/RAW/RAW+JPEG and PEF/DNG enum domains; no K-5 II row is added to the modern PTP model table |
+| Focus and AF | `test-pentax-utils` checks old `0x9016` versus new `0x9017` dispatch and direction semantics; `test-pentax-aperture-alias` checks the generic policy/manual-focus/immediate-AF widget contract for old and new families |
+| StarAF | The public control test asserts that no speculative `staraf`, `starafmode`, `starafdrive`, or `afwithliveview` widget is registered. IT2's AF-when-released/TouchAF policy remains distinct from an identified StarAF command |
+| Colour-only control boundary | The public fixture seeds a valid `0xd018` descriptor and proves the colour K-3 III exposes `pentaxcolortemperature` while model 78550 Monochrome rejects it |
+
 ## Model gates
 
-| Gate | K-1 Mark II | K-3 Mark III |
-|---|---:|---:|
-| Exact model / USB | PC-P `PENTAX K-1 Mark II`, `25fb:0183`; MSC `25fb:0182` | `PENTAX K-3 Mark III`, `25fb:0189`; MSC identity target |
-| Vendor model / extension | 78400 / 1 | 78420 / 1 |
-| Dual slot / new transfer / movie | Yes / Yes / Yes | Yes / Yes / Yes |
-| New focus control | No: old `0x9016` | Yes: new `0x9017` |
-| Movie settings and movie sub-image | No | Yes |
-| Tv / Av / exposure bracket gates | No / No / No | Yes / Yes / Yes |
-| Composition adjustment / aperture keep | No / No | Yes / Yes |
-| Color-temperature UI / detailed CI | No / No | Yes / Yes |
-| New timer/remote continuous modes | No | Yes |
-| Current-writing-slot / high-resolution PC LV | No / No | Yes / Yes |
-| Satobi | firmware >=1.0 | firmware >=1.3 |
+The four modern bodies in this audit have separate rows even where their
+operation codes are shared.  `Yes` below means that IT2's static model flags
+enable the corresponding client path; it is not a hardware qualification.
+
+| Gate | K-1 Mark II | K-1 | K-3 Mark III | K-3 Mark III Monochrome |
+|---|---:|---:|---:|---:|
+| Exact model / USB | PC-P `PENTAX K-1 Mark II`, `25fb:0183`; MSC `25fb:0182` | `PENTAX K-1`, `25fb:0179` | `PENTAX K-3 Mark III`, `25fb:0189` | `PENTAX K-3 Mark III Monochrome`, `25fb:018f` |
+| Vendor model / extension | 78400 / 1 | 77970 / 1 | 78420 / 1 | 78550 / 1 |
+| Dual slot / new transfer / movie | Yes / Yes / Yes | Yes / Yes / Yes | Yes / Yes / Yes | Yes / Yes / Yes |
+| New focus control | No: old `0x9016` | No: old `0x9016` | Yes: new `0x9017` | Yes: new `0x9017` |
+| Movie settings / movie sub-image | No / No | No / No | Yes / Yes | Yes / Yes |
+| Tv / Av / exposure bracket gates | No / No / No | No / No / No | Yes / Yes / Yes | Yes / Yes / Yes |
+| Composition adjustment / aperture keep | No / No | No / No | Yes / Yes | Yes / Yes |
+| Color-temperature UI / detailed CI | No / No | No / No | Yes / Yes | **No / Yes** |
+| New timer/remote continuous modes | No | No | Yes | Yes |
+| Current-writing-slot / high-resolution PC LV | No / No | No / No | Yes / Yes | Yes / Yes |
+| Monochrome model flag | No | No | No | Yes |
+| Satobi | firmware >=1.0 | firmware >=1.0 | firmware >=1.3 | not enabled by the model gate |
 
 The tested firmware versions, K-1 II 1.02 and K-3 III 2.20, satisfy Satobi.
 Runtime `0x9001` function flags are separate: K-1 II returned 3; K-3 III 0.
@@ -63,17 +83,18 @@ camera's USB mode setting, not a driver entry. See
 
 ## Model coverage status — what "supported" means per body
 
-Added 2026-10-07. Asked directly: *does this work on all Pentax cameras?* The
+Updated 2026-10-29. Asked directly: *does this work on all Pentax cameras?* The
 honest answer is **no, and the gap is measurable.** `camlibs/ptp2/pentax-utils.h`
-declares 11 model IDs and `pentax-utils.c` recognises all 11 from USB strings,
-but only two bodies have any hardware evidence. The other nine are recognised so
+declares 11 modern IT2 model IDs and `pentax-utils.c` recognises those IDs from
+USB strings, but only two bodies have any hardware evidence. The other bodies
+are recognised so
 that they fail *correctly*, not so that they work.
 
 | Model | ID | Recognised | Code references¹ | Hardware evidence |
 |---|---:|:--:|:--:|---|
 | K-3 Mark III | 78420 | yes | 6 | **HW-R / HW-W** — primary development body; direct-PC B-mode held Bulb action PASS for four 1 s starts/stops on PTP PID `0x0189`, with saved DNG/JPEG and EXIF 1.064–1.073 s. This qualifies only the experimental held action, not timed natural completion or Polaris. |
 | K-1 Mark II | 78400 | yes | 3 | **HW-R / HW-W** — second qualified body |
-| K-3 Mark III Monochrome | 78420 | yes | 3 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action; IT2's prefix model gate shares 78420 with the colour body |
+| K-3 Mark III Monochrome | 78550 | yes | 4 | no held-Bulb hardware evidence; PTP PID `0x018f` is explicitly blocked from the experimental action; IT2 2625 has a specific Monochrome gate, with colour-temperature support disabled |
 | KP | 78380 | yes | 3 | none. Classified **new-focus** (`0x9017`) by IT2's model table, unverified on hardware |
 | GR III | 78350 | yes | 2 | none. Also classified new-focus, unverified |
 | 645Z | 77840 | yes | 3 | none |
@@ -82,12 +103,13 @@ that they fail *correctly*, not so that they work.
 | 645D | 77320 | yes | 2 | none |
 | K-70 | 78370 | yes | 1 | none |
 | KF | 78520 | yes | 1 | none |
+| K-5 II | — | legacy only | — | Not an IT2 model. Remains in the USB-SCSI/MSC `camlibs/pentax` path; no modern `ptp2` vendor controls are inferred. |
 
 ¹ Count of `PENTAX_MODEL_*` occurrences in `pentax-utils.c` + `library.c`,
 including the recognition assignment itself. It measures how much code branches
 on the model, not how much of it is verified.
 
-Read this as: **2 of 11 bodies have general hardware evidence.** Everything
+Read this as: **2 of 11 modern IT2 bodies have general hardware evidence.** Everything
 else is recognition-plus-fail-closed. Most capability predicates remain derived
 from IT2's model table and encode what the vendor client does, not what a body
 has been observed to do. The exception is the experimental held-Bulb product

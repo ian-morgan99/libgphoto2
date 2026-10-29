@@ -107,7 +107,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
 	 * resolves from this value with no wire IO (cache-hit path). */
-	PTPDevicePropDesc *dpd = calloc (3, sizeof (*dpd));
+	PTPDevicePropDesc *dpd = calloc (4, sizeof (*dpd));
 	if (dpd) {
 		memset (dpd, 0, sizeof (*dpd));
 		dpd->DevicePropCode = PTP_DPC_FNumber;
@@ -143,8 +143,14 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		}
 		dpd[2].CurrentValue.u32 = 200;
 		dpd[2].timestamp = time (NULL);
+		dpd[3].DevicePropCode = PTP_DPC_PENTAX_ColorTemperature;
+		dpd[3].DataType       = PTP_DTC_UINT16;
+		dpd[3].GetSet         = PTP_DPGS_GetSet;
+		dpd[3].FormFlag       = PTP_DPFF_None;
+		dpd[3].CurrentValue.u16 = 5000;
+		dpd[3].timestamp = time (NULL);
 		params->dpd_cache.val = dpd;
-		params->dpd_cache.len = 3;
+		params->dpd_cache.len = 4;
 	}
 }
 
@@ -313,6 +319,12 @@ main (void)
 	CHECK (ret == GP_OK && manual_focus != NULL);
 	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
+	/* IT2 does not advertise the PC-live-view/immediate-AF control for either
+	 * K-1 body.  The generic autofocus widget above is only the capture policy
+	 * and must not be mistaken for an AF command. */
+	CameraWidget *autofocus_drive = NULL;
+	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
+	CHECK (ret != GP_OK || autofocus_drive == NULL);
 
 	/* K-3 III and its Monochrome product share the new-focus generic surface;
 	 * the independent product gate is exercised by the utility tests. */
@@ -322,17 +334,23 @@ main (void)
 	CHECK (ret == GP_OK && manual_focus != NULL);
 	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
-	CameraWidget *autofocus_drive = NULL;
+	autofocus_drive = NULL;
 	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
 	CHECK (ret == GP_OK && autofocus_drive != NULL);
 	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
+	/* The colour K-3 III has the IT2 colour-temperature control. */
+	CameraWidget *colour_temperature = NULL;
+	ret = get_single (cam, "pentaxcolortemperature", &colour_temperature,
+		context);
+	CHECK (ret == GP_OK && colour_temperature != NULL);
 	autofocus_policy = NULL;
 	ret = get_single (cam, "autofocus", &autofocus_policy, context);
 	CHECK (ret == GP_OK && autofocus_policy != NULL);
 	CHECK (gp_widget_get_type (autofocus_policy, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_RADIO);
 	cam->pl->params.pentax.usb_product = 0x018f;
+	cam->pl->params.pentax.model_no = PENTAX_MODEL_K3_MARK_III_MONOCHROME;
 	autofocus_policy = NULL;
 	ret = get_single (cam, "autofocus", &autofocus_policy, context);
 	CHECK (ret == GP_OK && autofocus_policy != NULL);
@@ -343,6 +361,12 @@ main (void)
 	CHECK (ret == GP_OK && autofocus_drive != NULL);
 	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
+	/* IT2 2625 explicitly disables colour temperature for the Monochrome,
+	 * despite the shared operation/property code. */
+	colour_temperature = NULL;
+	ret = get_single (cam, "pentaxcolortemperature", &colour_temperature,
+		context);
+	CHECK (ret != GP_OK || colour_temperature == NULL);
 
 	/* --- Negative: non-Pentax fixture (no generic property opcodes) stays
 	 * fail-closed. Without the vendor match and without the advertised ops,
@@ -380,6 +404,7 @@ main (void)
 		int count = gp_list_count (list);
 		int occurrences = 0;
 		int autofocus_occurrences = 0;
+		int staraf_occurrences = 0;
 		for (int i = 0; i < count; i++) {
 			const char *nm = NULL;
 			if (gp_list_get_name (list, i, &nm) == GP_OK &&
@@ -387,9 +412,17 @@ main (void)
 				occurrences++;
 			if (nm && !strcmp (nm, "autofocus"))
 				autofocus_occurrences++;
+			if (nm && (!strcmp (nm, "staraf") ||
+				!strcmp (nm, "starafmode") ||
+				!strcmp (nm, "starafdrive") ||
+				!strcmp (nm, "afwithliveview")))
+				staraf_occurrences++;
 		}
 		CHECK (occurrences == 1);
 		CHECK (autofocus_occurrences == 1);
+		/* IT2 exposes AF-when-released/TouchAF policy, but no identified
+		 * StarAF command.  Do not publish a speculative StarAF widget. */
+		CHECK (staraf_occurrences == 0);
 		gp_list_free (list);
 
 		/* A non-Pentax fixture must not surface the entry at all: vendor

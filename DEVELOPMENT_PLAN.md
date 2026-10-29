@@ -121,7 +121,9 @@ This list supersedes completed task narratives later in the document.
    The camera-owned timer could not be enabled (`pentaxdirectshutter=00:01`
    returned `GP_ERROR_NOT_SUPPORTED`); timed natural completion, stop/natural
    race, following Manual control, and Polaris/pgphoto integration remain
-   **NOT TESTED**. K-3 III Monochrome PID `0x018f` remains withheld. Do not
+   **NOT TESTED**. K-3 III Monochrome PID `0x018f` remains held-Bulb-gated.
+   Its static IT2 2625 model mapping is 78550, but it has no independent
+   hardware qualification. Do not
    report the camera-timed or Polaris path as qualified from the held-action pass.
 5. Capture/transfer passed once on K-1 II (H1.23); repeat JPEG capture and
    RAW hash comparison remain before Tier 9/10 can close.
@@ -195,7 +197,7 @@ build directory. There is deliberately no runtime preference. The research
 build advertises capture, preview and configuration only for exact Pentax PTP
 PIDs with an IMAGE Transmitter 2 model path. It currently includes K-1
 (`0x0179`), K-1 II PTP mode (`0x0183`), K-3 III (`0x0189`) and K-3 III
-Monochrome (`0x018f`). K-1 II `0x0182` is MSC-only and remains an empty
+Monochrome (`0x018f`, IT2 model 78550). K-1 II `0x0182` is MSC-only and remains an empty
 ability row. Those flags are source-authorised access, not hardware
 qualification or an upstream support claim; each body still requires its own
 hardware row in the Pentax log.
