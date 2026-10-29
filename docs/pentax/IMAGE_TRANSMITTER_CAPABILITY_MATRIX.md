@@ -213,6 +213,19 @@ claim is assigned until a later IT2 reference or direct evidence exists. The
 generic-only rejection is covered by the static model tests; hardware work is
 not authorised by this audit.
 
+#### Individual audit: Pentax K-01 PTP personality
+
+The K-01 PTP row is `25fb:0131`. IT2 2625 has no K-01 model branch, and the
+current driver deliberately rejects this PID from the Pentax vendor lookup.
+The same camera family has a separate `25fb:0130` MSC/SCSI identity in the
+legacy camlib; that shared product ID is not evidence that the PTP personality
+can use the 645D or any modern Pentax contract.
+
+The K-01 PTP result is therefore generic PTP/MTP only: no Pentax vendor mode,
+focus family, file-format widget, live view, capture, or transfer semantics
+are claimed. The PID/name rejection is pinned in the static tests and the
+legacy/modern path split remains an explicit architectural boundary.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
