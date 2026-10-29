@@ -15,6 +15,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 
 | Date | Work | Result | Evidence / next gate |
 |---|---|---|---|
+| 2026-10-29 | Individual static audit: Pentax Optio 43WR PTP (`0a17:000d`) | FAIL-CLOSED / GENERIC ONLY | No IT2 model branch or modern Pentax vendor identity exists. The lookup rejects it before any modern capability or opcode path is selected. |
 | 2026-10-29 | Individual static audit: Ricoh GR IIIx PTP (`25fb:2115`) | FAIL-CLOSED / GENERIC ONLY | IT2 lists only GR III model 78350 and the known `0x210f` PID. GR IIIx does not inherit the `0x9017` contract from a name prefix; support requires a distinct source or hardware audit. |
 | 2026-10-29 | Individual static audit: Pentax K-01 PTP (`25fb:0131`) | FAIL-CLOSED / GENERIC ONLY | No IT2 model branch exists. The PTP identity is kept separate from the `25fb:0130` MSC/SCSI legacy path and cannot inherit 645D or modern Pentax controls. |
 | 2026-10-29 | Individual static audit: Pentax K-3 II PTP (`25fb:017b`) | FAIL-CLOSED / NO IT2 CONTRACT | No IT2 2625 model branch exists; PID/name similarity must not inherit K-3 controls. Generic PTP only; any future support needs a newer normative client or direct protocol evidence. |

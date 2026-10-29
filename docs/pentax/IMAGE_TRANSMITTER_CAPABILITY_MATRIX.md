@@ -238,6 +238,17 @@ evidence distinguishes the GR IIIx. No GR III capture, focus, file-format,
 or live-view semantics are claimed. The negative lookup is covered by the
 static model tests.
 
+#### Individual audit: Pentax Optio 43WR PTP personality
+
+The PTP list contains `0a17:000d` as `Pentax:Optio 43WR`, but this is an
+older generic PTP camera with no IT2 2625 model branch and no modern Pentax
+vendor identity. The lookup rejects it before any Pentax capability table or
+vendor opcode path can be selected.
+
+The 43WR therefore remains generic PTP only. No modern focus, file-format,
+live-view, capture, or transfer contract is inferred from its Pentax branding;
+the negative lookup is covered by the static model tests.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their

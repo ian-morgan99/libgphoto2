@@ -606,6 +606,8 @@ main (void)
 		&model_no, &extension_version));
 	CHECK (!pentax_lookup_model (0x0a17, 0x00f7, "PENTAX Optio W90",
 		&model_no, &extension_version));
+	CHECK (!pentax_lookup_model (0x0a17, 0x000d, "PENTAX Optio 43WR",
+		&model_no, &extension_version));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III));
 	CHECK (pentax_model_uses_new_focus (PENTAX_MODEL_K3_MARK_III_MONOCHROME));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
