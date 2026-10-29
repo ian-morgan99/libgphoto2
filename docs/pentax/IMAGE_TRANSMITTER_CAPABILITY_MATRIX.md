@@ -71,6 +71,25 @@ direct, read-only identity/descriptor/focus-family gate followed by one
 variable-at-a-time control tests; do not treat this static pass as permission
 to enable capture or new vendor abilities.
 
+#### Individual audit: Pentax K-3
+
+The K-3 is the first remaining body in the PTP list processed independently
+after the K-1 work. The `ptp2` row is `25fb:0165`, and the IT2 2625
+`MtpDevice.Model` setter branch `StartsWith("PENTAX K-3")` assigns model 77760
+and extension version 1. Its source contract is deliberately narrower than
+the K-3 III contract: dual-slot support is enabled, but new transfer, new
+focus, movie, movie settings, high-resolution PC live view, bracketing,
+composition, detailed CI, colour temperature, and writing-file-format
+controls are not enabled by that model branch.
+
+The implementation therefore keeps K-3 on old focus `0x9016`, permits only
+the dual-slot/card-writing contract, and does not route it through the K-1
+direct-live-view path or the K-3 III advanced-control gates. The identity and
+full zero/non-zero capability contract are independently pinned in
+`tests/test-pentax-utils.c`; this is a source/static pass only. A directly
+connected K-3 still needs the read-only identity, descriptor, conditions,
+and focus-family gate before any control is hardware-qualified.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
