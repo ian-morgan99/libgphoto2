@@ -199,6 +199,20 @@ family controls. This is source/static evidence only. A GR III hardware pass
 must separately confirm its Ricoh transport, descriptors, conditions, and
 `0x9017` behaviour before any capture or transfer claim.
 
+#### Individual audit: Pentax K-3 II PTP personality
+
+The PTP list contains `25fb:017b` as `Pentax:K3 II (PTP Mode)`, but the
+available IT2 2625 source has no K-3 II model branch. The current lookup
+therefore rejects this PID even if the reported name resembles the K-3
+branch, and the row remains generic PTP only. Its MSC/SCSI personality is a
+separate legacy path and must not be confused with this PTP row.
+
+This is an intentional fail-closed result, not incomplete recognition. No
+Pentax vendor model number, focus opcode family, format contract, or capture
+claim is assigned until a later IT2 reference or direct evidence exists. The
+generic-only rejection is covered by the static model tests; hardware work is
+not authorised by this audit.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
