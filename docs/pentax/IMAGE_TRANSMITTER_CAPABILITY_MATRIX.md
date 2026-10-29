@@ -226,6 +226,18 @@ focus family, file-format widget, live view, capture, or transfer semantics
 are claimed. The PID/name rejection is pinned in the static tests and the
 legacy/modern path split remains an explicit architectural boundary.
 
+#### Individual audit: Ricoh GR IIIx PTP personality
+
+The PTP list contains `25fb:2115` as `Ricoh:GR IIIx (PTP mode)`. IT2 2625
+only has the `RICOH GR III` model branch, and the current lookup requires the
+known GR III PID `0x210f`; it therefore rejects the GR IIIx PID rather than
+letting the shared name prefix inherit model 78350 and `0x9017`.
+
+This is generic PTP/MTP only until a client reference or direct protocol
+evidence distinguishes the GR IIIx. No GR III capture, focus, file-format,
+or live-view semantics are claimed. The negative lookup is covered by the
+static model tests.
+
 ## Model gates
 
 The four modern bodies in this audit have separate rows even where their
