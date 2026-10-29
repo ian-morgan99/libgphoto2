@@ -107,6 +107,24 @@ exposure controls, and one capture/transfer; it does not close the old-focus,
 repeat-capture, or all-format hardware gates. No additional hardware claim
 is made by this individual static pass.
 
+#### Individual audit: Pentax K-3 Mark III
+
+The K-3 III PTP row is `25fb:0189`. IT2's exact model branch assigns model
+78420 and extension version 1. Its contract enables dual slot, new transfer,
+movie and movie-sub-image handling, new focus `0x9017`, Tv/Av/exposure
+bracketing, composition adjustment, aperture keep, detailed CI, colour
+temperature, the new timer/remote-continuous modes, slot change, high-
+resolution PC live view, card writing, and writing-file-format support.
+
+The implementation keeps the exact `0189` identity and the new-focus family
+separate from K-1/K-1 II and from Monochrome model 78550. The model fixture
+pins the full IT2 flag set, while the public control tests keep the colour
+temperature boundary explicit. Existing direct-PC evidence covers identity,
+preview, core settings, focus transport, and bounded capture observations;
+it does not mean every source-authorised control or the Polaris consumer path
+is hardware-qualified. No additional hardware claim is made by this
+individual static pass.
+
 #### Individual audit: Pentax K-3
 
 The K-3 is the first remaining body in the PTP list processed independently
