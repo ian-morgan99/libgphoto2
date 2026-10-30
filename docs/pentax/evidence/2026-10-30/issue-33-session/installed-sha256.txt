@@ -1,0 +1,9 @@
+aca9f7422539dbe78a2b718c2f0e97d9c9e31dee2d767a726e2236de53aa5322  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2.so.6.4.0
+7edc9760a7068a901f8b5cb21f03dca1ef27dd65501cc4c6d99e196bd3354022  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory.so
+66a23d023abf729c93cb35b31fb19553b2101c01463a1085ebfa5cb650d5a050  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2.so
+624fc8bc655865d21f7fc7440e5b8689644ffa9af011bdff8226634efdae0448  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port.so.12.2.0
+e8d56885f9ddc4f14d6241ec1cf0b36012ae4742fb04b2d3ef491dca2f7c186b  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk.so
+37a4867c83817cff712946c33c04456cb1acc55c5eb14a6f7428b5849137ae93  /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+ce94b2bf47c1fa919ea2e89a25c9f4c9422826237b0a7719335bbe30d9c577d8  /tmp/pentax-host-check.1eTacOnD/prefix/lib/pkgconfig/libgphoto2.pc
+4f67579b92f53c47139490ac3a05bb3905924c4aa487a61b6a4fa156b47123e3  /tmp/pentax-host-check.1eTacOnD/prefix/lib/pkgconfig/libgphoto2_port.pc
+47ff92c08ce3fee327996bc311d8bfb24746f176c3927dc28dc36302f5915c56  /tmp/pentax-host-check.1eTacOnD/prefix/lib/udev/check-ptp-camera

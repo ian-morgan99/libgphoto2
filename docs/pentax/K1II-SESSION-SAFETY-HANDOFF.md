@@ -3,6 +3,15 @@
 Updated 2026-10-30. This is a host-library handoff, **not a firmware release**.
 Do not describe a compile or simulated camera as a physical PASS.
 
+Completed clean host build: **`f97110d9272e24cf242830e83b4105092a0fdde4`**.
+Artifacts: `/tmp/pentax-host-check.1eTacOnD/`, isolated install under `prefix/`.
+The command above is reproducible; this exact artifact has its own hashes,
+not an assertion of byte-for-byte reproducibility across build paths.
+[Retained logs and hashes](evidence/2026-10-30/issue-33-session/README.md).
+Later documentation/evidence commits do not change that artifact's source SHA.
+USB-only detection on this build found K-1 II at `usb:001,006`; loaded-library
+evidence confirms its core, port, camlib and iolib. No PTP session was opened.
+
 ## Exact repositories and ownership
 
 | Work | Checkout / branch | Status |
