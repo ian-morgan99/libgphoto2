@@ -1,0 +1,590 @@
+   1415975:	find library=libgphoto2.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v4:/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v3:/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v2:/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v4/libgphoto2.so.6
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v3/libgphoto2.so.6
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/glibc-hwcaps/x86-64-v2/libgphoto2.so.6
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2.so.6
+   1415975:	
+   1415975:	find library=libgphoto2_port.so.12 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port.so.12
+   1415975:	
+   1415975:	find library=libcdk.so.5 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcdk.so.5
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcdk.so.5
+   1415975:	
+   1415975:	find library=libncurses.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libncurses.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libncurses.so.6
+   1415975:	
+   1415975:	find library=libaa.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libaa.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libaa.so.1
+   1415975:	
+   1415975:	find library=libjpeg.so.8 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libjpeg.so.8
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libjpeg.so.8
+   1415975:	
+   1415975:	find library=libexif.so.12 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libexif.so.12
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libexif.so.12
+   1415975:	
+   1415975:	find library=libreadline.so.8 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libreadline.so.8
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libreadline.so.8
+   1415975:	
+   1415975:	find library=libpopt.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libpopt.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libpopt.so.0
+   1415975:	
+   1415975:	find library=libc.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libc.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libc.so.6
+   1415975:	
+   1415975:	find library=libltdl.so.7 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libltdl.so.7
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libltdl.so.7
+   1415975:	
+   1415975:	find library=libm.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libm.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libm.so.6
+   1415975:	
+   1415975:	find library=libtinfo.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libtinfo.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libtinfo.so.6
+   1415975:	
+   1415975:	find library=libslang.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libslang.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libslang.so.2
+   1415975:	
+   1415975:	find library=libX11.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libX11.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libX11.so.6
+   1415975:	
+   1415975:	find library=libgpm.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgpm.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libgpm.so.2
+   1415975:	
+   1415975:	find library=libxcb.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libxcb.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libxcb.so.1
+   1415975:	
+   1415975:	find library=libXau.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libXau.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libXau.so.6
+   1415975:	
+   1415975:	find library=libXdmcp.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libXdmcp.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libXdmcp.so.6
+   1415975:	
+   1415975:	find library=libbsd.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libbsd.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libbsd.so.0
+   1415975:	
+   1415975:	find library=libmd.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libmd.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libmd.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib64/ld-linux-x86-64.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libc.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libmd.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libbsd.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libXdmcp.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libXau.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libxcb.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libgpm.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libX11.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libm.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libslang.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libtinfo.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libltdl.so.7
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libpopt.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libreadline.so.8
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libexif.so.12
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libjpeg.so.8
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libncurses.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libaa.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcdk.so.5
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port.so.12
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2.so.6
+   1415975:	
+   1415975:	
+   1415975:	initialize program: /usr/bin/gphoto2
+   1415975:	
+   1415975:	
+   1415975:	transferring control: /usr/bin/gphoto2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk.so: error: symbol lookup error: undefined symbol: disk_LTX_gp_port_library_type (fatal)
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk.so: error: symbol lookup error: undefined symbol: disk_LTX_gp_port_library_list (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk.so [0]
+   1415975:	
+   1415975:	find library=libusb-1.0.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libusb-1.0.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	find library=libudev.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libudev.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	find library=libcap.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcap.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_type (fatal)
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_list (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libusb-1.0.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libudev.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcap.so.2 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory.so: error: symbol lookup error: undefined symbol: directory_LTX_camera_id (fatal)
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory.so: error: symbol lookup error: undefined symbol: directory_LTX_camera_abilities (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory.so [0]
+   1415975:	
+   1415975:	find library=libxml2.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libxml2.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libxml2.so.2
+   1415975:	
+   1415975:	find library=libicuuc.so.74 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libicuuc.so.74
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libicuuc.so.74
+   1415975:	
+   1415975:	find library=libz.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libz.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libz.so.1
+   1415975:	
+   1415975:	find library=liblzma.so.5 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/liblzma.so.5
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/liblzma.so.5
+   1415975:	
+   1415975:	find library=libicudata.so.74 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libicudata.so.74
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libicudata.so.74
+   1415975:	
+   1415975:	find library=libstdc++.so.6 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libstdc++.so.6
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libstdc++.so.6
+   1415975:	
+   1415975:	find library=libgcc_s.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgcc_s.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libgcc_s.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libgcc_s.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libstdc++.so.6
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libicudata.so.74
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/liblzma.so.5
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libz.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libicuuc.so.74
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libxml2.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2.so: error: symbol lookup error: undefined symbol: ptp2_LTX_camera_id (fatal)
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2.so: error: symbol lookup error: undefined symbol: ptp2_LTX_camera_abilities (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libxml2.so.2 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libicuuc.so.74 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libz.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/liblzma.so.5 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libicudata.so.74 [0]
+   1415975:	
+   1415975:	find library=libusb-1.0.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libusb-1.0.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	find library=libudev.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libudev.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	find library=libcap.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcap.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_operations (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libusb-1.0.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libudev.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcap.so.2 [0]
+   1415975:	
+   1415975:	find library=libusb-1.0.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libusb-1.0.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	find library=libudev.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libudev.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	find library=libcap.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcap.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_operations (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libusb-1.0.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libudev.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcap.so.2 [0]
+   1415975:	
+   1415975:	find library=libusb-1.0.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libusb-1.0.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	find library=libudev.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libudev.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	find library=libcap.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcap.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_operations (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libusb-1.0.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libudev.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcap.so.2 [0]
+   1415975:	
+   1415975:	find library=libusb-1.0.so.0 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libusb-1.0.so.0
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	find library=libudev.so.1 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libudev.so.1
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	find library=libcap.so.2 [0]; searching
+   1415975:	 search path=/tmp/pentax-host-check.1eTacOnD/prefix/lib		(LD_LIBRARY_PATH)
+   1415975:	  trying file=/tmp/pentax-host-check.1eTacOnD/prefix/lib/libcap.so.2
+   1415975:	 search cache=/etc/ld.so.cache
+   1415975:	  trying file=/lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libcap.so.2
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libudev.so.1
+   1415975:	
+   1415975:	
+   1415975:	calling init: /lib/x86_64-linux-gnu/libusb-1.0.so.0
+   1415975:	
+   1415975:	
+   1415975:	calling init: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so
+   1415975:	
+   1415975:	/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so: error: symbol lookup error: undefined symbol: usb1_LTX_gp_port_library_operations (fatal)
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1.so [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libusb-1.0.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libudev.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcap.so.2 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini:  [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port.so.12 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libcdk.so.5 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libaa.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libncurses.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libjpeg.so.8 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libexif.so.12 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libreadline.so.8 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libpopt.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libltdl.so.7 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libtinfo.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libslang.so.2 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libX11.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libgpm.so.2 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libxcb.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libXau.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libXdmcp.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libbsd.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libmd.so.0 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libstdc++.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libm.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libgcc_s.so.1 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib/x86_64-linux-gnu/libc.so.6 [0]
+   1415975:	
+   1415975:	
+   1415975:	calling fini: /lib64/ld-linux-x86-64.so.2 [0]
+   1415975:	

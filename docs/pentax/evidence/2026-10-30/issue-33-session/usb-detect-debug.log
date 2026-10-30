@@ -1,0 +1,206 @@
+0.000009 main                        (2): ALWAYS INCLUDE THE FOLLOWING LINES WHEN SENDING DEBUG MESSAGES TO THE MAILING LIST:
+0.000019 main                        (2): gphoto2 2.5.28
+0.000020 main                        (2): gphoto2 has been compiled with the following options:
+0.000021 main                        (2):  + gcc (C compiler used)
+0.000021 main                        (2):  + popt (mandatory, for handling command-line parameters)
+0.000022 main                        (2):  + exif (for displaying EXIF information)
+0.000022 main                        (2):  + cdk (for accessing configuration options)
+0.000023 main                        (2):  + aa (for displaying live previews)
+0.000023 main                        (2):  + jpeg (for displaying live previews in JPEG format)
+0.000023 main                        (2):  + readline (for easy navigation in the shell)
+0.000025 main                        (2): libgphoto2 2.5.34
+0.000026 main                        (2): libgphoto2 has been compiled with the following options:
+0.000026 main                        (2):  + standard camlib set (ptp2 directory)
+0.000027 main                        (2):  + gcc (C compiler used)
+0.000027 main                        (2):  + ltdl (for portable loading of camlibs)
+0.000028 main                        (2):  + EXIF (for special handling of EXIF files)
+0.000030 main                        (2): libgphoto2_port 2.5.34
+0.000031 main                        (2): libgphoto2_port has been compiled with the following options:
+0.000031 main                        (2):  + iolibs: libusb1 disk
+0.000031 main                        (2):  + gcc (C compiler used)
+0.000032 main                        (2):  + ltdl (for portable loading of iolibs)
+0.000033 main                        (2):  + EXIF (for vusb)
+0.000033 main                        (2):  + USB (libusb1, for USB cameras)
+0.000033 main                        (2):  + no serial (for serial cameras)
+0.000034 main                        (2):  + no resmgr (serial port access and locking)
+0.000034 main                        (2):  + no ttylock (serial port locking)
+0.000034 main                        (2):  + no lockdev (serial port locking)
+0.000035 main                        (2): CAMLIBS = '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34'
+0.000035 main                        (2): IOLIBS = '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2'
+0.000036 main                        (2): invoked with following arguments:
+0.000036 main                        (2):   --debug
+0.000037 main                        (2):   --debug-logfile=/tmp/pentax-host-check.1eTacOnD/usb-detect-debug.log
+0.000037 main                        (2):   --auto-detect
+0.000056 gp_settings_path            (2): Using legacy settings path ('/home/ian/.gphoto/settings')
+0.000057 gp_settings_path            (2): Creating gphoto config directory ('/home/ian/.gphoto')
+0.000067 load_settings               (2): Loading settings from file '/home/ian/.gphoto/settings'.
+0.000105 gp_port_init_localedir      (2): localedir has been set to /tmp/pentax-host-check.1eTacOnD/prefix/share/locale (compile-time default)
+0.000107 gp_port_info_list_load      (2): Using ltdl to load io-drivers from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2'...
+0.000135 foreach_func                (2): Called for filename '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk'.
+0.000187 gp_port_library_list        (2): found fstab fstype ext4
+0.000191 gp_port_library_list        (2): found fstab fstype vfat
+0.000193 gp_port_library_list        (2): found fstab fstype swap
+0.000199 gp_port_library_list        (2): found fstab fstype ntfs3
+0.000247 gp_port_library_list        (2): found mtab fstype sysfs
+0.000248 gp_port_library_list        (2): found mtab fstype proc
+0.000249 gp_port_library_list        (2): found mtab fstype devtmpfs
+0.000252 gp_port_library_list        (2): found mtab fstype devpts
+0.000253 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000256 gp_port_library_list        (2): found mtab fstype ext4
+0.000260 gp_port_library_list        (2): found mtab fstype securityfs
+0.000261 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000265 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000268 gp_port_library_list        (2): found mtab fstype cgroup2
+0.000269 gp_port_library_list        (2): found mtab fstype pstore
+0.000274 gp_port_library_list        (2): found mtab fstype efivarfs
+0.000281 gp_port_library_list        (2): found mtab fstype bpf
+0.000307 gp_port_library_list        (2): found mtab fstype autofs
+0.000308 gp_port_library_list        (2): found mtab fstype mqueue
+0.000309 gp_port_library_list        (2): found mtab fstype hugetlbfs
+0.000313 gp_port_library_list        (2): found mtab fstype debugfs
+0.000316 gp_port_library_list        (2): found mtab fstype tracefs
+0.000319 gp_port_library_list        (2): found mtab fstype fusectl
+0.000319 gp_port_library_list        (2): found mtab fstype configfs
+0.000326 gp_port_library_list        (2): found mtab fstype autofs
+0.000326 gp_port_library_list        (2): found mtab fstype squashfs
+0.000329 gp_port_library_list        (2): found mtab fstype squashfs
+0.000331 gp_port_library_list        (2): found mtab fstype squashfs
+0.000334 gp_port_library_list        (2): found mtab fstype squashfs
+0.000337 gp_port_library_list        (2): found mtab fstype squashfs
+0.000356 gp_port_library_list        (2): found mtab fstype squashfs
+0.000359 gp_port_library_list        (2): found mtab fstype squashfs
+0.000362 gp_port_library_list        (2): found mtab fstype squashfs
+0.000364 gp_port_library_list        (2): found mtab fstype squashfs
+0.000368 gp_port_library_list        (2): found mtab fstype squashfs
+0.000372 gp_port_library_list        (2): found mtab fstype squashfs
+0.000375 gp_port_library_list        (2): found mtab fstype squashfs
+0.000378 gp_port_library_list        (2): found mtab fstype squashfs
+0.000380 gp_port_library_list        (2): found mtab fstype squashfs
+0.000383 gp_port_library_list        (2): found mtab fstype squashfs
+0.000385 gp_port_library_list        (2): found mtab fstype squashfs
+0.000403 gp_port_library_list        (2): found mtab fstype squashfs
+0.000406 gp_port_library_list        (2): found mtab fstype squashfs
+0.000408 gp_port_library_list        (2): found mtab fstype squashfs
+0.000411 gp_port_library_list        (2): found mtab fstype squashfs
+0.000413 gp_port_library_list        (2): found mtab fstype squashfs
+0.000416 gp_port_library_list        (2): found mtab fstype squashfs
+0.000418 gp_port_library_list        (2): found mtab fstype squashfs
+0.000421 gp_port_library_list        (2): found mtab fstype squashfs
+0.000424 gp_port_library_list        (2): found mtab fstype squashfs
+0.000427 gp_port_library_list        (2): found mtab fstype squashfs
+0.000430 gp_port_library_list        (2): found mtab fstype squashfs
+0.000447 gp_port_library_list        (2): found mtab fstype squashfs
+0.000449 gp_port_library_list        (2): found mtab fstype squashfs
+0.000451 gp_port_library_list        (2): found mtab fstype squashfs
+0.000453 gp_port_library_list        (2): found mtab fstype squashfs
+0.000456 gp_port_library_list        (2): found mtab fstype squashfs
+0.000458 gp_port_library_list        (2): found mtab fstype squashfs
+0.000460 gp_port_library_list        (2): found mtab fstype squashfs
+0.000462 gp_port_library_list        (2): found mtab fstype squashfs
+0.000465 gp_port_library_list        (2): found mtab fstype squashfs
+0.000468 gp_port_library_list        (2): found mtab fstype squashfs
+0.000485 gp_port_library_list        (2): found mtab fstype squashfs
+0.000487 gp_port_library_list        (2): found mtab fstype squashfs
+0.000489 gp_port_library_list        (2): found mtab fstype squashfs
+0.000491 gp_port_library_list        (2): found mtab fstype squashfs
+0.000493 gp_port_library_list        (2): found mtab fstype squashfs
+0.000496 gp_port_library_list        (2): found mtab fstype squashfs
+0.000498 gp_port_library_list        (2): found mtab fstype squashfs
+0.000500 gp_port_library_list        (2): found mtab fstype squashfs
+0.000503 gp_port_library_list        (2): found mtab fstype squashfs
+0.000506 gp_port_library_list        (2): found mtab fstype squashfs
+0.000522 gp_port_library_list        (2): found mtab fstype squashfs
+0.000525 gp_port_library_list        (2): found mtab fstype squashfs
+0.000527 gp_port_library_list        (2): found mtab fstype squashfs
+0.000530 gp_port_library_list        (2): found mtab fstype squashfs
+0.000532 gp_port_library_list        (2): found mtab fstype squashfs
+0.000534 gp_port_library_list        (2): found mtab fstype squashfs
+0.000536 gp_port_library_list        (2): found mtab fstype squashfs
+0.000538 gp_port_library_list        (2): found mtab fstype squashfs
+0.000540 gp_port_library_list        (2): found mtab fstype squashfs
+0.000543 gp_port_library_list        (2): found mtab fstype squashfs
+0.000545 gp_port_library_list        (2): found mtab fstype squashfs
+0.000568 gp_port_library_list        (2): found mtab fstype squashfs
+0.000570 gp_port_library_list        (2): found mtab fstype vfat
+0.000571 gp_port_library_list        (2): found mtab fstype binfmt_misc
+0.000580 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000582 gp_port_library_list        (2): found mtab fstype fuse.portal
+0.000583 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000588 gp_port_library_list        (2): found mtab fstype nsfs
+0.000599 gp_port_library_list        (2): found mtab fstype overlay
+0.000617 gp_port_library_list        (2): found mtab fstype overlay
+0.000618 gp_port_library_list        (2): found mtab fstype nsfs
+0.000621 gp_port_library_list        (2): found mtab fstype tmpfs
+0.000626 gp_port_library_list        (2): found mtab fstype fuse.portal
+0.000626 gp_port_library_list        (2): found mtab fstype fuse.xrdp-chansrv
+0.000627 gp_port_library_list        (2): found mtab fstype fuse.gvfsd-fuse
+0.000628 gp_port_library_list        (2): found mtab fstype nsfs
+0.000630 gp_port_library_list        (2): found mtab fstype nsfs
+0.000631 gp_port_library_list        (2): found mtab fstype squashfs
+0.000634 gp_port_library_list        (2): found mtab fstype nsfs
+0.000657 foreach_func                (2): Loaded '' ('^disk:') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/disk'.
+0.000658 foreach_func                (2): Called for filename '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003817 foreach_func                (2): Loaded '' ('^usb:') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003821 foreach_func                (2): Loaded 'Universal Serial Bus' ('usb:008,002') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003822 foreach_func                (2): Loaded 'Universal Serial Bus' ('usb:001,006') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003822 foreach_func                (2): Loaded 'Universal Serial Bus' ('usb:001,002') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003823 foreach_func                (2): Loaded 'Universal Serial Bus' ('usb:001,004') from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2_port/0.12.2/usb1'.
+0.003829 gp_port_info_list_count     (2): Counting entries (6 available)...
+0.003830 gp_port_info_list_count     (2): 4 regular entries available.
+0.003830 gp_port_info_list_count     (2): Counting entries (6 available)...
+0.003831 gp_port_info_list_count     (2): 4 regular entries available.
+0.003834 gp_port_init_localedir      (2): ignoring late call (localedir value NULL)
+0.003836 gp_init_localedir           (2): localedir has been set to /tmp/pentax-host-check.1eTacOnD/prefix/share/locale (compile-time default)
+0.003841 unlocked_gp_abilities_list_load_dir(2): Using ltdl to load camera libraries from '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34'...
+0.003886 foreach_func                (2): Found '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/directory'.
+0.003888 foreach_func                (2): Found '/tmp/pentax-host-check.1eTacOnD/prefix/lib/libgphoto2/2.5.34/ptp2'.
+0.003892 unlocked_gp_abilities_list_load_dir(2): Found 2 camera drivers.
+0.006895 gp_port_info_list_count     (2): Counting entries (6 available)...
+0.006902 gp_port_info_list_count     (2): 4 regular entries available.
+0.006903 gp_port_new                 (2): Creating new device...
+0.006905 gp_port_info_list_get_info  (2): Getting info of entry 0 (6 available)...
+0.010449 gp_port_set_timeout         (2): Setting port timeout to 5000 milliseconds.
+0.010456 gp_port_set_settings        (2): Setting settings...
+0.010461 gp_libusb1_update           (2): (old int=0, conf=-1, alt=-1) port usb:008,002, (new int=0, conf=-1, alt=-1) port usb:008,002
+0.010462 gp_libusb1_update           (2): lowlevel libusb1 port not yet opened, no need for libusb changes
+0.010465 gp_abilities_list_detect_usb(2): Auto-detecting USB cameras...
+0.010626 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x29a, subclass, 0xffffffff, protocol 0xffffffff)...
+0.010689 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x6, subclass, 0x1, protocol 0x1)...
+0.010698 gp_port_info_list_get_info  (2): Getting info of entry 1 (6 available)...
+0.013276 gp_port_set_timeout         (2): Setting port timeout to 5000 milliseconds.
+0.013279 gp_port_set_settings        (2): Setting settings...
+0.013282 gp_libusb1_update           (2): (old int=0, conf=-1, alt=-1) port usb:001,006, (new int=0, conf=-1, alt=-1) port usb:001,006
+0.013283 gp_libusb1_update           (2): lowlevel libusb1 port not yet opened, no need for libusb changes
+0.013283 gp_abilities_list_detect_usb(2): Auto-detecting USB cameras...
+0.013371 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x29a, subclass, 0xffffffff, protocol 0xffffffff)...
+0.013392 gp_libusb1_find_device_lib  (2): Looking for USB device (vendor 0x25fb, product 0x183)... found.
+0.013409 gp_libusb1_find_device_lib  (2): Detected defaults: config 1, interface 0, altsetting 0, inep 81, outep 02, intep 83, class 06, subclass 01
+0.013410 gp_abilities_list_detect_usb(2): Found 'Pentax K-1 Mark II (PTP mode)' (0x25fb,0x183)
+0.013438 gp_port_info_list_get_info  (2): Getting info of entry 2 (6 available)...
+0.015872 gp_port_set_timeout         (2): Setting port timeout to 5000 milliseconds.
+0.015875 gp_port_set_settings        (2): Setting settings...
+0.015877 gp_libusb1_update           (2): (old int=0, conf=-1, alt=-1) port usb:001,002, (new int=0, conf=-1, alt=-1) port usb:001,002
+0.015878 gp_libusb1_update           (2): lowlevel libusb1 port not yet opened, no need for libusb changes
+0.015879 gp_abilities_list_detect_usb(2): Auto-detecting USB cameras...
+0.015965 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x29a, subclass, 0xffffffff, protocol 0xffffffff)...
+0.016026 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x6, subclass, 0x1, protocol 0x1)...
+0.016033 gp_port_info_list_get_info  (2): Getting info of entry 3 (6 available)...
+0.018481 gp_port_set_timeout         (2): Setting port timeout to 5000 milliseconds.
+0.018484 gp_port_set_settings        (2): Setting settings...
+0.018486 gp_libusb1_update           (2): (old int=0, conf=-1, alt=-1) port usb:001,004, (new int=0, conf=-1, alt=-1) port usb:001,004
+0.018487 gp_libusb1_update           (2): lowlevel libusb1 port not yet opened, no need for libusb changes
+0.018488 gp_abilities_list_detect_usb(2): Auto-detecting USB cameras...
+0.018574 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x29a, subclass, 0xffffffff, protocol 0xffffffff)...
+0.018635 gp_libusb1_find_device_by_class_lib(2): Looking for USB device (class 0x6, subclass, 0x1, protocol 0x1)...
+0.018642 gp_port_free                (2): Freeing port...
+0.018643 gp_port_close               (2): Closing port...
+0.019008 gp_camera_free              (2): Freeing camera...
+0.019014 gp_port_free                (2): Freeing port...
+0.019016 gp_filesystem_reset         (2): resetting filesystem
+0.019017 gp_filesystem_lru_clear     (2): Clearing fscache LRU list...
+0.019022 gp_filesystem_lru_clear     (2): fscache LRU list already empty
+0.019023 delete_all_folders          (2): Internally deleting all folders from '/'...
+0.019024 lookup_folder               (2): Lookup folder '/'...
+0.019025 lookup_folder               (2): Found! / is 0x5a821d402500
+0.019026 recurse_delete_folder       (2): Recurse delete folder 0x5a821d402500//
+0.019027 delete_all_files            (2): Delete all files in folder 0x5a821d402500//

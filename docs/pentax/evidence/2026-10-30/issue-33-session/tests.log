@@ -1,0 +1,25 @@
+ 1/20 libgphoto2:test-port-list               OK              0.03s
+ 2/20 libgphoto2:test-ptp-context             OK              0.03s
+ 3/20 libgphoto2:test-ptp-folder-root         OK              0.03s
+ 4/20 libgphoto2:test-pentax-camera-exit      OK              0.03s
+ 5/20 libgphoto2:test-pentax-session          OK              0.02s
+ 6/20 libgphoto2:test-pentax-legacy-parsers   OK              0.02s
+ 7/20 libgphoto2:test-pentax-capture-contract OK              0.02s
+ 8/20 libgphoto2:test-pentax-bulb-lifecycle   OK              0.02s
+ 9/20 libgphoto2:test-pentax-publication      OK              0.02s
+10/20 libgphoto2:test-uvc-device-table        OK              0.02s
+11/20 libgphoto2:test-pentax-aperture-alias   OK              0.01s
+12/20 libgphoto2:test-i18n                    OK              0.01s
+13/20 libgphoto2:test-endian                  OK              0.01s
+14/20 libgphoto2:print-libgphoto2-version     OK              0.01s
+15/20 libgphoto2:test-gphoto2                 OK              0.01s
+16/20 libgphoto2:test-filesys                 OK              0.01s
+17/20 libgphoto2:test-init-localedir          OK              0.01s
+18/20 libgphoto2:test-camera-list             OK              0.01s
+19/20 libgphoto2:test-pentax-reconcile        OK              1.20s
+20/20 libgphoto2:test-pentax-utils            OK              3.50s
+
+Ok:                20  
+Fail:              0   
+
+Full log written to /tmp/pentax-host-check.1eTacOnD/build/meson-logs/testlog.txt

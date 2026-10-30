@@ -1,0 +1,1132 @@
+ninja: Entering directory `/tmp/pentax-host-check.1eTacOnD/build'
+[1/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-locking.c.o
+[2/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-result.c.o
+[3/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-portability.c.o
+[4/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-version.c.o
+[5/211] Generating libgphoto2/libgphoto2.ver with a custom command
+[6/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-log.c.o
+[7/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port-info-list.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/gphoto2-port-info-list.c: In function ‘foreach_func’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/gphoto2-port-info-list.c:255:18: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  255 |         lib_type = lt_dlsym (lh, "gp_port_library_type");
+      |                  ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/gphoto2-port-info-list.c:256:18: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  256 |         lib_list = lt_dlsym (lh, "gp_port_library_list");
+      |                  ^
+[8/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-abilities-list.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-abilities-list.c: In function ‘unlocked_gp_abilities_list_load_dir’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-abilities-list.c:256:20: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  256 |                 id = lt_dlsym (lh, "camera_id");
+      |                    ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-abilities-list.c:279:20: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  279 |                 ab = lt_dlsym (lh, "camera_abilities");
+      |                    ^
+[9/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/bayer.c.o
+[10/211] Compiling C object libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/gphoto2-port.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/gphoto2-port.c: In function ‘gp_port_set_info’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/gphoto2-port.c:185:18: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  185 |         ops_func = lt_dlsym (port->pc->lh, "gp_port_library_operations");
+      |                  ^
+[11/211] Linking target libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0
+[12/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/ahd_bayer.c.o
+[13/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-context.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-context.c:43:1: warning: ISO C99 does not support ‘_Static_assert’ [-Wpedantic]
+   43 | _Static_assert(__builtin_offsetof(struct _GPContext, progress_start_func) == 2 * sizeof(void *),
+      | ^~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-context.c:45:1: warning: ISO C99 does not support ‘_Static_assert’ [-Wpedantic]
+   45 | _Static_assert(__builtin_offsetof(struct _GPContext, progress_update_func) == 3 * sizeof(void *),
+      | ^~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-context.c:47:1: warning: ISO C99 does not support ‘_Static_assert’ [-Wpedantic]
+   47 | _Static_assert(__builtin_offsetof(struct _GPContext, progress_stop_func) == 4 * sizeof(void *),
+      | ^~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-context.c:49:1: warning: ISO C99 does not support ‘_Static_assert’ [-Wpedantic]
+   49 | _Static_assert(__builtin_offsetof(struct _GPContext, progress_func_data) == 5 * sizeof(void *),
+      | ^~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-context.c:51:1: warning: ISO C99 does not support ‘_Static_assert’ [-Wpedantic]
+   51 | _Static_assert(__builtin_offsetof(struct _GPContext, ref_count) == 16 * sizeof(void *),
+      | ^~~~~~~~~~~~~~
+[14/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/exif.c.o
+[15/211] Generating symbol file libgphoto2_port/libgphoto2_port/libgphoto2_port.so.12.2.0.p/libgphoto2_port.so.12.2.0.symbols
+[16/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gamma.c.o
+[17/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/jpeg.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/jpeg.c: In function ‘gpi_jpeg_make_SOFC’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/jpeg.c:244:17: warning: overflow in conversion from ‘int’ to ‘char’ changes value from ‘255’ to ‘-1’ [-Woverflow]
+  244 |                 0xFF, 0xC0, 0x00, 0x11,  0x08, 0x00, 0x80, 0x01,
+      |                 ^~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/jpeg.c:244:23: warning: overflow in conversion from ‘int’ to ‘char’ changes value from ‘192’ to ‘-64’ [-Woverflow]
+  244 |                 0xFF, 0xC0, 0x00, 0x11,  0x08, 0x00, 0x80, 0x01,
+      |                       ^~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/jpeg.c:244:54: warning: overflow in conversion from ‘int’ to ‘char’ changes value from ‘128’ to ‘-128’ [-Woverflow]
+  244 |                 0xFF, 0xC0, 0x00, 0x11,  0x08, 0x00, 0x80, 0x01,
+      |                                                      ^~~~
+[18/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-file.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c: In function ‘gp_file_open’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c:666:17: warning: ‘__builtin_strncpy’ specified bound 256 equals destination size [-Wstringop-truncation]
+  666 |                 strncpy (file->name, filename, sizeof (file->name));
+      |                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c:664:17: warning: ‘__builtin_strncpy’ specified bound 256 equals destination size [-Wstringop-truncation]
+  664 |                 strncpy (file->name, name + 1, sizeof (file->name));
+      |                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c:673:33: warning: ‘__builtin_strncpy’ specified bound 64 equals destination size [-Wstringop-truncation]
+  673 |                                 strncpy (file->mime_type, mime_table[i+1], sizeof(file->mime_type));
+      |                                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c: In function ‘gp_file_set_name’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c:1009:9: warning: ‘__builtin_strncpy’ specified bound 256 equals destination size [-Wstringop-truncation]
+ 1009 |         strncpy (file->name, name, sizeof (file->name));
+      |         ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c: In function ‘gp_file_set_mime_type’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-file.c:1026:9: warning: ‘__builtin_strncpy’ specified bound 64 equals destination size [-Wstringop-truncation]
+ 1026 |         strncpy (file->mime_type, mime_type, sizeof (file->mime_type));
+      |         ^
+[19/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-result.c.o
+[20/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-version.c.o
+[21/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-list.c.o
+[22/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-setting.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c: In function ‘gp_settings_path.isra’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c:210:40: warning: ‘/gphoto’ directive output may be truncated writing 7 bytes into a region of size between 1 and 1024 [-Wformat-truncation=]
+  210 |         snprintf (dir, GP_PATH_MAX, "%s/gphoto", xdg_config_home);
+      |                                        ^~~~~~~
+In file included from /usr/include/stdio.h:980,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c:29:
+In function ‘snprintf’,
+    inlined from ‘gp_settings_path.isra’ at ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c:210:2:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: ‘__builtin___snprintf_chk’ output between 8 and 1031 bytes into a destination of size 1024
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c: In function ‘gp_settings_path.isra’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c:211:41: warning: ‘/settings’ directive output may be truncated writing 9 bytes into a region of size between 1 and 1024 [-Wformat-truncation=]
+  211 |         snprintf (path, GP_PATH_MAX, "%s/settings", dir);
+      |                                         ^~~~~~~~~
+In function ‘snprintf’,
+    inlined from ‘gp_settings_path.isra’ at ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-setting.c:211:2:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: ‘__builtin___snprintf_chk’ output between 10 and 1033 bytes into a destination of size 1024
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+[23/211] Generating tests/test-camera-exit-source with a custom command
+[24/211] Generating tests/test-pentax-session-source with a custom command
+[25/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-filesys.c.o
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:36:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘delete_all_files’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:295:19: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘CameraFilesystemFolder *’ {aka ‘struct _CameraFilesystemFolder *’} [-Wformat=]
+  295 |         GP_LOG_D ("Delete all files in folder %p/%s", folder, folder->name);
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~
+      |                                                       |
+      |                                                       CameraFilesystemFolder * {aka struct _CameraFilesystemFolder *}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:295:48: note: format string is defined here
+  295 |         GP_LOG_D ("Delete all files in folder %p/%s", folder, folder->name);
+      |                                               ~^
+      |                                                |
+      |                                                void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘delete_folder’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:341:19: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘CameraFilesystemFolder *’ {aka ‘struct _CameraFilesystemFolder *’} [-Wformat=]
+  341 |         GP_LOG_D ("Delete one folder %p/%s", *folder, (*folder)->name);
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~
+      |                                              |
+      |                                              CameraFilesystemFolder * {aka struct _CameraFilesystemFolder *}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:341:39: note: format string is defined here
+  341 |         GP_LOG_D ("Delete one folder %p/%s", *folder, (*folder)->name);
+      |                                      ~^
+      |                                       |
+      |                                       void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘lookup_folder’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:366:35: warning: format ‘%p’ expects argument of type ‘void *’, but argument 5 has type ‘CameraFilesystemFolder *’ {aka ‘struct _CameraFilesystemFolder *’} [-Wformat=]
+  366 |                         GP_LOG_D ("Found! %s is %p", foldername, folder);
+      |                                   ^~~~~~~~~~~~~~~~~              ~~~~~~
+      |                                                                  |
+      |                                                                  CameraFilesystemFolder * {aka struct _CameraFilesystemFolder *}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:366:50: note: format string is defined here
+  366 |                         GP_LOG_D ("Found! %s is %p", foldername, folder);
+      |                                                 ~^
+      |                                                  |
+      |                                                  void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘recurse_delete_folder’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:464:19: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘CameraFilesystemFolder *’ {aka ‘struct _CameraFilesystemFolder *’} [-Wformat=]
+  464 |         GP_LOG_D ("Recurse delete folder %p/%s", folder, folder->name);
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~
+      |                                                  |
+      |                                                  CameraFilesystemFolder * {aka struct _CameraFilesystemFolder *}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:464:43: note: format string is defined here
+  464 |         GP_LOG_D ("Recurse delete folder %p/%s", folder, folder->name);
+      |                                          ~^
+      |                                           |
+      |                                           void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘append_to_folder’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:526:19: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘CameraFilesystemFolder *’ {aka ‘struct _CameraFilesystemFolder *’} [-Wformat=]
+  526 |         GP_LOG_D ("Append to folder %p/%s - %s", folder, folder->name, foldername);
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~
+      |                                                  |
+      |                                                  CameraFilesystemFolder * {aka struct _CameraFilesystemFolder *}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:526:38: note: format string is defined here
+  526 |         GP_LOG_D ("Append to folder %p/%s - %s", folder, folder->name, foldername);
+      |                                     ~^
+      |                                      |
+      |                                      void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c: In function ‘gp_filesystem_scan’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-filesys.c:1436:17: warning: ‘__builtin_strncpy’ specified bound 128 equals destination size [-Wstringop-truncation]
+ 1436 |                 strncpy (path, folder, sizeof (path));
+      |                 ^
+[26/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-widget.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-widget.c: In function ‘gp_widget_set_value’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-widget.c:391:36: warning: ISO C forbids conversion of object pointer to function pointer type [-Wpedantic]
+  391 |                 widget->callback = (CameraWidgetCallback) value;
+      |                                    ^
+[27/211] Compiling C object libgphoto2_port/tests/test-gp-port.p/test-gp-port.c.o
+[28/211] Compiling C object libgphoto2_port/disk/disk.so.p/disk.c.o
+[29/211] Compiling C object libgphoto2/libgphoto2.so.6.4.0.p/gphoto2-camera.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-camera.c: In function ‘gp_camera_init’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-camera.c:796:19: warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+  796 |         init_func = lt_dlsym (camera->pc->lh, "camera_init");
+      |                   ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-camera.c: In function ‘gp_camera_file_get_info’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/gphoto2-camera.c:1657:17: warning: ‘__builtin_strncpy’ specified bound 64 equals destination size [-Wstringop-truncation]
+ 1657 |                 strncpy (info->preview.type, mime_type,
+      |                 ^
+[30/211] Compiling C object libgphoto2_port/tests/test-port-list.p/test-port-list.c.o
+[31/211] Linking target libgphoto2/libgphoto2.so.6.4.0
+[32/211] Generating symbol file libgphoto2/libgphoto2.so.6.4.0.p/libgphoto2.so.6.4.0.symbols
+[33/211] Compiling C object camlibs/ptp2/ptp2.so.p/pentax-publication.c.o
+[34/211] Compiling C object camlibs/ptp2/ptp2.so.p/ptp-context.c.o
+[35/211] Compiling C object libgphoto2_port/libusb1/usb1.so.p/libusb1.c.o
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-info-list.h:64,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-library.h:27,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:25:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c: In function ‘_close_async_interrupts’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:572:34: warning: format ‘%p’ expects argument of type ‘void *’, but argument 5 has type ‘struct libusb_transfer *’ [-Wformat=]
+  572 |                         GP_LOG_D("checking: transfer %d:%p status %d",i, port->pl->transfers[i], port->pl->transfers[i]->status);
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~~~~~~~~
+      |                                                                                             |
+      |                                                                                             struct libusb_transfer *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:572:58: note: format string is defined here
+  572 |                         GP_LOG_D("checking: transfer %d:%p status %d",i, port->pl->transfers[i], port->pl->transfers[i]->status);
+      |                                                         ~^
+      |                                                          |
+      |                                                          void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c: In function ‘_cb_irq’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:736:26: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘struct libusb_transfer *’ [-Wformat=]
+  736 |                 GP_LOG_D("IRQ transfer %p failed with %s", transfer, status_str);
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~~
+      |                                                            |
+      |                                                            struct libusb_transfer *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:736:41: note: format string is defined here
+  736 |                 GP_LOG_D("IRQ transfer %p failed with %s", transfer, status_str);
+      |                                        ~^
+      |                                         |
+      |                                         void *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:776:18: warning: format ‘%p’ expects argument of type ‘void *’, but argument 4 has type ‘struct libusb_transfer *’ [-Wformat=]
+  776 |         GP_LOG_D("Requeuing completed transfer %p", transfer);
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ~~~~~~~~
+      |                                                     |
+      |                                                     struct libusb_transfer *
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:118:54: note: in definition of macro ‘GP_LOG_D’
+  118 | #define GP_LOG_D(...) gp_log(GP_LOG_DEBUG, __func__, __VA_ARGS__)
+      |                                                      ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libusb1/libusb1.c:776:49: note: format string is defined here
+  776 |         GP_LOG_D("Requeuing completed transfer %p", transfer);
+      |                                                ~^
+      |                                                 |
+      |                                                 void *
+[36/211] Compiling C object camlibs/ptp2/ptp2.so.p/pentax-utils.c.o
+[37/211] Compiling C object camlibs/ptp2/ptp2.so.p/usb.c.o
+[38/211] Compiling C object camlibs/ptp2/ptp2.so.p/ptpip.c.o
+[39/211] Compiling C object camlibs/ptp2/ptp2.so.p/olympus-wrap.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c: In function ‘parse_9581_tree’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:579:51: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  579 |                                 sscanf(xchars,"%02x", &y);
+      |                                                ~~~^   ~~
+      |                                                   |   |
+      |                                                   |   int *
+      |                                                   unsigned int *
+      |                                                %02x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c: In function ‘parse_9302_tree’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:629:50: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  629 |                         sscanf((char*)xchar, "%04x", &x3cver);
+      |                                               ~~~^   ~~~~~~~
+      |                                                  |   |
+      |                                                  |   int *
+      |                                                  unsigned int *
+      |                                               %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:644:50: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  644 |                                 if (sscanf(x,"%02x", &len)) {
+      |                                               ~~~^   ~~~~
+      |                                                  |   |
+      |                                                  |   int *
+      |                                                  unsigned int *
+      |                                               %02x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:649:72: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  649 |                                                 if (sscanf(x+2+i*4,"%04x", &xc)) {
+      |                                                                     ~~~^   ~~~
+      |                                                                        |   |
+      |                                                                        |   int *
+      |                                                                        unsigned int *
+      |                                                                     %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c: In function ‘traverse_output_tree’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:887:46: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  887 |                 if (!sscanf((char*)xchar,"%04x",&result))
+      |                                           ~~~^  ~~~~~~~
+      |                                              |  |
+      |                                              |  int *
+      |                                              unsigned int *
+      |                                           %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:894:46: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  894 |         if (!sscanf ((char*)next->name, "c%04x", &cmd)) {
+      |                                           ~~~^   ~~~~
+      |                                              |   |
+      |                                              |   int *
+      |                                              unsigned int *
+      |                                           %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c: In function ‘traverse_input_tree’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:939:49: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  939 |                 if (sscanf((char*)next->name,"e%x",&evt)) {
+      |                                                ~^  ~~~~
+      |                                                 |  |
+      |                                                 |  int *
+      |                                                 unsigned int *
+      |                                                %x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:951:79: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  951 |                                         if (sscanf((char*)propidnode->name,"p%x", &propid)) {
+      |                                                                              ~^   ~~~~~~~
+      |                                                                               |   |
+      |                                                                               |   int *
+      |                                                                               unsigned int *
+      |                                                                              %x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/olympus-wrap.c:975:69: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  975 |                         if (sscanf((char*)xmlNodeGetContent(next),"%x", &x)) {
+      |                                                                    ~^   ~~
+      |                                                                     |   |
+      |                                                                     |   int *
+      |                                                                     unsigned int *
+      |                                                                    %x
+[40/211] Compiling C object camlibs/ptp2/ptp2.so.p/chdk.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/chdk.c: In function ‘chdk_list_func’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/chdk.c:174:9: warning: string length ‘4691’ is greater than the length ‘4095’ ISO C99 compilers are required to support [-Woverlength-strings]
+  174 |         const char              *luascript = PTP_CHDK_LUA_LS"\nreturn ls('A%s',{\nstat='*',\n})";
+      |         ^~~~~
+[41/211] Compiling C object camlibs/ptp2/ptp2.so.p/fujiptpip.c.o
+[42/211] Compiling C object camlibs/directory/directory.so.p/directory.c.o
+[43/211] Compiling C object tests/test-ptp-context.p/test-ptp-context.c.o
+[44/211] Compiling C object tests/test-ptp-context.p/.._camlibs_ptp2_ptp-context.c.o
+[45/211] Compiling C object tests/test-ptp-folder-root.p/test-ptp-folder-root.c.o
+[46/211] Compiling C object tests/test-pentax-camera-exit.p/test-pentax-camera-exit.c.o
+[47/211] Compiling C object tests/test-pentax-session.p/test-pentax-session.c.o
+[48/211] Compiling C object camlibs/ptp2/ptp2.so.p/ptp.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘parse_9301_value’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:686:28: warning: format ‘%hhx’ expects argument of type ‘unsigned char *’, but argument 3 has type ‘int8_t *’ {aka ‘signed char *’} [-Wformat=]
+  686 |         CASE(PTP_DTC_INT8, "%02hhx", i8)
+      |                            ^~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:676:41: note: in definition of macro ‘CASE’
+  676 |                         if (sscanf(str, FMT, &propval->BITS) != 1) { \
+      |                                         ^~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:686:34: note: format string is defined here
+  686 |         CASE(PTP_DTC_INT8, "%02hhx", i8)
+      |                             ~~~~~^
+      |                                  |
+      |                                  unsigned char *
+      |                             %02hhx
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:688:29: warning: format ‘%hx’ expects argument of type ‘short unsigned int *’, but argument 3 has type ‘int16_t *’ {aka ‘short int *’} [-Wformat=]
+  688 |         CASE(PTP_DTC_INT16, "%04hx", i16)
+      |                             ^~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:676:41: note: in definition of macro ‘CASE’
+  676 |                         if (sscanf(str, FMT, &propval->BITS) != 1) { \
+      |                                         ^~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:688:34: note: format string is defined here
+  688 |         CASE(PTP_DTC_INT16, "%04hx", i16)
+      |                              ~~~~^
+      |                                  |
+      |                                  short unsigned int *
+      |                              %04hx
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:690:29: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int32_t *’ {aka ‘int *’} [-Wformat=]
+  690 |         CASE(PTP_DTC_INT32, "%08x", i32)
+      |                             ^~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:676:41: note: in definition of macro ‘CASE’
+  676 |                         if (sscanf(str, FMT, &propval->BITS) != 1) { \
+      |                                         ^~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:690:33: note: format string is defined here
+  690 |         CASE(PTP_DTC_INT32, "%08x", i32)
+      |                              ~~~^
+      |                                 |
+      |                                 unsigned int *
+      |                              %08x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:695:36: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  695 |                 if (sscanf(str,"%02x", &len)) {
+      |                                 ~~~^   ~~~~
+      |                                    |   |
+      |                                    |   int *
+      |                                    unsigned int *
+      |                                 %02x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:700:58: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  700 |                                 if (sscanf(str+2+i*4,"%04x", &xc)) {
+      |                                                       ~~~^   ~~~
+      |                                                          |   |
+      |                                                          |   int *
+      |                                                          unsigned int *
+      |                                                       %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘parse_9301_propdesc’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:737:74: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  737 |                         if (!sscanf((char*)xmlNodeGetContent (next), "%04x", &type)) {
+      |                                                                       ~~~^   ~~~~~
+      |                                                                          |   |
+      |                                                                          |   int *
+      |                                                                          unsigned int *
+      |                                                                       %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:748:74: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  748 |                         if (!sscanf((char*)xmlNodeGetContent (next), "%02x", &attr)) {
+      |                                                                       ~~~^   ~~~~~
+      |                                                                          |   |
+      |                                                                          |   int *
+      |                                                                          unsigned int *
+      |                                                                       %02x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘ptp_olympus_parse_output_xml’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:1810:54: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+ 1810 |                         if (!sscanf((char*)xchar,"%04x",&result))
+      |                                                   ~~~^  ~~~~~~~
+      |                                                      |  |
+      |                                                      |  int *
+      |                                                      unsigned int *
+      |                                                   %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:1816:49: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+ 1816 |                 if (sscanf((char*)next->name,"c%x", &xcode)) {
+      |                                                ~^   ~~~~~~
+      |                                                 |   |
+      |                                                 |   int *
+      |                                                 unsigned int *
+      |                                                %x
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:193:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp-pack.c: In function ‘ptp_unpack_PTPTIME.part.0’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp-pack.c:504:9: warning: ‘__builtin_strncpy’ specified bound 40 equals destination size [-Wstringop-truncation]
+  504 |         strncpy (ptpdate, str, sizeof(ptpdate));
+      |         ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘ptp_sigma_fp_getpictfileinfo2’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:1222:9: warning: ‘__builtin_strncpy’ specified bound 4 equals destination size [-Wstringop-truncation]
+ 1222 |         strncpy(pictinfo->fileext, (char*)data+28, 4);
+      |         ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘ptp_nikon_getwifiprofilelist’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:5344:17: warning: ‘__builtin_strncpy’ specified bound 16 equals destination size [-Wstringop-truncation]
+ 5344 |                 strncpy(params->wifi_profiles[profn].creation_date, buffer, sizeof(params->wifi_profiles[profn].creation_date));
+      |                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:5351:17: warning: ‘__builtin_strncpy’ specified bound 16 equals destination size [-Wstringop-truncation]
+ 5351 |                 strncpy(params->wifi_profiles[profn].lastusage_date, buffer, sizeof(params->wifi_profiles[profn].lastusage_date));
+      |                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c: In function ‘ptp_nikon_writewifiprofile’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:5437:9: warning: ‘__builtin_strncpy’ output may be truncated copying 16 bytes from a string of length 16 [-Wstringop-truncation]
+ 5437 |         strncpy((char*)&buffer[0x05], profile->profile_name, 16);
+      |         ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/ptp.c:5460:9: warning: ‘__builtin_strncpy’ output may be truncated copying 32 bytes from a string of length 32 [-Wstringop-truncation]
+ 5460 |         strncpy((char*)&buffer[0x4A], profile->essid, 32);
+      |         ^
+[49/211] Compiling C object tests/test-pentax-session.p/.._camlibs_ptp2_pentax-utils.c.o
+[50/211] Compiling C object camlibs/ptp2/ptp2.so.p/library.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c: In function ‘fixup_cached_deviceinfo’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:571:85: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+  571 |                 if (params->deviceinfo.Model && (sscanf(params->deviceinfo.Model,"D%d", &nikond) == 1))
+      |                                                                                    ~^   ~~~~~~~
+      |                                                                                     |   |
+      |                                                                                     |   unsigned int *
+      |                                                                                     int *
+      |                                                                                    %d
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-info-list.h:64,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/gphoto2/gphoto2-abilities-list.h:30,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/gphoto2/gphoto2-library.h:28,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:39:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c: In function ‘pentax_camera_transfer_timed_out’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6150:27: warning: format ‘%llu’ expects argument of type ‘long long unsigned int’, but argument 6 has type ‘uint64_t’ {aka ‘long unsigned int’} [-Wformat=]
+ 6150 |                 GP_LOG_E ("transfer stalled: %llu bytes so far, no progress "
+      |                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6151 |                         "for %llu ms", transfer->bytes_transferred, idle);
+      |                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                                |
+      |                                                uint64_t {aka long unsigned int}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:119:95: note: in definition of macro ‘GP_LOG_E’
+  119 | #define GP_LOG_E(...) gp_log_with_source_location(GP_LOG_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+      |                                                                                               ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6150:49: note: format string is defined here
+ 6150 |                 GP_LOG_E ("transfer stalled: %llu bytes so far, no progress "
+      |                                              ~~~^
+      |                                                 |
+      |                                                 long long unsigned int
+      |                                              %lu
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6154:27: warning: format ‘%llu’ expects argument of type ‘long long unsigned int’, but argument 7 has type ‘uint64_t’ {aka ‘long unsigned int’} [-Wformat=]
+ 6154 |                 GP_LOG_E ("transfer exceeded absolute ceiling of %d ms after "
+      |                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6155 |                         "%llu bytes", PENTAX_TRANSFER_TIMEOUT_MS,
+ 6156 |                         transfer->bytes_transferred);
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 |
+      |                                 uint64_t {aka long unsigned int}
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/gphoto2/gphoto2-port-log.h:119:95: note: in definition of macro ‘GP_LOG_E’
+  119 | #define GP_LOG_E(...) gp_log_with_source_location(GP_LOG_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+      |                                                                                               ^~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c: In function ‘pentax_reconcile_transfer_candidate’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6282:9: warning: missing initializer for field ‘last_progress’ of ‘PentaxCameraTransferContext’ [-Wmissing-field-initializers]
+ 6282 |         PentaxCameraTransferContext transfer = {params, rc->context, {0, 0}};
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6082:24: note: ‘last_progress’ declared here
+ 6082 |         struct timeval last_progress;
+      |                        ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c: In function ‘camera_pentax_capture_internal’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6774:9: warning: missing initializer for field ‘last_progress’ of ‘PentaxCameraTransferContext’ [-Wmissing-field-initializers]
+ 6774 |         PentaxCameraTransferContext transfer = {params, context, {0, 0}};
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:6082:24: note: ‘last_progress’ declared here
+ 6082 |         struct timeval last_progress;
+      |                        ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c: In function ‘find_object_path’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/library.c:3603:9: warning: ‘__builtin_strncpy’ specified bound 128 equals destination size [-Wstringop-truncation]
+ 3603 |         strncpy  (path->name,  (*ob)->oi.Filename, sizeof(path->name));
+      |         ^
+[51/211] Compiling C object tests/test-pentax-utils.p/.._camlibs_ptp2_pentax-utils.c.o
+[52/211] Compiling C object tests/test-pentax-reconcile.p/test-pentax-reconcile.c.o
+[53/211] Compiling C object tests/test-pentax-legacy-parsers.p/test-pentax-legacy-parsers.c.o
+[54/211] Compiling C object tests/test-pentax-utils.p/test-pentax-utils.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/tests/test-pentax-utils.c: In function ‘main’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/tests/test-pentax-utils.c:1608:17: warning: ISO C forbids nested functions [-Wpedantic]
+ 1608 |                 int
+      |                 ^~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/tests/test-pentax-utils.c:1651:17: warning: ISO C forbids nested functions [-Wpedantic]
+ 1651 |                 int
+      |                 ^~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/tests/test-pentax-utils.c:1664:17: warning: ISO C forbids nested functions [-Wpedantic]
+ 1664 |                 int
+      |                 ^~~
+[55/211] Compiling C object tests/test-pentax-legacy-parsers.p/.._camlibs_pentax_pslr_utils.c.o
+[56/211] Compiling C object tests/test-pentax-legacy-parsers.p/.._camlibs_pentax_pslr_log.c.o
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/pentax/pslr_log.c:33:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/pentax/pslr_log.h:47:17: warning: ISO C does not permit named variadic macros [-Wvariadic-macros]
+   47 | #define DPRINT(x...) pslr_write_log(PSLR_DEBUG, x)
+      |                 ^~~
+[57/211] Compiling C object tests/test-pentax-legacy-parsers.p/.._camlibs_pentax_js0n.c.o
+[58/211] Compiling C object tests/test-pentax-bulb-lifecycle.p/test-pentax-bulb-lifecycle.c.o
+[59/211] Compiling C object tests/test-pentax-bulb-lifecycle.p/pentax-bulb-lifecycle.c.o
+[60/211] Compiling C object tests/test-pentax-publication.p/test-pentax-publication.c.o
+[61/211] Compiling C object tests/test-pentax-legacy-parsers.p/.._camlibs_pentax_pslr_model.c.o
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/pentax/pslr_model.c:50:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/pentax/pslr_log.h:47:17: warning: ISO C does not permit named variadic macros [-Wvariadic-macros]
+   47 | #define DPRINT(x...) pslr_write_log(PSLR_DEBUG, x)
+      |                 ^~~
+[62/211] Compiling C object tests/test-pentax-publication.p/.._camlibs_ptp2_pentax-publication.c.o
+[63/211] Compiling C object tests/test-uvc-device-table.p/test-uvc-device-table.c.o
+[64/211] Compiling C object tests/test-pentax-reconcile.p/.._camlibs_ptp2_pentax-utils.c.o
+[65/211] Compiling C object tests/test-i18n.p/test-i18n.c.o
+[66/211] Compiling C object tests/test-endian.p/test-endian.c.o
+[67/211] Compiling C object tests/print-libgphoto2-version.p/print-libgphoto2-version.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/tests/print-libgphoto2-version.c:41:18: warning: ISO C does not permit named variadic macros [-Wvariadic-macros]
+   41 | #define FATAL(msg...)                           \
+      |                  ^~~
+[68/211] Compiling C object tests/test-gphoto2.p/test-gphoto2.c.o
+[69/211] Compiling C object tests/test-filesys.p/test-filesys.c.o
+[70/211] Compiling C object tests/test-pentax-aperture-alias.p/test-pentax-aperture-alias.c.o
+[71/211] Compiling C object tests/test-camera-list.p/test-camera-list.c.o
+[72/211] Compiling C object tests/test-init-localedir.p/test-init-localedir.c.o
+[73/211] Compiling C object examples/sample-autodetect.p/sample-autodetect.c.o
+[74/211] Compiling C object examples/sample-autodetect.p/context.c.o
+[75/211] Compiling C object examples/sample-multi-detect.p/sample-multi-detect.c.o
+[76/211] Compiling C object examples/sample-autodetect.p/config.c.o
+[77/211] Compiling C object examples/sample-multi-detect.p/autodetect.c.o
+[78/211] Compiling C object examples/sample-multi-detect.p/context.c.o
+[79/211] Compiling C object examples/sample-multi-detect.p/config.c.o
+[80/211] Compiling C object examples/lunkwill-canon-capture.p/lunkwill-canon-capture.c.o
+[81/211] Compiling C object examples/lunkwill-canon-capture.p/context.c.o
+[82/211] Compiling C object examples/sample-owner.p/sample-owner.c.o
+[83/211] Compiling C object examples/sample-owner.p/context.c.o
+[84/211] Compiling C object examples/lunkwill-canon-capture.p/config.c.o
+[85/211] Compiling C object examples/sample-photobooth.p/context.c.o
+[86/211] Compiling C object examples/sample-owner.p/config.c.o
+[87/211] Compiling C object examples/sample-photobooth.p/sample-photobooth.c.o
+[88/211] Compiling C object examples/sample-photobooth.p/config.c.o
+[89/211] Compiling C object examples/sample-preview.p/context.c.o
+[90/211] Compiling C object examples/sample-preview.p/preview.c.o
+[91/211] Compiling C object examples/sample-preview.p/config.c.o
+[92/211] Compiling C object examples/pentax-safe-preview.p/pentax-safe-preview.c.o
+[93/211] Compiling C object examples/sample-preview.p/focus.c.o
+[94/211] Compiling C object examples/pentax-safe-preview.p/context.c.o
+[95/211] Compiling C object examples/pentax-safe-preview.p/autodetect.c.o
+[96/211] Compiling C object examples/pentax-safe-iso-roundtrip.p/pentax-safe-iso-roundtrip.c.o
+[97/211] Compiling C object examples/pentax-safe-iso-roundtrip.p/context.c.o
+[98/211] Compiling C object examples/pentax-safe-iso-roundtrip.p/autodetect.c.o
+[99/211] Compiling C object examples/pentax-safe-shutter-roundtrip.p/context.c.o
+[100/211] Compiling C object examples/pentax-safe-shutter-roundtrip.p/autodetect.c.o
+[101/211] Compiling C object examples/pentax-safe-shutter-roundtrip.p/pentax-safe-shutter-roundtrip.c.o
+[102/211] Compiling C object examples/pentax-safe-focus.p/autodetect.c.o
+[103/211] Compiling C object examples/pentax-safe-focus.p/context.c.o
+[104/211] Compiling C object examples/pentax-safe-focus.p/pentax-safe-focus.c.o
+[105/211] Compiling C object examples/pentax-safe-lvaf-roundtrip.p/context.c.o
+[106/211] Compiling C object examples/pentax-safe-lvaf-roundtrip.p/autodetect.c.o
+[107/211] Compiling C object examples/pentax-safe-lvaf-roundtrip.p/pentax-safe-lvaf-roundtrip.c.o
+[108/211] Compiling C object examples/sample-tether.p/context.c.o
+[109/211] Compiling C object examples/sample-tether.p/sample-tether.c.o
+[110/211] Compiling C object examples/sample-tether.p/config.c.o
+[111/211] Compiling C object examples/sample-afl.p/context.c.o
+[112/211] Compiling C object examples/sample-afl.p/sample-afl.c.o
+[113/211] Compiling C object examples/sample-afl.p/autodetect.c.o
+[114/211] Compiling C object examples/sample-capture.p/context.c.o
+[115/211] Compiling C object examples/sample-capture.p/sample-capture.c.o
+[116/211] Compiling C object examples/best-iso.p/best-iso.c.o
+[117/211] Compiling C object examples/sample-capture.p/config.c.o
+[118/211] Compiling C object examples/sample-capture.p/focus.c.o
+[119/211] Compiling C object examples/sample-trigger-capture.p/sample-trigger-capture.c.o
+[120/211] Compiling C object examples/sample-trigger-capture.p/context.c.o
+[121/211] Compiling C object examples/sample-justfocus.p/context.c.o
+[122/211] Compiling C object examples/sample-trigger-capture.p/config.c.o
+[123/211] Compiling C object examples/sample-justfocus.p/sample-justfocus.c.o
+[124/211] Linking target libgphoto2_port/libusb1/usb1.so
+[125/211] Linking target libgphoto2_port/disk/disk.so
+[126/211] Linking target libgphoto2_port/tests/test-gp-port
+[127/211] Compiling C object examples/sample-justfocus.p/focus.c.o
+[128/211] Building translation libgphoto2_port/po/ar/LC_MESSAGES/libgphoto2_port-12-ar.mo
+[129/211] Building translation libgphoto2_port/po/cs/LC_MESSAGES/libgphoto2_port-12-cs.mo
+[130/211] Linking target libgphoto2_port/tests/test-port-list
+[131/211] Building translation libgphoto2_port/po/da/LC_MESSAGES/libgphoto2_port-12-da.mo
+[132/211] Building translation libgphoto2_port/po/de/LC_MESSAGES/libgphoto2_port-12-de.mo
+[133/211] Building translation libgphoto2_port/po/es/LC_MESSAGES/libgphoto2_port-12-es.mo
+[134/211] Building translation libgphoto2_port/po/eu/LC_MESSAGES/libgphoto2_port-12-eu.mo
+[135/211] Building translation libgphoto2_port/po/fi/LC_MESSAGES/libgphoto2_port-12-fi.mo
+[136/211] Building translation libgphoto2_port/po/fur/LC_MESSAGES/libgphoto2_port-12-fur.mo
+[137/211] Building translation libgphoto2_port/po/fr/LC_MESSAGES/libgphoto2_port-12-fr.mo
+[138/211] Building translation libgphoto2_port/po/it/LC_MESSAGES/libgphoto2_port-12-it.mo
+[139/211] Building translation libgphoto2_port/po/ja/LC_MESSAGES/libgphoto2_port-12-ja.mo
+[140/211] Building translation libgphoto2_port/po/ka/LC_MESSAGES/libgphoto2_port-12-ka.mo
+[141/211] Building translation libgphoto2_port/po/nl/LC_MESSAGES/libgphoto2_port-12-nl.mo
+[142/211] Building translation libgphoto2_port/po/pl/LC_MESSAGES/libgphoto2_port-12-pl.mo
+[143/211] Building translation libgphoto2_port/po/pt_BR/LC_MESSAGES/libgphoto2_port-12-pt_BR.mo
+[144/211] Building translation libgphoto2_port/po/ro/LC_MESSAGES/libgphoto2_port-12-ro.mo
+[145/211] Building translation libgphoto2_port/po/ru/LC_MESSAGES/libgphoto2_port-12-ru.mo
+[146/211] Building translation libgphoto2_port/po/sk/LC_MESSAGES/libgphoto2_port-12-sk.mo
+[147/211] Building translation libgphoto2_port/po/sr/LC_MESSAGES/libgphoto2_port-12-sr.mo
+[148/211] Building translation libgphoto2_port/po/sv/LC_MESSAGES/libgphoto2_port-12-sv.mo
+[149/211] Building translation libgphoto2_port/po/uk/LC_MESSAGES/libgphoto2_port-12-uk.mo
+[150/211] Building translation libgphoto2_port/po/vi/LC_MESSAGES/libgphoto2_port-12-vi.mo
+[151/211] Building translation libgphoto2_port/po/zh_CN/LC_MESSAGES/libgphoto2_port-12-zh_CN.mo
+[152/211] Building translation libgphoto2_port/po/zh_TW/LC_MESSAGES/libgphoto2_port-12-zh_TW.mo
+[153/211] Linking target camlibs/directory/directory.so
+[154/211] Building translation po/ar/LC_MESSAGES/libgphoto2-6-ar.mo
+[155/211] Building translation po/cs/LC_MESSAGES/libgphoto2-6-cs.mo
+[156/211] Building translation po/da/LC_MESSAGES/libgphoto2-6-da.mo
+[157/211] Building translation po/de/LC_MESSAGES/libgphoto2-6-de.mo
+[158/211] Building translation po/es/LC_MESSAGES/libgphoto2-6-es.mo
+[159/211] Building translation po/eu/LC_MESSAGES/libgphoto2-6-eu.mo
+[160/211] Building translation po/hu/LC_MESSAGES/libgphoto2-6-hu.mo
+[161/211] Building translation po/fr/LC_MESSAGES/libgphoto2-6-fr.mo
+[162/211] Building translation po/it/LC_MESSAGES/libgphoto2-6-it.mo
+[163/211] Building translation po/ja/LC_MESSAGES/libgphoto2-6-ja.mo
+[164/211] Building translation po/ka/LC_MESSAGES/libgphoto2-6-ka.mo
+[165/211] Building translation po/nl/LC_MESSAGES/libgphoto2-6-nl.mo
+[166/211] Building translation po/pl/LC_MESSAGES/libgphoto2-6-pl.mo
+[167/211] Building translation po/ro/LC_MESSAGES/libgphoto2-6-ro.mo
+[168/211] Building translation po/ru/LC_MESSAGES/libgphoto2-6-ru.mo
+[169/211] Building translation po/sv/LC_MESSAGES/libgphoto2-6-sv.mo
+[170/211] Building translation po/uk/LC_MESSAGES/libgphoto2-6-uk.mo
+[171/211] Compiling C object packaging/generic/print-camera-list.p/print-camera-list.c.o
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/packaging/generic/print-camera-list.c:135:18: warning: ISO C does not permit named variadic macros [-Wvariadic-macros]
+  135 | #define FATAL(msg...) \
+      |                  ^~~
+[172/211] Building translation po/vi/LC_MESSAGES/libgphoto2-6-vi.mo
+[173/211] Linking target tests/test-ptp-context
+[174/211] Linking target tests/test-ptp-folder-root
+[175/211] Building translation po/zh_CN/LC_MESSAGES/libgphoto2-6-zh_CN.mo
+[176/211] Linking target tests/test-pentax-camera-exit
+[177/211] Linking target tests/test-pentax-session
+[178/211] Linking target tests/test-pentax-utils
+[179/211] Linking target tests/test-pentax-reconcile
+[180/211] Linking target tests/test-pentax-bulb-lifecycle
+[181/211] Linking target tests/test-pentax-legacy-parsers
+[182/211] Linking target tests/test-uvc-device-table
+[183/211] Linking target tests/test-pentax-publication
+[184/211] Linking target tests/test-pentax-aperture-alias
+[185/211] Linking target tests/test-endian
+[186/211] Linking target tests/test-i18n
+[187/211] Linking target tests/print-libgphoto2-version
+[188/211] Linking target tests/test-gphoto2
+[189/211] Linking target tests/test-filesys
+[190/211] Linking target tests/test-camera-list
+[191/211] Linking target tests/test-init-localedir
+[192/211] Linking target examples/sample-autodetect
+[193/211] Linking target examples/sample-multi-detect
+[194/211] Linking target examples/lunkwill-canon-capture
+[195/211] Linking target examples/sample-owner
+[196/211] Linking target examples/sample-photobooth
+[197/211] Linking target examples/sample-preview
+[198/211] Linking target examples/pentax-safe-preview
+[199/211] Linking target examples/pentax-safe-iso-roundtrip
+[200/211] Linking target examples/pentax-safe-shutter-roundtrip
+[201/211] Linking target examples/pentax-safe-focus
+[202/211] Linking target examples/pentax-safe-lvaf-roundtrip
+[203/211] Linking target examples/sample-tether
+[204/211] Linking target examples/sample-afl
+[205/211] Linking target examples/best-iso
+[206/211] Linking target examples/sample-capture
+[207/211] Linking target examples/sample-trigger-capture
+[208/211] Linking target examples/sample-justfocus
+[209/211] Linking target packaging/generic/print-camera-list
+[210/211] Compiling C object camlibs/ptp2/ptp2.so.p/config.c.o
+In file included from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2/i18n.h:13,
+                 from ../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:42:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Genericu32Table’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:30: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                              ^~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:28: note: in expansion of macro ‘_’
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                            ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:909:1: note: in expansion of macro ‘GENERIC_TABLE’
+  909 | GENERIC_TABLE(u32,uint32_t,PTP_DTC_UINT32)
+      | ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:48: note: format string is defined here
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                                             ~~~^
+      |                                                |
+      |                                                unsigned int *
+      |                                             %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Genericu16Table’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:30: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                              ^~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:28: note: in expansion of macro ‘_’
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                            ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:910:1: note: in expansion of macro ‘GENERIC_TABLE’
+  910 | GENERIC_TABLE(u16,uint16_t,PTP_DTC_UINT16)
+      | ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:48: note: format string is defined here
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                                             ~~~^
+      |                                                |
+      |                                                unsigned int *
+      |                                             %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Generici16Table’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:30: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                              ^~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:28: note: in expansion of macro ‘_’
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                            ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:911:1: note: in expansion of macro ‘GENERIC_TABLE’
+  911 | GENERIC_TABLE(i16,int16_t, PTP_DTC_INT16)
+      | ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:48: note: format string is defined here
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                                             ~~~^
+      |                                                |
+      |                                                unsigned int *
+      |                                             %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Genericu8Table’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:30: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                              ^~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:28: note: in expansion of macro ‘_’
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                            ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:912:1: note: in expansion of macro ‘GENERIC_TABLE’
+  912 | GENERIC_TABLE(u8, uint8_t, PTP_DTC_UINT8)
+      | ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:48: note: format string is defined here
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                                             ~~~^
+      |                                                |
+      |                                                unsigned int *
+      |                                             %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Generici8Table’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:30: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                              ^~~~~~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:28: note: in expansion of macro ‘_’
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                            ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:913:1: note: in expansion of macro ‘GENERIC_TABLE’
+  913 | GENERIC_TABLE(i8, int8_t,  PTP_DTC_INT8)
+      | ^~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:900:48: note: format string is defined here
+  900 |         if (!sscanf(value, _("Unknown value %04x"), &intval)) { \
+      |                                             ~~~^
+      |                                                |
+      |                                                unsigned int *
+      |                                             %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Nikon_WBBiasPreset’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:2110:24: warning: format ‘%u’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+ 2110 |         sscanf (val, "%u", &ret);
+      |                       ~^   ~~~~
+      |                        |   |
+      |                        |   int *
+      |                        unsigned int *
+      |                       %u
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_parse_Sony_ISO’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3397:27: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+ 3397 |         if (sscanf(buf, "%d%n", raw_iso, &len) == 0) {
+      |                          ~^     ~~~~~~~
+      |                           |     |
+      |                           int * uint32_t * {aka unsigned int *}
+      |                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Olympus_AspectRatio’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3569:34: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 3569 |         if (2 == sscanf(value, "%d:%d", &x, &y)) {
+      |                                 ~^      ~~
+      |                                  |      |
+      |                                  int *  unsigned int *
+      |                                 %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3569:37: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘unsigned int *’ [-Wformat=]
+ 3569 |         if (2 == sscanf(value, "%d:%d", &x, &y)) {
+      |                                    ~^       ~~
+      |                                     |       |
+      |                                     int *   unsigned int *
+      |                                    %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_ExpTime’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:28: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                            ^~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:26: note: in expansion of macro ‘_’
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                          ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:30: note: format string is defined here
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                             ~^
+      |                              |
+      |                              int *
+      |                             %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:28: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘unsigned int *’ [-Wformat=]
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                            ^~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:26: note: in expansion of macro ‘_’
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                          ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:33: note: format string is defined here
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                                ~^
+      |                                 |
+      |                                 int *
+      |                                %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:28: warning: format ‘%d’ expects argument of type ‘int *’, but argument 5 has type ‘unsigned int *’ [-Wformat=]
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                            ^~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:26: note: in expansion of macro ‘_’
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                          ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3889:36: note: format string is defined here
+ 3889 |         if (sscanf(value,_("%d %d/%d"),&ival1,&ival2,&ival3) == 3) {
+      |                                   ~^
+      |                                    |
+      |                                    int *
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:35: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                   ^~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:33: note: in expansion of macro ‘_’
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:37: note: format string is defined here
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                    ~^
+      |                                     |
+      |                                     int *
+      |                                    %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:35: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘unsigned int *’ [-Wformat=]
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                   ^~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:33: note: in expansion of macro ‘_’
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:3892:40: note: format string is defined here
+ 3892 |         } else if (sscanf(value,_("%d/%d"),&ival1,&ival2) == 2) {
+      |                                       ~^
+      |                                        |
+      |                                        int *
+      |                                       %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Nikon_ControlMode’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8185:27: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8185 |         if (!sscanf(val,"%d",&xval))
+      |                          ~^  ~~~~~
+      |                           |  |
+      |                           |  unsigned int *
+      |                           int *
+      |                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Nikon_ApplicationMode2’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8211:27: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8211 |         if (!sscanf(val,"%d",&xval))
+      |                          ~^  ~~~~~
+      |                           |  |
+      |                           |  unsigned int *
+      |                           int *
+      |                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Canon_EOS_MFDrive’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8348:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8348 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                             ^~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8348:27: note: in expansion of macro ‘_’
+ 8348 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                           ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8348:36: note: format string is defined here
+ 8348 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                                   ~^
+      |                                    |
+      |                                    int *
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8349:37: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8349 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                     ^~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8349:35: note: in expansion of macro ‘_’
+ 8349 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                   ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8349:43: note: format string is defined here
+ 8349 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                          ~^
+      |                                           |
+      |                                           int *
+      |                                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Panasonic_MFDrive’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8390:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8390 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                             ^~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8390:27: note: in expansion of macro ‘_’
+ 8390 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                           ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8390:36: note: format string is defined here
+ 8390 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                                   ~^
+      |                                    |
+      |                                    int *
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8391:37: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8391 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                     ^~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8391:35: note: in expansion of macro ‘_’
+ 8391 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                   ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8391:43: note: format string is defined here
+ 8391 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                          ~^
+      |                                           |
+      |                                           int *
+      |                                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Olympus_OMD_MFDrive’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8442:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8442 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                             ^~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8442:27: note: in expansion of macro ‘_’
+ 8442 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                           ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8442:36: note: format string is defined here
+ 8442 |         if (!sscanf (val, _("Near %d"), &xval)) {
+      |                                   ~^
+      |                                    |
+      |                                    int *
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8443:37: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8443 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                     ^~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8443:35: note: in expansion of macro ‘_’
+ 8443 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                   ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8443:43: note: format string is defined here
+ 8443 |                 if (!sscanf (val, _("Far %d"), &xval)) {
+      |                                          ~^
+      |                                           |
+      |                                           int *
+      |                                          %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Canon_EOS_Zoom’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8480:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8480 |         if (!sscanf (val, "%d", &xval)) {
+      |                            ~^   ~~~~~
+      |                             |   |
+      |                             |   unsigned int *
+      |                             int *
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Canon_EOS_ZoomPosition’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8513:31: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+ 8513 |         if (2!=sscanf (val, "%d,%d", &x,&y)) {
+      |                              ~^      ~~
+      |                               |      |
+      |                               int *  unsigned int *
+      |                              %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8513:34: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘unsigned int *’ [-Wformat=]
+ 8513 |         if (2!=sscanf (val, "%d,%d", &x,&y)) {
+      |                                 ~^      ~~
+      |                                  |      |
+      |                                  int *  unsigned int *
+      |                                 %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Canon_RemoteMode’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8697:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+ 8697 |         if (!sscanf (val, "%d", &mode))
+      |                            ~^   ~~~~~
+      |                             |   |
+      |                             |   uint32_t * {aka unsigned int *}
+      |                             int *
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Canon_EventMode’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8718:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+ 8718 |         if (!sscanf (val, "%d", &mode))
+      |                            ~^   ~~~~~
+      |                             |   |
+      |                             |   uint32_t * {aka unsigned int *}
+      |                             int *
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Generic_OPCode’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:8984:29: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+ 8984 |         if (!sscanf(val,"0x%x", &opcode))
+      |                            ~^   ~~~~~~~
+      |                             |   |
+      |                             |   int *
+      |                             unsigned int *
+      |                            %x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Sony_FocusMagnifySetting’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12729:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12729 |         if (sscanf (xval, "%d.%1d,%d,%d", &magInteger, &magDecimal, &x, &y) == 4) {
+      |                            ~^             ~~~~~~~~~~~
+      |                             |             |
+      |                             int *         uint32_t * {aka unsigned int *}
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12729:33: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12729 |         if (sscanf (xval, "%d.%1d,%d,%d", &magInteger, &magDecimal, &x, &y) == 4) {
+      |                               ~~^                      ~~~~~~~~~~~
+      |                                 |                      |
+      |                                 int *                  uint32_t * {aka unsigned int *}
+      |                               %1d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12729:36: warning: format ‘%d’ expects argument of type ‘int *’, but argument 5 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12729 |         if (sscanf (xval, "%d.%1d,%d,%d", &magInteger, &magDecimal, &x, &y) == 4) {
+      |                                   ~^                                ~~
+      |                                    |                                |
+      |                                    int *                            uint32_t * {aka unsigned int *}
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12729:39: warning: format ‘%d’ expects argument of type ‘int *’, but argument 6 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12729 |         if (sscanf (xval, "%d.%1d,%d,%d", &magInteger, &magDecimal, &x, &y) == 4) {
+      |                                      ~^                                 ~~
+      |                                       |                                 |
+      |                                       int *                             uint32_t * {aka unsigned int *}
+      |                                      %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12731:36: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12731 |         } else if (sscanf (xval, "%d,%d,%d", &magInteger, &x, &y) == 3) {
+      |                                   ~^         ~~~~~~~~~~~
+      |                                    |         |
+      |                                    int *     uint32_t * {aka unsigned int *}
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12731:39: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12731 |         } else if (sscanf (xval, "%d,%d,%d", &magInteger, &x, &y) == 3) {
+      |                                      ~^                   ~~
+      |                                       |                   |
+      |                                       int *               uint32_t * {aka unsigned int *}
+      |                                      %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12731:42: warning: format ‘%d’ expects argument of type ‘int *’, but argument 5 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12731 |         } else if (sscanf (xval, "%d,%d,%d", &magInteger, &x, &y) == 3) {
+      |                                         ~^                    ~~
+      |                                          |                    |
+      |                                          int *                uint32_t * {aka unsigned int *}
+      |                                         %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12733:36: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12733 |         } else if (sscanf (xval, "%d.%d", &magInteger, &magDecimal) == 2) {
+      |                                   ~^      ~~~~~~~~~~~
+      |                                    |      |
+      |                                    int *  uint32_t * {aka unsigned int *}
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12733:39: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12733 |         } else if (sscanf (xval, "%d.%d", &magInteger, &magDecimal) == 2) {
+      |                                      ~^                ~~~~~~~~~~~
+      |                                       |                |
+      |                                       int *            uint32_t * {aka unsigned int *}
+      |                                      %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12735:36: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12735 |         } else if (sscanf (xval, "%d", &magInteger) == 1) {
+      |                                   ~^   ~~~~~~~~~~~
+      |                                    |   |
+      |                                    |   uint32_t * {aka unsigned int *}
+      |                                    int *
+      |                                   %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Sony_SpotFocusArea’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12780:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12780 |         if (sscanf (xval, "%d,%d", &x, &y) == 2) {
+      |                            ~^      ~~
+      |                             |      |
+      |                             int *  uint32_t * {aka unsigned int *}
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12780:32: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘uint32_t *’ {aka ‘unsigned int *’} [-Wformat=]
+12780 |         if (sscanf (xval, "%d,%d", &x, &y) == 2) {
+      |                               ~^       ~~
+      |                                |       |
+      |                                int *   uint32_t * {aka unsigned int *}
+      |                               %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Panasonic_ISO’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:12937:25: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+12937 |         sscanf (xval, "%d", &ival);
+      |                        ~^   ~~~~~
+      |                         |   |
+      |                         |   unsigned int *
+      |                         int *
+      |                        %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Panasonic_ColorTemp’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13094:26: warning: format ‘%hd’ expects argument of type ‘short int *’, but argument 3 has type ‘uint16_t *’ {aka ‘short unsigned int *’} [-Wformat=]
+13094 |         sscanf (xval, "%hd", &KSet);
+      |                        ~~^   ~~~~~
+      |                          |   |
+      |                          |   uint16_t * {aka short unsigned int *}
+      |                          short int *
+      |                        %hd
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Panasonic_Whitebalance’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13398:27: warning: format ‘%x’ expects argument of type ‘unsigned int *’, but argument 3 has type ‘int *’ [-Wformat=]
+13398 |         if (sscanf(xval,_("Unknown 0x%04x"), &ival))
+      |                           ^~~~~~~~~~~~~~~~
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13398:25: note: in expansion of macro ‘_’
+13398 |         if (sscanf(xval,_("Unknown 0x%04x"), &ival))
+      |                         ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13398:41: note: format string is defined here
+13398 |         if (sscanf(xval,_("Unknown 0x%04x"), &ival))
+      |                                      ~~~^
+      |                                         |
+      |                                         unsigned int *
+      |                                      %04x
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_Panasonic_LiveViewSize’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13558:29: warning: format ‘%d’ expects argument of type ‘int *’, but argument 3 has type ‘unsigned int *’ [-Wformat=]
+13558 |         if (!sscanf(xval, "%dx%d %d %dHZ", &width, &height, &x, &freq))
+      |                            ~^              ~~~~~~
+      |                             |              |
+      |                             int *          unsigned int *
+      |                            %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13558:32: warning: format ‘%d’ expects argument of type ‘int *’, but argument 4 has type ‘unsigned int *’ [-Wformat=]
+13558 |         if (!sscanf(xval, "%dx%d %d %dHZ", &width, &height, &x, &freq))
+      |                               ~^                   ~~~~~~~
+      |                                |                   |
+      |                                int *               unsigned int *
+      |                               %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13558:35: warning: format ‘%d’ expects argument of type ‘int *’, but argument 5 has type ‘unsigned int *’ [-Wformat=]
+13558 |         if (!sscanf(xval, "%dx%d %d %dHZ", &width, &height, &x, &freq))
+      |                                  ~^                         ~~
+      |                                   |                         |
+      |                                   int *                     unsigned int *
+      |                                  %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:13558:38: warning: format ‘%d’ expects argument of type ‘int *’, but argument 6 has type ‘unsigned int *’ [-Wformat=]
+13558 |         if (!sscanf(xval, "%dx%d %d %dHZ", &width, &height, &x, &freq))
+      |                                     ~^                          ~~~~~
+      |                                      |                          |
+      |                                      int *                      unsigned int *
+      |                                     %d
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c: In function ‘_put_nikon_wifi_profile_write’:
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:14358:17: warning: ‘__builtin_strncpy’ output may be truncated copying 16 bytes from a string of length 1023 [-Wstringop-truncation]
+14358 |                 strncpy(profile.profile_name, buffer, 16);
+      |                 ^
+../../../home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/camlibs/ptp2/config.c:14360:17: warning: ‘__builtin_strncpy’ output may be truncated copying 32 bytes from a string of length 1023 [-Wstringop-truncation]
+14360 |                 strncpy(profile.essid, buffer, 32);
+      |                 ^
+[211/211] Linking target camlibs/ptp2/ptp2.so
