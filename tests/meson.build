@@ -40,6 +40,22 @@ test_pentax_camera_exit = executable(
 )
 test('test-pentax-camera-exit', test_pentax_camera_exit)
 
+pentax_session_source = custom_target(
+  'test-pentax-session-source',
+  input: '../camlibs/ptp2/library.c',
+  output: 'test-pentax-session.inc',
+  command: [python, files('extract-pentax-session.py'), '@INPUT@', '@OUTPUT@'],
+  depend_files: files('extract-camera-exit.py'),
+)
+test_pentax_session = executable(
+  'test-pentax-session',
+  'test-pentax-session.c', pentax_session_source,
+  '../camlibs/ptp2/pentax-utils.c',
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+test('test-pentax-session', test_pentax_session)
+
 test_pentax_utils_exe = executable(
   'test-pentax-utils',
   'test-pentax-utils.c',

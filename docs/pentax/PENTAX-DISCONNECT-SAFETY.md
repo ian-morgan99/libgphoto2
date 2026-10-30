@@ -119,6 +119,12 @@ Physical/non-Pentax evidence: none for this revision
 
 ## Still open — do not turn this into a camera-readiness claim
 
+**Follow-up 2026-10-30:** the separate initializer barrier is now implemented
+and covered by 84 actual-startup-loop fault-injection cases. The combined host
+suite passes 20/20. See [the current handoff](K1II-SESSION-SAFETY-HANDOFF.md)
+for exact checkout/build commands and remaining gates. The paragraphs below
+describe the scope of the earlier disconnect-only commit `6fe00aeb6`.
+
 Issue [#138](https://github.com/ian-morgan99/libgphoto2/issues/138) remains open
 for review and physical qualification. This slice does **not** alter the
 separate stale-session initializer, which may reset USB after an unsafe or

@@ -11,6 +11,8 @@ noinst_PROGRAMS =
 # The Meson cleanup fixture extracts production code at build time. Keep its
 # sources in release tarballs even when using the autotools build.
 EXTRA_DIST = extract-camera-exit.py test-pentax-camera-exit.c
+EXTRA_DIST += extract-pentax-session.py test-pentax-session.c
+EXTRA_DIST += run-pentax-host-check.sh
 
 
 ########################################################################
