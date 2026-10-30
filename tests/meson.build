@@ -24,6 +24,22 @@ test_ptp_folder_root_exe = executable(
 
 test('test-ptp-folder-root', test_ptp_folder_root_exe)
 
+# Compile the unchanged production cleanup body with mocked transport; never
+# open a camera or add a test entry point to the installed camlib ABI.
+camera_exit_source = custom_target(
+  'test-camera-exit-source',
+  input: '../camlibs/ptp2/library.c',
+  output: 'test-camera-exit.inc',
+  command: [python, files('extract-camera-exit.py'), '@INPUT@', '@OUTPUT@'],
+)
+test_pentax_camera_exit = executable(
+  'test-pentax-camera-exit',
+  'test-pentax-camera-exit.c', camera_exit_source,
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+test('test-pentax-camera-exit', test_pentax_camera_exit)
+
 test_pentax_utils_exe = executable(
   'test-pentax-utils',
   'test-pentax-utils.c',

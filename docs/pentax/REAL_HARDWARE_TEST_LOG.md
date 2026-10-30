@@ -456,6 +456,12 @@ Request bytes were verified byte-identical between a succeeding run
 any software mechanism available over USB. Only a physical power cycle clears it.
 
 **Code changes kept (best-effort recovery, harmless when unnecessary):**
+> **Source correction, 2026-10-30 (#138; no new hardware test):** the historical
+> "harmless" claim above was not established by these failed experiments.
+> Automatic CameraShutdown on ordinary exit has now been removed to match IT2.
+> The separate stale-session reset path has not been changed by that fix.
+> See [the source audit and remaining gates](PENTAX-DISCONNECT-SAFETY.md).
+
 - `camlibs/ptp2/library.c` OpenSession retry loop: on `0x201e` for Pentax candidates,
   the recovery path now closes the PTP session, performs a USB port reset
   (`gp_port_reset`), waits 2 s, then reopens. This is the correct ordering even though

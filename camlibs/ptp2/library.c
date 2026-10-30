@@ -3387,6 +3387,7 @@ camera_exit (Camera *camera, GPContext *context)
 {
 	int exit_result = PTP_RC_OK;
 	int exit_gp_result = GP_OK;
+	int pentax_exit = 0;
 	if (camera->pl!=NULL) {
 		PTPParams *params = &camera->pl->params;
 		PTPContainer event;
@@ -3395,6 +3396,7 @@ camera_exit (Camera *camera, GPContext *context)
 		switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
 			params->deviceinfo.VendorExtensionID) {
 		case PTP_VENDOR_PENTAX:
+			pentax_exit = 1;
 			if (params->pentax.vendor_mode_enabled ||
 			    params->pentax.vendor_mode_unknown) {
 				uint32_t function_flags = 0;
@@ -3421,13 +3423,10 @@ camera_exit (Camera *camera, GPContext *context)
 					GP_LOG_D ("Pentax vendor mode disabled");
 					params->pentax.vendor_mode_enabled = 0;
 					params->pentax.vendor_mode_unknown = 0;
-					/* Belt and braces: ask the camera to tear
-					 * down its vendor session so the next
-					 * connect does not hit a stale session
-					 * (0x201e) that blocks vendor enable
-					 * (issue #33). */
-					if (PTP_RC_OK != ptp_pentax_camera_shutdown (params))
-						GP_LOG_D ("Pentax camera shutdown (0x9002) not accepted; relying on CloseSession");
+					/* IT2 Disconnect disables vendor mode and closes
+					 * the transport. CameraShutdown (0x9002) belongs
+					 * to its separate explicit shutdown action, not
+					 * ordinary cleanup or stale-session recovery. */
 				}
 			}
 			break;
@@ -3505,7 +3504,12 @@ camera_exit (Camera *camera, GPContext *context)
 		/* 2016 EOS cameras do not like that and report 0x2005 on all following opcodes */
 		if (!DONT_CLOSE_SESSION(params)) {
 			/* close ptp session */
-			ptp_closesession (params);
+			uint16_t close_result = ptp_closesession (params);
+			/* Preserve the first Pentax cleanup error, including a
+			 * failed CloseSession after a successful vendor disable.
+			 * Other vendors retain their existing return semantics. */
+			if (pentax_exit && exit_result == PTP_RC_OK)
+				exit_result = close_result;
 		}
 exitfailed:
 		pentax_capture_publications_clear (params);

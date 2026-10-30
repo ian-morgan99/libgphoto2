@@ -1,0 +1,1 @@
+FAIL line 127: operation_count == (unsigned int)(restore + disable + close)

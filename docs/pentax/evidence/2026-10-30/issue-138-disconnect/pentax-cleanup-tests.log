@@ -1,0 +1,24 @@
+ 1/19 libgphoto2:test-port-list               OK              0.03s
+ 2/19 libgphoto2:test-ptp-context             OK              0.03s
+ 3/19 libgphoto2:test-ptp-folder-root         OK              0.02s
+ 4/19 libgphoto2:test-pentax-camera-exit      OK              0.02s
+ 5/19 libgphoto2:test-pentax-legacy-parsers   OK              0.02s
+ 6/19 libgphoto2:test-pentax-capture-contract OK              0.02s
+ 7/19 libgphoto2:test-pentax-bulb-lifecycle   OK              0.02s
+ 8/19 libgphoto2:test-pentax-publication      OK              0.02s
+ 9/19 libgphoto2:test-uvc-device-table        OK              0.02s
+10/19 libgphoto2:test-pentax-aperture-alias   OK              0.01s
+11/19 libgphoto2:test-i18n                    OK              0.01s
+12/19 libgphoto2:test-endian                  OK              0.01s
+13/19 libgphoto2:print-libgphoto2-version     OK              0.01s
+14/19 libgphoto2:test-gphoto2                 OK              0.01s
+15/19 libgphoto2:test-filesys                 OK              0.01s
+16/19 libgphoto2:test-init-localedir          OK              0.01s
+17/19 libgphoto2:test-camera-list             OK              0.01s
+18/19 libgphoto2:test-pentax-reconcile        OK              1.20s
+19/19 libgphoto2:test-pentax-utils            OK              3.50s
+
+Ok:                19  
+Fail:              0   
+
+Full log written to /home/ian/Documents/VSCodeProjects/LibGphoto2/build-pentax-cleanup-main/meson-logs/testlog.txt

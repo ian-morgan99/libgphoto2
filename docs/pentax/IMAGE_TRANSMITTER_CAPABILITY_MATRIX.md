@@ -138,7 +138,7 @@ substitute for that sweep.
 | Code | IT2 meaning and transport | K-1 II / K-3 III | Fork and hardware status |
 |---:|---|---|---|
 | `0x9001` | vendor mode; no data; `[13,model,on/off,1,0]`; Param2 flags | Both | Implemented; HW-R both |
-| `0x9002` | camera shutdown; no parameters | Both | Withheld; never a wake/recovery command |
+| `0x9002` | camera shutdown; no parameters | Both | Withheld; never a wake/recovery command. The contradictory automatic exit call was removed on 2026-10-30 (#138); [source audit and regression limits](PENTAX-DISCONNECT-SAFETY.md). Reconnect hardware qualification remains open. |
 | `0x9003` | acknowledge old-path object handle | Legacy path | Not the target for these new-transfer bodies |
 | `0x9004` | card writing bitmask | Both | Target; no hardware write |
 | `0x9006` | live-view frame, data-in | Both | Implemented; K-3 III 50-frame HW-R; K-1 II 10/reconnect/50/500-frame HW-R, with bounded transient startup polling and cleanup |

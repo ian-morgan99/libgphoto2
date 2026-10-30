@@ -1,0 +1,3 @@
+ninja: Entering directory `/home/ian/Documents/VSCodeProjects/LibGphoto2/build-pentax-cleanup-main'
+[1/2] Compiling C object tests/test-pentax-camera-exit.p/test-pentax-camera-exit.c.o
+[2/2] Linking target tests/test-pentax-camera-exit
