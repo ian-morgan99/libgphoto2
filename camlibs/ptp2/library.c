@@ -7826,7 +7826,15 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 				params->pentax.bulb_action_start_ms, pentax_monotonic_ms ());
 		PTPPropValue propval;
 		uint16_t setres;
-
+		if (context &&
+		    gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+			GP_LOG_D ("pentax-bulb: cancelling deferred camera-timed fallback "
+				"before initiating exposure");
+			params->pentax.bulb_action_timed_fallback = 0;
+			params->pentax.bulb_action_start_ms = 0;
+			params->pentax.bulb_action_body_reported_seconds = 0;
+			return GP_ERROR_CANCEL;
+		}
 		params->pentax.bulb_action_timed_fallback = 0;
 		params->pentax.bulb_action_start_ms = 0;
 		params->pentax.bulb_action_body_reported_seconds = 0;
