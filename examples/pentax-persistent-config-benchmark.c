@@ -5,6 +5,8 @@
  * card, and restores focus peaking to its value at startup before exiting.
  * The default "single" mode is the Polaris-relevant API path. "full" mode
  * measures the legacy full-tree path used by the gphoto2 CLI today.
+ * "single-lv" and "full-lv" first start one PC-LV preview in memory and keep
+ * the session active; this is required for Live-View-scoped Pentax controls.
  */
 #include "config.h"
 
@@ -15,6 +17,7 @@
 #include <time.h>
 
 #include <gphoto2/gphoto2-camera.h>
+#include <gphoto2/gphoto2-file.h>
 #include <gphoto2/gphoto2-widget.h>
 
 #include "samples.h"
@@ -54,6 +57,41 @@ read_focus_peaking (Camera *camera, GPContext *context, char *value,
 		*elapsed = monotonic_seconds () - started;
 	if (widget)
 		gp_widget_free (widget);
+	return result;
+}
+
+static int
+set_keep_live_view (Camera *camera, GPContext *context, const char *value)
+{
+	CameraWidget *widget = NULL;
+	int result;
+
+	result = gp_camera_get_single_config (camera, "pentaxpclvkeep", &widget,
+		context);
+	if (result >= GP_OK)
+		result = gp_widget_set_value (widget, value);
+	if (result >= GP_OK)
+		result = gp_camera_set_single_config (camera, "pentaxpclvkeep", widget,
+			context);
+	if (widget)
+		gp_widget_free (widget);
+	return result;
+}
+
+static int
+start_persistent_live_view (Camera *camera, GPContext *context)
+{
+	CameraFile *file = NULL;
+	int result;
+
+	result = set_keep_live_view (camera, context, "on");
+	if (result < GP_OK)
+		return result;
+	result = gp_file_new (&file);
+	if (result >= GP_OK)
+		result = gp_camera_capture_preview (camera, file, context);
+	if (file)
+		gp_file_unref (file);
 	return result;
 }
 
@@ -130,7 +168,8 @@ main (int argc, char **argv)
 	GPContext *context = NULL;
 	char initial[32] = { 0 }, current[32] = { 0 }, target[32];
 	int iterations = DEFAULT_ITERATIONS, initialized = 0, result = GP_OK;
-	int attempted = 0, full_mode = 0, i;
+	int attempted = 0, full_mode = 0, live_view_mode = 0;
+	int keep_live_view = 0, i;
 
 	if ((argc < 3) || (argc > 5) ||
 	    strcmp (argv[1], "Pentax K-1 Mark II (PTP mode)")) {
@@ -147,8 +186,16 @@ main (int argc, char **argv)
 	if (argc == 5) {
 		if (!strcmp (argv[4], "full"))
 			full_mode = 1;
-		else if (strcmp (argv[4], "single")) {
-			fprintf (stderr, "MODE must be single or full\n");
+		else if (!strcmp (argv[4], "single"))
+			;
+		else if (!strcmp (argv[4], "single-lv"))
+			live_view_mode = 1;
+		else if (!strcmp (argv[4], "full-lv")) {
+			full_mode = 1;
+			live_view_mode = 1;
+		} else {
+			fprintf (stderr,
+			         "MODE must be single, full, single-lv or full-lv\n");
 			return 2;
 		}
 	}
@@ -164,6 +211,19 @@ main (int argc, char **argv)
 		goto out;
 	initialized = 1;
 
+	if (live_view_mode) {
+		/* Set the cleanup flag first: even a failed preview must clear the
+		 * session-local keep-live-view request before gp_camera_exit. */
+		keep_live_view = 1;
+		result = start_persistent_live_view (camera, context);
+		if (result < GP_OK) {
+			fprintf (stderr, "stage=start-persistent-lv error=%s (%d)\n",
+			         gp_result_as_string (result), result);
+			goto out;
+		}
+		printf ("stage=start-persistent-lv ok capture=preview-memory-only\n");
+	}
+
 	{
 		double read_seconds;
 		result = read_focus_peaking (camera, context, initial, sizeof initial,
@@ -172,7 +232,9 @@ main (int argc, char **argv)
 			goto out;
 		snprintf (current, sizeof current, "%s", initial);
 		printf ("issue=141 model=Pentax-K-1-II port=%s iterations=%d mode=%s\n",
-		        argv[2], iterations, full_mode ? "full" : "single");
+		        argv[2], iterations,
+		        live_view_mode ? (full_mode ? "full-lv" : "single-lv") :
+		        (full_mode ? "full" : "single"));
 		printf ("initial=%s read_seconds=%.6f persistent_session=yes capture=no\n",
 		        initial, read_seconds);
 	}
@@ -223,6 +285,12 @@ out:
 		}
 	}
 	if (initialized) {
+		if (keep_live_view) {
+			int keep_result = set_keep_live_view (camera, context, "off");
+			printf ("live-view-keep=off result=%d\n", keep_result);
+			if ((result >= GP_OK) && (keep_result < GP_OK))
+				result = keep_result;
+		}
 		int exit_result = gp_camera_exit (camera, context);
 		if ((result >= GP_OK) && (exit_result < GP_OK))
 			result = exit_result;

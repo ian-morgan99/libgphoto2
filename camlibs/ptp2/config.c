@@ -10183,6 +10183,11 @@ _get_Pentax_FocusPeaking (CONFIG_GET_ARGS)
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
+	/* d02b is a Live View-session control. Outside PC-LV the K-1 II
+	 * accepts the SET but returns an empty/stale value; expose it only
+	 * when this libgphoto2 session owns an active Live View session. */
+	if ((params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) && !params->inliveview)
+		return GP_ERROR_NOT_SUPPORTED;
 	ret = ptp_pentax_get_device_prop_raw (params,
 		PTP_DPC_PENTAX_FocusPeaking, &data, &size);
 	if (ret != PTP_RC_OK) {
@@ -10216,6 +10221,9 @@ _put_Pentax_FocusPeaking (CONFIG_PUT_ARGS)
 	uint16_t ret;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
+		return GP_ERROR_NOT_SUPPORTED;
+	/* Do not issue a silent no-op outside the active LV session. */
+	if ((params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) && !params->inliveview)
 		return GP_ERROR_NOT_SUPPORTED;
 	CR (gp_widget_get_value (widget, &value));
 	if (!strcmp (value, "on")) {
