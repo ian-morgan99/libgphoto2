@@ -99,6 +99,18 @@ executable(
   dependencies: libgphoto2_dep,
 )
 
+# Opt-in hardware benchmark for issue #141. It intentionally is not a Meson
+# test: it toggles a live camera setting, restores the original value, and
+# requires an explicitly selected camera and USB port.
+executable(
+  'pentax-persistent-config-benchmark',
+  'pentax-persistent-config-benchmark.c',
+  'samples.h',
+  'autodetect.c',
+  'context.c',
+  dependencies: libgphoto2_dep,
+)
+
 executable(
   'sample-tether',
   'sample-tether.c',
