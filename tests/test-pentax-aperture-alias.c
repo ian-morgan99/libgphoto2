@@ -107,7 +107,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 
 	/* Pre-seed the FNumber descriptor in the property cache so GET
 	 * resolves from this value with no wire IO (cache-hit path). */
-	PTPDevicePropDesc *dpd = calloc (5, sizeof (*dpd));
+	PTPDevicePropDesc *dpd = calloc (6, sizeof (*dpd));
 	if (dpd) {
 		memset (dpd, 0, sizeof (*dpd));
 		dpd->DevicePropCode = PTP_DPC_FNumber;
@@ -161,8 +161,21 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		}
 		dpd[4].CurrentValue.u16 = 32783;
 		dpd[4].timestamp = time (NULL);
+		dpd[5].DevicePropCode = PTP_DPC_ExposureBiasCompensation;
+		dpd[5].DataType       = PTP_DTC_INT16;
+		dpd[5].GetSet         = PTP_DPGS_GetSet;
+		dpd[5].FormFlag       = PTP_DPFF_Enumeration;
+		dpd[5].FORM.Enum.NumberOfValues = 3;
+		dpd[5].FORM.Enum.SupportedValue = calloc (3, sizeof (PTPPropValue));
+		if (dpd[5].FORM.Enum.SupportedValue) {
+			dpd[5].FORM.Enum.SupportedValue[0].i16 = -1000;
+			dpd[5].FORM.Enum.SupportedValue[1].i16 = 0;
+			dpd[5].FORM.Enum.SupportedValue[2].i16 = 1000;
+		}
+		dpd[5].CurrentValue.i16 = 0;
+		dpd[5].timestamp = time (NULL);
 		params->dpd_cache.val = dpd;
-		params->dpd_cache.len = 5;
+		params->dpd_cache.len = 6;
 	}
 }
 
@@ -276,6 +289,21 @@ main (void)
 	char *iso_value = NULL;
 	CHECK (gp_widget_get_value (iso, &iso_value) == GP_OK);
 	CHECK (iso_value && !strcmp (iso_value, "200"));
+
+	/* Benro Connect asks for the standard libgphoto2 name.  The K-1 II
+	 * descriptor is seeded with its camera-advertised INT16 enumeration; the
+	 * public alias must expose that list rather than returning an empty config. */
+	CameraWidget *ev = NULL;
+	ret = get_single (cam, "exposurecompensation", &ev, context);
+	CHECK (ret == GP_OK && ev != NULL);
+	CHECK (gp_widget_get_name (ev, &name) == GP_OK);
+	CHECK (name && !strcmp (name, "exposurecompensation"));
+	CHECK (gp_widget_get_type (ev, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_RADIO);
+	CHECK (gp_widget_count_choices (ev) == 3);
+	char *ev_value = NULL;
+	CHECK (gp_widget_get_value (ev, &ev_value) == GP_OK);
+	CHECK (ev_value && !strcmp (ev_value, "0"));
 
 	/* K-1 II firmware can omit 0x5005 from DeviceInfo.  The public
 	 * "whitebalance" name must nevertheless resolve through the Pentax direct
