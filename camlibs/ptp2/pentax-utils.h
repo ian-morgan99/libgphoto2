@@ -77,6 +77,12 @@ typedef struct {
 	int supports_self_timer_continuous_new;
 	int supports_remote_continuous_new;
 	int supports_slot_change;
+	/* Answers GetDevicePropDesc for standard properties it omits from
+	 * DeviceInfo.DeviceProps.  The K-1 II advertises only five properties yet
+	 * returns fully-populated descriptors for white balance and exposure
+	 * compensation, so those controls have to be offered without the usual
+	 * advertisement gate. */
+	int answers_undeclared_generic_props;
 	int is_monochrome;
 } PentaxModelCapabilities;
 
@@ -492,6 +498,10 @@ int pentax_parse_legacy_shutter_denominator (const char *value,
 int pentax_session_error_needs_close_reset (uint16_t response,
 		unsigned int attempt);
 int pentax_model_supports_cross_process (uint32_t model_no);
+/* True for bodies that answer GetDevicePropDesc for standard properties they
+ * do not advertise.  Callers must still confirm the property is one this body
+ * is known to honour; never use this to widen the gate generically. */
+int pentax_model_answers_undeclared_generic_props (uint32_t model_no);
 int pentax_model_supports_color_temperature (uint32_t model_no);
 int pentax_model_supports_ci_detail (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);

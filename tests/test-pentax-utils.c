@@ -531,7 +531,8 @@ main (void)
 			    .supports_movie = 1,
 			    .uses_it2_direct_live_view_start = 1,
 			    .supports_card_writing_mode = 1,
-			    .supports_writing_file_format = 1 } },
+			    .supports_writing_file_format = 1,
+			    .answers_undeclared_generic_props = 1 } },
 			{ 0x0189, "PENTAX K-3 Mark III", PENTAX_MODEL_K3_MARK_III, 1,
 			  { .model_no = PENTAX_MODEL_K3_MARK_III,
 			    .focus_family = PENTAX_FOCUS_FAMILY_NEW,
@@ -1096,6 +1097,20 @@ main (void)
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_K70));
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_GR_III));
 	CHECK (!pentax_model_supports_card_writing_mode (PENTAX_MODEL_KF));
+
+	/* Undeclared-but-answerable generic properties (issue #233): the K-1 II
+	 * advertises only five DeviceProps yet returns full settable descriptors
+	 * for 0x5005 and 0x5010.  Only that body is authorised; every other body
+	 * keeps the strict advertisement gate. */
+	CHECK (pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_model_answers_undeclared_generic_props (
+			PENTAX_MODEL_K3_MARK_III_MONOCHROME));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_K1));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_KP));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_K70));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_KF));
+	CHECK (!pentax_model_answers_undeclared_generic_props (PENTAX_MODEL_GR_III));
 
 	/* Cross process (d02c): K-1 II probe (2026-09-02) shows GET/SET
 	 * unsupported even in cross-process mode, so gate on k3iii family. */

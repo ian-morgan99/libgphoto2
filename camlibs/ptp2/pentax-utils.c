@@ -825,7 +825,8 @@ static const PentaxModelCapabilities pentax_model_capability_table[] = {
 	  .supports_movie = 1,
 	  .uses_it2_direct_live_view_start = 1,
 	  .supports_card_writing_mode = 1,
-	  .supports_writing_file_format = 1 },
+	  .supports_writing_file_format = 1,
+	  .answers_undeclared_generic_props = 1 },
 	{ .model_no = PENTAX_MODEL_K3_MARK_III,
 	  .focus_family = PENTAX_FOCUS_FAMILY_NEW,
 	  .supports_dual_slot = 1,
@@ -954,6 +955,25 @@ pentax_model_supports_pc_live_view (uint32_t model_no)
 	const PentaxModelCapabilities *capabilities =
 		pentax_model_capabilities (model_no);
 	return capabilities && capabilities->supports_pc_live_view;
+}
+
+/* The K-1 II advertises only five entries in DeviceInfo.DeviceProps
+ * (5001, 5011, d303, d406, d407) where the K-3 III advertises thirty-five, so
+ * every generic control libgphoto2 builds from that list is missing on this
+ * body.  Direct GetDevicePropDesc reads prove several of them are in fact
+ * present and settable: 0x5010 (exposure compensation) returns INT16,
+ * GETANDSET, form=Enumeration with enum-count=31, and 0x5005 (white balance)
+ * returns UINT16, GETANDSET, form=Enumeration with enum-count=18 (evidence:
+ * docs/evidence/benro-connect-crash-20261010/raw/Clog_000276.txt, K-1 II
+ * segments, our pentaxprop5005/pentaxprop5010 audit widgets).  The omission is
+ * therefore a declaration gap rather than a hardware limitation.  Callers must
+ * still name the specific properties this body is known to honour. */
+int
+pentax_model_answers_undeclared_generic_props (uint32_t model_no)
+{
+	const PentaxModelCapabilities *capabilities =
+		pentax_model_capabilities (model_no);
+	return capabilities && capabilities->answers_undeclared_generic_props;
 }
 
 /* Cross process (d02c): the HW finding that writes work once CI mode d020 is

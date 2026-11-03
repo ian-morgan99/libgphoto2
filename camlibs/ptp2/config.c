@@ -84,6 +84,25 @@ have_prop(Camera *camera, uint16_t vendor, uint32_t prop) {
 			if (vendor_matches)
 				return 1;
 		}
+		/* The K-1 II advertises only five properties in DeviceInfo but answers
+		 * GetDevicePropDesc for standard ones it omits, with fully populated
+		 * settable descriptors.  Offer exactly the properties proven on hardware
+		 * rather than widening the gate: 0x5010 reads back INT16 / GETANDSET /
+		 * Enumeration with enum-count=31 and 0x5005 reads back UINT16 /
+		 * GETANDSET / Enumeration with enum-count=18, both matching the datatypes
+		 * these menu entries expect (issue #233).  Restricted to vendor 0 so only
+		 * the generic handlers are selected: the menu table also carries
+		 * PTP_DPC_ExposureBiasCompensation tagged PTP_VENDOR_SONY with
+		 * _put_Sony_ExpCompensation, and that entry is listed before the generic
+		 * one, so a vendor-agnostic bypass would bind a Sony writer to this body. */
+		if ((!vendor || vendor_matches) &&
+		    camera->pl->params.pentax.supported_model &&
+		    camera->pl->params.pentax.vendor_mode_enabled &&
+		    pentax_model_answers_undeclared_generic_props (
+			    camera->pl->params.pentax.model_no) &&
+		    (prop == PTP_DPC_ExposureBiasCompensation ||
+		     prop == PTP_DPC_WhiteBalance))
+			return 1;
 	}
 	if ((prop & 0x7000) == 0x1000) { /* commands */
 		/* The K-1 family does not advertise PTP_OC_PENTAX_FocusControl
