@@ -88,8 +88,34 @@ typedef struct {
 
 const PentaxModelCapabilities *pentax_model_capabilities (uint32_t model_no);
 
+/* Exposure-mode codes read from conditions offset 184 (exposure_mode).
+ *
+ * OBSERVED ON ONE BODY, NOT SPECIFICATION.  Only 8 and 9 were measured, both on
+ * a single K-1 II (USB 25fb:0183) with the dial position confirmed by the
+ * operator; nothing here is a Pentax-published code table, and no other body or
+ * mode has been read.  Codes 12 and 20 were never read here at all: they come
+ * from the hashed Image Transmitter 2 reference client (ExpMode.cs, recorded in
+ * docs/pentax/REFERENCE_CLIENTS.md and IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md
+ * as "P 0 ... M 8, B 9, aperture-ring Av/M/B 10/11/12 ... Astro 20").  That
+ * source independently agrees with the live reading of 9, which is why 12 and
+ * 20 are listed rather than omitted -- but they remain inferred until a live
+ * read confirms them.
+ *
+ *   8  = Manual           (live-confirmed on K-1 II: Tv-changeable=yes, bulb-timer=no)
+ *   9  = Bulb             (live-confirmed on K-1 II: Tv-changeable=no, bulb-timer=yes)
+ *   12 = aperture-ring B  (IT2-sourced, NOT measured here)
+ *   20 = Astro            (IT2-sourced, NOT measured here; separately gated per #101)
+ *
+ * The K-1 II dial has more positions than these (P, Tv, Av, Sv, TAv, U1-U3,
+ * scene modes); every one of them is unmeasured.  Do not use this table to
+ * decide whether a shutter write is permitted -- read
+ * PENTAX_CONDITION_CAN_CHANGE_TV instead, which is what the body itself reports
+ * for the current mode. */
+#define PENTAX_EXP_MODE_MANUAL 8U
+
 /* Parsed subset of the Pentax GetAllConditions response.  Mode values
- * deliberately remain raw until each value has been correlated on hardware. */
+ * deliberately remain raw until each value has been correlated on hardware;
+ * see the PENTAX_EXP_MODE_* table above for what is measured and what is not. */
 typedef struct {
 	uint8_t operation_state;
 	uint32_t activity_flags;
@@ -173,6 +199,12 @@ typedef struct {
 #define PENTAX_EXP_MODE_BULB 9U
 #define PENTAX_EXP_MODE_BULB_LENS 12U
 
+/* Short label for an exposure-mode code, for diagnostics only.  Returns NULL
+ * for any code not in the table above -- including every mode that has never
+ * been read on hardware -- so callers must not treat a NULL as an error or
+ * invent a name for it. */
+const char *pentax_exposure_mode_name (uint32_t exposure_mode);
+
 /* The standard action is deliberately restricted to the same exposure modes
  * for which Image Transmitter 2 selects release mode 2.  Camera-timed Bulb
  * (capability flag 0x40) is excluded by the caller and remains on the normal
@@ -209,6 +241,33 @@ extern const uint32_t pentax_bulb_list_seconds[PENTAX_BULB_LIST_SECONDS_COUNT];
 
 /* True when a shutter-list value is one of the Bulb/seconds entries. */
 int pentax_shutter_value_is_bulb_seconds (uint64_t value);
+
+/* Decide whether a shutter-speed write may be attempted at all, given the
+ * capability_flags of the current conditions sample and the wire value the
+ * caller is about to send.
+ *
+ * Shutter speed is a Tv property, so a non-Bulb request requires
+ * PENTAX_CONDITION_CAN_CHANGE_TV specifically.  PENTAX_CONDITION_BULB_TIMER on
+ * its own only says that a bulb timer exists -- measured on the K-1 II, in Bulb
+ * (exposure mode 9) CAN_CHANGE_TV is clear and BULB_TIMER is set, and every
+ * shutter write there was refused by the body.  Admitting those requests let the
+ * driver issue a doomed write and poll ten times before failing.
+ *
+ * A Bulb/seconds request is admitted against the exact set of whole-second
+ * values the body advertises for 0xd00f -- measured on the K-3 III as an
+ * enumeration (form=2) spanning up to 600 seconds, with a 300->600->300 write
+ * round trip passing -- and not against the smaller list synthesised when the
+ * enumeration comes back empty.  The advertised second-counts are sparse (6 is
+ * followed by 8), so membership is exact rather than a min/max bound, which
+ * would wrongly admit values the camera never offered.  Pass
+ * advertised_count == 0 when no timer domain could be read; the published subset
+ * is then used as the fallback domain.
+ *
+ * Returns 1 when the write may proceed, 0 when it must be rejected as
+ * unsupported.  This is a capability decision only: readiness (idle, not task
+ * changing, transport) is still the caller's job via the shared preflight. */
+int pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
+        const uint32_t *advertised_seconds, unsigned int advertised_count);
 
 /* Whether an empty shutter enumeration may be filled with the Bulb/seconds
  * entries.  Constrained to the one product whose populated list those values
