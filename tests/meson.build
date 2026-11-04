@@ -82,6 +82,21 @@ test(
   ],
 )
 
+# Source-contract regression for the K-1 II shutter-speed gate and verification
+# (issue #143): non-bulb shutter writes require CAN_CHANGE_TV, and verification
+# must read the shutter property over GetDevicePropValue rather than a conditions
+# bulb-timer field or a cached descriptor.  Both defects were measured live;
+# neither is reachable from a camera-less unit test.
+test(
+  'test-pentax-shutter-contract',
+  python,
+  args: [
+    files('test-pentax-shutter-contract.py'),
+    meson.project_source_root() / 'camlibs/ptp2/config.c',
+    meson.project_source_root() / 'camlibs/ptp2/pentax-utils.c',
+  ],
+)
+
 # Unit tests use an injected camera API to verify that every failed Bulb path
 # stops an opened shutter before cleanup or exits fail-closed without an
 # unmatched stop when start was not confirmed.

@@ -203,6 +203,60 @@ main (void)
 	CHECK (!pentax_shutter_value_is_bulb_seconds (0));
 	CHECK (!pentax_shutter_value_is_bulb_seconds (
 			pentax_whole_second_shutter_value (7)));   /* 7 s is not in the list */
+
+	/* Issue #143: shutter-speed write gating.  A bulb timer existing does not
+	 * mean arbitrary shutter values are writable.  Live on the K-1 II, Bulb
+	 * (exposure mode 9) reports Tv-changeable=no and bulb-timer=yes, and every
+	 * shutter write there was refused by the body -- but the old
+	 * (CAN_CHANGE_TV | BULB_TIMER) gate admitted the mode, so the driver issued a
+	 * doomed write and burned ten verification cycles (~720 ms) before returning
+	 * an error.  Shutter speed is a Tv property, so a non-Bulb request needs
+	 * CAN_CHANGE_TV specifically. */
+	{
+		uint32_t manual = PENTAX_CONDITION_CAN_CHANGE_TV;
+		uint32_t bulb = PENTAX_CONDITION_BULB_TIMER;
+		uint32_t both = PENTAX_CONDITION_CAN_CHANGE_TV |
+				  PENTAX_CONDITION_BULB_TIMER;
+		uint64_t onefifty = ((uint64_t) 50 << 32) | 1;    /* "1/50" */
+		uint64_t fivetenth = ((uint64_t) 10 << 32) | 5;   /* "5/10" */
+		uint64_t bulb30 = pentax_whole_second_shutter_value (30);
+
+		/* Manual as measured: Tv-changeable=yes, bulb-timer=no. */
+		CHECK (pentax_shutter_write_permitted (manual, onefifty));
+		CHECK (pentax_shutter_write_permitted (manual, fivetenth));
+		CHECK (pentax_shutter_write_permitted (both, onefifty));
+
+		/* Bulb as measured: Tv-changeable=no, bulb-timer=yes.  This is the case
+		 * that used to reach the wire and fail slowly. */
+		CHECK (!pentax_shutter_write_permitted (bulb, onefifty));
+		CHECK (!pentax_shutter_write_permitted (bulb, fivetenth));
+
+		/* Bulb/seconds entries keep the bulb-timer path even without
+		 * CAN_CHANGE_TV: #101 warns the camera-owned timer must not be assumed to
+		 * work on our direct B path, so those requests go through and the
+		 * post-write read-back judges whether one took effect. */
+		CHECK (pentax_shutter_write_permitted (bulb, bulb30));
+		CHECK (pentax_shutter_write_permitted (both, bulb30));
+
+		/* No capability bits at all: nothing is writable. */
+		CHECK (!pentax_shutter_write_permitted (0, onefifty));
+		CHECK (!pentax_shutter_write_permitted (0, bulb30));
+
+		/* A whole-second value outside the published Bulb set is not a
+		 * bulb-timer entry, so it still needs Tv. */
+		CHECK (!pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (7)));
+	}
+
+	/* Issue #143: the exposure-mode code table.  Only 8 and 9 were read on
+	 * hardware; 12 and 20 are IT2-sourced.  An unmeasured code must yield NULL
+	 * rather than an invented name. */
+	CHECK (!strcmp (pentax_exposure_mode_name (PENTAX_EXP_MODE_MANUAL), "Manual"));
+	CHECK (!strcmp (pentax_exposure_mode_name (PENTAX_EXP_MODE_BULB), "Bulb"));
+	CHECK (pentax_exposure_mode_name (PENTAX_EXP_MODE_BULB_LENS) != NULL);
+	CHECK (pentax_exposure_mode_name (PENTAX_EXP_MODE_ASTROTRACER) != NULL);
+	CHECK (pentax_exposure_mode_name (4) == NULL);   /* never measured */
+	CHECK (pentax_exposure_mode_name (0) == NULL);
 	PentaxLiveViewGeometry geometry, unchanged_geometry;
 	unsigned char condition_data[532] = {0};
 	unsigned char geometry_data[20] = {0};
