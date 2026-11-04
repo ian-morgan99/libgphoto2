@@ -220,32 +220,70 @@ main (void)
 		uint64_t onefifty = ((uint64_t) 50 << 32) | 1;    /* "1/50" */
 		uint64_t fivetenth = ((uint64_t) 10 << 32) | 5;   /* "5/10" */
 		uint64_t bulb30 = pentax_whole_second_shutter_value (30);
+		/* The K-3 III advertises a 1-600 second timer domain for 0xd00f in B. */
+		const uint32_t k3iii_min = 1, k3iii_max = 600;
+		/* No advertised domain could be read (empty B-mode enumeration). */
+		const uint32_t none = 0;
 
 		/* Manual as measured: Tv-changeable=yes, bulb-timer=no. */
-		CHECK (pentax_shutter_write_permitted (manual, onefifty));
-		CHECK (pentax_shutter_write_permitted (manual, fivetenth));
-		CHECK (pentax_shutter_write_permitted (both, onefifty));
+		CHECK (pentax_shutter_write_permitted (manual, onefifty,
+				k3iii_min, k3iii_max));
+		CHECK (pentax_shutter_write_permitted (manual, fivetenth,
+				k3iii_min, k3iii_max));
+		CHECK (pentax_shutter_write_permitted (both, onefifty,
+				k3iii_min, k3iii_max));
 
 		/* Bulb as measured: Tv-changeable=no, bulb-timer=yes.  This is the case
 		 * that used to reach the wire and fail slowly. */
-		CHECK (!pentax_shutter_write_permitted (bulb, onefifty));
-		CHECK (!pentax_shutter_write_permitted (bulb, fivetenth));
+		CHECK (!pentax_shutter_write_permitted (bulb, onefifty,
+				k3iii_min, k3iii_max));
+		CHECK (!pentax_shutter_write_permitted (bulb, fivetenth,
+				k3iii_min, k3iii_max));
 
 		/* Bulb/seconds entries keep the bulb-timer path even without
 		 * CAN_CHANGE_TV: #101 warns the camera-owned timer must not be assumed to
 		 * work on our direct B path, so those requests go through and the
 		 * post-write read-back judges whether one took effect. */
-		CHECK (pentax_shutter_write_permitted (bulb, bulb30));
-		CHECK (pentax_shutter_write_permitted (both, bulb30));
+		CHECK (pentax_shutter_write_permitted (bulb, bulb30,
+				k3iii_min, k3iii_max));
+		CHECK (pentax_shutter_write_permitted (both, bulb30,
+				k3iii_min, k3iii_max));
 
 		/* No capability bits at all: nothing is writable. */
-		CHECK (!pentax_shutter_write_permitted (0, onefifty));
-		CHECK (!pentax_shutter_write_permitted (0, bulb30));
+		CHECK (!pentax_shutter_write_permitted (0, onefifty,
+				k3iii_min, k3iii_max));
+		CHECK (!pentax_shutter_write_permitted (0, bulb30,
+				k3iii_min, k3iii_max));
 
-		/* A whole-second value outside the published Bulb set is not a
-		 * bulb-timer entry, so it still needs Tv. */
+		/* A whole-second value the body advertises is a timer request even when
+		 * it is absent from the 13-entry list synthesised for an empty
+		 * enumeration.  The K-3 III exposes 1-600 seconds in B and a
+		 * 300->600->300 write round trip passed on hardware, so refusing those
+		 * would reject values the camera accepts. */
+		CHECK (pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (7),
+				k3iii_min, k3iii_max));
+		CHECK (pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (300),
+				k3iii_min, k3iii_max));
+		CHECK (pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (600),
+				k3iii_min, k3iii_max));
+
+		/* Outside the advertised domain it is refused again, and a plain "1/N"
+		 * shutter speed never counts as a timer entry. */
 		CHECK (!pentax_shutter_write_permitted (bulb,
-				pentax_whole_second_shutter_value (7)));
+				pentax_whole_second_shutter_value (601),
+				k3iii_min, k3iii_max));
+		CHECK (!pentax_shutter_write_permitted (bulb, onefifty,
+				k3iii_min, k3iii_max));
+
+		/* With no advertised domain the published subset is the fallback. */
+		CHECK (pentax_shutter_write_permitted (bulb, bulb30, none, none));
+		CHECK (!pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (7), none, none));
+		CHECK (!pentax_shutter_write_permitted (bulb,
+				pentax_whole_second_shutter_value (300), none, none));
 	}
 
 	/* Issue #143: the exposure-mode code table.  Only 8 and 9 were read on

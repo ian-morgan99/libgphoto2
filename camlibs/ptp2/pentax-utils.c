@@ -90,26 +90,45 @@ pentax_exposure_mode_name (uint32_t exposure_mode)
 }
 
 int
-pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested)
+pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
+        uint32_t advertised_timer_min, uint32_t advertised_timer_max)
 {
-	/* A bulb timer existing does not mean arbitrary shutter values are
-	 * writable.  On the K-1 II, Bulb clears CAN_CHANGE_TV but sets BULB_TIMER:
-	 * the old OR gate therefore admitted the mode, the body refused the write,
-	 * and verification burned ten cycles before failing.  Require the bit that
-	 * actually describes the property being written -- Tv -- for every value
-	 * that is not a Bulb/seconds timer entry.
-	 *
-	 * Bulb/seconds entries keep the BULB_TIMER path: that domain was proven
-	 * writable on the K-3 III, and #101 warns that the camera-owned timer must
-	 * not be assumed to work on our direct B path either, so those requests
-	 * still go through and are judged honestly by the post-write read-back
-	 * rather than being refused or accepted here. */
-	if (capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV)
-		return 1;
-	if ((capability_flags & PENTAX_CONDITION_BULB_TIMER) &&
-	    pentax_shutter_value_is_bulb_seconds (requested))
-		return 1;
-	return 0;
+        /* A bulb timer existing does not mean arbitrary shutter values are
+         * writable.  On the K-1 II, Bulb clears CAN_CHANGE_TV but sets BULB_TIMER:
+         * the old OR gate therefore admitted the mode, the body refused the write,
+         * and verification burned ten cycles before failing.  Require the bit that
+         * actually describes the property being written -- Tv -- for every value
+         * that is not a Bulb/seconds timer entry.
+         *
+         * Bulb/seconds entries keep the BULB_TIMER path: that domain was proven
+         * writable on the K-3 III, and #101 warns that the camera-owned timer must
+         * not be assumed to work on our direct B path either, so those requests
+         * still go through and are judged honestly by the post-write read-back
+         * rather than being refused or accepted here.
+         *
+         * The timer domain is what the body itself advertises for 0xd00f, not the
+         * 13-entry list synthesised for an empty enumeration.  The K-3 III exposes
+         * 1-600 seconds in B and a 300->600->300 round trip passed on hardware
+         * (docs/pentax/REAL_HARDWARE_TEST_LOG.md), so rejecting 300 or 600 because
+         * they are absent from the synthesis subset would refuse values the camera
+         * accepts.  advertised_timer_min == 0 means no domain could be read -- an
+         * empty B-mode enumeration -- and the published subset is used instead. */
+        uint32_t denominator = (uint32_t)(requested >> 32);
+        uint32_t numerator = (uint32_t)requested;
+
+        if (capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV)
+                return 1;
+        if (!(capability_flags & PENTAX_CONDITION_BULB_TIMER))
+                return 0;
+        /* Only the whole-second timer layout is a Bulb/seconds entry: denominator
+         * 1.  A plain "1/N" shutter speed has numerator 1 and a large
+         * denominator, so it never matches here. */
+        if (denominator != 1 || numerator == 0)
+                return 0;
+        if (advertised_timer_min == 0 || advertised_timer_max == 0)
+                return pentax_shutter_value_is_bulb_seconds (requested);
+        return numerator >= advertised_timer_min &&
+               numerator <= advertised_timer_max;
 }
 
 int

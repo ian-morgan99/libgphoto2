@@ -253,10 +253,18 @@ int pentax_shutter_value_is_bulb_seconds (uint64_t value);
  * shutter write there was refused by the body.  Admitting those requests let the
  * driver issue a doomed write and poll ten times before failing.
  *
+ * A Bulb/seconds request is admitted against the timer domain the body itself
+ * advertises for 0xd00f -- measured on the K-3 III as 1-600 seconds, with a
+ * 300->600->300 write round trip passing -- and not against the smaller list
+ * synthesised when the enumeration comes back empty.  Pass
+ * advertised_timer_min == 0 when no domain could be read; the published subset
+ * is then used as the fallback domain.
+ *
  * Returns 1 when the write may proceed, 0 when it must be rejected as
  * unsupported.  This is a capability decision only: readiness (idle, not task
  * changing, transport) is still the caller's job via the shared preflight. */
-int pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested);
+int pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
+        uint32_t advertised_timer_min, uint32_t advertised_timer_max);
 
 /* Whether an empty shutter enumeration may be filled with the Bulb/seconds
  * entries.  Constrained to the one product whose populated list those values

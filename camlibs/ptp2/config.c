@@ -9858,12 +9858,21 @@ _pentax_exposure_write_preflight (PTPParams *params, uint32_t change_bit,
 
 /* Bounded live-conditions verification after an exposure-property write.
  * Compares the parsed conditions against the expected numerator/denominator
- * pair for up to ten 100 ms attempts, mirroring IT2's asynchronous polling. */
+ * pair for up to ten 100 ms attempts, mirroring IT2's asynchronous polling.
+ *
+ * required_capability is a capability bit that must still be set on every fresh
+ * sample for that field to mean what the caller thinks it means; pass 0 when
+ * the field is mode-independent.  It is re-checked per sample rather than once
+ * from the caller's pre-write snapshot: the dial can move between the preflight
+ * and a verification attempt, and in Bulb offsets 272/276 hold the bulb timer
+ * instead of the applied shutter speed -- exactly the field that produced the
+ * #143 false pass. */
 static int
 _pentax_verify_rational_in_conditions (PTPParams *params,
 	uint32_t expect_num, uint32_t expect_den,
 	uint32_t (*get_num)(const PentaxConditions *),
-	uint32_t (*get_den)(const PentaxConditions *))
+	uint32_t (*get_den)(const PentaxConditions *),
+	uint32_t required_capability)
 {
 	PentaxConditions conditions;
 	unsigned char *condition_data = NULL;
@@ -9871,6 +9880,7 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 	unsigned int attempt;
 	uint16_t ret;
 	int result;
+	int capability_lost = 0;
 
 	result = GP_ERROR;
 	/* Increased from 5 to 10 attempts (500ms -> 1s) to accommodate
@@ -9902,6 +9912,19 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 			result = GP_ERROR;
 			continue;
 		}
+		if (required_capability &&
+			!(conditions.capability_flags & required_capability)) {
+			/* The mode changed underneath the write.  This field no longer
+			 * carries the value that was written, so nothing in it can
+			 * confirm the write -- and a stale match here is the false pass
+			 * this path exists to avoid.  Never accept; report unconfirmed. */
+			GP_LOG_D ("Pentax rational verification attempt %u: required "
+				"capability 0x%08x cleared, conditions no longer hold "
+				"the written value", attempt, required_capability);
+			capability_lost = 1;
+			result = GP_ERROR;
+			continue;
+		}
 		GP_LOG_D ("Pentax rational verification attempt %u: "
 			"expected=%u/%u, conditions=%u/%u", attempt,
 			expect_num, expect_den,
@@ -9912,9 +9935,18 @@ _pentax_verify_rational_in_conditions (PTPParams *params,
 		}
 		result = GP_ERROR;
 	}
-	if (result == GP_ERROR)
-		GP_LOG_E ("Pentax write was acknowledged but conditions retained "
-			"%u/%u after 1000 ms (requested %u/%u).",
+	if (capability_lost)
+		/* The write may or may not have taken effect; what is certain is that
+		 * the driver cannot tell, which must not be reported as success. */
+		gp_context_error (ptp_context_get (params->data),
+			_("Pentax write of %u/%u could not be confirmed: the camera "
+			"left the mode in which that setting is readable while the "
+			"write was being verified."),
+			expect_num, expect_den);
+	else if (result == GP_ERROR)
+		gp_context_error (ptp_context_get (params->data),
+			_("Pentax write was acknowledged but conditions retained "
+			"%u/%u after 1000 ms (requested %u/%u)."),
 			get_num (&conditions), get_den (&conditions),
 			expect_num, expect_den);
 	return result;
@@ -10060,14 +10092,22 @@ _pentax_verify_property_value (PTPParams *params, uint32_t property,
 	if (!got_value) {
 		/* Every idle frame deferred the read or the read failed without a
 		 * usable value: there is no actual state to report. */
-		GP_LOG_E ("Pentax write to property 0x%04x could not be read back "
-			"after 1000 ms (requested %s).", property, expected_text);
+		gp_context_error (ptp_context_get (params->data),
+			_("Pentax write to property 0x%04x could not be read back "
+			"after 1000 ms (requested %s)."), property, expected_text);
 		return GP_ERROR;
 	}
 	_pentax_propvalue_text (datatype, &actual, format, actual_text,
 		sizeof (actual_text));
-	GP_LOG_E ("Pentax write to property 0x%04x was acknowledged but the body "
-		"still reports %s after 1000 ms (requested %s).",
+	/* Issue #27: a verification failure must reach the caller with the
+	 * camera's actual state.  GP_LOG_E only reaches the logging API, so a
+	 * caller that installed an error callback but no log callback received a
+	 * bare GP_ERROR and could not tell what the body holds.  gp_context_error
+	 * reports through the context and logs at GP_LOG_ERROR as well, so both
+	 * audiences get requested and actual from one call. */
+	gp_context_error (ptp_context_get (params->data),
+		_("Pentax write to property 0x%04x was acknowledged but the body "
+		"still reports %s after 1000 ms (requested %s)."),
 		property, actual_text, expected_text);
 	return GP_ERROR;
 }
@@ -10139,7 +10179,8 @@ _put_Pentax_DirectAperture (CONFIG_PUT_ARGS)
 				 * Pentax conditions store a tenths numerator over 10. */
 				value.u16 / 10, 10,
 				_pentax_cond_aperture_num,
-				_pentax_cond_aperture_den);
+				_pentax_cond_aperture_den,
+				PENTAX_CONDITION_CAN_CHANGE_AV);
 		if (alreadyset)
 			*alreadyset = 1;
 	}
@@ -11793,7 +11834,7 @@ _put_Pentax_DirectDriveMode (CONFIG_PUT_ARGS)
 				"0xd013; verifying through conditions");
 			result = _pentax_verify_rational_in_conditions (params,
 				target, 0, _pentax_cond_drive_mode,
-				_pentax_cond_drive_mode_none);
+				_pentax_cond_drive_mode_none, 0);
 		}
 	}
 	if (result == GP_OK && alreadyset)
@@ -11970,12 +12011,66 @@ _put_Pentax_DirectEV (CONFIG_PUT_ARGS)
 			 * thousandths. Verify at tenth granularity. */
 			result = _pentax_verify_rational_in_conditions (params,
 				(uint32_t)(ev_thousandths / 100), 10,
-				_pentax_cond_ev_num, _pentax_cond_ev_den);
+				_pentax_cond_ev_num, _pentax_cond_ev_den,
+				PENTAX_CONDITION_CAN_CHANGE_XV);
 		if (alreadyset)
 			*alreadyset = 1;
 	}
 	ptp_free_devicepropdesc (&desc);
 	return result;
+}
+
+/* Extract the whole-second Bulb timer domain the body itself advertises for
+ * 0xd00f, in seconds.  Handles both descriptor forms: a Range form whose
+ * min/max are timer values, and an enumeration scanned for whole-second
+ * entries (denominator 1).  Returns 0 with *min == *max == 0 when the
+ * descriptor advertises no timer domain at all -- which is the B-mode,
+ * no-JPEG case where the enumeration comes back empty (#241) and the
+ * caller should fall back to the published subset.
+ *
+ * The descriptor may be one cached for up to params->cachetime seconds, so a
+ * dial change immediately before the write can leave it briefly stale.  That is
+ * safe in both directions: a stale domain either admits a request the body then
+ * refuses -- which the uncached read-back below reports honestly -- or refuses
+ * one the camera would have taken, which is an error rather than a false pass. */
+static void
+_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,
+	uint32_t *min, uint32_t *max)
+{
+	unsigned int i;
+
+	*min = 0;
+	*max = 0;
+
+	if (desc->DataType != PTP_DTC_UINT64)
+		return;
+	if (desc->FormFlag == PTP_DPFF_Range) {
+		uint32_t lo_den = (uint32_t)(desc->FORM.Range.MinValue.u64 >> 32);
+		uint32_t hi_den = (uint32_t)(desc->FORM.Range.MaxValue.u64 >> 32);
+
+		/* Both bounds must be timer values to describe a timer domain. */
+		if (lo_den != 1 || hi_den != 1)
+			return;
+		*min = (uint32_t)desc->FORM.Range.MinValue.u64;
+		*max = (uint32_t)desc->FORM.Range.MaxValue.u64;
+		return;
+	}
+	if (desc->FormFlag != PTP_DPFF_Enumeration ||
+		desc->FORM.Enum.NumberOfValues == 0 ||
+		!desc->FORM.Enum.SupportedValue)
+		return;
+	for (i = 0; i < desc->FORM.Enum.NumberOfValues; i++) {
+		uint64_t raw = desc->FORM.Enum.SupportedValue[i].u64;
+		uint32_t den = (uint32_t)(raw >> 32);
+		uint32_t num = (uint32_t)raw;
+
+		if (den != 1 || num == 0)
+			continue;
+		if (*min == 0 || num < *min)
+			*min = num;
+		if (num > *max)
+			*max = num;
+	}
 }
 
 static int
@@ -11985,6 +12080,7 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	PTPDevicePropDesc desc;
 	PTPPropValue value;
 	PentaxConditions conditions;
+	uint32_t timer_min, timer_max;
 	uint16_t ret;
 	int result;
 
@@ -12014,22 +12110,31 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	 * (~720 ms) before failing.  Refuse non-Bulb/seconds values up front
 	 * instead; Bulb/seconds entries still go through, because #101 warns the
 	 * camera-owned timer must not be assumed to work on our direct B path and
-	 * only the read-back below can tell whether one took effect. */
+	 * only the read-back below can tell whether one took effect.
+	 *
+	 * Timer requests are judged against the domain the body advertises for
+	 * 0xd00f, not the 13-entry list synthesised for an empty enumeration: the
+	 * K-3 III exposes 1-600 seconds in B and a 300->600->300 write round trip
+	 * passed on hardware, so 300 and 600 are values the camera accepts even
+	 * though they are absent from that subset. */
+	_pentax_advertised_bulb_timer_domain (&desc, &timer_min, &timer_max);
 	if (!pentax_shutter_write_permitted (conditions.capability_flags,
-		value.u64)) {
+		value.u64, timer_min, timer_max)) {
 		char refused[32];
 		const char *mode_name = pentax_exposure_mode_name (
 			conditions.exposure_mode);
 
 		pentax_format_shutter_speed (value.u64, refused, sizeof (refused));
 		GP_LOG_E ("pentax-shutter: refusing %s; body reports Tv-changeable=%s, "
-			"bulb-timer=%s (exposure mode %u/%s)", refused,
+			"bulb-timer=%s (exposure mode %u/%s, advertised timer domain "
+			"%u-%u s)", refused,
 			(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV) ?
 			"yes" : "no",
 			(conditions.capability_flags & PENTAX_CONDITION_BULB_TIMER) ?
 			"yes" : "no",
 			conditions.exposure_mode,
-			mode_name ? mode_name : "unmeasured code");
+			mode_name ? mode_name : "unmeasured code",
+			timer_min, timer_max);
 		ptp_free_devicepropdesc (&desc);
 		return GP_ERROR_NOT_SUPPORTED;
 	}
@@ -12054,10 +12159,15 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 				 * shutter speed rather than a bulb timer. */
 				GP_LOG_D ("pentax-shutter: body refused GetDevicePropValue for "
 					"0xd00f; verifying through conditions (Tv-changeable)");
+				/* CAN_CHANGE_TV is re-checked on every fresh sample inside the
+				 * verifier, not just in this pre-write snapshot: if the dial moves
+				 * to Bulb mid-window, offsets 272/276 become the bulb timer again
+				 * and a stale match there would recreate the false pass. */
 				result = _pentax_verify_rational_in_conditions (params,
 					(uint32_t)(value.u64 & 0xffffffffU),
 					(uint32_t)(value.u64 >> 32),
-					_pentax_cond_shutter_num, _pentax_cond_shutter_den);
+					_pentax_cond_shutter_num, _pentax_cond_shutter_den,
+					PENTAX_CONDITION_CAN_CHANGE_TV);
 			} else {
 				/* No read-back and no sound substitute: outside a Tv-changeable
 				 * mode offsets 272/276 are the bulb timer, not the value written.

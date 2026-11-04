@@ -33,6 +33,24 @@ def function_body(source: str, signature: str) -> str:
     raise AssertionError(f"unterminated function: {signature}")
 
 
+def strip_comments(source: str) -> str:
+    """Drop C comments so an assertion cannot be satisfied -- or defeated -- by
+    explanatory prose that merely mentions the token it is looking for."""
+    out = []
+    i = 0
+    while i < len(source):
+        if source.startswith("/*", i):
+            end = source.find("*/", i + 2)
+            i = len(source) if end < 0 else end + 2
+        elif source.startswith("//", i):
+            end = source.find("\n", i)
+            i = len(source) if end < 0 else end
+        else:
+            out.append(source[i])
+            i += 1
+    return "".join(out)
+
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -47,7 +65,9 @@ def main() -> int:
     utils = open(sys.argv[2], encoding="utf-8").read()
 
     shutter = function_body(config, "_put_Pentax_DirectShutter (CONFIG_PUT_ARGS)")
-    verifier = function_body(config, "_pentax_verify_property_value (PTPParams *params,")
+    verifier = strip_comments(function_body(config, "_pentax_verify_property_value (PTPParams *params,"))
+    conditions_verifier = strip_comments(function_body(
+        config, "_pentax_verify_rational_in_conditions (PTPParams *params,"))
     gate = function_body(utils, "pentax_shutter_write_permitted (uint32_t capability_flags,")
 
     # --- Change 1: the gate is a single shared predicate, not an inline OR. ---
@@ -103,9 +123,74 @@ def main() -> int:
             "a refused GetDevicePropValue must be distinguishable from a mismatch")
 
     # The conditions fallback is only sound while Tv is changeable; trusting
-    # offsets 272/276 in Bulb is exactly what produced the false pass.
+    # offsets 272/276 in Bulb is exactly what produced the false pass.  The bit
+    # must be re-checked on every fresh sample inside the verifier, not once from
+    # the caller's pre-write snapshot: the dial can move to B mid-window, and a
+    # requested 30/1 would then match the bulb timer and return GP_OK.
     require("PENTAX_CONDITION_CAN_CHANGE_TV" in shutter,
             "the conditions fallback must stay gated on CAN_CHANGE_TV")
+    require("_pentax_cond_shutter_den,\n\t\t\t\t\tPENTAX_CONDITION_CAN_CHANGE_TV)"
+            in shutter,
+            "the shutter conditions fallback must pass CAN_CHANGE_TV to the verifier")
+    require("required_capability" in conditions_verifier,
+            "the conditions verifier must take a required-capability argument")
+    # The guard must be one live expression: testing the bit against each fresh
+    # sample AND'd with the caller's requirement.  Asserting the two halves
+    # separately would still pass if the test were short-circuited away.  Match
+    # on whitespace-collapsed source so re-indentation cannot defeat it.
+    collapsed = " ".join(conditions_verifier.split())
+    require("if (required_capability && !(conditions.capability_flags & required_capability))"
+            in collapsed,
+            "the conditions verifier must test the required capability against "
+            "each fresh sample, not the caller's pre-write snapshot")
+    require("capability_lost = 1" in conditions_verifier,
+            "losing the capability mid-window must be recorded, never accepted")
+    require(conditions_verifier.index("capability_lost = 1") <
+            conditions_verifier.index("return GP_OK"),
+            "the capability check must precede any acceptance")
+    require("if (capability_lost)" in conditions_verifier,
+            "a lost capability must be reported as unconfirmed, not success")
+
+    # #27: the actual state must reach the caller, not only the log.  A caller
+    # with an error callback but no log callback would otherwise see a bare
+    # GP_ERROR.  Both terminal failure paths must report through the context, so
+    # two calls are required and no GP_LOG_E may remain in either verifier.
+    require(verifier.count("gp_context_error") >= 2,
+            "both verification failure paths (no read-back, and mismatch) must "
+            "report through gp_context_error")
+    require("GP_LOG_E" not in verifier,
+            "verification failures must not be log-only: a caller with an error "
+            "callback but no log callback would see only GP_ERROR")
+    require(conditions_verifier.count("gp_context_error") >= 2,
+            "both conditions verification failure paths must report through "
+            "gp_context_error")
+    require("GP_LOG_E" not in conditions_verifier,
+            "conditions verification failures must not be log-only either")
+
+    # The gate judges Bulb/seconds requests against the timer domain the body
+    # advertises for 0xd00f (K-3 III: 1-600 s, 300->600->300 write proven), not
+    # against the 13-entry list synthesised for an empty enumeration.
+    require("advertised_timer_min" in gate and "advertised_timer_max" in gate,
+            "the gate must take the advertised timer domain")
+    require("numerator >= advertised_timer_min" in gate and
+            "numerator <= advertised_timer_max" in gate,
+            "the gate must compare the request against the advertised bounds -- "
+            "300 and 600 s are hardware-proven writable but absent from the "
+            "13-entry synthesis subset")
+    require("pentax_shutter_value_is_bulb_seconds (requested)" in gate,
+            "the published subset must remain the fallback when no domain was read")
+    require(gate.index("advertised_timer_min == 0") <
+            gate.index("numerator >= advertised_timer_min"),
+            "the advertised domain must win whenever it is known")
+    require("_pentax_advertised_bulb_timer_domain (&desc, &timer_min, &timer_max)"
+            in shutter,
+            "shutter put must read the advertised timer domain from the descriptor")
+    require("PTP_DPFF_Range" in function_body(
+        config, "_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,"),
+        "the advertised domain must handle a Range form descriptor")
+    require("den != 1" in function_body(
+        config, "_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,"),
+        "the advertised domain must ignore non-timer (1/N) entries")
 
     # --- Change 3: unmeasured exposure-mode codes must not get invented names. ---
     naming = function_body(utils, "pentax_exposure_mode_name (uint32_t exposure_mode)")
