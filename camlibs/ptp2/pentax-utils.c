@@ -91,7 +91,7 @@ pentax_exposure_mode_name (uint32_t exposure_mode)
 
 int
 pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
-        uint32_t advertised_timer_min, uint32_t advertised_timer_max)
+        const uint32_t *advertised_seconds, unsigned int advertised_count)
 {
         /* A bulb timer existing does not mean arbitrary shutter values are
          * writable.  On the K-1 II, Bulb clears CAN_CHANGE_TV but sets BULB_TIMER:
@@ -106,15 +106,20 @@ pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
          * still go through and are judged honestly by the post-write read-back
          * rather than being refused or accepted here.
          *
-         * The timer domain is what the body itself advertises for 0xd00f, not the
-         * 13-entry list synthesised for an empty enumeration.  The K-3 III exposes
-         * 1-600 seconds in B and a 300->600->300 round trip passed on hardware
-         * (docs/pentax/REAL_HARDWARE_TEST_LOG.md), so rejecting 300 or 600 because
-         * they are absent from the synthesis subset would refuse values the camera
-         * accepts.  advertised_timer_min == 0 means no domain could be read -- an
-         * empty B-mode enumeration -- and the published subset is used instead. */
+         * The timer domain is the exact set of whole-second values the body
+         * advertises for 0xd00f, not the 13-entry list synthesised for an empty
+         * enumeration.  Measured on the K-3 III in B the descriptor is an
+         * enumeration (form=2) spanning up to 600 seconds with a 300->600->300
+         * write round trip passing, so 300 and 600 are values the camera accepts
+         * even though they are absent from the synthesis subset.  It is an
+         * enumeration rather than a Range, and its second-counts are sparse --
+         * 6 is followed by 8, with no 7 -- so membership must be exact: a min/max
+         * bound would wrongly admit 7.  advertised_count == 0 means the descriptor
+         * advertised no timer domain (the empty B-mode enumeration of #241) and
+         * the published subset is used instead. */
         uint32_t denominator = (uint32_t)(requested >> 32);
         uint32_t numerator = (uint32_t)requested;
+        unsigned int i;
 
         if (capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV)
                 return 1;
@@ -125,10 +130,12 @@ pentax_shutter_write_permitted (uint32_t capability_flags, uint64_t requested,
          * denominator, so it never matches here. */
         if (denominator != 1 || numerator == 0)
                 return 0;
-        if (advertised_timer_min == 0 || advertised_timer_max == 0)
+        if (advertised_count == 0 || !advertised_seconds)
                 return pentax_shutter_value_is_bulb_seconds (requested);
-        return numerator >= advertised_timer_min &&
-               numerator <= advertised_timer_max;
+        for (i = 0; i < advertised_count; i++)
+                if (advertised_seconds[i] == numerator)
+                        return 1;
+        return 0;
 }
 
 int

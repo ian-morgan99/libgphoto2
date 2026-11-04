@@ -167,30 +167,34 @@ def main() -> int:
     require("GP_LOG_E" not in conditions_verifier,
             "conditions verification failures must not be log-only either")
 
-    # The gate judges Bulb/seconds requests against the timer domain the body
-    # advertises for 0xd00f (K-3 III: 1-600 s, 300->600->300 write proven), not
-    # against the 13-entry list synthesised for an empty enumeration.
-    require("advertised_timer_min" in gate and "advertised_timer_max" in gate,
-            "the gate must take the advertised timer domain")
-    require("numerator >= advertised_timer_min" in gate and
-            "numerator <= advertised_timer_max" in gate,
-            "the gate must compare the request against the advertised bounds -- "
-            "300 and 600 s are hardware-proven writable but absent from the "
-            "13-entry synthesis subset")
+    # The gate judges Bulb/seconds requests against the exact set of whole-second
+    # values the body advertises for 0xd00f (K-3 III: an enumeration up to 600 s,
+    # 300->600->300 write proven), not the 13-entry list synthesised for an empty
+    # enumeration.  The advertised counts are sparse -- measured, 6 is followed by
+    # 8 with no 7 -- so membership must be exact: a min/max bound would wrongly
+    # admit 7.
+    require("advertised_seconds" in gate and "advertised_count" in gate,
+            "the gate must take the advertised timer value set")
+    require("advertised_seconds[i] == numerator" in gate,
+            "the gate must test exact membership of the advertised set -- a "
+            "min/max bound would admit unadvertised values like 7 s")
+    require("advertised_timer_min" not in gate and
+            "advertised_timer_max" not in gate,
+            "the gate must not fall back to min/max bounds: the B descriptor is "
+            "an enumeration with sparse second-counts")
     require("pentax_shutter_value_is_bulb_seconds (requested)" in gate,
             "the published subset must remain the fallback when no domain was read")
-    require(gate.index("advertised_timer_min == 0") <
-            gate.index("numerator >= advertised_timer_min"),
-            "the advertised domain must win whenever it is known")
-    require("_pentax_advertised_bulb_timer_domain (&desc, &timer_min, &timer_max)"
-            in shutter,
-            "shutter put must read the advertised timer domain from the descriptor")
-    require("PTP_DPFF_Range" in function_body(
-        config, "_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,"),
-        "the advertised domain must handle a Range form descriptor")
-    require("den != 1" in function_body(
-        config, "_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,"),
-        "the advertised domain must ignore non-timer (1/N) entries")
+    require(gate.index("advertised_count == 0") <
+            gate.index("advertised_seconds[i] == numerator"),
+            "the advertised set must win whenever it is non-empty")
+    require("_pentax_advertised_bulb_timer_seconds (&desc," in shutter,
+            "shutter put must read the advertised timer values from the descriptor")
+    helper = function_body(
+        config, "_pentax_advertised_bulb_timer_seconds (const PTPDevicePropDesc *desc,")
+    require("PTP_DPFF_Range" in helper and "PTP_DPFF_Enumeration" in helper,
+            "the advertised timer reader must handle both Range and enumeration forms")
+    require("den != 1 || num == 0" in helper,
+            "the advertised timer reader must ignore non-timer (1/N) entries")
 
     # --- Change 3: unmeasured exposure-mode codes must not get invented names. ---
     naming = function_body(utils, "pentax_exposure_mode_name (uint32_t exposure_mode)")

@@ -12020,57 +12020,71 @@ _put_Pentax_DirectEV (CONFIG_PUT_ARGS)
 	return result;
 }
 
-/* Extract the whole-second Bulb timer domain the body itself advertises for
- * 0xd00f, in seconds.  Handles both descriptor forms: a Range form whose
- * min/max are timer values, and an enumeration scanned for whole-second
- * entries (denominator 1).  Returns 0 with *min == *max == 0 when the
- * descriptor advertises no timer domain at all -- which is the B-mode,
- * no-JPEG case where the enumeration comes back empty (#241) and the
- * caller should fall back to the published subset.
+/* Collect the whole-second Bulb timer values the body itself advertises for
+ * 0xd00f, in seconds, into buf (capacity buf_capacity) and return how many were
+ * written.  Handles both descriptor forms: a Range form whose min/max are timer
+ * values is treated as its endpoints, and an enumeration is scanned for
+ * whole-second entries (denominator 1).  Returns 0 when the descriptor
+ * advertises no timer domain at all -- which is the B-mode, no-JPEG case where
+ * the enumeration comes back empty (#241) and the caller should fall back to the
+ * published subset.
+ *
+ * The advertised second-counts are sparse (measured: 6 is followed by 8), so the
+ * exact set is kept rather than a min/max bound -- a bound would admit values
+ * the camera never offered.  Duplicates are dropped and the list is bounded to
+ * buf_capacity; the timer subset of a shutter enumeration is small.
  *
  * The descriptor may be one cached for up to params->cachetime seconds, so a
  * dial change immediately before the write can leave it briefly stale.  That is
- * safe in both directions: a stale domain either admits a request the body then
+ * safe in both directions: a stale set either admits a request the body then
  * refuses -- which the uncached read-back below reports honestly -- or refuses
  * one the camera would have taken, which is an error rather than a false pass. */
-static void
-_pentax_advertised_bulb_timer_domain (const PTPDevicePropDesc *desc,
-	uint32_t *min, uint32_t *max)
+#define PENTAX_ADVERTISED_TIMER_MAX 64
+static unsigned int
+_pentax_advertised_bulb_timer_seconds (const PTPDevicePropDesc *desc,
+	uint32_t *buf, unsigned int buf_capacity)
 {
 	unsigned int i;
-
-	*min = 0;
-	*max = 0;
+	unsigned int count = 0;
 
 	if (desc->DataType != PTP_DTC_UINT64)
-		return;
+		return 0;
+
 	if (desc->FormFlag == PTP_DPFF_Range) {
 		uint32_t lo_den = (uint32_t)(desc->FORM.Range.MinValue.u64 >> 32);
 		uint32_t hi_den = (uint32_t)(desc->FORM.Range.MaxValue.u64 >> 32);
 
 		/* Both bounds must be timer values to describe a timer domain. */
 		if (lo_den != 1 || hi_den != 1)
-			return;
-		*min = (uint32_t)desc->FORM.Range.MinValue.u64;
-		*max = (uint32_t)desc->FORM.Range.MaxValue.u64;
-		return;
+			return 0;
+		buf[count++] = (uint32_t)desc->FORM.Range.MinValue.u64;
+		if (count < buf_capacity &&
+			(uint32_t)desc->FORM.Range.MaxValue.u64 != buf[0])
+			buf[count++] = (uint32_t)desc->FORM.Range.MaxValue.u64;
+		return count;
 	}
 	if (desc->FormFlag != PTP_DPFF_Enumeration ||
 		desc->FORM.Enum.NumberOfValues == 0 ||
 		!desc->FORM.Enum.SupportedValue)
-		return;
-	for (i = 0; i < desc->FORM.Enum.NumberOfValues; i++) {
+		return 0;
+	for (i = 0; i < desc->FORM.Enum.NumberOfValues && count < buf_capacity; i++) {
 		uint64_t raw = desc->FORM.Enum.SupportedValue[i].u64;
 		uint32_t den = (uint32_t)(raw >> 32);
 		uint32_t num = (uint32_t)raw;
+		unsigned int j;
+		int dup = 0;
 
 		if (den != 1 || num == 0)
 			continue;
-		if (*min == 0 || num < *min)
-			*min = num;
-		if (num > *max)
-			*max = num;
+		for (j = 0; j < count; j++)
+			if (buf[j] == num) {
+				dup = 1;
+				break;
+			}
+		if (!dup)
+			buf[count++] = num;
 	}
+	return count;
 }
 
 static int
@@ -12080,7 +12094,8 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	PTPDevicePropDesc desc;
 	PTPPropValue value;
 	PentaxConditions conditions;
-	uint32_t timer_min, timer_max;
+	uint32_t advertised_timer[PENTAX_ADVERTISED_TIMER_MAX];
+	unsigned int advertised_count;
 	uint16_t ret;
 	int result;
 
@@ -12112,29 +12127,32 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 	 * camera-owned timer must not be assumed to work on our direct B path and
 	 * only the read-back below can tell whether one took effect.
 	 *
-	 * Timer requests are judged against the domain the body advertises for
-	 * 0xd00f, not the 13-entry list synthesised for an empty enumeration: the
-	 * K-3 III exposes 1-600 seconds in B and a 300->600->300 write round trip
-	 * passed on hardware, so 300 and 600 are values the camera accepts even
-	 * though they are absent from that subset. */
-	_pentax_advertised_bulb_timer_domain (&desc, &timer_min, &timer_max);
+	 * Timer requests are judged against the exact set of whole-second values the
+	 * body advertises for 0xd00f, not the 13-entry list synthesised for an empty
+	 * enumeration: measured in B the descriptor is an enumeration spanning up to
+	 * 600 seconds and a 300->600->300 write round trip passed on hardware, so 300
+	 * and 600 are values the camera accepts even though they are absent from that
+	 * subset.  The advertised counts are sparse (6 then 8), hence exact membership
+	 * rather than a min/max bound. */
+	advertised_count = _pentax_advertised_bulb_timer_seconds (&desc,
+		advertised_timer, PENTAX_ADVERTISED_TIMER_MAX);
 	if (!pentax_shutter_write_permitted (conditions.capability_flags,
-		value.u64, timer_min, timer_max)) {
+		value.u64, advertised_timer, advertised_count)) {
 		char refused[32];
 		const char *mode_name = pentax_exposure_mode_name (
 			conditions.exposure_mode);
 
 		pentax_format_shutter_speed (value.u64, refused, sizeof (refused));
 		GP_LOG_E ("pentax-shutter: refusing %s; body reports Tv-changeable=%s, "
-			"bulb-timer=%s (exposure mode %u/%s, advertised timer domain "
-			"%u-%u s)", refused,
+			"bulb-timer=%s (exposure mode %u/%s, %u advertised timer "
+			"values)", refused,
 			(conditions.capability_flags & PENTAX_CONDITION_CAN_CHANGE_TV) ?
 			"yes" : "no",
 			(conditions.capability_flags & PENTAX_CONDITION_BULB_TIMER) ?
 			"yes" : "no",
 			conditions.exposure_mode,
 			mode_name ? mode_name : "unmeasured code",
-			timer_min, timer_max);
+			advertised_count);
 		ptp_free_devicepropdesc (&desc);
 		return GP_ERROR_NOT_SUPPORTED;
 	}
