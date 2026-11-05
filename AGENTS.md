@@ -2,6 +2,28 @@
 
 These instructions apply to all work in this repository.
 
+## Which repo does this belong in?
+
+This repository is the **camera library only** — C code that talks to cameras over
+USB. Everything else lives in
+`ian-morgan99/benro-polaris-firmware-patcher`: build scripts, packaging,
+releases, documentation, firmware patching of the Benro Polaris device, and the
+issue tracker people actually follow.
+
+Before opening an issue here, ask: **does the fix require changing C code that
+talks to a camera?** If no, file it in the patcher repo. In particular, anything
+that requires changing a compiled binary inside the Polaris firmware (`pgphoto`,
+`sp_camera`) is patcher work, never a driver issue — the driver cannot ship a
+firmware change.
+
+Issue numbering: driver is `#1xx`, patcher is `#2xx`. A driver issue that turns
+out to need a firmware change is closed with a pointer to the patcher issue. The
+worked example is libgphoto2 #145, closed 2026-11-05: the library's cancellation
+handling was proven correct on a real K-3 III, and the remaining work belongs to
+patcher #251.
+
+The full cross-repo map is `docs/WHO-DOES-WHAT.md` in the patcher repository.
+
 ## Two-agent working agreement
 
 Development is done in the coding session; a separate review/verification agent reads
