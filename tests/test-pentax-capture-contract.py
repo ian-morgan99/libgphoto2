@@ -88,6 +88,24 @@ def main() -> int:
     # never arrives -- so every timed capture spun forever. Operator verdict:
     # "objectively worse than .74". Reverted in df9d72745; these checks keep it out.
     fallback = fallback_region(source)
+    bulb_fallback = action[action.index("if (params->pentax.bulb_action_timed_fallback)"):action.index("if (!params->pentax.bulb_action_active", action.index("if (params->pentax.bulb_action_timed_fallback)"))]
+    cancel_check = "gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL"
+    require(cancel_check in bulb_fallback,
+            "deferred camera-timed fallback must honor cancellation")
+    require(bulb_fallback.index(cancel_check) <
+            bulb_fallback.index("ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed"),
+            "deferred cancellation must be checked before initiating the new exposure")
+    require("bulb_action_timed_fallback = 0;" in bulb_fallback and
+            "bulb_action_start_ms = 0;" in bulb_fallback and
+            "bulb_action_body_reported_seconds = 0;" in bulb_fallback,
+            "deferred cancellation must clear the pending fallback state")
+    require("return GP_ERROR_CANCEL;" in bulb_fallback,
+            "deferred cancellation must report GP_ERROR_CANCEL")
+    # The source-level contract above is deliberately narrow: held Bulb remains
+    # below this branch and retains its explicit TerminateCapture lifecycle.
+    require(action.index(cancel_check) <
+            action.index("if (!params->pentax.bulb_action_active"),
+            "deferred cancellation check must not be moved into held Bulb")
     require("ptp_getdevicepropvalue" not in fallback,
             "camera-timed fallback must not read back PTP_DPC_PENTAX_ShutterSpeed: "
             "GetDevicePropValue is not a supported read path for this property "

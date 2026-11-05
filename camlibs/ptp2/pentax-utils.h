@@ -534,6 +534,13 @@ int pentax_parse_conditions (const unsigned char *data, size_t size,
 	PentaxConditions *conditions);
 /* True only when the conditions frame permits a vendor-property write. */
 int pentax_conditions_are_idle (const PentaxConditions *conditions);
+
+/* Reproduce IMAGE Transmitter 2's live release-mode selection before an
+ * InitiateCapture action.  The AF-only action still uses focus mode 1; this
+ * helper supplies the current release mode rather than assuming normal still
+ * mode for every exposure/drive state. */
+int pentax_it2_release_mode (uint32_t vendor_ext_version,
+	const PentaxConditions *conditions, uint32_t *release_mode);
 int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_old_focus_protocol_direction (int direction,
@@ -545,6 +552,9 @@ int pentax_model_supports_exp_bracket (uint32_t model_no);
 int pentax_model_supports_composition_adjust (uint32_t model_no);
 int pentax_model_supports_movie_setting (uint32_t model_no);
 int pentax_model_supports_pc_live_view (uint32_t model_no);
+/* IMAGE Transmitter 2 starts PC live view directly on these bodies: it reads
+ * the live-view geometry, sets d035=1, and does not first GET d035. */
+int pentax_model_uses_it2_direct_live_view_start (uint32_t model_no);
 /* Format a shutter-speed UINT64 wire value (high 32 = denominator, low 32 =
  * numerator) for display: "Auto", "<n>s" for whole-second timer values
  * (Bulb timer), "1/<n>" and "<a>/<b>" for fractions.  Returns 0 on success. */
@@ -571,6 +581,10 @@ int pentax_wff_raw_kind_byte (const char *value);
 const char *pentax_wff_raw_kind_label (uint8_t raw_kind);
 int pentax_wff_quality_byte (const char *value);
 int pentax_wff_payload_is_valid (const unsigned char *payload, size_t size);
+int pentax_wff_set_format (unsigned char *payload, size_t size,
+	const char *value);
+int pentax_wff_set_raw_kind (unsigned char *payload, size_t size,
+	const char *value);
 int pentax_capture_buffer_write (PentaxCaptureBuffer *buffer,
 	const unsigned char *data, size_t size);
 int pentax_capture_buffer_seek (PentaxCaptureBuffer *buffer,

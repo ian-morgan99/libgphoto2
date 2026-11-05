@@ -1,0 +1,119 @@
+The Meson build system
+Version: 1.12.0
+Source dir: /home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main
+Build dir: /home/ian/Documents/VSCodeProjects/LibGphoto2/build-pentax-cleanup-main
+Build type: native build
+Project name: libgphoto2
+Project version: 2.5.34
+C compiler for the host machine: /home/ian/.local/bin/ccache cc (gcc 13.3.0 "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0")
+C linker for the host machine: cc ld.bfd 2.42
+Host machine cpu family: x86_64
+Host machine cpu: x86_64
+Program python3 found: YES (/home/ian/.local/share/uv/tools/meson/bin/python)
+Compiler for C supports arguments -Werror=unknown-warning-option: NO 
+Compiler for C supports arguments -Werror=incompatible-pointer-types: YES 
+Compiler for C supports arguments -Werror=implicit: YES 
+Compiler for C supports arguments -Werror=int-conversion: YES 
+Compiler for C supports arguments -Wno-error=reserved-identifier: NO 
+Compiler for C supports arguments -Wno-error=documentation-deprecated-sync: NO 
+Compiler for C supports arguments -Wno-unused-parameter: YES 
+Compiler for C supports arguments -Wno-unused: YES 
+Library m found: YES
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Run-time dependency libxml-2.0 found: YES 2.9.14
+Run-time dependency libcurl found: YES 8.5.0
+Run-time dependency gdlib found: YES 2.3.3
+Run-time dependency libexif found: YES 0.6.24
+Run-time dependency libjpeg found: YES 2.1.5
+Run-time dependency libtiff-4 found: YES 4.5.1
+Run-time dependency intl found: YES
+Checking for function "va_copy" : YES 
+Checking for function "strncpy" : YES 
+Checking for function "snprintf" : YES 
+Checking for function "statvfs" : YES 
+Checking for function "localtime_r" : YES 
+Checking for function "lstat" : YES 
+Checking for function "inet_aton" : YES 
+Checking for function "setenv" : YES 
+Checking whether type "struct tm" has member "tm_gmtoff" : YES 
+Checking whether type "ExifData" has member "ifd" with dependency libexif: YES 
+Checking if "Make sure we can actually compile and link against libjpeg." with dependency libjpeg links: YES 
+Has header "iconv.h" : YES 
+Has header "sys/param.h" : YES 
+Has header "sys/mman.h" : YES 
+Has header "sys/select.h" : YES 
+Has header "locale.h" : YES 
+Has header "memory.h" : YES 
+Has header "getopt.h" : YES 
+Has header "unistd.h" : YES 
+Has header "mcheck.h" : YES 
+Has header "limits.h" : YES 
+Has header "sys/time.h" : YES 
+Has header "langinfo.h" : YES 
+Has header "stdio.h" : YES 
+Has header "stdlib.h" : YES 
+Has header "string.h" : YES 
+Has header "sys/statvfs.h" : YES 
+Checking for function "mmap" : YES 
+Compiler for C supports link arguments -Wl,--version-script=/home/ian/Documents/VSCodeProjects/LibGphoto2-v86-main/libgphoto2_port/libgphoto2_port/libgphoto2_port.ver: YES 
+Configuring config.h using configuration
+Configuring gphoto2-config using configuration
+Has header "ltdl.h" : YES 
+Library ltdl found: YES
+Run-time dependency libusb-1.0 found: YES 1.0.27
+Checking for function "libusb_strerror" with dependency libusb-1.0: YES 
+Checking for function "libusb_wrap_sys_device" with dependency libusb-1.0: YES 
+Checking if "Has LIBUSB_OPTION_NO_DEVICE_DISCOVERY" with dependency libusb-1.0 compiles: YES 
+Library lockdev found: NO
+Has header "ttylock.h" : NO 
+Has header "regex.h" : YES 
+Checking for function "re_compile_pattern" : NO 
+Has header "stdlib.h" : YES (cached)
+Has header "unistd.h" : YES (cached)
+Has header "stdio.h" : YES (cached)
+Has header "errno.h" : YES 
+Has header "sys/time.h" : YES (cached)
+Has header "sys/param.h" : YES (cached)
+Has header "sys/select.h" : YES (cached)
+Has header "termios.h" : YES 
+Has header "sgetty.h" : NO 
+Has header "ttold.h" : NO 
+Has header "ioctl-types.h" : NO 
+Has header "fcntl.h" : YES 
+Has header "sgtty.h" : YES 
+Has header "sys/ioctl.h" : YES 
+Has header "sys/time.h" : YES (cached)
+Has header "termio.h" : YES 
+Has header "unistd.h" : YES (cached)
+Has header "endian.h" : YES 
+Has header "byteswap.h" : YES 
+Has header "asm/io.h" : NO 
+Has header "mntent.h" : YES 
+Has header "sys/mntent.h" : NO 
+Has header "sys/mnttab.h" : NO 
+Has header "scsi/sg.h" : YES 
+Has header "limits.h" : YES (cached)
+Has header "sys/file.h" : YES 
+Has header "lockdev.h" : NO 
+Has header "ttylock.h" : NO (cached)
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Program msgfmt found: YES (/usr/bin/msgfmt)
+Program msginit found: YES (/usr/bin/msginit)
+Program msgmerge found: YES (/usr/bin/msgmerge)
+Program xgettext found: YES (/usr/bin/xgettext)
+Configuring gphoto2-endian.h using configuration
+Run-time dependency threads found: YES
+Build targets in project: 94
+
+libgphoto2 2.5.34
+
+  User defined options
+    camlibs                : ptp2,directory
+    docs                   : false
+    iolibs                 : libusb1,disk
+    libdir                 : lib
+    pentax_research_capture: false
+    prefix                 : /home/ian/Documents/VSCodeProjects/LibGphoto2/prefix-pentax-cleanup-main
+    wrap_mode              : nodownload
+
+Found ninja-1.13.0.git.kitware.jobserver-pipe-1 at /home/ian/.local/bin/ninja

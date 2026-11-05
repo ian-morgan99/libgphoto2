@@ -411,9 +411,21 @@ main (void)
 		unsigned char wff10[10] = { 6, 0, 0, 0, 2, 2, 4, 1, 0, 1 };
 		unsigned char wff11[11] = { 7, 0, 0, 0, 2, 2, 4, 1, 0, 1, 2 };
 		unsigned char malformed_wff[11];
+		unsigned char original_wff10[10];
 		memcpy (malformed_wff, wff11, sizeof (malformed_wff));
+		memcpy (original_wff10, wff10, sizeof (original_wff10));
 		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
 		CHECK (pentax_wff_payload_is_valid (wff11, sizeof (wff11)));
+		CHECK (pentax_wff_set_format (wff10, sizeof (wff10), "RAW") == 0);
+		CHECK (wff10[4] == 1 && wff10[5] == 1);
+		CHECK (wff10[8] == original_wff10[8] && wff10[9] == original_wff10[9]);
+		CHECK (pentax_wff_set_raw_kind (wff10, sizeof (wff10), "DNG") == 0);
+		CHECK (wff10[8] == PTP_PENTAX_RAW_KIND_DNG);
+		CHECK (wff10[4] == 1 && wff10[5] == 1 && wff10[9] == original_wff10[9]);
+		CHECK (pentax_wff_set_raw_kind (wff10, sizeof (wff10), "PEF") == 0);
+		CHECK (wff10[8] == PTP_PENTAX_RAW_KIND_PEF);
+		CHECK (pentax_wff_set_format (wff10, sizeof (wff10), "PEF") == -1);
+		CHECK (pentax_wff_set_raw_kind (wff10, sizeof (wff10), "RAW") == -1);
 		wff10[4] = 3;
 		wff10[5] = 3;
 		CHECK (pentax_wff_payload_is_valid (wff10, sizeof (wff10)));
@@ -712,6 +724,48 @@ main (void)
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1_MARK_II));
 	CHECK (!pentax_model_uses_new_focus (PENTAX_MODEL_K1));
 	CHECK (!pentax_model_uses_new_focus (0));
+	{
+		PentaxConditions conditions;
+		uint32_t release_mode;
+
+		memset (&conditions, 0, sizeof (conditions));
+		conditions.exposure_mode = 8;
+		conditions.drive_mode = 1;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		conditions.exposure_mode = 9;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 2);
+		conditions.capability_flags = PENTAX_CONDITION_BULB_TIMER;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		conditions.capability_flags = 0;
+		conditions.exposure_mode = 8;
+		conditions.activity_flags = PENTAX_CONDITION_ACTIVITY_MOVIE_MODE;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 3);
+		conditions.drive_mode = 4;
+		CHECK (pentax_it2_release_mode (1, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 1);
+		CHECK (pentax_it2_release_mode (0, &conditions,
+			&release_mode) == GP_OK);
+		CHECK (release_mode == 0);
+		CHECK (pentax_it2_release_mode (1, NULL, &release_mode) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_it2_release_mode (1, &conditions, NULL) ==
+			GP_ERROR_BAD_PARAMETERS);
+	}
+	/* IMAGE Transmitter 2 starts PC live view directly on both K-1 bodies;
+	 * the K-3 III remains on the observed-state path. */
+	CHECK (pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K1));
+	CHECK (pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K1_MARK_II));
+	CHECK (!pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_K3_MARK_III));
+	CHECK (!pentax_model_uses_it2_direct_live_view_start (PENTAX_MODEL_KP));
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III) != NULL);
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->k3iii_family);
 	CHECK (pentax_model_capabilities (PENTAX_MODEL_K3_MARK_III)->supports_pc_live_view);

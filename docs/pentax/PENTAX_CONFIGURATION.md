@@ -16,11 +16,12 @@ expected datatype:
 |---|---:|---:|---|
 | `iso` | ExposureIndex `0x500f` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
 | `f-number` / `aperture` | FNumber `0x5007` | UINT16 | Hardware descriptor verified read/write |
-| `whitebalance` | WhiteBalance `0x5005` | UINT16 | Hardware descriptor verified read/write |
+| `whitebalance` | WhiteBalance `0x5005` | UINT16 | Pentax-gated IT2 alias; works even when modern bodies omit `0x5005` from DeviceInfo; hardware re-qualification pending |
 | `focusmode` | FocusMode `0x500a` | UINT16 | Absent on K-3 III firmware 2.20; do not expose through this path |
 | `exposurecompensation` | ExposureBiasCompensation `0x5010` | INT16 | Hardware descriptor verified read/write |
 | `shutterspeed` | Pentax/Ricoh `0xd00f` | UINT64 rational | K-3 III descriptor read; K-1 II direct read verified, but an acknowledged M-mode write was ignored, so general write support is not yet proven |
 | `imageformat` | Pentax WritingFileFormat `0xd01b` | IT2 compound 10/11-byte payload | Source-authorised K-1/K-1 II/K-3 III/Monochrome path; read-modify-write preserves unrelated bytes and requires exact raw read-back; hardware qualification remains open |
+| `pentaxrawformat` | Pentax WritingFileFormat `0xd01b`, RawKind byte 8 | `PEF` / `DNG` radio | Source-authorised K-1/K-1 II/K-3 III/Monochrome path; changes only byte 8 and requires exact raw read-back; hardware qualification remains open |
 | `imagequality` | Pentax WritingFileFormat `0xd01b`, byte 7 | IT2 quality byte (`0=fine`, `1=normal`, `2=basic`) | Separate source-authorised control over the same compound payload; exact raw read-back and hardware transfer correlation remain open |
 
 The IT2 2625 model gate assigns K-1 model 77970 and K-3 III Monochrome model
@@ -34,6 +35,24 @@ Pentax name is an alias for the same wire property. K-1 II does not advertise
 it in DeviceInfo, so the exact-model `pentaxdirectshutter` widget requests its
 descriptor on demand. Its setter verifies the post-write descriptor and fails
 if a camera acknowledges but retains the old value.
+
+The public `whitebalance` widget follows the same missing-DeviceInfo rule on
+modern Pentax bodies: its Pentax-vendor alias requests the `0x5005` descriptor
+on demand and uses the complete 18-entry IT2 list-index contract. The exact
+labels are `auto`, `multi-auto`, `daylight`, `shade`, `cloudy`,
+`fluorescent-d`, `fluorescent-n`, `fluorescent-w`, `fluorescent-l`, `tungsten`,
+`flash`, `cte`, `manual-1` through `manual-3`, and `color-temp-1` through
+`color-temp-3`, as represented by the source LUT. Polaris must send the
+selected list index, not the raw PTP value; libgphoto2 performs the raw-value
+mapping.
+
+The failure seen through Polaris was at widget discovery, before any WB write:
+Polaris code 266 asks for the public `whitebalance` config, but the K-1 II's
+DeviceInfo omits `0x5005`. Before this alias existed, libgphoto2 therefore
+skipped its generic property row and returned no usable widget; Polaris logged
+`RD:0;V:;R:;` and treated the request as failed. The alias makes that public
+request reach the direct descriptor handler while leaving the generic path for
+non-Pentax cameras.
 
 On K-1 II in physical M, 1/500→1/125 produced the exact IT2 payload and PTP OK,
 but immediate and fresh-session reads retained 1/500. The explicit restoration
@@ -53,9 +72,10 @@ post-write value through live conditions. A single-session 200→400→200 round
 trip and independent restoration check passed on hardware.
 
 Read-only widget decoding on firmware 2.20 passed for white balance, aperture,
-exposure compensation, and shutter speed. Several white-balance enumeration
-values remain deliberately labelled `Unknown value` because the existing
-Pentax table does not name them; no labels are guessed.
+exposure compensation, and shutter speed. The former generic Pentax table left
+some white-balance values as `Unknown value`; the current public Pentax alias
+uses the complete source LUT instead. Hardware re-qualification of the public
+widget remains pending.
 
 A controlled cold-start sequence subsequently reconfirmed shutter property
 `0xd00f` through read-only `GetDevicePropDesc` (`0x1014`): UINT64 rational,

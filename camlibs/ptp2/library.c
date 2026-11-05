@@ -3387,6 +3387,7 @@ camera_exit (Camera *camera, GPContext *context)
 {
 	int exit_result = PTP_RC_OK;
 	int exit_gp_result = GP_OK;
+	int pentax_exit = 0;
 	if (camera->pl!=NULL) {
 		PTPParams *params = &camera->pl->params;
 		PTPContainer event;
@@ -3395,6 +3396,7 @@ camera_exit (Camera *camera, GPContext *context)
 		switch (params->pentax.vendor_mode_enabled ? PTP_VENDOR_PENTAX :
 			params->deviceinfo.VendorExtensionID) {
 		case PTP_VENDOR_PENTAX:
+			pentax_exit = 1;
 			if (params->pentax.vendor_mode_enabled ||
 			    params->pentax.vendor_mode_unknown) {
 				uint32_t function_flags = 0;
@@ -3421,13 +3423,10 @@ camera_exit (Camera *camera, GPContext *context)
 					GP_LOG_D ("Pentax vendor mode disabled");
 					params->pentax.vendor_mode_enabled = 0;
 					params->pentax.vendor_mode_unknown = 0;
-					/* Belt and braces: ask the camera to tear
-					 * down its vendor session so the next
-					 * connect does not hit a stale session
-					 * (0x201e) that blocks vendor enable
-					 * (issue #33). */
-					if (PTP_RC_OK != ptp_pentax_camera_shutdown (params))
-						GP_LOG_D ("Pentax camera shutdown (0x9002) not accepted; relying on CloseSession");
+					/* IT2 Disconnect disables vendor mode and closes
+					 * the transport. CameraShutdown (0x9002) belongs
+					 * to its separate explicit shutdown action, not
+					 * ordinary cleanup or stale-session recovery. */
 				}
 			}
 			break;
@@ -3505,7 +3504,12 @@ camera_exit (Camera *camera, GPContext *context)
 		/* 2016 EOS cameras do not like that and report 0x2005 on all following opcodes */
 		if (!DONT_CLOSE_SESSION(params)) {
 			/* close ptp session */
-			ptp_closesession (params);
+			uint16_t close_result = ptp_closesession (params);
+			/* Preserve the first Pentax cleanup error, including a
+			 * failed CloseSession after a successful vendor disable.
+			 * Other vendors retain their existing return semantics. */
+			if (pentax_exit && exit_result == PTP_RC_OK)
+				exit_result = close_result;
 		}
 exitfailed:
 		pentax_capture_publications_clear (params);
@@ -3781,18 +3785,20 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			return GP_ERROR_NOT_SUPPORTED;
 		SET_CONTEXT_P (params, context);
 		if (!params->inliveview) {
-			ret = ptp_getdevicepropvalue (params,
-				PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
-			if (ret != PTP_RC_OK) {
-				gp_context_status (context,
-					_("Pentax preview stage read-PC-LV returned 0x%04x."), ret);
-				if ((params->pentax.model_no == PENTAX_MODEL_K1_MARK_II) &&
-				    (ret == PTP_ERROR_IO)) {
-					/* K-1 II returns an empty 0xd035 value and a datatype-zero
-					 * descriptor.  In a fresh non-live-view session, follow IT2's
-					 * direct start/stop path and restore explicitly to zero. */
-					value.u8 = 0;
-				} else {
+			if (pentax_model_uses_it2_direct_live_view_start (
+					params->pentax.model_no)) {
+				/* IMAGE Transmitter 2 does not GET d035 before starting PC-LV.
+				 * The K-1 family can reject that preliminary read even though
+				 * the source-defined SET d035=1 and 0x9006 frame operation work.
+				 * In a fresh session, IT2's stop path restores d035 explicitly to
+				 * zero. */
+				value.u8 = 0;
+			} else {
+				ret = ptp_getdevicepropvalue (params,
+					PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8);
+				if (ret != PTP_RC_OK) {
+					gp_context_status (context,
+						_("Pentax preview stage read-PC-LV returned 0x%04x."), ret);
 					SET_CONTEXT_P (params, NULL);
 					return translate_ptp_result (ret);
 				}
@@ -7820,7 +7826,15 @@ ptp2_pentax_bulb_action (Camera *camera, int enabled, GPContext *context)
 				params->pentax.bulb_action_start_ms, pentax_monotonic_ms ());
 		PTPPropValue propval;
 		uint16_t setres;
-
+		if (context &&
+		    gp_context_cancel (context) == GP_CONTEXT_FEEDBACK_CANCEL) {
+			GP_LOG_D ("pentax-bulb: cancelling deferred camera-timed fallback "
+				"before initiating exposure");
+			params->pentax.bulb_action_timed_fallback = 0;
+			params->pentax.bulb_action_start_ms = 0;
+			params->pentax.bulb_action_body_reported_seconds = 0;
+			return GP_ERROR_CANCEL;
+		}
 		params->pentax.bulb_action_timed_fallback = 0;
 		params->pentax.bulb_action_start_ms = 0;
 		params->pentax.bulb_action_body_reported_seconds = 0;
@@ -11721,12 +11735,14 @@ static CameraFilesystemFuncs fsfuncs = {
  * live view running, or an exposure/candidate in flight. Observe only —
  * never reset state that could destroy an in-flight user exposure
  * (issue #33). */
-static void
+static int
 pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 {
 	unsigned char *data = NULL;
 	unsigned int size = 0;
 	PTPPropValue value;
+	int live_view_idle = 0;
+	PentaxReconcileDecision decision = PENTAX_RECONCILE_UNREADABLE;
 
 	GP_LOG_D ("Pentax session was already opened; reconciling observed camera state");
 	gp_context_status (context,
@@ -11736,6 +11752,7 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 			PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8)) {
 		params->pentax.live_view_original_value = value.u8;
 		params->pentax.live_view_original_valid = 1;
+		live_view_idle = (value.u8 == 0);
 		if (value.u8 == 1) {
 			params->inliveview = 1;
 			GP_LOG_D ("reconciliation: PC live view is active; "
@@ -11748,7 +11765,8 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 	if (PTP_RC_OK == ptp_pentax_get_all_conditions (params, &data, &size)) {
 		uint32_t candidate = 0;
 
-		switch (pentax_reconcile_conditions (data, size, &candidate)) {
+		decision = pentax_reconcile_conditions (data, size, &candidate);
+		switch (decision) {
 		case PENTAX_RECONCILE_UNSAFE:
 			GP_LOG_E ("reconciliation: camera is in an unsafe "
 				"activity state (flags 0x%08x, op state %u); "
@@ -11778,12 +11796,79 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 	}
 	free (data);
 
-	/* Vendor mode can only be confirmed by the camera, not inferred from
-	 * process-local memory (issue #30): probe idempotently. A successful
-	 * re-enable proves the camera was not in vendor mode and now is; a
-	 * "wrong state" style failure suggests vendor mode was already on.
-	 * Either way the flag below is cleared once observation succeeds. */
-	params->pentax.vendor_mode_unknown = 0;
+	/* Neither observation proves vendor-mode ownership (issue #30).
+	 * In particular an unreadable probe must not clear an unknown state.
+	 * Idle here means both observations succeeded, with no live view or
+	 * pending transfer; it is not permission to clear a prior barrier. */
+	return live_view_idle && decision == PENTAX_RECONCILE_IDLE;
+}
+
+/* The core unloads the camlib without calling camera_exit after failed init.
+ * Release our host allocations without issuing cleanup PTP commands against
+ * a possibly busy/unowned session. Never turn the original failure into OK. */
+static int
+pentax_failed_session_init (Camera *camera, int result)
+{
+	PTPParams *params = &camera->pl->params;
+	ptp_free_params (params);
+#if defined(HAVE_ICONV) && defined(HAVE_LANGINFO_H)
+	if (params->cd_ucs2_to_locale != (iconv_t)-1) iconv_close (params->cd_ucs2_to_locale);
+	if (params->cd_locale_to_ucs2 != (iconv_t)-1) iconv_close (params->cd_locale_to_ucs2);
+#endif
+	if (camera->port->type == GP_PORT_PTPIP)
+		ptp_ptpip_disconnect (params);
+	ptp_context_set (params->data, NULL);
+	free (params->data);
+	free (camera->pl);
+	camera->pl = NULL;
+	return result;
+}
+
+/* This is the existing appliance reconnect sequence, not an IT2 command
+ * sequence or a diagnostic reset. Only camera_init, reached after the core
+ * successfully opens/claims the USB interface, may call it. PTP/IP and SCSI
+ * do not provide that ownership invariant here and are refused. */
+static int
+pentax_recover_stale_session (Camera *camera, GPContext *context, uint32_t sessionid)
+{
+	PTPParams *params = &camera->pl->params;
+	uint16_t ret;
+	int result;
+
+	if (camera->port->type != GP_PORT_USB) {
+		params->pentax.recovery_required = 1;
+		gp_context_error (context, _("Pentax session recovery requires exclusive USB ownership."));
+		return GP_ERROR_CAMERA_BUSY;
+	}
+	if (!pentax_reconcile_reused_session (params, context) ||
+	    params->pentax.recovery_required) {
+		params->pentax.recovery_required = 1;
+		gp_context_error (context, _("Pentax state is busy or unknown; refusing session close and USB reset."));
+		return GP_ERROR_CAMERA_BUSY;
+	}
+
+	/* Preserve the evidenced idle close/reset/reopen ordering. Stop on the
+	 * first failure, never reset after a failed close or adopt a failed open. */
+	ret = ptp_closesession (params);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+	result = gp_port_reset (camera->port);
+	if (result < GP_OK)
+		return result;
+	sleep (2);
+	ret = ptp_opensession (params, sessionid);
+	if (ret != PTP_RC_OK)
+		return translate_ptp_result (ret);
+
+	/* A reopened session is not proof of camera quiescence. Do not clear
+	 * earlier evidence or send vendor enable following a failed observation. */
+	if (!pentax_reconcile_reused_session (params, context) ||
+	    params->pentax.recovery_required) {
+		params->pentax.recovery_required = 1;
+		gp_context_error (context, _("Pentax state after reconnect is busy or unknown; refusing initialization."));
+		return GP_ERROR_CAMERA_BUSY;
+	}
+	return GP_OK;
 }
 
 int
@@ -11994,30 +12079,9 @@ camera_init (Camera *camera, GPContext *context)
 			 * research Pentax bodies observe leftover state
 			 * before treating this as a fresh start (issue #33). */
 			if (pentax_candidate) {
-				pentax_reconcile_reused_session (params, context);
-				/* If the previous owner exited without fully
-				 * clearing camera-side session state, the
-				 * camera refuses vendor enable (0x9001 ->
-				 * 0x2002). Empirically neither a PTP
-				 * CloseSession nor a USB reset alone clears
-				 * it; close the PTP session first, then do a
-				 * USB port reset (libusb_reset_device), then
-				 * reopen (issue #33). */
-				if (PTP_RC_OK == ptp_closesession (params))
-					GP_LOG_D ("stale Pentax session closed");
-				if (camera->port->type == GP_PORT_USB) {
-					GP_LOG_D ("stale Pentax session: issuing USB port reset to clear camera-side session state");
-					if (GP_OK != gp_port_reset (camera->port))
-						GP_LOG_E ("USB port reset failed; stale session may persist");
-					/* give the camera time to recover its PTP stack */
-					sleep(2);
-				}
-				{
-					GP_LOG_D ("stale Pentax session: reopening");
-					ret = LOG_ON_PTP_E (ptp_opensession (params, sessionid));
-					if (ret == PTP_RC_OK)
-						break;
-				}
+				ret = pentax_recover_stale_session (camera, context, sessionid);
+				if (ret < GP_OK)
+					return pentax_failed_session_init (camera, ret);
 			}
 			break;
 		}
@@ -12034,7 +12098,7 @@ camera_init (Camera *camera, GPContext *context)
 			if (tries < 10)
 				continue;
 
-			if (tries < 11 && camera->port->type == GP_PORT_USB) {
+			if (!pentax_candidate && tries < 11 && camera->port->type == GP_PORT_USB) {
 				/* Try whacking PTP device */
 				ptp_usb_control_device_reset_request (&camera->pl->params);
 				sessionid = 1;
@@ -12042,24 +12106,14 @@ camera_init (Camera *camera, GPContext *context)
 			}
 		} else if (pentax_candidate &&
 			pentax_session_error_needs_close_reset (ret, tries)) {
-			/* A replacement appliance process can receive 0x02fa rather
-			 * than SessionAlreadyOpened for the same stale-owner condition.
-			 * A control reset alone was observed to repeat 0x02fa forever.
-			 * Use the already hardware-established ordered recovery: ask the
-			 * camera to close the resident PTP session, reset the USB port,
-			 * settle, then retry. */
-			uint16_t close_ret = ptp_closesession (params);
-
-			gp_context_error (context,
-				_("Pentax init recovery after OpenSession 0x%04x attempt %d: CloseSession returned 0x%04x; resetting USB port."),
-				ret, tries, close_ret);
-			if (camera->port->type == GP_PORT_USB) {
-				if (GP_OK != gp_port_reset (camera->port))
-					GP_LOG_E ("Pentax reconnect USB port reset failed");
-				sleep (2);
-			}
-		} else if ((ret == PTP_ERROR_RESP_EXPECTED) ||
-			   (ret == PTP_ERROR_IO) || (ret == 0x02fa)) {
+			/* Transport errors do not establish idle state or ownership.
+			 * Apply the same observation barrier as SessionAlreadyOpened. */
+			ret = pentax_recover_stale_session (camera, context, sessionid);
+			if (ret < GP_OK)
+				return pentax_failed_session_init (camera, ret);
+			break;
+		} else if (!pentax_candidate && ((ret == PTP_ERROR_RESP_EXPECTED) ||
+			   (ret == PTP_ERROR_IO) || (ret == 0x02fa))) {
 			/* Preserve generic-camera historical recovery. */
 			if (tries < 3 && camera->port->type == GP_PORT_USB)
 				ptp_usb_control_device_reset_request (params);
@@ -12069,6 +12123,8 @@ camera_init (Camera *camera, GPContext *context)
 			continue;
 
 		/* FIXME: deviceinfo is not read yet ... (see macro)*/
+		if (pentax_candidate)
+			return pentax_failed_session_init (camera, translate_ptp_result (ret));
 		C_PTP_REP (ret);
 	}
 	/* We have cameras where a response takes 15 seconds(!), so make
@@ -12179,6 +12235,7 @@ camera_init (Camera *camera, GPContext *context)
 
 			params->pentax.function_flags = function_flags;
 			params->pentax.vendor_mode_enabled = 1;
+			params->pentax.vendor_mode_unknown = 0;
 			GP_LOG_D ("Pentax vendor mode enabled, function flags 0x%08x",
 				function_flags);
 			/* K-3 III firmware 2.20 exposes its vendor property list only

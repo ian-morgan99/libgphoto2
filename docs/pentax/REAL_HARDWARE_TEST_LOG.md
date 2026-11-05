@@ -456,6 +456,12 @@ Request bytes were verified byte-identical between a succeeding run
 any software mechanism available over USB. Only a physical power cycle clears it.
 
 **Code changes kept (best-effort recovery, harmless when unnecessary):**
+> **Source correction, 2026-10-30 (#138; no new hardware test):** the historical
+> "harmless" claim above was not established by these failed experiments.
+> Automatic CameraShutdown on ordinary exit has now been removed to match IT2.
+> The separate stale-session reset path has not been changed by that fix.
+> See [the source audit and remaining gates](PENTAX-DISCONNECT-SAFETY.md).
+
 - `camlibs/ptp2/library.c` OpenSession retry loop: on `0x201e` for Pentax candidates,
   the recovery path now closes the PTP session, performs a USB port reset
   (`gp_port_reset`), waits 2 s, then reopens. This is the correct ordering even though
@@ -877,3 +883,23 @@ that immediate widget reads are not equivalent to application. Focus requires
 an operator-side AF/MF switch change before the bounded near/far gate can be
 completed. See issue #117 for the comparison update; direct capture evidence
 also updates issue #48.
+
+## 2026-10-30 — K-1 II USB-only inventory, no camera session
+
+- Time: 16:22:21 UTC; attachment directly to PC, not Polaris.
+- USB: `25fb:0183`, `usb:001,006`; gphoto2 abilities identify
+  `Pentax K-1 Mark II (PTP mode)`. Firmware **not queried**; do not inherit
+  the earlier firmware 1.02 observation as a current measurement.
+- Exact clean source: `f97110d9272e24cf242830e83b4105092a0fdde4`.
+  `bash tests/run-pentax-host-check.sh` passed configure/build, 20/20 offline
+  tests and isolated install at `/tmp/pentax-host-check.1eTacOnD/prefix`.
+- Ran only `/usr/bin/gphoto2 --auto-detect` with CAMLIBS/IOLIBS/
+  LD_LIBRARY_PATH pinned to that prefix, no LD_PRELOAD, and loader/debug logs.
+  The loader confirms that exact core, port, ptp2 and usb1 iolib, not system
+  libgphoto2. The trace contains enumeration, not camera init/OpenSession.
+- No vendor command, settings read/write, preview, focus, shutter, reset or
+  shutdown. No camera values changed and no restoration obligation was created.
+- **PASS: USB discovery and host loader provenance only.** Settings latency,
+  ordinary disconnect and fresh/warm reconnect remain unqualified. See
+  [retained raw evidence](evidence/2026-10-30/issue-33-session/README.md) and
+  [the junior-agent handoff](K1II-SESSION-SAFETY-HANDOFF.md).
