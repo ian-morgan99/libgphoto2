@@ -154,7 +154,7 @@ seed_pentax_params (PTPParams *params, int pentax, int advertise_ops)
 		dpd[4].GetSet         = PTP_DPGS_GetSet;
 		dpd[4].FormFlag       = PTP_DPFF_Enumeration;
 		dpd[4].FORM.Enum.NumberOfValues = 2;
-		dpd[4].FORM.Enum.SupportedValue = calloc (2, sizeof (PTPPropertyValue));
+		dpd[4].FORM.Enum.SupportedValue = calloc (2, sizeof (PTPPropValue));
 		if (dpd[4].FORM.Enum.SupportedValue) {
 			dpd[4].FORM.Enum.SupportedValue[0].u16 = 2;
 			dpd[4].FORM.Enum.SupportedValue[1].u16 = 32783;
