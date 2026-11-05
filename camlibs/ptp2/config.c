@@ -1800,6 +1800,21 @@ _get_ExpCompensation(CONFIG_GET_ARGS) {
 		return GP_ERROR;
 	if (dpd->DataType != PTP_DTC_INT16)
 		return GP_ERROR;
+	/* An enumeration that advertises no values is not a usable control.
+	 *
+	 * Evidence: patcher #269 measured exposurecompensation returning a widget
+	 * with choices=0 on a live K-3 III (USB 25fb:0189), reproducibly 3/3, while
+	 * iso/aperture/whitebalance/shutter all returned populated lists in the same
+	 * session.  That symptom pins the descriptor shape by deduction rather than
+	 * by a direct GetDevicePropDesc capture: this function returns GP_ERROR
+	 * unless FormFlag is Enumeration and DataType is INT16, so a widget that was
+	 * created at all must have had both -- leaving NumberOfValues == 0 as the only
+	 * remaining explanation for zero choices.  Treat that descriptor as unusable
+	 * and fail closed, which is the same policy _pentax_prop_get already applies
+	 * to vendor properties.  Do not promote this to a confirmed descriptor dump
+	 * until GetDevicePropDesc is captured on the body. */
+	if (dpd->FORM.Enum.NumberOfValues == 0)
+		return GP_ERROR_NOT_SUPPORTED;
 	gp_widget_new (GP_WIDGET_RADIO, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
 	for (j=0;j<dpd->FORM.Enum.NumberOfValues; j++) {

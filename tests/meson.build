@@ -129,6 +129,22 @@ test(
   ],
 )
 
+# Source-contract regression for an empty exposure-compensation enumeration
+# publishing a zero-choice widget (patcher #269, measured live on a K-3 III
+# 25fb:0189 on 2026-11-05), and an unchecked cache re-fetch in the folder walk
+# reached when the body re-announces an object (related to patcher #176; the
+# transcript shows that walk failing one step earlier, so the second check is a
+# defensive consistency fix).  Neither is reachable from a camera-less unit test.
+test(
+  'test-pentax-empty-descriptor-contract',
+  python,
+  args: [
+    files('test-pentax-empty-descriptor-contract.py'),
+    meson.project_source_root() / 'camlibs/ptp2/config.c',
+    meson.project_source_root() / 'camlibs/ptp2/library.c',
+  ],
+)
+
 # Unit tests use an injected camera API to verify that every failed Bulb path
 # stops an opened shutter before cleanup or exits fail-closed without an
 # unmatched stop when start was not confirmed.

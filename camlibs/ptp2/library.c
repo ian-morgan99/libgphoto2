@@ -3587,8 +3587,21 @@ append_folder_from_handle (Camera *camera, uint32_t storage, uint32_t handle, ch
 
 	C_PTP (ptp_object_want (params, handle, PTPOBJECT_PARENTOBJECT_LOADED|PTPOBJECT_OBJECTINFO_LOADED, &ob)); // refresh
 	CR (append_folder_from_handle (camera, storage, ob->oi.ParentObject, folder));
-	/* re-fetch invalidated ob cache pointer */
-	ptp_find_object_in_cache(params, handle, &ob);
+	/* re-fetch invalidated ob cache pointer.  The result must be checked:
+	 * ptp_find_object_in_cache assigns the bsearch result to *retob before
+	 * testing it, so on a miss it leaves ob == NULL and returns an error, and
+	 * the strcat below would dereference that NULL.
+	 *
+	 * This is a defensive consistency fix, not a reproduction of the #176
+	 * crash.  In the K-3 III transcript (docs/pentax/evidence/2026-08-25/) the
+	 * re-announced object fails one step earlier -- ptp_object_want returns
+	 * PTP Invalid Object Handle (0x2009) and C_PTP propagates it -- so this
+	 * line was never reached there and the event was dropped cleanly with -1.
+	 * The sibling find_object_path() wraps the identical call in CR(); this one
+	 * did not, which is the inconsistency being closed. */
+	CR (ptp_find_object_in_cache(params, handle, &ob));
+	if (!ob || !ob->oi.Filename)
+		return GP_ERROR_BAD_PARAMETERS;
 	strcat (folder, "/");
 	strcat (folder, ob->oi.Filename);
 	return GP_OK;
