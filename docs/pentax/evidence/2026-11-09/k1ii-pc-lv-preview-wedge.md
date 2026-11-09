@@ -112,8 +112,9 @@ Not proven, deliberately:
 
 ## Open defect surfaced
 
-Frame 2's post-frame PC-LV restore returned `0x02ff` (invalid dataset / general operation error),
-then frame 3's start returned `0x02f9` and the device left the bus. The sequence in
+Frame 2's post-frame PC-LV restore returned `0x02ff`, then frame 3's get-frame returned `0x02f9`
+and the device left the bus. (See "Authoritative code meanings" below — an earlier draft of this
+file labelled `0x02ff` as "invalid dataset / general operation error", which is wrong.) The sequence in
 `camera_pentax_capture_preview` is: start PC-LV, get frame, restore state after frame. The restore
 after a successful frame is where this body diverged from IT2's expected stop behaviour
 (`PcLiveViewMode` accepts `0xa005` or `0x2001` on stop). Whether the `0x02ff` restore is the cause
@@ -253,6 +254,32 @@ Two caveats on that:
 An earlier ad-hoc Python reimplementation of the walk reported a desync at offset 595. That was
 my reimplementation being wrong about entropy-coded scan handling, not the parser: the verbatim
 C code walks the same bytes cleanly. Recorded so the discrepancy is not mistaken for a defect.
+
+## Authoritative code meanings, and what they change
+
+`camlibs/ptp2/ptp.h:1347-1353` defines this range as internal transport results, not camera
+PTP responses:
+
+| code | name | meaning |
+|---|---|---|
+| `0x02F9` | `PTP_ERROR_NODEVICE` | the requested device is not there |
+| `0x02FA` | `PTP_ERROR_TIMEOUT` | transport timeout |
+| `0x02FF` | `PTP_ERROR_IO` | transport I/O error |
+
+The repo already treats the whole range as ambiguous ownership (`pentax-utils.c:259-261`,
+`library.c:7201-7204`: "the shutter may have been accepted before the response was lost"), and
+`pentax_session_error_needs_close_reset()` lists `0x02fa`/`0x02fd`/`0x02ff` as needing a bounded
+close/reset.
+
+This reframes the sequence. In run 3, `get-frame` returned `0x02F9` = **NODEVICE**: by the time
+the restore failed, the transport already considered the body gone. Same in run 1 at frame 3. So
+the restore is not the cause of the disappearance — it is reporting a device that has already
+dropped. The only error that precedes any NODEVICE is `0x02FF` (I/O) on the post-frame restore in
+run 1, after a frame that transferred completely.
+
+Corrected reading: the body leaves USB during or immediately after the second PC-LV cycle, and
+the PTP codes are consequences of that, not the failure itself. "Restore returns 0x02ff therefore
+restore wedges the camera" is **not** supported by this evidence.
 
 ## Still untested
 
