@@ -1081,6 +1081,59 @@ main (void)
 		CHECK ((jpeg_offset == 0) && (jpeg_length == 0));
 		CHECK (pentax_jpeg_bounds (NULL, 0, &jpeg_offset, &jpeg_length) ==
 			GP_ERROR_BAD_PARAMETERS);
+		/* An EXIF APP1 segment may embed a thumbnail carrying its own
+		 * SOI/EOI pair.  Byte-scanning for FF D9 stopped at that inner EOI and
+		 * reported a truncated frame as complete, so the caller appended that
+		 * prefix and reported success. */
+		{
+			const unsigned char exif_thumb_jpeg[] = {
+				0xff, 0xd8,
+				0xff, 0xe1, 0x00, 0x0c,
+					0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04,
+					0x00, 0x01, 0xff, 0xd9,
+				0xff, 0xc0, 0x00, 0x04, 0x00, 0x01,
+				0xff, 0xda, 0x00, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x11, 0x22, 0x33,
+				0xff, 0xd9
+			};
+			CHECK (pentax_jpeg_bounds (exif_thumb_jpeg, sizeof (exif_thumb_jpeg),
+				&jpeg_offset, &jpeg_length) == GP_OK);
+			CHECK ((jpeg_offset == 0) && (jpeg_length == sizeof (exif_thumb_jpeg)));
+		}
+		/* Entropy data with a stuffed FF and an RST marker must still reach the
+		 * real terminator. */
+		{
+			const unsigned char stuffed_jpeg[] = {
+				0xff, 0xd8,
+				0xff, 0xda, 0x00, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0xaa, 0xff, 0x00, 0xbb, 0xff, 0xd0, 0xcc,
+				0xff, 0xd9
+			};
+			CHECK (pentax_jpeg_bounds (stuffed_jpeg, sizeof (stuffed_jpeg),
+				&jpeg_offset, &jpeg_length) == GP_OK);
+			CHECK ((jpeg_offset == 0) && (jpeg_length == sizeof (stuffed_jpeg)));
+		}
+		/* Two frames in one buffer: only the first is in bounds. */
+		{
+			const unsigned char two_frames[] = {
+				0xff, 0xd8, 0xff, 0xda, 0x00, 0x08, 0x01, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x11, 0xff, 0xd9,
+				0xff, 0xd8, 0xff, 0xda, 0x00, 0x08, 0x01, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x22, 0xff, 0xd9
+			};
+			CHECK (pentax_jpeg_bounds (two_frames, sizeof (two_frames),
+				&jpeg_offset, &jpeg_length) == GP_OK);
+			CHECK ((jpeg_offset == 0) && (jpeg_length == 15));
+		}
+		/* A segment length that runs past the end of the buffer is corrupt. */
+		{
+			const unsigned char short_segment[] = {
+				0xff, 0xd8, 0xff, 0xe1, 0x00, 0x40, 0x01
+			};
+			CHECK (pentax_jpeg_bounds (short_segment, sizeof (short_segment),
+				&jpeg_offset, &jpeg_length) == GP_ERROR_CORRUPTED_DATA);
+			CHECK ((jpeg_offset == 0) && (jpeg_length == 0));
+		}
 	}
 
 	free (buffer.data);
