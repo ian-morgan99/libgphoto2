@@ -901,3 +901,34 @@ Suite state: 23 ok / 2 fail. Both failures are pre-existing and unrelated to
 these changes — `test-gp-port` and `test-gphoto2` ("Unknown model") fail
 identically on clean HEAD with the fixes stashed. No hardware gate was run, so
 no live-view frame, d035 value or focus-peaking state is claimed as measured.
+
+## 2026-11-09 K-1 II preview attempt on main; wedge before any focus test
+
+The attached K-1 II (`25fb:0183`, PTP mode) came back online and one bounded
+five-frame PC live-view run was attempted against `origin/main` at `7e6dec95f`,
+using the research-enabled build so the Pentax preview path is compiled in. A
+read-only init probe passed first with VID:PID verified before any write.
+
+Frames 1 and 2 transferred (`0x2001`, 17093 and 28271 bytes). The post-frame PC
+live-view restore after frame 2 returned `0x02ff`, frame 3 then returned
+`0x02f9`, and the body left the USB bus entirely. No process held the port, so
+this is not a host-side leak; it matches the §6.5 wedge signature where only a
+physical power cycle recovers PTP. No recovery was performed or claimed and the
+camera is currently unreachable.
+
+Two things this run does **not** establish, both recorded in
+`docs/pentax/evidence/2026-11-09/k1ii-pc-lv-preview-wedge.md`:
+
+- `valid_jpeg=yes` is not frame-integrity evidence here. The tested build is
+  `main`, which still has the old first-`ff d9` scan; the marker walk is only on
+  `feature/polaris-capture-events`. Those two frames need re-validation against
+  the new parser before any integrity claim.
+- No focus command was sent, so this contributes nothing to the unresolved
+  direction question. Neither `0x9016` nor `0x9017` was issued and no lens
+  movement was observed.
+
+The earlier note in this file that "no hardware gate was run" applied to the
+host-side fixes above and stands for those; this paragraph supersedes it as the
+record of what was subsequently attempted on the body. Next step is an operator
+power cycle, then re-run preview against a build carrying the marker walk before
+anything focus-related is attempted.
