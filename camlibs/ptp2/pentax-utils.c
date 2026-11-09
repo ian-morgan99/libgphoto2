@@ -1450,7 +1450,7 @@ int
 pentax_jpeg_bounds (const unsigned char *data, size_t size,
 		size_t *offset, size_t *length)
 {
-	size_t start, end;
+	size_t start, p;
 
 	if (!data || !offset || !length)
 		return GP_ERROR_BAD_PARAMETERS;
@@ -1461,12 +1461,89 @@ pentax_jpeg_bounds (const unsigned char *data, size_t size,
 			break;
 	if (start + 1 >= size)
 		return GP_ERROR_CORRUPTED_DATA;
-	for (end = start + 2; end + 1 < size; end++)
-		if ((data[end] == 0xff) && (data[end + 1] == 0xd9)) {
+
+	/* Walk markers instead of byte-scanning for FF D9.  A raw scan stops at the
+	 * first FF D9 anywhere in the buffer, which is not necessarily this frame's
+	 * terminator: an EXIF APP1 segment may embed a thumbnail carrying its own
+	 * SOI/EOI pair, and that inner EOI sits inside the APP1 payload.  The scan
+	 * then returns GP_OK with a length ending at the thumbnail, so the caller in
+	 * library.c appends that prefix, sets the MIME type and reports success; a
+	 * decoder given those bytes renders only the rows that arrived and garbage
+	 * below them.  Skipping every length-bearing segment whole finds the
+	 * terminator that actually ends this frame; entropy data is scanned for the
+	 * next real marker, honouring FF 00 (a stuffed FF, which per ITU-T T.81 must
+	 * always follow FF inside a scan so a bare FF D9 cannot occur there) and FF
+	 * D0..D7 restart markers.  offset/length keep the original contract: offset
+	 * is the SOI position and length runs from that SOI to the EOI, inclusive. */
+	p = start + 2;
+	while (p + 1 < size) {
+		unsigned char marker;
+
+		while ((p < size) && (data[p] != 0xff))
+			p++;
+		while ((p + 1 < size) && (data[p] == 0xff) && (data[p + 1] == 0xff))
+			p++;
+		if (p + 1 >= size)
+			return GP_ERROR_CORRUPTED_DATA;
+		marker = data[p + 1];
+
+		if (marker == 0xd9) {
 			*offset = start;
-			*length = end + 2 - start;
+			*length = p + 2 - start;
 			return GP_OK;
 		}
+		/* TEM, RSTn and SOI carry no payload; only EOI ends the frame. */
+		if ((marker == 0x01) || (marker == 0xd8) ||
+		    ((marker >= 0xd0) && (marker <= 0xd7))) {
+			p += 2;
+			continue;
+		}
+		if (marker == 0xda) {
+			size_t len;
+
+			if (p + 3 >= size)
+				return GP_ERROR_CORRUPTED_DATA;
+			len = ((size_t) data[p + 2] << 8) | data[p + 3];
+			if ((len < 2) || (p + 2 + len > size))
+				return GP_ERROR_CORRUPTED_DATA;
+			p += 2 + len;
+			/* Entropy data: FF 00 is a stuffed FF, FF Dn is a restart marker
+			 * and repeated FF are fill bytes.  Any other FF xx is a real
+			 * marker and the loop below re-reads it as one. */
+			while (p + 1 < size) {
+				if (data[p] != 0xff) {
+					p++;
+					continue;
+				}
+				if (data[p + 1] == 0x00) {
+					p += 2;
+					continue;
+				}
+				if ((data[p + 1] >= 0xd0) && (data[p + 1] <= 0xd7)) {
+					p += 2;
+					continue;
+				}
+				if (data[p + 1] == 0xff) {
+					p++;
+					continue;
+				}
+				break;
+			}
+			continue;
+		}
+		/* Every remaining marker is length-bearing: skip the whole segment so
+		 * an embedded thumbnail's own EOI is never seen as a terminator. */
+		{
+			size_t len;
+
+			if (p + 3 >= size)
+				return GP_ERROR_CORRUPTED_DATA;
+			len = ((size_t) data[p + 2] << 8) | data[p + 3];
+			if ((len < 2) || (p + 2 + len > size))
+				return GP_ERROR_CORRUPTED_DATA;
+			p += 2 + len;
+		}
+	}
 	return GP_ERROR_CORRUPTED_DATA;
 }
 

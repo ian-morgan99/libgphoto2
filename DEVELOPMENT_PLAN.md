@@ -854,3 +854,81 @@ K-1 II old-family focus was not qualified in this run because the camera's
 physical AF/MF switch was not in AF; the driver fail-closed before sending
 `0x9016`. No focus claim is made until that physical prerequisite is set and
 near/far lens motion is observed.
+
+## 2026-11-09 host-side defect fixes, no camera session
+
+Two defects were reproduced and corrected offline; neither run touched a
+camera, wrote the card, or created a restoration obligation.
+
+`pentax_jpeg_bounds()` byte-scanned for the first `ff d9` in a live-view
+buffer. An EXIF APP1 segment can embed a thumbnail carrying its own SOI/EOI
+pair, and that inner EOI sits inside the APP1 payload, so the scan returned
+`GP_OK` with a length ending at the thumbnail. The caller in `library.c`
+appended that prefix, set the MIME type and reported a successful preview
+whose lower rows were never transmitted. The function now walks markers: every
+length-bearing segment is skipped whole, TEM and RSTn are payload-free, and
+inside entropy data `ff 00` (a stuffed FF, which per ITU-T T.81 must always
+follow FF inside a scan so a bare `ff d9` cannot occur there), `ff d0..d7`
+restart markers and `ff` fill bytes are honoured. A segment length running
+past the end of the buffer is corrupt data, not a frame. The offset/length
+contract is unchanged. The new EXIF-thumbnail case fails on the previous code
+and passes with this change, which is what proves the test is load-bearing
+rather than tautological.
+
+Issue #141 review feedback on `examples/pentax-persistent-config-benchmark.c`
+was reproduced from source and corrected. `set_keep_live_view()` passed a
+string literal to `gp_widget_set_value()` for `pentaxpclvkeep`, which is a
+`GP_WIDGET_TOGGLE` consumed as an `int`; `"off"` reads back as nonzero, so the
+cleanup set `keep_live_view=1` again while logging `live-view-keep=off
+result=0`. It takes an `int` now and reads the toggle back after clearing it.
+Cleanup also treated a failed readback as "restore not needed"; a failed read
+after a write leaves the state unknown, which is not unchanged, so cleanup now
+restores best-effort whenever the state is unknown, verifies that restore with
+an independent readback, and reports `operation_result`, `restore_result` and
+`final_value_verified` separately, exiting non-zero on UNKNOWN or MISMATCH.
+
+`tests/test-pentax-keep-live-view-toggle.c` drives the real
+`camera_get_single_config`/`camera_set_single_config` path against a seeded
+Pentax fixture with no wire IO. It records one dispatch quirk found while
+writing it: in `MODE_SINGLE_GET`, the opcode-gated branch of `_get_config()`
+returns `GP_OK` and hands back whatever a declined handler left in its output
+pointer, so a non-Pentax `pentaxpclvkeep` get returns `GP_OK` with a NULL
+widget. Callers must not assume a non-NULL widget on `GP_OK`. That quirk is
+asserted only for the widget and printed as a note; it is not corrected here
+because changing `_get_config()` return codes is outside this scope.
+
+Suite state: 23 ok / 2 fail. Both failures are pre-existing and unrelated to
+these changes — `test-gp-port` and `test-gphoto2` ("Unknown model") fail
+identically on clean HEAD with the fixes stashed. No hardware gate was run, so
+no live-view frame, d035 value or focus-peaking state is claimed as measured.
+
+## 2026-11-09 K-1 II preview attempt on main; wedge before any focus test
+
+The attached K-1 II (`25fb:0183`, PTP mode) came back online and one bounded
+five-frame PC live-view run was attempted against `origin/main` at `7e6dec95f`,
+using the research-enabled build so the Pentax preview path is compiled in. A
+read-only init probe passed first with VID:PID verified before any write.
+
+Frames 1 and 2 transferred (`0x2001`, 17093 and 28271 bytes). The post-frame PC
+live-view restore after frame 2 returned `0x02ff`, frame 3 then returned
+`0x02f9`, and the body left the USB bus entirely. No process held the port, so
+this is not a host-side leak; it matches the §6.5 wedge signature where only a
+physical power cycle recovers PTP. No recovery was performed or claimed and the
+camera is currently unreachable.
+
+Two things this run does **not** establish, both recorded in
+`docs/pentax/evidence/2026-11-09/k1ii-pc-lv-preview-wedge.md`:
+
+- `valid_jpeg=yes` is not frame-integrity evidence here. The tested build is
+  `main`, which still has the old first-`ff d9` scan; the marker walk is only on
+  `feature/polaris-capture-events`. Those two frames need re-validation against
+  the new parser before any integrity claim.
+- No focus command was sent, so this contributes nothing to the unresolved
+  direction question. Neither `0x9016` nor `0x9017` was issued and no lens
+  movement was observed.
+
+The earlier note in this file that "no hardware gate was run" applied to the
+host-side fixes above and stands for those; this paragraph supersedes it as the
+record of what was subsequently attempted on the body. Next step is an operator
+power cycle, then re-run preview against a build carrying the marker walk before
+anything focus-related is attempted.
