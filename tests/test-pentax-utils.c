@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <gphoto2/gphoto2-result.h>
 
@@ -1285,6 +1286,42 @@ main (void)
 		CHECK (pentax_old_focus_protocol_direction (0,
 			&protocol_direction) == GP_ERROR_BAD_PARAMETERS);
 		CHECK (pentax_old_focus_protocol_direction (1, NULL) ==
+			GP_ERROR_BAD_PARAMETERS);
+	}
+
+	/* #303: manualfocusdrive is a RANGE of -7..7 step 1. The old-focus path
+	 * used to discard the magnitude and always send amount=5, so every slider
+	 * position produced an identical command. IT2 FocusFineTune scales it as
+	 * amount = |UI value| * 5. */
+	{
+		uint32_t amount = 99;
+
+		CHECK (pentax_old_focus_drive_amount (-1.0f, &amount) == GP_OK);
+		CHECK (amount == 5);          /* unchanged: the old minimum step */
+		CHECK (pentax_old_focus_drive_amount (-7.0f, &amount) == GP_OK);
+		CHECK (amount == 35);         /* |val| * 5, the full slider */
+		CHECK (pentax_old_focus_drive_amount (7.0f, &amount) == GP_OK);
+		CHECK (amount == 35);         /* magnitude only; sign is direction */
+		CHECK (pentax_old_focus_drive_amount (3.0f, &amount) == GP_OK);
+		CHECK (amount == 15);
+		CHECK (pentax_old_focus_drive_amount (-2.6f, &amount) == GP_OK);
+		CHECK (amount == 15);         /* step 1, so it rounds to 3 */
+
+		/* Zero is a no-op the caller rejects before reaching here. */
+		CHECK (pentax_old_focus_drive_amount (0.0f, &amount) ==
+			GP_ERROR_BAD_PARAMETERS);
+		/* Out of range must be refused, not clamped upward: 0x9016 has a
+		 * confirmed wedge history on the K-1 II, so an oversized amount from a
+		 * buggy client must never reach the body. */
+		CHECK (pentax_old_focus_drive_amount (8.0f, &amount) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_old_focus_drive_amount (-8.0f, &amount) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_old_focus_drive_amount (1000.0f, &amount) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_old_focus_drive_amount (NAN, &amount) ==
+			GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_old_focus_drive_amount (1.0f, NULL) ==
 			GP_ERROR_BAD_PARAMETERS);
 	}
 

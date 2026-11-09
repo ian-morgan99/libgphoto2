@@ -545,6 +545,10 @@ int pentax_minimum_focus_displacement (uint32_t open_av_num, int direction,
 	int32_t *displacement);
 int pentax_old_focus_protocol_direction (int direction,
 	uint32_t *protocol_direction);
+/* Magnitude for old-focus opcode 0x9016 derived from a RANGE widget value.
+ * Kept out of the widget handler so the scaling rule is testable without a
+ * camera (#303). */
+int pentax_old_focus_drive_amount (float ui_value, uint32_t *amount);
 int pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 	const char *device_model, uint32_t *model_no, uint32_t *extension_version);
 int pentax_model_uses_new_focus (uint32_t model_no);
