@@ -317,3 +317,58 @@ So "the wedge requires a power cycle" is not established either. This drop self-
 level within minutes. Whether the PTP/vendor session is usable again after such a self-recovery
 was not tested — no session was opened, to avoid re-triggering the same failure while its cause
 is unknown.
+
+---
+
+## Fourth run: card emptied, 6 frames, clean — but the cause is NOT established
+
+The operator emptied the SD card. Same build (`build-k1ii-marker`, marker-walk parser), same
+body, port `usb:001,008` (devnum 8 after the self-recovery). Requested 6 frames — more than any
+previous run.
+
+```
+frame=1 bytes=12241 valid_jpeg=yes
+frame=2 bytes=28855 valid_jpeg=yes
+frame=3 bytes=28897 valid_jpeg=yes
+frame=4 bytes=28874 valid_jpeg=yes
+frame=5 bytes=28901 valid_jpeg=yes
+frame=6 bytes=28837 valid_jpeg=yes
+completed_frames=6 cleanup=ok
+```
+
+Exit 0, no `0x02ff`/`0x02f9`, device still on the bus afterwards. All six frames validated two
+ways: `pentax_jpeg_bounds()` returns `offset=0 length=<size> covers_to=<size>` for every frame,
+and `djpeg -strict` passes 6/6 with no warnings.
+
+## Why this does not prove the card caused the wedge
+
+Two variables changed between run 3 (failed at frame 2) and run 4 (clean at 6 frames):
+
+1. the SD card was emptied;
+2. the body had power-cycled/self-recovered into a fresh session in between.
+
+Run 2 earlier today was also clean (2 frames) **without** the card being emptied, after a power
+cycle only. So a fresh session alone is sufficient to produce a clean run, and the card state has
+not been isolated. PC live view does not write image files to the card on this body, so a full
+card causing a USB drop during preview would also be an unexpected mechanism.
+
+**The discriminating test, not yet run:** with the card left empty, reproduce the wedge (if it
+still happens) and then refill the card and re-run. Until that is done, "empty card fixes it" is
+a correlation across one observation each way, not a finding. Recorded as such deliberately —
+the previous three runs in this file each over-claimed something and had to be corrected.
+
+## Cumulative state of this investigation
+
+| run | card | session | requested | succeeded | result |
+|---|---|---|---|---|---|
+| 1 | not empty | reused | 5 | 2 | drop at frame 3 |
+| 2 | not empty | fresh (power cycle) | 2 | 2 | clean |
+| 3 | not empty | reused | 4 | 1 | drop at frame 2 |
+| 4 | **empty** | fresh (self-recovery) | 6 | 6 | clean |
+
+Clean runs so far are exactly the runs that started from a fresh session. Run 1 and run 3 both
+reused a session and both dropped. That is a stronger pattern than card state, and it points at
+#33 rather than the card — but with n=2 per arm and two confounds still open, it is not a
+conclusion.
+
+No focus command has been sent in any run. `0x9016`/`0x9017` remain unexercised.
