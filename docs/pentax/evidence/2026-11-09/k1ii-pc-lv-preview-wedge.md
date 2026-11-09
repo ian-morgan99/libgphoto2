@@ -261,3 +261,20 @@ unexercised on this body, so the direction mapping stays unresolved and no lens 
 been observed. Given the wedge reproduces after one or two live-view frames, a focus test that
 needs live view active first is not safe to run without addressing the wedge; the old-focus path
 does not require live view, but the recorded precondition rules forbid driving it blind anyway.
+
+### Independent decoder corroboration
+
+`pentax_jpeg_bounds()` accepting the frame is self-referential evidence — it is the same code
+under review. Cross-checked with libjpeg-turbo:
+
+```
+$ djpeg -strict -outfile /dev/null .../frame-001.jpg ; echo $?
+0
+$ djpeg -verbose ... 2>&1 | grep -iE "image size|components|markers not|missing|truncat|corrupt|warning"
+Start Of Frame 0xc0: width=720, height=480, components=3
+Start Of Scan: 3 components
+```
+
+Strict-mode decode succeeds with no warnings, no "marker not found", no truncation report. The
+frame is a complete 720x480 three-component JPEG. This confirms the transfer itself was intact;
+the failure mode is the session teardown after it, not frame corruption.
