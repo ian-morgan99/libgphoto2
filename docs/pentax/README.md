@@ -189,6 +189,7 @@ Start with [`NIGHTLY_AGENT_START_HERE.md`](NIGHTLY_AGENT_START_HERE.md) and
 - [`IMAGE_TRANSMITTER_ERROR_RECOVERY.md`](IMAGE_TRANSMITTER_ERROR_RECOVERY.md) — session recovery sequences
 - [`IMAGE_TRANSMITTER_SETTING_PATH.md`](IMAGE_TRANSMITTER_SETTING_PATH.md) — the reference client's set/verify ordering and timing
 - [`GENERIC_CONTROL_COMPATIBILITY_AUDIT.md`](GENERIC_CONTROL_COMPATIBILITY_AUDIT.md) — generic widget ↔ vendor capability mapping
+- [`FOCUS_LIVE_VIEW_MODEL_AUDIT.md`](FOCUS_LIVE_VIEW_MODEL_AUDIT.md) — focus and PC live-view model mapping against IMAGE Transmitter 2 (issues #134, #135)
 - [`CONTROL_ISSUE_INDEX.md`](CONTROL_ISSUE_INDEX.md) — per-control tracking index
 - [`CAPTURE-RECOVERY.md`](CAPTURE-RECOVERY.md) — capture failure/recovery contract
 - [`K3III-CAPTURE-MODE-DIAGNOSTICS.md`](K3III-CAPTURE-MODE-DIAGNOSTICS.md) — Bulb / Astro / intervalometer ownership analysis
