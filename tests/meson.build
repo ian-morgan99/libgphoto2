@@ -218,6 +218,21 @@ test(
   env: gp_test_env,
 )
 
+# pentaxpclvkeep is a GP_WIDGET_TOGGLE consumed as an int (issue #141 review):
+# drive the real get/set_single_config path and prove the toggle round-trips.
+test_pentax_keep_live_view_toggle_exe = executable(
+  'test-pentax-keep-live-view-toggle',
+  'test-pentax-keep-live-view-toggle.c',
+  include_directories: [include_directories('../camlibs/ptp2'), include_directories('..')],
+  dependencies: [ libgphoto2_dep ],
+)
+
+test(
+  'test-pentax-keep-live-view-toggle',
+  test_pentax_keep_live_view_toggle_exe,
+  env: gp_test_env,
+)
+
 test_i18n_exe = executable(
   'test-i18n',
   'test-i18n.c',
