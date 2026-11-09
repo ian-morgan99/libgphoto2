@@ -119,3 +119,82 @@ after a successful frame is where this body diverged from IT2's expected stop be
 (`PcLiveViewMode` accepts `0xa005` or `0x2001` on stop). Whether the `0x02ff` restore is the cause
 of the disappearance or a symptom of an already-failing body is not determinable from one run and
 is not claimed either way.
+
+---
+
+## Follow-up after operator power cycle — marker-walk build, 2 frames, clean
+
+Same day. The operator power-cycled the body; it re-enumerated as
+`/sys/bus/usb/devices/1-4`, `25fb:0183`, **devnum 6** (was 5).
+
+Build under test:
+
+- Tree `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2`, branch
+  `feature/polaris-capture-events` at `c676066b6`.
+- Fresh meson tree `build-k1ii-marker` (`-Dcamlibs=ptp2 -Dpentax_research_capture=true`).
+- This tree contains the marker-walk `pentax_jpeg_bounds()` (`0b31c524e`), which `main` does not.
+- Built targets: `camlibs/ptp2/ptp2.so`, `examples/pentax-safe-preview`,
+  `examples/pentax-safe-focus`, `libgphoto2_port/libusb1/usb1.so`,
+  `tests/test-pentax-utils`.
+
+Port-driver note: this tree does not build `usbscsi.so`, and ltdl could not resolve the driver
+from `$B/libgphoto2_port/libusb1` directly (`error=Error loading a library (-4)`). Staged per
+runbook §4.2 instead:
+
+```bash
+mkdir -p /tmp/iolibs-1109
+cp $B/libgphoto2_port/libusb1/usb1.so /tmp/iolibs-1109/libusb1.so
+export IOLIBS=/tmp/iolibs-1109
+```
+
+Parser regression test in this tree: `tests/test-pentax-utils` exit 0 (includes the EXIF
+thumbnail case at `tests/test-pentax-utils.c:1084`).
+
+Read-only init probe:
+
+```
+$ examples/pentax-safe-focus "Pentax K-1 Mark II (PTP mode)" usb:001,006 init
+selected_model=Pentax K-1 Mark II (PTP mode) usb=25fb:0183 port=usb:001,006
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+focus_init=command-accepted cleanup=ok retries=0
+```
+
+Bounded preview, deliberately only 2 frames to limit exposure:
+
+```
+$ examples/pentax-safe-preview "Pentax K-1 Mark II (PTP mode)" usb:001,006 2
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (17207 bytes, 22 attempts, 724 ms).
+frame=1 bytes=17207 valid_jpeg=yes
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (28170 bytes, 11 attempts, 340 ms).
+frame=2 bytes=28170 valid_jpeg=yes
+completed_frames=2 cleanup=ok
+```
+
+Exit 0. No `0x02ff`, no `0x02f9`, and the body was still on the bus immediately afterwards
+(`/sys/bus/usb/devices/1-4/idVendor` present).
+
+## What this follow-up does not establish
+
+- **The wedge is not shown to be fixed.** Only 2 frames were attempted; the earlier failure
+  surfaced at frame 3. The run was deliberately capped below that point, so it cannot rule out
+  reproduction at frame 3 or later.
+- **No code delta explains the difference.** `camera_pentax_capture_preview` is byte-identical
+  between `origin/main` and this branch (`diff` of that function returns empty). The only
+  relevant delta is `pentax_jpeg_bounds()`, which runs after a frame is received and does not
+  touch the PC-LV restore path. The likeliest cause of the clean run is the power cycle clearing
+  stale vendor/live-view state, not a code change.
+- **`valid_jpeg=yes` is still weak integrity evidence, even with the marker walk.** The probe
+  validates by checking `ff d8` at the head and `ff d9` at the tail of the returned blob. A blob
+  truncated at an EXIF thumbnail's EOI also ends in `ff d9`, so that check passes for both a
+  complete frame and a truncated one. Byte counts differ between runs (17093/28271 on `main`
+  yesterday vs 17207/28170 here) but live-view frames vary by scene content, so sizes prove
+  nothing either. Real validation needs the frames written to disk and structure-walked offline;
+  `pentax-safe-preview.c` does not save them. That gap is open.
+- No focus command was sent in either run. `0x9016` and `0x9017` were never issued, so the
+  unresolved direction mapping in `FOCUS_LIVE_VIEW_MODEL_AUDIT.md` remains untested and no lens
+  movement was observed.
