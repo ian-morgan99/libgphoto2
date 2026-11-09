@@ -305,3 +305,15 @@ Start Of Scan: 3 components
 Strict-mode decode succeeds with no warnings, no "marker not found", no truncation report. The
 frame is a complete 720x480 three-component JPEG. This confirms the transfer itself was intact;
 the failure mode is the session teardown after it, not frame corruption.
+
+## Post-script: the body came back on its own
+
+Minutes after run 3, `25fb:0183` reappeared at `/sys/bus/usb/devices/1-4` with **devnum 7** — no
+operator power cycle was performed this time. That differs from the 2026-08-24 incident recorded
+in `HARDWARE_TESTING_RUNBOOK.md` §6.5, where the K-1 II showed roughly 40 minutes of no
+self-recovery before vanishing and only a physical power cycle restored PTP.
+
+So "the wedge requires a power cycle" is not established either. This drop self-healed at the USB
+level within minutes. Whether the PTP/vendor session is usable again after such a self-recovery
+was not tested — no session was opened, to avoid re-triggering the same failure while its cause
+is unknown.
