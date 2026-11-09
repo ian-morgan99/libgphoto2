@@ -775,6 +775,36 @@ pentax_old_focus_protocol_direction (int direction,
 	return GP_OK;
 }
 
+/* #303: the manualfocusdrive widget is a RANGE of -7..7 step 1, so it carries a
+ * real magnitude. The old-focus path discarded it and always sent amount=5, which
+ * made every slider position move the lens by the same minimum step. IT2
+ * FocusFineTune scales the old-path amount by the absolute UI value (amount =
+ * |UI value| * 5), so -7 and -1 must not produce the same command.
+ *
+ * The magnitude is clamped to the widget's own documented span rather than passed
+ * through: 0x9016 has a confirmed wedge history on the K-1 II (REAL_HARDWARE_TEST_LOG
+ * .md, 2026-08-24), so an out-of-range value from a client must not reach the body
+ * as an arbitrarily large amount. */
+int
+pentax_old_focus_drive_amount (float ui_value, uint32_t *amount)
+{
+	float magnitude;
+	long steps;
+
+	if (!amount)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* Range is -7..7 step 1; anything wider is a client bug, not a request. */
+	if (!(ui_value >= -7.0f) || !(ui_value <= 7.0f))
+		return GP_ERROR_BAD_PARAMETERS;
+	magnitude = ui_value < 0.0f ? -ui_value : ui_value;
+	steps = (long) (magnitude + 0.5f);
+	if (steps < 1)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* The bounds above already cap this at 7, so the amount is 5..35. */
+	*amount = (uint32_t) steps * 5U;
+	return GP_OK;
+}
+
 int
 pentax_lookup_model (uint16_t usb_vendor, uint16_t usb_product,
 		const char *device_model, uint32_t *model_no, uint32_t *extension_version)

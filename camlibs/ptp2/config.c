@@ -12694,16 +12694,27 @@ _put_Pentax_GenericManualFocusDrive (CONFIG_PUT_ARGS)
 			gp_context_status (ptp_context_get (params->data),
 				_("Pentax manual focus drive (new) returned response 0x%04x."), ret);
 	} else {
-		/* Old-focus family (K-1/K-1 II): 0x9016 with amount=5 and the
-		 * source-backed protocol direction mapping. */
-		uint32_t amount = 5U;
+		/* Old-focus family (K-1/K-1 II): 0x9016 with the magnitude taken from
+		 * the RANGE widget and the source-backed protocol direction mapping.
+		 *
+		 * #303: this branch used to hardcode amount=5 and use only the sign of
+		 * val, so -7 and -1 sent an identical command and every slider position
+		 * moved the lens by the same minimum step. The TOGGLE buttons
+		 * (oldfocusdrivenear/far) keep amount=5 -- a button really is one step.
+		 *
+		 * Whether 5 is itself the correct minimum unit for 0x9016 on this body
+		 * has not been measured; no focus-distance reading exists, only that the
+		 * lens moves. Scaling preserves that behaviour at |val| == 1 and makes
+		 * larger values do more, which is what the widget advertises. */
+		uint32_t amount;
 		uint32_t old_direction;
 
+		CR (pentax_old_focus_drive_amount (val, &amount));
 		CR (pentax_old_focus_protocol_direction (direction, &old_direction));
 
 		gp_context_status (ptp_context_get (params->data),
-			_("Pentax manual focus drive (old): amount=%u, direction=%u (%s), opcode=0x9016."),
-			amount, old_direction, direction > 0 ? "Near" : "Far");
+			_("Pentax manual focus drive (old): value=%g amount=%u, direction=%u (%s), opcode=0x9016."),
+			val, amount, old_direction, direction > 0 ? "Near" : "Far");
 		ret = ptp_pentax_focus_control (params, amount, old_direction);
 		if (ret != PTP_RC_OK)
 			gp_context_error (ptp_context_get (params->data),
