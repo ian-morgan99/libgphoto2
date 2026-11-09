@@ -21,8 +21,9 @@ main (int argc, char **argv)
 	long requested;
 	int initialized = 0, result = GP_OK, exit_result, i;
 
-	if (argc != 4) {
-		fprintf (stderr, "usage: %s MODEL usb:BUS,DEVICE FRAME_COUNT\n", argv[0]);
+	if ((argc != 4) && (argc != 5)) {
+		fprintf (stderr,
+			"usage: %s MODEL usb:BUS,DEVICE FRAME_COUNT [DUMP_DIR]\n", argv[0]);
 		return 2;
 	}
 	if (strcmp (argv[1], "Pentax K-3 Mark III (MTP mode)") &&
@@ -74,6 +75,32 @@ main (int argc, char **argv)
 		     ((unsigned char)data[size - 2] != 0xff) ||
 		     ((unsigned char)data[size - 1] != 0xd9)))
 			result = GP_ERROR_CORRUPTED_DATA;
+		/* The head/tail check above is not integrity evidence: a blob truncated
+		 * at an EXIF thumbnail's EOI also ends in FF D9.  When DUMP_DIR is
+		 * given, keep the exact bytes so the frame can be structure-walked
+		 * offline against the marker-walk parser.
+		 */
+		if ((result == GP_OK) && (argc == 5)) {
+			char path[1024];
+			FILE *dump = NULL;
+
+			snprintf (path, sizeof (path), "%s/frame-%03d.jpg", argv[4], i + 1);
+			dump = fopen (path, "wb");
+			if (!dump)
+				result = GP_ERROR_IO;
+			if ((result == GP_OK) &&
+			    (fwrite (data, 1, size, dump) != size))
+				result = GP_ERROR_CORRUPTED_DATA;
+			if (dump)
+				fclose (dump);
+			if (result < GP_OK) {
+				fprintf (stderr, "frame=%d stage=dump error=%s (%d)\n",
+					i + 1, gp_result_as_string (result), result);
+				gp_file_unref (file);
+				goto out;
+			}
+			printf ("frame=%d dumped=%s\n", i + 1, path);
+		}
 		gp_file_unref (file);
 		if (result < GP_OK)
 			goto out;

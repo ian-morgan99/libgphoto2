@@ -198,3 +198,66 @@ Exit 0. No `0x02ff`, no `0x02f9`, and the body was still on the bus immediately 
 - No focus command was sent in either run. `0x9016` and `0x9017` were never issued, so the
   unresolved direction mapping in `FOCUS_LIVE_VIEW_MODEL_AUDIT.md` remains untested and no lens
   movement was observed.
+
+---
+
+## Third run: 4 frames with byte dumps — wedged again, at frame 2
+
+Added an optional `DUMP_DIR` argument to `examples/pentax-safe-preview.c` so frames can be
+structure-walked offline; rebuilt and ran 4 frames against the same body (still devnum 6, no
+power cycle since the clean 2-frame run).
+
+```
+$ examples/pentax-safe-preview "Pentax K-1 Mark II (PTP mode)" usb:001,006 4 docs/pentax/evidence/2026-11-09/frames
+Pentax session already open from a previous connection; observing camera state.
+Pentax init stage vendor enable succeeded; function flags 0x00000003.
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x2001 (28201 bytes, 8 attempts, 241 ms).
+frame=1 dumped=docs/pentax/evidence/2026-11-09/frames/frame-001.jpg
+frame=1 bytes=28201 valid_jpeg=yes
+Pentax preview stage start-PC-LV returned 0x2001.
+Pentax preview stage get-frame returned 0x02f9 (0 bytes, 15 attempts, 473 ms).
+Pentax preview stage restore-after-frame returned 0x02f9.
+frame=2 stage=capture-preview error=Could not find the requested device on the USB port (-52)
+safe preview failed: Could not find the requested device on the USB port (-52)
+```
+
+Exit 1, and `25fb` was gone from the bus immediately afterwards.
+
+**The wedge is reproducible and not fixed.** Across three runs on the same body the number of
+successful frames before failure was 2, then 2, then 1 (yesterday's run died at frame 3): the
+failure is not tied to a specific frame index, so the earlier clean 2-frame run was luck, not a
+threshold. Every run started with `session already open from a previous connection`.
+
+## Offline validation of the one captured frame
+
+`frame-001.jpg` (28201 bytes) was checked by compiling `pentax_jpeg_bounds()` verbatim out of
+`camlibs/ptp2/pentax-utils.c` (lines 1449-1548) into a standalone harness:
+
+```
+file=.../frame-001.jpg size=28201 result=0 offset=0 length=28201 covers_to=28201
+```
+
+So this frame is structurally complete under the marker walk: SOI at 0, EOI at the end of the
+buffer, every segment length consistent. This is the first genuine frame-integrity evidence in
+this investigation — the probe's own `valid_jpeg=yes` was not, as noted above.
+
+Two caveats on that:
+
+- It is **one** frame from one body. Nothing generalises from it.
+- The frame carries no EXIF APP1 at all (markers are SOI, DQT, DRT, SOF0, DHT, SOS), so the
+  thumbnail-EOI case the marker walk exists to handle does not arise for live-view frames from
+  this body. The parser fix matters for captured images, not for these previews; that is a
+  finding, not a reason to doubt the fix.
+
+An earlier ad-hoc Python reimplementation of the walk reported a desync at offset 595. That was
+my reimplementation being wrong about entropy-coded scan handling, not the parser: the verbatim
+C code walks the same bytes cleanly. Recorded so the discrepancy is not mistaken for a defect.
+
+## Still untested
+
+No focus command has been sent in any run today or yesterday. `0x9016` and `0x9017` remain
+unexercised on this body, so the direction mapping stays unresolved and no lens movement has
+been observed. Given the wedge reproduces after one or two live-view frames, a focus test that
+needs live view active first is not safe to run without addressing the wedge; the old-focus path
+does not require live view, but the recorded precondition rules forbid driving it blind anyway.
