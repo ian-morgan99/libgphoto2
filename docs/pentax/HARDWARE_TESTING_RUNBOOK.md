@@ -297,10 +297,12 @@ tags exist so nothing is ever truly lost, which removes the reason to keep stale
 
 **Known deferred work not on `main`:** the Benro generic exposure-compensation alias
 (`archive/pre-consolidation/fix/k1ii-benro-controls`, commit `0ca7c9205`) applies textually
-but breaks `test-pentax-aperture-alias` on current main — its new `exposurecompensation`
-Pentax menu row is shadowed by the earlier generic row, so the widget resolves to the wrong
-handler and returns no choices. It needs rework against main's menu lookup before it can
-land; it is preserved as a tag, not merged.
+but breaks `test-pentax-aperture-alias` on current main. Measured symptom, reproduced by
+applying the patch to `main` and instrumenting the assertion: `get_single (cam,
+"exposurecompensation", &ev, context)` returns `GP_OK` with `ev == NULL`. The cause is not
+established — the row lands in `capture_settings_menu[]` alongside several existing generic
+`exposurecompensation` rows, but no investigation has confirmed how they interact. It needs
+rework against main's menu lookup before it can land; it is preserved as a tag, not merged.
 
 **Rule:** hardware-test only code that is committed on `main` (or a clearly named branch off
 it), and record the exact commit hash in the test-log entry.
