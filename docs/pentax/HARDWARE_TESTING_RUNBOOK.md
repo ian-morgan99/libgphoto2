@@ -278,18 +278,32 @@ confirmed).
 
 ## 7. BRANCHES AND MERGE STATE
 
+Consolidated on 2026-11-09 to a single integration branch. The prior state — five
+worktrees, ~30 local branches, ~15 remote branches — was unsustainable and is gone.
+
 | Branch | State | Purpose |
 |---|---|---|
-| `master` (= `origin/master`) | Integration branch. All tested work lands here. | Work from this branch. |
-| `backup/pre-rebase-2026-08-24` | Local-only, intentionally NOT merged | Safety snapshot taken before a history rewrite on 2026-08-24. Keep; do not delete; do not merge. |
+| `main` (= `origin/main`) | Integration branch. All tested work lands here. | Work from this branch. |
 | `upstream/*` remotes | Read-only reference | `upstream` = gphoto/libgphoto2. Never push there. |
 
-Remote feature branches (`origin/c99-compliance-pentax`, `origin/fix-pentax-deps`,
-`origin/pentax-modern-integration`, etc.) are historical; `master` supersedes
-them. Do not resume work on them without operator instruction.
+There is exactly one worktree: `/home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2`.
+Every superseded branch was tagged `archive/pre-consolidation/<name>` and pushed before
+deletion, so any of them is recoverable with `git checkout -b <name>
+archive/pre-consolidation/<name>`. Do not delete those tags.
 
-**Rule:** hardware-test only code that is committed on `master` (or a clearly
-named branch off it), and record the exact commit hash in the test-log entry.
+**Workflow going forward:** one issue → one short-lived branch off `main` → squash-merge
+via PR → delete the branch on merge. Do not accumulate long-lived branches; the archive
+tags exist so nothing is ever truly lost, which removes the reason to keep stale refs.
+
+**Known deferred work not on `main`:** the Benro generic exposure-compensation alias
+(`archive/pre-consolidation/fix/k1ii-benro-controls`, commit `0ca7c9205`) applies textually
+but breaks `test-pentax-aperture-alias` on current main — its new `exposurecompensation`
+Pentax menu row is shadowed by the earlier generic row, so the widget resolves to the wrong
+handler and returns no choices. It needs rework against main's menu lookup before it can
+land; it is preserved as a tag, not merged.
+
+**Rule:** hardware-test only code that is committed on `main` (or a clearly named branch off
+it), and record the exact commit hash in the test-log entry.
 
 ---
 
