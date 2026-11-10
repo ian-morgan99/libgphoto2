@@ -2304,7 +2304,16 @@ pentax_format_shutter_speed (uint64_t value, char *buf, size_t buflen)
 /* Parse the whole-second labels emitted above.  Keep this beside the formatter
  * so a displayed radio choice always maps back to its exact wire value.
  * Accept the old unit-bearing spellings as input for compatibility with
- * existing callers and saved configurations, but emit only MM:SS. */
+ * existing callers and saved configurations, but emit only MM:SS.
+ *
+ * MM-SS is accepted as an input alias.  pgphoto builds the app-facing shutter
+ * list with its own "%02u-%02u" emitter, so the label the user actually picks
+ * (for example "00-02", seen in SP_GetCameraPara) is the hyphen spelling of a
+ * value we formatted as "00:02".  Without this alias the label matches no
+ * branch here and also fails pentax_parse_legacy_shutter_denominator, because
+ * strtoull stops at the separator and *end != '\0'; the write is then rejected
+ * and the seconds entry silently never applies.  Emitting stays on MM:SS so
+ * the wire spelling we advertise does not change. */
 int
 pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 {
@@ -2317,7 +2326,7 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	first = strtoull (value, &end, 10);
 	if (end == value || errno == ERANGE)
 		return -1;
-	if (*end == ':') {
+	if (*end == ':' || *end == '-') {
 		char *seconds_end;
 		if (end[1] < '0' || end[1] > '9')
 			return -1;
@@ -2342,6 +2351,7 @@ pentax_parse_shutter_duration (const char *value, uint32_t *seconds)
 	end++;
 	if (*end) {
 		char *seconds_end;
+		/* "1m-10s" stays invalid: the seconds part must be a bare number. */
 		if (end[0] < '0' || end[0] > '9')
 			return -1;
 		errno = 0;

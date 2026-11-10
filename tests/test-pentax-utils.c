@@ -1897,6 +1897,26 @@ main (void)
 		CHECK (candidate == 60);
 		CHECK (pentax_parse_shutter_duration ("1:10", &candidate) == 0);
 		CHECK (candidate == 70);
+		/* pgphoto re-emits our whole-second labels as MM-SS and sends that
+		 * spelling back on set, so it must map to the same seconds. */
+		CHECK (pentax_parse_shutter_duration ("00-02", &candidate) == 0);
+		CHECK (candidate == 2);
+		CHECK (pentax_parse_shutter_duration ("00-30", &candidate) == 0);
+		CHECK (candidate == 30);
+		CHECK (pentax_parse_shutter_duration ("01-10", &candidate) == 0);
+		CHECK (candidate == 70);
+		CHECK (pentax_parse_shutter_duration ("02-00", &candidate) == 0);
+		CHECK (candidate == 120);
+		/* A hyphen is not a licence for garbage: the seconds half must be a
+		 * bare number below 60, exactly as for MM:SS. */
+		CHECK (pentax_parse_shutter_duration ("00-60", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("00-", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("00--2", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("00-2junk", &candidate) == -1);
+		CHECK (pentax_parse_shutter_duration ("00-2s", &candidate) == -1);
+		/* A rejected duration must not be rescued by the legacy plain-integer
+		 * fallback as its leading numeric prefix. */
+		CHECK (pentax_parse_legacy_shutter_denominator ("00-02", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("1m60s", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("01:60", &candidate) == -1);
 		CHECK (pentax_parse_shutter_duration ("4294967296s", &candidate) == -1);
