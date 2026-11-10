@@ -9660,9 +9660,29 @@ _get_Pentax_DirectProperty (CONFIG_GET_ARGS)
 		return translate_ptp_result (ret);
 	}
 	if (raw_desc) {
-		used = (unsigned int)snprintf (value, sizeof (value),
-			"code=0x%04x; descriptor-parse=failed; descriptor-bytes=%u; "
-			"descriptor-hex=", code, raw_desc_size);
+		/* Issue #322: the generic unpacker rejects these vendor payloads, but
+		 * the fixed PTP header is decodable.  Report what the body actually
+		 * advertises instead of only "descriptor-parse=failed", and keep the
+		 * raw hex so the unmeasured vendor bytes remain visible. */
+		PentaxDirectPropertyDescriptor hparsed;
+		int hok = (pentax_parse_direct_property_descriptor (code, raw_desc,
+				raw_desc_size, &hparsed) == GP_OK);
+
+		if (hok)
+			used = (unsigned int)snprintf (value, sizeof (value),
+				"code=0x%04x; descriptor-parse=header; "
+				"descriptor-bytes=%u; datatype=0x%04x; "
+				"array=%s; element-type=0x%04x; getset=%u; form=%u; "
+				"extension-bytes=%u; verdict=%s; descriptor-hex=",
+				code, raw_desc_size, hparsed.data_type,
+				hparsed.is_array ? "yes" : "no", hparsed.element_type,
+				hparsed.getset, hparsed.form_flag,
+				hparsed.extension_bytes,
+				pentax_direct_property_descriptor_verdict (&hparsed));
+		else
+			used = (unsigned int)snprintf (value, sizeof (value),
+				"code=0x%04x; descriptor-parse=failed; descriptor-bytes=%u; "
+				"descriptor-hex=", code, raw_desc_size);
 		for (i = 0; i < raw_desc_size && i < 64 && used + 2 < sizeof (value); i++)
 			used += (unsigned int)snprintf (value + used,
 				sizeof (value) - used, "%02x", raw_desc[i]);

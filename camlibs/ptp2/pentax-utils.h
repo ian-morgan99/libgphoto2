@@ -511,6 +511,30 @@ int pentax_wait_for_idle (int (*read_cb) (void *user_data, unsigned char **data,
  * Model-agnostic, so it covers the K-1 II as well as the K-3 III. */
 int pentax_conditions_in_astro_mode (const PentaxConditions *conditions);
 
+/* Issue #322: the fixed PTP GetDevicePropDesc header of a Pentax vendor
+ * property whose full form the generic unpacker cannot parse.  Only the header
+ * is decoded; extension_bytes counts the vendor bytes that follow and those are
+ * never interpreted. */
+typedef struct {
+        uint16_t prop_code;
+        uint16_t data_type;      /* as advertised, ARRAY_MASK included */
+        uint16_t element_type;   /* data_type with ARRAY_MASK cleared */
+        uint8_t getset;          /* 0 read-only, 1 readable/writable */
+        uint8_t form_flag;       /* 0 none, 1 range, 2 enum */
+        int is_array;
+        unsigned int header_bytes;
+        unsigned int extension_bytes;
+} PentaxDirectPropertyDescriptor;
+
+/* Decode the header of a raw vendor descriptor.  expected_code must match the
+ * PropCode the body echoed or the payload is rejected as corrupted. */
+int pentax_parse_direct_property_descriptor (uint16_t expected_code,
+	const unsigned char *data, size_t size,
+	PentaxDirectPropertyDescriptor *parsed);
+/* One-line conservative reading of a parsed header, for the widget string. */
+const char *pentax_direct_property_descriptor_verdict (
+	const PentaxDirectPropertyDescriptor *parsed);
+
 uint32_t pentax_get_u32le (const unsigned char *data);
 int pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 	PentaxLiveViewGeometry *geometry);

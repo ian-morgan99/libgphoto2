@@ -447,6 +447,61 @@ main (void)
 		CHECK (!pentax_wff_payload_is_valid (wff10, 9));
 	}
 
+	/* Issue #322: the two vendor descriptors the generic unpacker rejects.
+	 * Byte sequences are the payloads H1.11 measured twice on a K-1 II fw
+	 * 1.02, byte-for-byte identical across runs. */
+	{
+		unsigned char d02b[16] = {
+			0x2b, 0xd0, 0x04, 0x40, 0x01, 0x00, 0x01, 0x02,
+			0x02, 0x00, 0x00, 0x00, 0x40, 0x02, 0x40, 0x01
+		};
+		unsigned char d035[6] = { 0x35, 0xd0, 0x00, 0x00, 0x00, 0x00 };
+		PentaxDirectPropertyDescriptor hparsed;
+
+		memset (&hparsed, 0xa5, sizeof (hparsed));
+		CHECK (pentax_parse_direct_property_descriptor (0xd02b, d02b,
+			sizeof (d02b), &hparsed) == GP_OK);
+		CHECK (hparsed.prop_code == 0xd02b);
+		/* 0x4004 is ARRAY_MASK | UINT16: the body advertises an array, which
+		 * is precisely why IT2's UINT8 scalar assumption fails here. */
+		CHECK (hparsed.data_type == 0x4004);
+		CHECK (hparsed.is_array != 0);
+		CHECK (hparsed.element_type == PTP_DTC_UINT16);
+		CHECK (hparsed.getset == 1);
+		CHECK (hparsed.form_flag == 0);
+		CHECK (hparsed.header_bytes == 6);
+		CHECK (hparsed.extension_bytes == 10);
+		CHECK (!strcmp (pentax_direct_property_descriptor_verdict (&hparsed),
+			"array-payload; scalar-assumption-invalid; withheld"));
+
+		memset (&hparsed, 0xa5, sizeof (hparsed));
+		CHECK (pentax_parse_direct_property_descriptor (0xd035, d035,
+			sizeof (d035), &hparsed) == GP_OK);
+		CHECK (hparsed.prop_code == 0xd035);
+		CHECK (hparsed.data_type == PTP_DTC_UNDEF);
+		CHECK (hparsed.is_array == 0);
+		CHECK (hparsed.getset == 0);
+		CHECK (hparsed.extension_bytes == 0);
+		CHECK (!strcmp (pentax_direct_property_descriptor_verdict (&hparsed),
+			"null-placeholder; not-a-scalar; use-source-defined-path"));
+
+		/* A descriptor naming a different property is not this property's
+		 * descriptor, and a payload too short to carry the fixed header is
+		 * not parseable at all. */
+		memset (&hparsed, 0xa5, sizeof (hparsed));
+		CHECK (pentax_parse_direct_property_descriptor (0xd02b, d035,
+			sizeof (d035), &hparsed) == GP_ERROR_CORRUPTED_DATA);
+		CHECK (pentax_parse_direct_property_descriptor (0xd035, d02b,
+			sizeof (d02b), &hparsed) == GP_ERROR_CORRUPTED_DATA);
+		CHECK (pentax_parse_direct_property_descriptor (0xd02b, d02b,
+			5, &hparsed) == GP_ERROR_CORRUPTED_DATA);
+		CHECK (pentax_parse_direct_property_descriptor (0xd02b, NULL,
+			sizeof (d02b), &hparsed) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_parse_direct_property_descriptor (0xd02b, d02b,
+			sizeof (d02b), NULL) == GP_ERROR_BAD_PARAMETERS);
+		CHECK (pentax_direct_property_descriptor_verdict (NULL) != NULL);
+	}
+
 	put_u32le (geometry_data, 4, 480U << 16 | 720U);
 	put_u32le (geometry_data, 8, 400U << 16 | 640U);
 	put_u32le (geometry_data, 12, 360U << 16 | 600U);

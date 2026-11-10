@@ -513,6 +513,74 @@ pentax_get_u16le (const unsigned char *data)
 	return (uint16_t)(data[0] | ((uint16_t)data[1] << 8));
 }
 
+/* Issue #322: 0xd02b (focus peaking) and 0xd035 (PC live view) return payloads
+ * the generic GetDevicePropDesc unpacker rejects, so _get_Pentax_DirectProperty
+ * fell through to "descriptor-parse=failed" plus raw hex.  Both are decoded
+ * here only as far as the PTP descriptor header is provable; the vendor bytes
+ * that follow are reported verbatim and never interpreted.
+ *
+ * H1.11 (docs/pentax/evidence/2026-08-21/H1.11/README.md) measured both on a
+ * K-1 II fw 1.02, twice, byte-for-byte identical, and ruled that they "must not
+ * be normalized, guessed, or exposed as writable widgets".  These parsers honour
+ * that: they name the datatype and access the body actually advertises, which
+ * is what a caller needs to decide whether a scalar UINT8 assumption is safe,
+ * and they stop there.
+ *
+ * Measured samples:
+ *   0xd02b 16 bytes 2bd00440010001020200000040024001
+ *     propcode 0xd02b, datatype 0x4004 = ARRAY_MASK|UINT16, getset 0x01,
+ *     form 0x00, then 10 vendor bytes.
+ *   0xd035  6 bytes 35d000000000
+ *     propcode 0xd035, datatype 0x0000 = UNDEF, getset 0x00, form 0x00.
+ */
+int
+pentax_parse_direct_property_descriptor (uint16_t expected_code,
+		const unsigned char *data, size_t size,
+		PentaxDirectPropertyDescriptor *parsed)
+{
+	if (!data || !parsed)
+		return GP_ERROR_BAD_PARAMETERS;
+	/* PropCode, DataType, GetSet and FormFlag are the fixed PTP header.  A
+	 * shorter payload has no header to report, so it stays unparsed. */
+	if (size < 6)
+		return GP_ERROR_CORRUPTED_DATA;
+	memset (parsed, 0, sizeof (*parsed));
+	parsed->prop_code = pentax_get_u16le (data);
+	/* A descriptor naming a different property than was asked for is not this
+	 * property's descriptor; reporting it would misattribute the payload. */
+	if (parsed->prop_code != expected_code)
+		return GP_ERROR_CORRUPTED_DATA;
+	parsed->data_type = pentax_get_u16le (data + 2);
+	parsed->getset = data[4];
+	parsed->form_flag = data[5];
+	parsed->is_array = (parsed->data_type & PTP_DTC_ARRAY_MASK) != 0;
+	parsed->element_type = parsed->data_type & ~PTP_DTC_ARRAY_MASK;
+	parsed->header_bytes = 6;
+	/* Everything past the header is vendor-specific and unmeasured.  Keep the
+	 * count so a caller can see it exists, but do not decode it. */
+	parsed->extension_bytes = (unsigned int)(size - 6);
+	return GP_OK;
+}
+
+const char *
+pentax_direct_property_descriptor_verdict (
+		const PentaxDirectPropertyDescriptor *parsed)
+{
+	if (!parsed)
+		return "not-parsed";
+	/* 0xd035 advertises datatype 0x0000 with no form: a null placeholder, not
+	 * a scalar.  IT2 starts PC live view without a preliminary GET for exactly
+	 * this reason (IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md row 0xd035). */
+	if (parsed->data_type == PTP_DTC_UNDEF)
+		return "null-placeholder; not-a-scalar; use-source-defined-path";
+	/* 0xd02b advertises an array of UINT16.  IT2 assumes a UINT8 scalar, so
+	 * the assumption is provably wrong on this body and the property must not
+	 * be exposed as a writable scalar widget. */
+	if (parsed->is_array)
+		return "array-payload; scalar-assumption-invalid; withheld";
+	return "scalar-descriptor; header-parsed";
+}
+
 int
 pentax_parse_live_view_geometry (const unsigned char *data, size_t size,
 		PentaxLiveViewGeometry *geometry)
