@@ -15331,6 +15331,13 @@ static struct submenu capture_settings_menu[] = {
 	 * supported_model && vendor_mode_enabled and target PTP_DPC_FNumber.
 	 * The existing `f-number` / `pentaxdirectaperture` names are preserved. */
 	{ N_("Aperture"),                       "aperture",                 0,                                      PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropDesc, _get_Pentax_DirectAperture, _put_Pentax_DirectAperture },
+	/* Modern Pentax bodies likewise omit 0x5010 from the generic menu path.
+	 * Benro Connect requests the standard name `exposurecompensation` (code
+	 * 267), while the Pentax-specific entry is `pentaxdirectev`. Route the
+	 * standard name through the same descriptor-driven handler so K-1 II gets
+	 * its camera-advertised enumeration, without fabricating a range or
+	 * changing any non-Pentax vendor row. */
+	{ N_("Exposure Compensation"),          "exposurecompensation",       0,                                      PTP_VENDOR_PENTAX,  PTP_OC_GetDevicePropDesc, _get_Pentax_DirectEV, _put_Pentax_DirectEV },
 	{ N_("Focusing Point"),                 "focusingpoint",            PTP_DPC_CANON_FocusingPoint,            PTP_VENDOR_CANON,   PTP_DTC_UINT16, _get_Canon_FocusingPoint,           _put_Canon_FocusingPoint },
 	{ N_("Sharpness"),                      "sharpness",                PTP_DPC_Sharpness,                      0,                  PTP_DTC_UINT8,  _get_Sharpness,                     _put_Sharpness },
 	{ N_("Capture Delay"),                  "capturedelay",             PTP_DPC_CaptureDelay,                   0,                  PTP_DTC_UINT32, _get_Milliseconds,                  _put_Milliseconds },
