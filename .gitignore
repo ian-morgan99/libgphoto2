@@ -162,3 +162,9 @@ docs/pentax/evidence/**/*.log
 
 # local PR kit (push instructions, bodies) - not for upstream
 .pr-artifacts/
+
+# Generated harness includes. These are produced into the build directory by the
+# extract-*.py scripts; a copy left in the source tree is found FIRST by a quoted
+# #include, so it silently shadows the up-to-date one and the harness then asserts
+# against stale code while still reporting PASS.
+/tests/*.inc

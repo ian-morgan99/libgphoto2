@@ -56,6 +56,25 @@ test_pentax_session = executable(
 )
 test('test-pentax-session', test_pentax_session)
 
+# Issue #140: the held-Bulb action's cancellation and stop-edge state machine, run
+# against a mocked transport. The static contract test only asserts source text, which
+# cannot show that a cancel returns GP_ERROR_CANCEL without writing a shutter.
+pentax_bulb_action_source = custom_target(
+  'test-pentax-bulb-action-source',
+  input: '../camlibs/ptp2/library.c',
+  output: 'test-pentax-bulb-action.inc',
+  command: [python, files('extract-pentax-bulb-action.py'), '@INPUT@', '@OUTPUT@'],
+  depend_files: files('extract-camera-exit.py'),
+)
+test_pentax_bulb_action = executable(
+  'test-pentax-bulb-action',
+  'test-pentax-bulb-action.c', pentax_bulb_action_source,
+  '../camlibs/ptp2/pentax-utils.c',
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+test('test-pentax-bulb-action', test_pentax_bulb_action)
+
 test_pentax_utils_exe = executable(
   'test-pentax-utils',
   'test-pentax-utils.c',
