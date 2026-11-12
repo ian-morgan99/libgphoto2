@@ -65,13 +65,17 @@ There are two decompiled versions and they differ; see
 `../WORKSPACE-MAP.md` §3 before citing one:
 
 - `../IT2_2625_decompile/` — app version **2.6.2.5**, newest. Has the K-3 III
-  Monochrome model gate. No XAML, so UI value ranges are compiled into BAML and
-  cannot be recovered from it.
-- `../ImageTransmitter2/` — app version **2.6.1.3**, older. Has `.xaml`, so UI
-  value ranges are readable. Contains no Monochrome handling at all.
+  Monochrome model gate. No XAML, but extracted `.baml` resources are present, so
+  UI value ranges are recoverable from them.
+- `../ImageTransmitter2/` — app version **2.6.1.3**, older. Has `.xaml`, so ranges
+  read as plain text. Contains no Monochrome handling at all.
 
-Neither tree answers both model-gate questions and value-range questions. Do not
-read the app version from the bundled .NET stubs in `../ImageTransmitter2/`
+Prefer 2.6.2.5 for both model gates and value ranges; use the older tree as a quick
+cross-check. BAML stores these values as **length-prefixed ASCII strings**, so a
+numeric byte search for e.g. `10000` finds nothing and the range looks absent when
+it is not. `../tools/baml_props.py` extracts them and validates the result.
+
+Do not read the app version from the bundled .NET stubs in `../ImageTransmitter2/`
 (`mscorlib`, `PresentationCore`, …), which report 4.0.0.0; confirm against the
 app's own `Properties/AssemblyInfo.cs`.
 
