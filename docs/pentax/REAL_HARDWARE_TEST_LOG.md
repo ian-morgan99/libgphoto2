@@ -903,3 +903,48 @@ also updates issue #48.
   ordinary disconnect and fresh/warm reconnect remain unqualified. See
   [retained raw evidence](evidence/2026-10-30/issue-33-session/README.md) and
   [the junior-agent handoff](K1II-SESSION-SAFETY-HANDOFF.md).
+
+## 2026-11-09 — K-1 II bounded PC live-view preview; wedged at frame 3 (inconclusive)
+
+- Build under test: `7e6dec95f` (`origin/main`), research-enabled so the Pentax
+  preview path is compiled in. Device attached directly to PC, not Polaris.
+- USB: `25fb:0183`, port derived from sysfs as `usb:001,005` (not hardcoded).
+  Step 1 was a read-only init probe — `examples/pentax-safe-focus ... init`,
+  exit 0, VID:PID verified before any write, per §4.1.
+- Step 2: `examples/pentax-safe-preview "Pentax K-1 Mark II (PTP mode)"
+  usb:001,005 5`. PC-LV start returned `0x2001`; frame 1 transferred 17093 bytes
+  (21 attempts, 673 ms) and frame 2 transferred 28271 bytes (9 attempts, 290 ms).
+- Failure sequence: the post-frame PC-LV restore after frame 2 returned `0x02ff`,
+  frame 3's get-frame returned `0x02f9` with 0 bytes, and the restore-after-frame
+  also returned `0x02f9`. The body then left the bus entirely — `25fb` absent from
+  every `/sys/bus/usb/devices/*/idVendor`, no `1-4` entry.
+- Not a host-side leak: `pgrep` for `pentax-safe|gphoto2|gphotofs|gvfs` was empty,
+  so no process held the port. Matches the wedge signature in
+  `HARDWARE_TESTING_RUNBOOK.md` §6.5, where a USB-level reset did **not** recover
+  PTP and only a physical power cycle did.
+- **No recovery was performed or claimed.** The camera was unreachable from this
+  host at the time of writing. This is recorded as an inconclusive run, not a
+  pass or a fail: it wedged before any focus test ran, so there is no verdict on
+  the feature under test — only the wedge itself is observed.
+- Proven by this run: vendor-mode enable works on this body/firmware (function
+  flags `0x00000003`); PC-LV start returns `0x2001` and at least two frames
+  transfer with non-trivial sizes.
+- Deliberately **not** proven:
+  - `valid_jpeg=yes` is not frame-integrity evidence here. `origin/main` still
+    contains the old first-`ff d9` byte-scan in `pentax_jpeg_bounds()`; the
+    marker-walk replacement (`0b31c524e`) is on `feature/polaris-capture-events`
+    and is not on `main`. That scan can be fooled by an EXIF thumbnail EOI, so
+    both frames must be re-validated against the new parser before any integrity
+    claim.
+  - No focus command was sent — neither `0x9016` nor `0x9017` — and no lens
+    movement was observed. This contributes nothing to the unresolved
+    old-focus/new-focus direction question in `FOCUS_LIVE_VIEW_MODEL_AUDIT.md`.
+  - No still capture, no card write, no parameter write.
+- Open defect surfaced: whether the `0x02ff` restore is the cause of the
+  subsequent `0x02f9` responses is unresolved. Note that `ptp.c` labels `0x02ff`
+  as "invalid dataset / general operation error", which is wrong for this
+  sequence; `PcLiveViewMode` accepts `0xa005` or `0x2001` on stop.
+- Next step: operator power cycle, then re-run preview against a build carrying
+  the marker walk before anything focus-related is attempted. See
+  [retained raw evidence](evidence/2026-11-09/k1ii-pc-lv-preview-wedge.md) and
+  the captured frames in `evidence/2026-11-09/frames/`.
