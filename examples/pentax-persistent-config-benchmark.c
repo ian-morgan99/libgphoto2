@@ -197,6 +197,9 @@ main (int argc, char **argv)
 	 * separately: a failed primary operation must not hide a failed restore, and
 	 * a restore is never claimed without an independent readback. */
 	int operation_result = GP_OK, restore_result = GP_OK;
+	/* Kept out of the verification block so a failed readback can be propagated
+	 * as the exit status instead of being reduced to the string "UNKNOWN". */
+	int verify_result = GP_OK;
 	const char *final_value_verified = "not-attempted";
 
 	if ((argc < 3) || (argc > 5) ||
@@ -319,8 +322,8 @@ out:
 		 * evidence that the camera holds the startup value. */
 		{
 			char verified[32] = { 0 };
-			int verify_result = read_focus_peaking (camera, context, verified,
-			                                       sizeof verified, NULL);
+			verify_result = read_focus_peaking (camera, context, verified,
+			                                     sizeof verified, NULL);
 			if (verify_result < GP_OK)
 				final_value_verified = "UNKNOWN";
 			else if (strcmp (verified, initial))
@@ -363,6 +366,13 @@ out:
 	else if ((result >= GP_OK) && (attempted) &&
 	         !strcmp (final_value_verified, "MISMATCH"))
 		result = GP_ERROR_CORRUPTED_DATA;
+	/* "UNKNOWN" is only ever set when the readback itself failed, so
+	 * verify_result already carries the reason. An unverified camera state is
+	 * not a pass: the whole point of the independent readback is that the
+	 * restore write's own return code proves nothing about the camera. */
+	else if ((result >= GP_OK) && (attempted) &&
+	         !strcmp (final_value_verified, "UNKNOWN"))
+		result = verify_result;
 	if (camera)
 		gp_camera_unref (camera);
 	if (context)
