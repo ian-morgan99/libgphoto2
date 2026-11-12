@@ -60,6 +60,24 @@ property, payload, model gate, state transition, retry, or cleanup path:
 4. Update `DEVELOPMENT_PLAN.md` and the separate hardware log after every real
    camera test. Preserve exact original values and restoration obligations.
 
+The IT2 trees live outside this repository, in the parent workspace directory.
+There are two decompiled versions and they differ; see
+`../WORKSPACE-MAP.md` §3 before citing one:
+
+- `../IT2_2625_decompile/` — app version **2.6.2.5**, newest. Has the K-3 III
+  Monochrome model gate. No XAML, so UI value ranges are compiled into BAML and
+  cannot be recovered from it.
+- `../ImageTransmitter2/` — app version **2.6.1.3**, older. Has `.xaml`, so UI
+  value ranges are readable. Contains no Monochrome handling at all.
+
+Neither tree answers both model-gate questions and value-range questions. Do not
+read the app version from the bundled .NET stubs in `../ImageTransmitter2/`
+(`mscorlib`, `PresentationCore`, …), which report 4.0.0.0; confirm against the
+app's own `Properties/AssemblyInfo.cs`.
+
+The decompiler emits decimal literals: `0x9011` is `36881`, `0xd018` is `53272`.
+Convert before searching or you will find nothing.
+
 ## Hardware truth rules
 
 - A PTP `0x2001` response proves acknowledgement, not application. A setting
