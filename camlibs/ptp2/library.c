@@ -3778,7 +3778,13 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 {
 	unsigned char	*data = NULL, *jpgStartPtr = NULL;
 	uint32_t	size = 0;
-	uint16_t	ret;
+	/* ret is assigned only inside the frame loop. If the context is cancelled
+	 * before the first attempt the loop breaks without ever assigning it, so it
+	 * must not be left indeterminate: the status line below reads it, and an
+	 * uninitialised read there printed 0x0000 -- PTP_RC_OK -- for a fetch that
+	 * never happened. That is what made a cancelled preview look like a
+	 * successful frame with zero bytes in the field logs. */
+	uint16_t	ret = 0;
 	PTPParams *params = &camera->pl->params;
 
 	camera->pl->checkevents = TRUE;
@@ -3849,9 +3855,17 @@ camera_capture_preview (Camera *camera, CameraFile *file, GPContext *context)
 			if (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms, size))
 				usleep (33000);
 		} while (pentax_live_view_frame_should_retry (ret, attempts, elapsed_ms, size));
-		gp_context_status (context,
-			_("Pentax preview stage get-frame returned 0x%04x (%u bytes, %u attempts, %u ms)."),
-			ret, size, attempts, elapsed_ms);
+		/* Say plainly when nothing was ever attempted. "get-frame returned
+		 * 0x0000 (0 bytes, 0 attempts)" reads as a frame fetch that succeeded
+		 * and came back empty, which is not what happened and sent diagnosis
+		 * down exactly that path. */
+		if (cancelled && !attempts)
+			gp_context_status (context,
+				_("Pentax preview stage cancelled before the first frame attempt."));
+		else
+			gp_context_status (context,
+				_("Pentax preview stage get-frame returned 0x%04x (%u bytes, %u attempts, %u ms)."),
+				ret, size, attempts, elapsed_ms);
 		if (cancelled || (ret != PTP_RC_OK)) {
 			uint16_t restore_ret = pentax_restore_live_view (params, 0);
 			gp_context_status (context,
