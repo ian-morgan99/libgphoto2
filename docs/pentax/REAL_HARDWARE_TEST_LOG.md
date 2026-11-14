@@ -984,9 +984,13 @@ also updates issue #48.
   The offline suite passed 26/26 and the runtime debug log showed the exact
   isolated `CAMLIBS` and `IOLIBS` paths.
 - One-frame preview passed: PC-LV start and frame transfer returned `0x2001`,
-  10,172 bytes, valid JPEG, 23 attempts, 738 ms; cleanup passed.
-- Five-frame preview passed: all five frames transferred as valid JPEGs,
-  7,347 bytes each, 11–13 attempts, 338–402 ms each; cleanup passed.
+  10,172 bytes, and passed the helper's MIME/SOI/EOI boundary check; 23
+  attempts, 738 ms; cleanup passed. This helper check is not a full JPEG
+  marker-walk integrity qualification.
+- Five-frame preview passed: all five frames transferred as 7,347 bytes each
+  and passed the helper's MIME/SOI/EOI boundary check; 11–13 attempts,
+  338–402 ms each; cleanup passed. Full marker-walk integrity remains to be
+  revalidated against these retained frames.
 - Source-faithful K-1 II shutter round trip passed after the test helper was
   corrected to accept the camera's `MM:SS` widget representation and convert it
   to the `N/1` form emitted by live `GetAllConditions`: `00:20` -> `1/30` ->
@@ -1021,3 +1025,43 @@ also updates issue #48.
 - Retained evidence: `/tmp/polaris-window-20261114-k3iii/probe-9090.txt`,
   `probe-expected-sw-live.txt`, `list-shutters.txt`, their JSON files,
   `fwver.txt`, and `layer-report-go.txt`.
+
+
+## 2026-11-14 — offline follow-up before next physical session
+
+No camera command was sent during this follow-up because the bodies are
+unavailable for approximately eight hours.
+
+- The current K-1 II old-focus implementation is source-gated before the
+  command: `_put_Pentax_OldFocusDrive` reads `GetAllConditions`, requires the
+  IT2-derived AF-mode field at offset 196 to be non-zero, sends exactly one
+  `0x9016` command with amount 5, and performs no retry. This is the correct
+  fail-closed safety boundary for the next focus test.
+- The old-focus Near/Far direction remains unqualified. IT2's `FocusFineTune`
+  path and current code comments/mappings disagree, while retained hardware
+  evidence records acknowledgements but no observed lens movement. Do not flip
+  the mapping offline. The next test must log the exact action and have the
+  operator observe the lens before any direction claim.
+- The current preview helper's `valid_jpeg=yes` output means only MIME plus
+  SOI/EOI boundary validation. It is not a full marker-walk integrity result;
+  the retained one- and five-frame files need that separate offline validation
+  before preview integrity is called complete.
+
+Next-session command sequence, using the exact isolated research build and a
+fresh port derived from sysfs:
+
+```text
+research_root=$(cat /tmp/pentax-research-host.latest)
+# derive the current usb:BUS,DEVICE; do not reuse an old port if enumeration changed
+"$research_root/build/examples/pentax-safe-focus" \
+  "Pentax K-1 Mark II (PTP mode)" usb:BUS,DEVICE init
+# only after the operator confirms lens mounted, AF/MF=AF, and movement is safe:
+"$research_root/build/examples/pentax-safe-focus" \
+  "Pentax K-1 Mark II (PTP mode)" usb:BUS,DEVICE near-lv
+"$research_root/build/examples/pentax-safe-focus" \
+  "Pentax K-1 Mark II (PTP mode)" usb:BUS,DEVICE far-lv
+```
+
+The matching `near-lv`/`far-lv` pair is the only focus action planned. No
+capture, Bulb, reset, firmware operation, or K-3 second USB owner is permitted
+as part of this handoff.

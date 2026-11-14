@@ -945,7 +945,9 @@ The correct research-enabled build used source
 `/tmp/pentax-research-host.Iqq8or/prefix`, and `ptp2.so` SHA-256
 `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
 Offline tests passed 26/26. With the exact isolated runtime proven, K-1 II
-one-frame and five-frame previews passed with valid JPEGs and clean cleanup.
+one-frame and five-frame previews passed the helper's MIME/SOI/EOI boundary
+check and clean cleanup; this is not yet a full marker-walk JPEG integrity
+qualification.
 The source-faithful shutter helper also passed `00:20 -> 1/30 -> 00:20`
 through live conditions after its parser was corrected for the camera's
 `MM:SS` widget form. No focus, still capture, or Bulb command was run.
@@ -961,3 +963,21 @@ Next physical work is operator-gated K-1 focus or capture/Bulb qualification;
 K-3 requires a documented single-owner mode oracle before capture. Do not
 infer a libgphoto2 defect from the discarded research-disabled invocation or
 from the Polaris ownership failure.
+
+
+## 2026-11-14 offline follow-up — physical session paused
+
+The cameras are unavailable for approximately eight hours, so no further
+hardware command was issued. Source audit confirms that the next K-1 II focus
+probe is appropriately fail-closed: `_put_Pentax_OldFocusDrive` obtains live
+`GetAllConditions`, requires AF mode field offset 196 to be non-zero, then sends
+one amount-5 `0x9016` command with no retry. The IT2 old-focus direction and the
+current code mapping remain in conflict, and retained hardware evidence has no
+observed lens movement. Direction must therefore remain unqualified until the
+operator observes a bounded Near/Far pair.
+
+The K-1 preview helper's `valid_jpeg=yes` is only a MIME/SOI/EOI boundary check;
+full marker-walk validation of the retained frames is still a separate offline
+task. K-3 capture remains blocked by the proven `pgphoto` USB ownership issue.
+No capture, Bulb, reset, firmware operation, or second USB owner was used while
+preparing this handoff.
