@@ -949,7 +949,7 @@ also updates issue #48.
   [retained raw evidence](evidence/2026-11-09/k1ii-pc-lv-preview-wedge.md) and
   the captured frames in `evidence/2026-11-09/frames/`.
 
-## 2026-11-14 — current K-1 II preview gate stopped at unsupported operation
+## 2026-11-14 — K-1 II initial preview invocation was research-disabled
 
 - Body: K-1 Mark II, USB `25fb:0183`, `usb:001,006`, serial `7371227`.
   The PTP summary reported `Version: 2.51`; a camera-menu firmware value was not
@@ -965,15 +965,40 @@ also updates issue #48.
   returned `GP_ERROR_NOT_SUPPORTED (-6)` at frame 1. No preview file was
   produced. No five-frame preview, setting write, focus request, still capture,
   Bulb request, retry, reset, or recovery was sent after the failure.
-- Verdict: **CURRENT DIRECT-PC PREVIEW FAIL at the libgphoto2 operation
-  boundary; lower-level PTP cause not yet identified.** This is stronger recent
-  evidence than older K-1 II preview passes, but it does not by itself identify
-  a code defect or justify a change without a debug-level reproducer of the
-  first failing PTP operation.
+- **Qualification correction:** this prefix was produced by the generic host
+  check with `-Dpentax_research_capture=false`. That build intentionally
+  compiles out the Pentax research preview path, so `-6` is a test-configuration
+  result, not a camera or current-libgphoto2 preview result. Do not use this
+  invocation as evidence of a direct-PC driver failure.
 - Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/summary.txt`,
   `summary.debug.log`, `conditions-baseline.txt`, `init.txt`,
   `preview-1.txt`, `runtime.env`, `usb-descriptor.txt`, and the empty
   `preview-1/` directory.
+
+## 2026-11-14 — K-1 II research-enabled preview and shutter round trip passed
+
+- Correct direct-PC build: source `fc1599552c268bdf863106cf3505d609ea158edc`,
+  isolated prefix `/tmp/pentax-research-host.Iqq8or/prefix`, configured with
+  `-Dpentax_research_capture=true`; `ptp2.so` SHA-256
+  `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
+  The offline suite passed 26/26 and the runtime debug log showed the exact
+  isolated `CAMLIBS` and `IOLIBS` paths.
+- One-frame preview passed: PC-LV start and frame transfer returned `0x2001`,
+  10,172 bytes, valid JPEG, 23 attempts, 738 ms; cleanup passed.
+- Five-frame preview passed: all five frames transferred as valid JPEGs,
+  7,347 bytes each, 11–13 attempts, 338–402 ms each; cleanup passed.
+- Source-faithful K-1 II shutter round trip passed after the test helper was
+  corrected to accept the camera's `MM:SS` widget representation and convert it
+  to the `N/1` form emitted by live `GetAllConditions`: `00:20` -> `1/30` ->
+  `00:20`, with target and restore read back through live conditions and clean
+  exit. No other setting was changed.
+- Post-preview conditions remained state `0`, Manual/raw `8`, ISO 6400,
+  shooting/processing false, `Tv-changeable=yes`, and `bulb-timer=no`.
+- This qualifies current K-1 II preview and the one-variable shutter setting
+  path for this exact build and body. Focus, still capture, and Bulb remain
+  unqualified in this session because they require separate physical/operator
+  gates.
+- Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`.
 
 ## 2026-11-14 — K-3 III Polaris discovery gate passed; capture held on ownership
 

@@ -1,5 +1,6 @@
 /* Exact-model Pentax shutter round trip with live-baseline restoration. */
 #include "config.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,8 +11,22 @@
 static int
 parse_shutter (const char *value, unsigned int *num, unsigned int *den)
 {
-	return ((sscanf (value, "%u/%u", num, den) == 2) && *den) ? GP_OK :
-		GP_ERROR_BAD_PARAMETERS;
+	unsigned int first, second;
+
+	if (sscanf (value, "%u/%u", &first, &second) == 2 && second) {
+		*num = first;
+		*den = second;
+		return GP_OK;
+	}
+	/* The Pentax widget formats whole-second values as MM:SS while the
+	 * GetAllConditions serializer reports the same wire value as N/1. */
+	if (sscanf (value, "%u:%u", &first, &second) == 2 && second < 60 &&
+	    first <= (UINT_MAX - second) / 60) {
+		*num = first * 60 + second;
+		*den = 1;
+		return GP_OK;
+	}
+	return GP_ERROR_BAD_PARAMETERS;
 }
 
 static int

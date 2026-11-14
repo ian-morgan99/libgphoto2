@@ -933,17 +933,22 @@ record of what was subsequently attempted on the body. Next step is an operator
 power cycle, then re-run preview against a build carrying the marker walk before
 anything focus-related is attempted.
 
-## 2026-11-14 physical camera-session checkpoint
+## 2026-11-14 physical camera-session checkpoint — corrected
 
 The current split session used K-1 II directly on the PC and K-3 III through
-Polaris. The exact K-1 II libgphoto2 build was source `fc1599552c268bdf863106cf3505d609ea158edc`
-with isolated `ptp2.so` SHA-256
-`b9536dc8f0568237adb1f8784490994fa441fcd15854de622d44e8953acd9461`.
-K-1 identity, init, summary, and live conditions passed, but the first bounded
-`gp_camera_capture_preview` returned `GP_ERROR_NOT_SUPPORTED (-6)` and produced
-no frame. The lane stopped immediately; no settings, focus, capture, or Bulb
-command followed. This is current direct-boundary failure evidence, not yet a
-root-cause diagnosis.
+Polaris. The first K-1 preview `-6` result came from the generic host-check
+prefix, which was configured with `-Dpentax_research_capture=false`; it is not
+current camera or driver failure evidence.
+
+The correct research-enabled build used source
+`fc1599552c268bdf863106cf3505d609ea158edc`, isolated prefix
+`/tmp/pentax-research-host.Iqq8or/prefix`, and `ptp2.so` SHA-256
+`b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
+Offline tests passed 26/26. With the exact isolated runtime proven, K-1 II
+one-frame and five-frame previews passed with valid JPEGs and clean cleanup.
+The source-faithful shutter helper also passed `00:20 -> 1/30 -> 00:20`
+through live conditions after its parser was corrected for the camera's
+`MM:SS` widget form. No focus, still capture, or Bulb command was run.
 
 K-3 Polaris identity, service liveness, exact code-780 firmware, and command-268
 shutter-list discovery passed. Capture remains held because the required
@@ -952,6 +957,7 @@ exposure-mode query attempts a second gphoto2 USB claim and receives `-53` while
 canonical details and retained paths are in
 `docs/pentax/REAL_HARDWARE_TEST_LOG.md`.
 
-Next work must reproduce the K-1 preview failure with a debug-level trace of the
-first failing PTP operation before any code change, and must not bypass the K-3
-single-owner/mode-oracle gate to obtain a capture result.
+Next physical work is operator-gated K-1 focus or capture/Bulb qualification;
+K-3 requires a documented single-owner mode oracle before capture. Do not
+infer a libgphoto2 defect from the discarded research-disabled invocation or
+from the Polaris ownership failure.
