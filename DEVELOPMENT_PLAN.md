@@ -997,3 +997,14 @@ continuity before/after, and cleanup `ok`. A fresh conditions read remained
 state 0 and idle with no card or exposure operation. This is a
 protocol/transport/cleanup PASS only; physical Near/Far movement and optical
 restoration remain UNKNOWN, so the IT2/current mapping dispute is not resolved.
+
+
+## 2026-11-14 remote K-1 ISO result
+
+The dynamic test helper in `29d9470f9` selected only an advertised adjacent
+value from the live descriptor and used bounded 100 ms condition polling. On the
+K-1 II it proved `6400 -> 3200 -> 6400` with both target and restoration read
+back through live `GetAllConditions`; a fresh session independently confirmed
+6400 and idle state. This closes the current-session ISO live-baseline gate as
+**HW-W PASS / EXACT RESTORED** without touching capture, card, Bulb, firmware,
+or reset paths.

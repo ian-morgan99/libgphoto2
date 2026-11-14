@@ -1103,3 +1103,27 @@ that the lens physically moved in the named direction.
 - Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
   (`conditions-post-focus-pair.txt`, `init-post-focus-pair.txt`, and the prior
   preview/shutter transcripts).
+
+
+## 2026-11-14 — K-1 II dynamic ISO live-baseline round trip passed
+
+- The test helper was hardened in LibGphoto2 commit `29d9470f9` so it reads the
+  live ISO baseline, requires the widget current value to agree, selects only an
+  adjacent advertised value, polls live conditions at the IT2-derived 100 ms
+  cadence, and restores the original value even if the SET response is lost.
+- Exact body/runtime: K-1 Mark II `25fb:0183`, `usb:001,006`, research prefix
+  `/tmp/pentax-research-host.Iqq8or/prefix`; driver `ptp2.so` SHA-256
+  `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
+- Read-only descriptor showed current ISO `6400` and advertised choices including
+  adjacent lower value `3200`. The one-variable round trip applied `6400 -> 3200`
+  with live conditions confirming `3200`, then restored `3200 -> 6400` with live
+  conditions confirming `6400`; both SETs returned `0`, both bounded waits passed,
+  and cleanup was `ok`.
+- An independent fresh session then reported ISO `6400`, state `0`, Manual/raw
+  exposure mode `8`, drive raw `0`, shooting/processing/task-changing false,
+  `Tv-changeable=yes`, and `bulb-timer=no`. No other setting, card, capture,
+  Bulb state, firmware, or reset operation was touched.
+- Verdict: **HW-W PASS / EXACT LIVE BASELINE RESTORED.**
+- Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
+  (`iso-descriptor-post-focus.txt`, `iso-roundtrip-dynamic.txt`,
+  `conditions-post-iso.txt`, and `init-post-iso.txt`).
