@@ -932,3 +932,26 @@ host-side fixes above and stands for those; this paragraph supersedes it as the
 record of what was subsequently attempted on the body. Next step is an operator
 power cycle, then re-run preview against a build carrying the marker walk before
 anything focus-related is attempted.
+
+## 2026-11-14 physical camera-session checkpoint
+
+The current split session used K-1 II directly on the PC and K-3 III through
+Polaris. The exact K-1 II libgphoto2 build was source `fc1599552c268bdf863106cf3505d609ea158edc`
+with isolated `ptp2.so` SHA-256
+`b9536dc8f0568237adb1f8784490994fa441fcd15854de622d44e8953acd9461`.
+K-1 identity, init, summary, and live conditions passed, but the first bounded
+`gp_camera_capture_preview` returned `GP_ERROR_NOT_SUPPORTED (-6)` and produced
+no frame. The lane stopped immediately; no settings, focus, capture, or Bulb
+command followed. This is current direct-boundary failure evidence, not yet a
+root-cause diagnosis.
+
+K-3 Polaris identity, service liveness, exact code-780 firmware, and command-268
+shutter-list discovery passed. Capture remains held because the required
+exposure-mode query attempts a second gphoto2 USB claim and receives `-53` while
+`pgphoto` owns interface 0. This is integration ownership evidence only. The
+canonical details and retained paths are in
+`docs/pentax/REAL_HARDWARE_TEST_LOG.md`.
+
+Next work must reproduce the K-1 preview failure with a debug-level trace of the
+first failing PTP operation before any code change, and must not bypass the K-3
+single-owner/mode-oracle gate to obtain a capture result.

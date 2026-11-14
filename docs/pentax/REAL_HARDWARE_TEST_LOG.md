@@ -948,3 +948,51 @@ also updates issue #48.
   the marker walk before anything focus-related is attempted. See
   [retained raw evidence](evidence/2026-11-09/k1ii-pc-lv-preview-wedge.md) and
   the captured frames in `evidence/2026-11-09/frames/`.
+
+## 2026-11-14 — current K-1 II preview gate stopped at unsupported operation
+
+- Body: K-1 Mark II, USB `25fb:0183`, `usb:001,006`, serial `7371227`.
+  The PTP summary reported `Version: 2.51`; a camera-menu firmware value was not
+  independently recorded.
+- Exact source/build: `fc1599552c268bdf863106cf3505d609ea158edc`, isolated prefix
+  `/tmp/pentax-host-check.neyQN1VX/prefix`, `ptp2.so` SHA-256
+  `b9536dc8f0568237adb1f8784490994fa441fcd15854de622d44e8953acd9461`.
+- Read-only summary and source-faithful init passed. Vendor enable returned
+  function flags `0x00000003`; the body remained enumerated. Conditions reported
+  state `0`, Manual, `exposure-mode-raw=8`, ISO 6400, shooting/processing false,
+  and `bulb-timer=no`.
+- The first bounded preview request called `gp_camera_capture_preview` and
+  returned `GP_ERROR_NOT_SUPPORTED (-6)` at frame 1. No preview file was
+  produced. No five-frame preview, setting write, focus request, still capture,
+  Bulb request, retry, reset, or recovery was sent after the failure.
+- Verdict: **CURRENT DIRECT-PC PREVIEW FAIL at the libgphoto2 operation
+  boundary; lower-level PTP cause not yet identified.** This is stronger recent
+  evidence than older K-1 II preview passes, but it does not by itself identify
+  a code defect or justify a change without a debug-level reproducer of the
+  first failing PTP operation.
+- Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/summary.txt`,
+  `summary.debug.log`, `conditions-baseline.txt`, `init.txt`,
+  `preview-1.txt`, `runtime.env`, `usb-descriptor.txt`, and the empty
+  `preview-1/` directory.
+
+## 2026-11-14 — K-3 III Polaris discovery gate passed; capture held on ownership
+
+- Body: K-3 III, Polaris USB `25fb:0189`, model `pentax k-3 mark iii` from
+  command 286. The service was healthy on 9090; `pgphoto` was the sole camera
+  owner observed by the layer report.
+- Polaris provenance: `/app/FwVer` reported
+  `FwVer:6.0.0.54.108;date:2026.11.13;`; code 780 independently returned
+  `sw:6.0.0.54.108`, `hw:1.1.1.2`, `exAxis:1.0.2.14`, `sv:1`.
+- Read-only canary probe passed through 284/820/823/286. Command 268 returned
+  55 shutter options, current index 52 (`00-20`), with the observed list ending
+  at `00-30`; no setting or capture command was sent.
+- Exposure mode could not be read through the current canary precondition: the
+  device-side gphoto2 attempted a second USB claim and returned `-53` because
+  `pgphoto` already owns interface 0. No PTP conditions request was sent by
+  that query. This is an integration ownership limitation, not a camera or
+  direct-libgphoto2 result.
+- Verdict: **DISCOVERY PASS; CAPTURE BLOCKED/UNKNOWN.** Do not run a capture
+  without a mode oracle, exact output obligation, and a single-owner design.
+- Retained evidence: `/tmp/polaris-window-20261114-k3iii/probe-9090.txt`,
+  `probe-expected-sw-live.txt`, `list-shutters.txt`, their JSON files,
+  `fwver.txt`, and `layer-report-go.txt`.
