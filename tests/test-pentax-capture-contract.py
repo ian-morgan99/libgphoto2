@@ -76,6 +76,9 @@ def main() -> int:
     require("ret = GP_OK;" in internal and
             "ptp_pentax_terminate_capture (params," in internal,
             "errored timed captures must retain bounded abort cleanup")
+    require("boundary=wait-timeout" in internal and
+            "fprintf (stderr" in internal,
+            "capture timeout attribution must reach the device stderr log")
     require("pentax_initiate_camera_timed_capture (params, focus_mode)" in internal,
             "ordinary capture must call the explicit release=0 helper")
     require("pentax_initiate_experimental_held_capture (params" in internal,

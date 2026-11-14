@@ -7423,21 +7423,16 @@ camera_pentax_capture_internal (Camera *camera, CameraFilePath *path,
 	if (!candidate_handle) {
 		PentaxCaptureTimeoutState timeout_state =
 			pentax_capture_timeout_state (last_activity_flags);
+		const char *timeout_phase = "unknown";
 		if (timeout_state == PENTAX_CAPTURE_TIMEOUT_STATE_PROCESSING)
-			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out in "
-				"post-exposure processing before candidate publication "
-				"(%u ms; +104=0x%08x)", capture_id,
-				capture_timeout_ms, last_activity_flags);
+			timeout_phase = "processing";
 		else if (timeout_state == PENTAX_CAPTURE_TIMEOUT_STATE_EXPOSING)
-			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out while "
-				"the camera was still exposing (%u ms total; exposure "
-				"budget %u ms; +104=0x%08x)", capture_id,
-				capture_timeout_ms, exposure_phase_ms, last_activity_flags);
-		else
-			GP_LOG_E ("pentax-capture[%llu]: capture wait timed out with "
-				"no usable activity state before candidate publication "
-				"(%u ms; +104=0x%08x)", capture_id,
-				capture_timeout_ms, last_activity_flags);
+			timeout_phase = "exposing";
+		fprintf (stderr, "[pentax] capture=%llu boundary=wait-timeout phase=%s "
+			"total_budget_ms=%u exposure_budget_ms=%u activity=0x%08x\n",
+			capture_id, timeout_phase, capture_timeout_ms, exposure_phase_ms,
+			last_activity_flags);
+		fflush (stderr);
 		ret = GP_ERROR_TIMEOUT;
 		goto out;
 	}
