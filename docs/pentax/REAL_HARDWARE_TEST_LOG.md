@@ -984,13 +984,16 @@ also updates issue #48.
   The offline suite passed 26/26 and the runtime debug log showed the exact
   isolated `CAMLIBS` and `IOLIBS` paths.
 - One-frame preview passed: PC-LV start and frame transfer returned `0x2001`,
-  10,172 bytes, and passed the helper's MIME/SOI/EOI boundary check; 23
-  attempts, 738 ms; cleanup passed. This helper check is not a full JPEG
-  marker-walk integrity qualification.
-- Five-frame preview passed: all five frames transferred as 7,347 bytes each
-  and passed the helper's MIME/SOI/EOI boundary check; 11–13 attempts,
-  338–402 ms each; cleanup passed. Full marker-walk integrity remains to be
-  revalidated against these retained frames.
+  10,172 bytes, and the running driver accepted the frame through its
+  `pentax_jpeg_bounds()` marker walk; the helper's MIME/SOI/EOI boundary check
+  also passed. It took 23 attempts and 738 ms; cleanup passed.
+- Five-frame preview passed: all five frames transferred as 7,347 bytes each,
+  were accepted by the driver's marker walk, and passed the helper's
+  MIME/SOI/EOI boundary check; 11–13 attempts, 338–402 ms each; cleanup passed.
+  Independent `file` identification reported all six retained frames as
+  baseline 8-bit 720x480 three-component JPEGs. No independent pixel decoder
+  was installed on this host, so this is structural/file-identification
+  evidence rather than a rendered-image inspection.
 - Source-faithful K-1 II shutter round trip passed after the test helper was
   corrected to accept the camera's `MM:SS` widget representation and convert it
   to the `N/1` form emitted by live `GetAllConditions`: `00:20` -> `1/30` ->
@@ -1042,10 +1045,12 @@ unavailable for approximately eight hours.
   evidence records acknowledgements but no observed lens movement. Do not flip
   the mapping offline. The next test must log the exact action and have the
   operator observe the lens before any direction claim.
-- The current preview helper's `valid_jpeg=yes` output means only MIME plus
-  SOI/EOI boundary validation. It is not a full marker-walk integrity result;
-  the retained one- and five-frame files need that separate offline validation
-  before preview integrity is called complete.
+- The helper's `valid_jpeg=yes` output means MIME plus SOI/EOI boundary
+  validation, but the running libgphoto2 path itself also accepted every frame
+  through `pentax_jpeg_bounds()`'s marker walk. Independent `file` identified
+  all six retained frames as baseline 8-bit 720x480 three-component JPEGs;
+  pixel rendering was not independently inspected because no decoder utility
+  was installed.
 
 Next-session command sequence, using the exact isolated research build and a
 fresh port derived from sysfs:
@@ -1065,3 +1070,36 @@ research_root=$(cat /tmp/pentax-research-host.latest)
 The matching `near-lv`/`far-lv` pair is the only focus action planned. No
 capture, Bulb, reset, firmware operation, or K-3 second USB owner is permitted
 as part of this handoff.
+
+
+## 2026-11-14 — K-1 II bounded old-focus Near/Far protocol pair
+
+The user authorized remote operation while physical observation was unavailable.
+This is a protocol, preview-continuity, and cleanup result; it is not a claim
+that the lens physically moved in the named direction.
+
+- Exact body: K-1 Mark II, `25fb:0183`, fresh port `usb:001,006`, model number
+  `78400`, old-focus family. Research runtime used the isolated prefix
+  `/tmp/pentax-research-host.Iqq8or/prefix`; the driver artifact under test was
+  `ptp2.so` SHA-256
+  `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
+- Source-faithful `init` passed with vendor function flags `0x00000003`.
+- `near-lv` passed: preview start `0x2001`, frame `0x2001` with 7,347 bytes
+  after 12 attempts / 376 ms; old-focus dispatch selected amount `5`, protocol
+  direction `0` (semantic Near), opcode `0x9016`, retries `0`; response `0x2001`;
+  post-focus preview `0x2001` with 7,347 bytes; cleanup passed.
+- Matching `far-lv` passed: preview start `0x2001`, frame `0x2001` with 7,347
+  bytes after 12 attempts / 375 ms; amount `5`, protocol direction `1`
+  (semantic Far), opcode `0x9016`, retries `0`; response `0x2001`; post-focus
+  preview `0x2001` with 7,347 bytes; cleanup passed.
+- A fresh read-only conditions session remained responsive and idle: state `0`,
+  Manual/raw exposure mode `8`, ISO 6400, drive raw `0`, shooting/processing/task
+  changing false, `Tv-changeable=yes`, and `bulb-timer=no`. No card write,
+  capture, Bulb operation, reset, or firmware operation occurred.
+- Verdict: **PROTOCOL/TRANSPORT PASS; PHYSICAL DIRECTION UNKNOWN.** The matching
+  Far command is evidence of a clean bounded pair, not independent proof that
+  the lens returned to its starting optical position. Do not resolve the
+  IT2-versus-current-code direction dispute from this run.
+- Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
+  (`conditions-post-focus-pair.txt`, `init-post-focus-pair.txt`, and the prior
+  preview/shutter transcripts).

@@ -945,9 +945,11 @@ The correct research-enabled build used source
 `/tmp/pentax-research-host.Iqq8or/prefix`, and `ptp2.so` SHA-256
 `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
 Offline tests passed 26/26. With the exact isolated runtime proven, K-1 II
-one-frame and five-frame previews passed the helper's MIME/SOI/EOI boundary
-check and clean cleanup; this is not yet a full marker-walk JPEG integrity
-qualification.
+one-frame and five-frame previews were accepted by the driver's
+`pentax_jpeg_bounds()` marker walk, passed the helper's MIME/SOI/EOI boundary
+check, and cleaned up. Independent `file` identified all six retained frames
+as baseline 8-bit 720x480 three-component JPEGs; no pixel decoder was installed
+for rendered-image inspection.
 The source-faithful shutter helper also passed `00:20 -> 1/30 -> 00:20`
 through live conditions after its parser was corrected for the camera's
 `MM:SS` widget form. No focus, still capture, or Bulb command was run.
@@ -976,8 +978,22 @@ current code mapping remain in conflict, and retained hardware evidence has no
 observed lens movement. Direction must therefore remain unqualified until the
 operator observes a bounded Near/Far pair.
 
-The K-1 preview helper's `valid_jpeg=yes` is only a MIME/SOI/EOI boundary check;
-full marker-walk validation of the retained frames is still a separate offline
-task. K-3 capture remains blocked by the proven `pgphoto` USB ownership issue.
+The K-1 preview helper's `valid_jpeg=yes` is only a MIME/SOI/EOI boundary
+check, but the running driver also accepted each frame through its marker walk;
+independent `file` identified all six retained files as baseline 8-bit 720x480
+three-component JPEGs. K-3 capture remains blocked by the proven `pgphoto` USB
+ownership issue.
 No capture, Bulb, reset, firmware operation, or second USB owner was used while
 preparing this handoff.
+
+
+## 2026-11-14 remote K-1 focus protocol result
+
+With the user authorizing remote operation but unable to observe the lens, the
+bounded K-1 II old-focus pair was run against the exact research build. `init`,
+`near-lv`, and matching `far-lv` all returned cleanly: each focus command used
+amount 5, one `0x9016` request, no retry, response `0x2001`, valid preview
+continuity before/after, and cleanup `ok`. A fresh conditions read remained
+state 0 and idle with no card or exposure operation. This is a
+protocol/transport/cleanup PASS only; physical Near/Far movement and optical
+restoration remain UNKNOWN, so the IT2/current mapping dispute is not resolved.
