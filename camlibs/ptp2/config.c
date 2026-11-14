@@ -10920,22 +10920,14 @@ _pentax_prop_get (Camera *camera, CameraWidget **widget,
 		ptp_free_devicepropdesc (&desc);
 		return GP_ERROR_NOT_SUPPORTED;
 	}
-	/* A form-less descriptor is a usable control only when the body exposes
-	 * it as a writable scalar.  0xd018 is a GetSet UINT16 with no form: the
-	 * generic property path already renders that shape as a plain TEXT widget
-	 * (see the 0xd018 row of docs/pentax/IMAGE_TRANSMITTER_CAPABILITY_MATRIX.md,
-	 * "descriptor-driven"), and the K-3 III reads and writes it through that
-	 * raw path.  A read-only or non-scalar form-less descriptor still fails
-	 * closed, so this does not infer support from a GetSet descriptor alone
-	 * (AGENTS.md rule 2). */
+	/* A form-less descriptor is only admitted for the one source-authorised
+	 * scalar whose domain is known.  IT2's 0xd018 color-temperature control is
+	 * a GetSet UINT16; all other form-less scalars remain withheld because a
+	 * descriptor alone does not establish a safe value domain. */
 	if (desc.FormFlag == PTP_DPFF_None) {
-		int scalar = (desc.DataType == PTP_DTC_UINT8  ||
-			      desc.DataType == PTP_DTC_INT8   ||
-			      desc.DataType == PTP_DTC_UINT16 ||
-			      desc.DataType == PTP_DTC_INT16  ||
-			      desc.DataType == PTP_DTC_UINT32 ||
-			      desc.DataType == PTP_DTC_INT32);
-		if (desc.GetSet != PTP_DPGS_GetSet || !scalar) {
+		if (code != PTP_DPC_PENTAX_ColorTemperature ||
+		    desc.GetSet != PTP_DPGS_GetSet ||
+		    desc.DataType != PTP_DTC_UINT16) {
 			ptp_free_devicepropdesc (&desc);
 			return GP_ERROR_NOT_SUPPORTED;
 		}
@@ -10969,6 +10961,19 @@ _pentax_prop_put (Camera *camera, CameraWidget *widget,
 		return GP_ERROR_NOT_SUPPORTED;
 	}
 	result = _put_INT (camera, widget, &value, &desc, alreadyset);
+	if (result == GP_OK && desc.FormFlag == PTP_DPFF_None) {
+		if (code != PTP_DPC_PENTAX_ColorTemperature ||
+		    desc.DataType != PTP_DTC_UINT16) {
+			GP_LOG_E ("Pentax property 0x%04x rejected: a form-less "
+				"scalar has no source-derived IT2 value domain.", code);
+			result = GP_ERROR_NOT_SUPPORTED;
+		} else if (!pentax_color_temperature_value_is_source_valid (
+				value.u16)) {
+			GP_LOG_E ("Pentax color temperature %u K rejected: IT2 "
+				"domain is 2500..10000 K in 10 K steps.", value.u16);
+			result = GP_ERROR_BAD_PARAMETERS;
+		}
+	}
 	if (result == GP_OK) {
 		/* These are Custom-Image / white-balance settings, not exposure
 		 * settings mirrored in the conditions block, so (like the other

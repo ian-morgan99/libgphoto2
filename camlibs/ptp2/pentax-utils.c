@@ -1226,6 +1226,18 @@ pentax_model_supports_color_temperature (uint32_t model_no)
 	return capabilities && capabilities->supports_color_temperature;
 }
 
+/* IMAGE Transmitter 2's ColorTempDlgWindow is a Slider with
+ * Minimum=2500, Maximum=10000, and SmallChange=10 (the same values are
+ * recovered from the 2.6.2.5 BAML).  The MtpDevice.WBColorTemp setter
+ * serializes the selected value as a UINT16 for 0xd018.  Keep this domain
+ * explicit because the device descriptor is form-less and cannot validate
+ * an arbitrary text-widget value. */
+int
+pentax_color_temperature_value_is_source_valid (uint16_t value)
+{
+	return value >= 2500U && value <= 10000U && (value % 10U) == 0U;
+}
+
 /* Detailed Custom Image parameters (0xd021-0xd029): the source capability
  * matrix authorises them for the K-3 III family, including model 78550. Each
  * is a single-byte device-property write with camera-defined signedness. Fail

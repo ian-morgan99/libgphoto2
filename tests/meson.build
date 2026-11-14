@@ -347,3 +347,15 @@ test(
   test_init_localedir_exe,
   env: gp_test_env,
 )
+
+# Source-contract regression for issue #164: a form-less writable scalar is
+# admitted only when its IT2 value domain is known, and validation precedes
+# the device-property write.
+test(
+  'test-pentax-formless-property-contract',
+  python,
+  args: [
+    files('test-pentax-formless-property-contract.py'),
+    meson.project_source_root() / 'camlibs/ptp2/config.c',
+  ],
+)

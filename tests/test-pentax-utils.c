@@ -989,6 +989,15 @@ main (void)
 		"PENTAX K-3 Mark III", &model_no, &extension_version));
 	CHECK (pentax_model_uses_new_focus (model_no));
 	CHECK (pentax_bulb_action_model_supported (model_no, 0x0189));
+	/* Issue #164: IT2's form-less 0xd018 control is a UINT16 slider with
+	 * 2500..10000 K bounds and 10 K quantisation.  These are source-domain
+	 * checks, not a claim that an unconnected body has accepted every value. */
+	CHECK (pentax_color_temperature_value_is_source_valid (2500));
+	CHECK (pentax_color_temperature_value_is_source_valid (2510));
+	CHECK (pentax_color_temperature_value_is_source_valid (10000));
+	CHECK (!pentax_color_temperature_value_is_source_valid (2490));
+	CHECK (!pentax_color_temperature_value_is_source_valid (2505));
+	CHECK (!pentax_color_temperature_value_is_source_valid (10010));
 	/* K-1 II remains on the old-focus dispatch. */
 	CHECK (pentax_lookup_model (0x25fb, 0x0183,
 		"PENTAX K-1 Mark II", &model_no, &extension_version));

@@ -600,6 +600,7 @@ int pentax_model_supports_cross_process (uint32_t model_no);
  * is known to honour; never use this to widen the gate generically. */
 int pentax_model_answers_undeclared_generic_props (uint32_t model_no);
 int pentax_model_supports_color_temperature (uint32_t model_no);
+int pentax_color_temperature_value_is_source_valid (uint16_t value);
 int pentax_model_supports_ci_detail (uint32_t model_no);
 int pentax_model_supports_card_writing_mode (uint32_t model_no);
 int pentax_model_supports_writing_file_format (uint32_t model_no);
