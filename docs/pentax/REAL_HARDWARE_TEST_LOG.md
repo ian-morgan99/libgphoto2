@@ -1127,3 +1127,29 @@ that the lens physically moved in the named direction.
 - Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
   (`iso-descriptor-post-focus.txt`, `iso-roundtrip-dynamic.txt`,
   `conditions-post-iso.txt`, and `init-post-iso.txt`).
+
+
+## 2026-11-14 — K-1 II live-view AF-position round trip passed with cleanup
+
+- The test-only helper cleanup was committed as `5702a64e8`: the toggle is now
+  passed as an `int`, and every path that attempts to enable keep-live-view also
+  attempts an explicit OFF before camera exit.
+- Exact body/runtime: K-1 Mark II `25fb:0183`, `usb:001,006`, model `78400`,
+  isolated research driver `ptp2.so` SHA-256
+  `b13f6d1464bb2d2f31b0365f86665ad3d5de953f40274454c0e011f53818d4f6`.
+- Vendor init passed with flags `0x00000003`. Keep-live-view enabled, PC-LV
+  started with a 7,347-byte frame, and the source-faithful baseline AF position
+  was `360,240`.
+- A bounded non-baseline `0xd036` write to `310,190` was accepted. The immediate
+  read returned `310,190`; a post-write preview returned 7,347 bytes, proving
+  PC-LV continuity across the write. The exact baseline `360,240` was restored,
+  and the post-restore read returned `360,240`.
+- Cleanup explicitly disabled keep-live-view. A fresh read reported toggle
+  `Current: 0`, and a fresh init again passed vendor enable. No lens focus,
+  capture, card, Bulb, firmware, reset, or second USB owner operation occurred.
+- Verdict: **HW-W PASS / TRANSPORT + SESSION PERSISTENCE + EXACT RESTORE.** This
+  does not independently prove a visible AF-area effect; the camera's
+  source-documented centre readback is the accepted model-specific criterion.
+- Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
+  (`lvaf-roundtrip-cleanup.txt`, `keep-live-view-post-lvaf.txt`, and
+  `init-post-lvaf.txt`).

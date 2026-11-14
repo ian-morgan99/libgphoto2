@@ -1008,3 +1008,13 @@ back through live `GetAllConditions`; a fresh session independently confirmed
 6400 and idle state. This closes the current-session ISO live-baseline gate as
 **HW-W PASS / EXACT RESTORED** without touching capture, card, Bulb, firmware,
 or reset paths.
+
+
+## 2026-11-14 remote K-1 live-view AF-position result
+
+The cleaned-up test helper (`5702a64e8`) proved the K-1 II `0xd036` path with a
+non-baseline `360,240 -> 310,190` write, structurally valid readback, preview
+continuity, exact `360,240` restoration, explicit keep-live-view OFF, and fresh
+`Current: 0` verification. This closes the transport/session-persistence gate
+as **HW-W PASS / EXACT RESTORE**; a visible AF-area effect remains outside the
+claim.
