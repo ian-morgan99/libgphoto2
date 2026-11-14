@@ -1018,3 +1018,35 @@ continuity, exact `360,240` restoration, explicit keep-live-view OFF, and fresh
 `Current: 0` verification. This closes the transport/session-persistence gate
 as **HW-W PASS / EXACT RESTORE**; a visible AF-area effect remains outside the
 claim.
+
+
+## 2026-11-14 K-1 II focus-peaking gate and active-PC-LV qualification
+
+The direct-PC K-1 II session supplied the first current evidence for the
+focus-peaking control. The pre-fix no-LV read returned GP_ERROR_BAD_PARAMETERS
+(-2) even though no focus-peaking write had been attempted. The debug trace
+showed the K-1 II 0xd02b descriptor as the known 16-byte array-UINT16 payload,
+so the descriptor remains withheld from scalar normalization. The actual
+focus-peaking handler is intentionally unavailable until the K-1 II session
+owns PC live view; the defect was in the generic _get_config() single-function
+dispatcher, which returned GP_OK with a NULL widget instead of propagating
+the handler's GP_ERROR_NOT_SUPPORTED.
+
+LibGphoto2 commit 4cbfcf27e fixes that error propagation and adds a
+public-path regression assertion. Generic impact is limited to function-backed
+single-config errors: no PTP opcode, payload, timeout, session, transfer, or
+non-Pentax device behavior changed. The existing build-k1ii-marker research
+configuration rebuilt ptp2.so with SHA-256
+b0ba97a46b1ec2b893f4207562f7d0ea8e67f345850b20da625bc069d5b3ee99.
+The focused offline test passed. The full existing offline run passed 25/27:
+the new and all Pentax tests passed; unrelated test-gp-port and
+test-gphoto2 remained environment/fixture failures (test-gp-port unsupported
+host-port operation and test-gphoto2 unknown model).
+
+The active-PC-LV benchmark then passed one iteration with preview memory only:
+start 0x2001, 7,347-byte frame, initial on, on -> off write and read-back,
+restore off -> on, independent initial verification, and keep-live-view
+OFF read-back 0. A fresh conditions session remained idle and responsive
+(state 0, Manual/raw 8, ISO 6400, no shooting/processing/task change,
+Tv-changeable yes, no bulb timer). Verdict is HW-W PASS / EXACT RESTORE for
+the active-PC-LV control path, not a claim of visually inspected overlay.

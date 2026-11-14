@@ -1153,3 +1153,49 @@ that the lens physically moved in the named direction.
 - Retained evidence: `/tmp/pentax-window-20261114-k1ii-pc/research-enabled/`
   (`lvaf-roundtrip-cleanup.txt`, `keep-live-view-post-lvaf.txt`, and
   `init-post-lvaf.txt`).
+
+
+## 2026-11-14 — K-1 II focus-peaking gate and active-PC-LV round trip
+
+- Exact body: K-1 Mark II 25fb:0183, fresh direct-PC port usb:001,006,
+  model 78400, firmware 1.02. The source fix is LibGphoto2 commit
+  4cbfcf27e on main, built with the existing isolated
+  build-k1ii-marker configuration (pentax_research_capture=true);
+  rebuilt ptp2.so SHA-256 is
+  b0ba97a46b1ec2b893f4207562f7d0ea8e67f345850b20da625bc069d5b3ee99.
+- The pre-fix no-LV probe returned GP_ERROR_BAD_PARAMETERS (-2) without
+  attempting a focus-peaking write. The saved trace showed the K-1 II's
+  0xd02b descriptor is a 16-byte array-UINT16 payload
+  (2bd00440010001020200000040024001) with a four-byte raw value; the
+  scalar descriptor assumption remains invalid. The actual
+  pentaxfocuspeaking handler is correctly gated until this session owns
+  PC live view. The generic _get_config() single-function path had been
+  returning GP_OK with a NULL widget when that handler declined, masking
+  GP_ERROR_NOT_SUPPORTED as a later Bad parameters. No focus write was
+  sent in that probe.
+- Commit 4cbfcf27e now propagates a declined function-backed single-config
+  handler error and adds a public-path regression assertion for the K-1 II
+  focus-peaking guard. It changes no PTP opcode, payload, timeout, session,
+  or non-Pentax device semantics; the generic impact is limited to returning
+  the handler's existing error instead of success with a NULL widget.
+- With the rebuilt artifact, the source-faithful one-iteration
+  single-lv benchmark started PC-LV in memory only (0x2001, 7,347-byte
+  frame, 13 attempts / 404 ms), read initial focus peaking as on, changed
+  on -> off, and read back off. Cleanup restored off -> on and an
+  independent read verified initial; explicit keep-live-view OFF read back
+  as 0. operation_result=0, restore_result=0, and
+  final_value_verified=initial. No capture or card write occurred.
+- An independent fresh read-only conditions session then reported state 0,
+  Manual/raw exposure mode 8, ISO 6400, drive raw 0,
+  shooting/processing/task-changing false, Tv-changeable=yes, and
+  bulb-timer=no.
+- Verdict: HW-W PASS / EXACT STATE RESTORE for the active-PC-LV
+  focus-peaking control path. This proves protocol, state read-back, and
+  cleanup; it does not claim an independently observed visual overlay because
+  the preview pixels were not visually inspected.
+- Retained evidence:
+  /tmp/pentax-window-20261114-k1ii-pc/research-enabled/
+  (focus-peaking-readonly-debug.log,
+  focus-peaking-readonly-fixed-debug.log,
+  focus-peaking-single-lv-fixed.txt, and
+  conditions-post-focus-peaking.txt).
