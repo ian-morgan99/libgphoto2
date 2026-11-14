@@ -53,7 +53,7 @@ bash tests/run-pentax-host-check.sh
 
 The prepared host gate passed 26/26 non-hardware tests for the SHA above. The
 run produced an isolated build and installed `ptp2.so` with SHA-256
-`0708c6b5b4b407f00f577b7e57ec3ecdf7aae58a2a7346990659be813148ae27`; retain
+`9e21f7522f6f8d63e4f7abdd52b498edf8e625a4d6e9147b8f38d1b0d327625d`; retain
 the newly printed artifact directory rather than assuming that temporary path
 still exists.
 
