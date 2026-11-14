@@ -1050,3 +1050,15 @@ OFF read-back 0. A fresh conditions session remained idle and responsive
 (state 0, Manual/raw 8, ISO 6400, no shooting/processing/task change,
 Tv-changeable yes, no bulb timer). Verdict is HW-W PASS / EXACT RESTORE for
 the active-PC-LV control path, not a claim of visually inspected overlay.
+
+
+## 2026-11-14 K-1 II single-config versus full-tree timing
+
+The same exact rebuilt artifact was run through both public paths on one
+persistent PC-LV session. The source-faithful single-lv focus-peaking write
+took 0.307991 s and restore took 0.309237 s. The full-lv path took 4.952064 s
+and 4.532114 s respectively. Both changed and restored the value with
+independent verification, then cleared keep-live-view and read back zero.
+Fresh conditions remained idle and restored. This is current direct hardware
+evidence that full-tree enumeration costs roughly 15x on this body; it does
+not justify weakening the verified single-config path.

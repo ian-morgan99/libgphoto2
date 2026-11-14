@@ -1199,3 +1199,26 @@ that the lens physically moved in the named direction.
   focus-peaking-readonly-fixed-debug.log,
   focus-peaking-single-lv-fixed.txt, and
   conditions-post-focus-peaking.txt).
+
+
+## 2026-11-14 — K-1 II full-tree PC-LV focus-peaking comparison
+
+A complementary one-iteration full-lv run used the same body, port, and rebuilt
+ptp2 artifact as the preceding single-lv qualification. PC-LV started with a
+0x2001 response and a 7,347-byte preview after 14 attempts / 441 ms. The
+full-tree path read initial focus peaking as on, changed on -> off with a
+4.952064-second set transaction and passing read-back, restored off -> on in
+4.532114 seconds, independently verified initial, and cleared keep-live-view
+with read-back 0. The run ended operation_result=0, restore_result=0,
+final_value_verified=initial, cleanup=ok. A fresh conditions read again
+reported state 0, Manual/raw 8, ISO 6400, no shooting/processing/task change,
+Tv-changeable=yes, and no bulb timer.
+
+This is direct current hardware timing evidence for issue #141: on this
+K-1 II/session, the Polaris-relevant single-lv path took 0.307991 seconds for
+the write and 0.309237 seconds for restore, while full-lv took 4.952064 and
+4.532114 seconds respectively. Both paths passed their state and cleanup
+gates; the timing difference is not a reason to weaken verification.
+No capture or card write occurred. Evidence:
+ /tmp/pentax-window-20261114-k1ii-pc/research-enabled/focus-peaking-full-lv-fixed.txt
+ and conditions-post-focus-peaking-full-lv.txt.
