@@ -30,6 +30,7 @@
 /* ptp2 camlib private layout, for the seeded PTPParams fixture. */
 #include "ptp.h"
 #include "ptp-private.h"
+#include "pentax-utils.h"
 
 typedef int (*cam_get_single_config_fn)(Camera *camera, const char *confname,
                                        CameraWidget **widget, GPContext *context);
@@ -102,6 +103,7 @@ build_fixture (Camera **out, GPContext *context)
 	camera->pl->params.deviceinfo.VendorExtensionID = PTP_VENDOR_PENTAX;
 	camera->pl->params.pentax.supported_model = 1;
 	camera->pl->params.pentax.vendor_mode_enabled = 1;
+	camera->pl->params.pentax.model_no = PENTAX_MODEL_K1_MARK_II;
 
 	ops = calloc (2, sizeof (*ops));
 	if (!ops) {
@@ -228,25 +230,28 @@ main (void)
 	CHECK (get_toggle (get_single, cam, context, &value) == GP_OK);
 	CHECK (value == 1);
 
-	/* Non-Pentax sessions must stay fail-closed on this control:
-	 * _get_Pentax_KeepLiveView() declines with GP_ERROR_NOT_SUPPORTED, so no
-	 * usable widget may reach the caller.  Note the return code is asserted only
-	 * for the widget: in MODE_SINGLE_GET the opcode-gated branch of _get_config()
-	 * returns GP_OK and hands back whatever the declined handler left in its
-	 * output pointer, so callers must not assume a non-NULL widget on GP_OK. */
+	/* A function-backed control that is unavailable must propagate the
+	 * handler's error.  Returning GP_OK with a NULL widget makes callers
+	 * report a misleading GP_ERROR_BAD_PARAMETERS instead.  The K-1 II
+	 * focus-peaking getter is deliberately unavailable until this session
+	 * owns PC live view, so this is also the exact guard exercised by the
+	 * recent remote read-only qualification. */
+	ret = get_single (cam, "pentaxfocuspeaking", &widget, context);
+	CHECK (ret == GP_ERROR_NOT_SUPPORTED);
+	CHECK (widget == NULL);
+
+	/* Non-Pentax sessions must remain fail-closed on the existing toggle. */
 	{
 		Camera *other = NULL;
-		CameraWidget *other_widget = (CameraWidget *) 0x1;
+		CameraWidget *other_widget = NULL;
 
 		CHECK (!build_fixture (&other, context));
 		other->pl->params.deviceinfo.VendorExtensionID = PTP_VENDOR_CANON;
 		other->pl->params.pentax.supported_model = 0;
 		other->pl->params.pentax.vendor_mode_enabled = 0;
 		ret = get_single (other, "pentaxpclvkeep", &other_widget, context);
+		CHECK (ret == GP_ERROR_NOT_SUPPORTED);
 		CHECK (other_widget == NULL);
-		if (ret >= GP_OK)
-			printf ("note: non-Pentax pentaxpclvkeep get returned GP_OK with a "
-			        "NULL widget\n");
 	}
 
 	printf ("test-pentax-keep-live-view-toggle: all checks passed\n");

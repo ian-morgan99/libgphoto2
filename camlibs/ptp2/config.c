@@ -15866,6 +15866,10 @@ _get_config (Camera *camera, const char *confname, CameraWidget **outwidget, Cam
 							gp_widget_set_readonly(widget, 1);
 						}
 						if (mode == MODE_SINGLE_GET) {
+							if (ret != GP_OK) {
+								free (setprops);
+								return ret;
+							}
 							*outwidget = widget;
 							free (setprops);
 							return GP_OK;
