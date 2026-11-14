@@ -37,7 +37,7 @@ The current direct-PC candidate is:
 ```text
 libgphoto2 repository: /home/ian/Documents/VSCodeProjects/LibGphoto2/libgphoto2
 required ref: main
-qualified source SHA: 1bf8ba51a83144f16872fa8cdca6d386bc9d191f
+qualified camera-code baseline SHA: 1bf8ba51a83144f16872fa8cdca6d386bc9d191f
 ```
 
 Do not substitute a branch, detached checkout, dirty tree, or a newly built
@@ -51,11 +51,14 @@ git rev-parse HEAD
 bash tests/run-pentax-host-check.sh
 ```
 
-The prepared host gate passed 26/26 non-hardware tests for the SHA above. The
-run produced an isolated build and installed `ptp2.so` with SHA-256
-`9e21f7522f6f8d63e4f7abdd52b498edf8e625a4d6e9147b8f38d1b0d327625d`; retain
-the newly printed artifact directory rather than assuming that temporary path
-still exists.
+The prepared host gate passed 26/26 non-hardware tests for the code baseline
+above. The latest clean checkout tested was
+`69e89f2c4f3aeea767ddd7bf656672a19f500f8f` (documentation-only commits may
+follow). Its isolated build recorded `ptp2.so` SHA-256
+`143e818c17555e16eae94e6ecea3b07292344b903f93fb31f36f432acd50b868` under
+`/tmp/pentax-host-check.x0VsSnbS`; retain the newly printed artifact
+directory and hash for each run. Artifact hashes are run-scoped evidence, not
+a fixed replacement for a later clean build.
 
 The relevant built direct-PC cards are:
 
