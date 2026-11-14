@@ -75,7 +75,7 @@ write_lvaf (Camera *camera, GPContext *context, const char *value)
 }
 
 static int
-set_keep_live_view (Camera *camera, GPContext *context, const char *value)
+set_keep_live_view (Camera *camera, GPContext *context, int value)
 {
 	CameraWidget *widget = NULL;
 	int result;
@@ -84,7 +84,7 @@ set_keep_live_view (Camera *camera, GPContext *context, const char *value)
 		context);
 	if (result < GP_OK)
 		return result;
-	result = gp_widget_set_value (widget, value);
+	result = gp_widget_set_value (widget, &value);
 	if (result >= GP_OK)
 		result = gp_camera_set_single_config (camera, "pentaxpclvkeep",
 			widget, context);
@@ -98,7 +98,7 @@ main (int argc, char **argv)
 	Camera *camera = NULL;
 	GPContext *context = NULL;
 	char *baseline = NULL, *after = NULL;
-	int initialized = 0;
+	int initialized = 0, keep_live_view_requested = 0;
 	int result = GP_OK, exit_result;
 	/* TA review: once the baseline has been changed by a non-baseline write,
 	 * EVERY subsequent exit path must attempt exact restoration before
@@ -126,7 +126,10 @@ main (int argc, char **argv)
 	initialized = 1;
 
 	/* Keep PC-LV running so LiveViewAreaInfo is valid for the d036 path. */
-	result = set_keep_live_view (camera, context, "on");
+	/* Mark the cleanup obligation before the SET: a lost response leaves the
+	 * keep-live-view state unknown and must be followed by a best-effort OFF. */
+	keep_live_view_requested = 1;
+	result = set_keep_live_view (camera, context, 1);
 	if (result < GP_OK) {
 		fprintf (stderr, "stage=keep-live-view error=%s (%d)\n",
 			gp_result_as_string (result), result);
@@ -277,6 +280,17 @@ out:
 		}
 	}
 
+	if (initialized && keep_live_view_requested && camera) {
+		int keep_off_result = set_keep_live_view (camera, context, 0);
+		if (keep_off_result < GP_OK) {
+			fprintf (stderr, "stage=keep-live-view-off FAILED: %s (%d)\n",
+				gp_result_as_string (keep_off_result), keep_off_result);
+			if (result >= GP_OK)
+				result = keep_off_result;
+		} else {
+			printf ("stage=keep-live-view off\n");
+		}
+	}
 	if (initialized) {
 		exit_result = gp_camera_exit (camera, context);
 		if ((result >= GP_OK) && (exit_result < GP_OK))
