@@ -68,6 +68,8 @@ def main() -> int:
     require("camera_pentax_capture_internal (camera, NULL, context" in action and
             "PENTAX_CAPTURE_BULB_START" in action,
             "Bulb start must use the shared capture admission/lifecycle path")
+    require("params->pentax.capture_output_pending" not in action,
+            "Bulb start must not bypass shared admission on the raw output flag")
     # The shared cleanup path may abort an errored, pre-candidate operation.
     # A successful natural timed completion returns before that error-only
     # branch; the explicit action stop remains the only normal Bulb stop edge.

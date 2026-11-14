@@ -56,6 +56,7 @@ static uint64_t written_shutter;
 static int capture_modes[4], capture_calls;
 static uint16_t terminate_result;
 static int terminate_calls;
+static int clear_pending_on_shared_admission;
 
 /* Scripted clock: the start edge is stamped at 1000 ms and "now" at 25500 ms, so the
  * measured hold is exactly 25 s and the expected wire value is (1<<32)|25. */
@@ -132,6 +133,12 @@ static int camera_pentax_capture_internal (Camera *cam, CameraFilePath *path,
     GPContext *ctx, int mode)
 {
     (void) cam; (void) ctx;
+    /* The real shared path clears this bookkeeping flag only after a fresh
+     * idle/no-candidate conditions frame. Model that decision here so the
+     * regression proves the held-Bulb action reaches the shared owner. */
+    if (clear_pending_on_shared_admission &&
+        private.params.pentax.capture_output_pending)
+        private.params.pentax.capture_output_pending = 0;
     CHECK (capture_calls < 4);
     record ('C');
     capture_modes[capture_calls++] = mode;
@@ -147,6 +154,7 @@ static void fixture (int action_active, uint32_t transfer_state)
     used = capture_calls = terminate_calls = 0;
     written_shutter = 0;
     cancel_answer = 0;
+    clear_pending_on_shared_admission = 0;
     terminate_result = PTP_RC_OK;
     camera.pl = &private;
     private.params.pentax.supported_model = 1;
@@ -235,11 +243,24 @@ static void test_start_discards_stale_fallback (void)
     CHECK (private.params.pentax.bulb_action_timed_fallback == 0);
 }
 
-/* Requirement 5: busy conditions reject before any shutter or capture. */
+static void test_start_reprobes_pending_output_when_idle (void)
+{
+    fixture (0, PTP_PENTAX_TRANSFER_IDLE);
+    private.params.pentax.capture_output_pending = 1;
+    clear_pending_on_shared_admission = 1;
+
+    CHECK (ptp2_pentax_bulb_action (&camera, 1, context) == GP_OK);
+    CHECK (strcmp (operations, "C") == 0);
+    CHECK (capture_calls == 1 && capture_modes[0] == PENTAX_CAPTURE_BULB_START);
+    CHECK (private.params.pentax.capture_output_pending == 0);
+}
+
+/* Requirement 5: genuinely active conditions still reject before any shutter or
+ * capture. The self-derived pending-output flag is intentionally tested above
+ * through the shared admission owner instead of this outer guard. */
 static void test_start_rejected_when_busy (void)
 {
     fixture (0, PTP_PENTAX_TRANSFER_TRIGGERED);
-    private.params.pentax.capture_output_pending = 1;
     CHECK (ptp2_pentax_bulb_action (&camera, 1, context) == GP_ERROR_CAMERA_BUSY);
     CHECK (strcmp (operations, "") == 0);
 
@@ -332,6 +353,7 @@ int main (void)
     test_null_context_proceeds ();
     test_cancel_leaves_session_usable ();
     test_start_discards_stale_fallback ();
+    test_start_reprobes_pending_output_when_idle ();
     test_start_rejected_when_busy ();
     test_stop_terminates_then_finalizes ();
     test_stop_rejected_is_not_replayed ();
