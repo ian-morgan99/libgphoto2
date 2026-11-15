@@ -1150,3 +1150,29 @@ patcher #235/#274 and the canonical libgphoto2 #143 mode-gating work, but it is
 not grounds for a generic library change or an app-side retry/padding
 workaround. Raw logs are retained at
 `/tmp/k1ii-polaris-2110-logs-20261115/polaris-logs-20261115-005724.tar.gz`.
+
+
+## 2026-11-15 — current K-1 II capture evidence supersedes the one-shot failure only
+
+Two consecutive user-authorized default captures on the exact v108 Polaris
+runtime completed and published one JPEG each: `SP_0018.jpg` and `SP_0019.jpg`.
+Both had the complete `1 -> 4 -> 2 -> 3 -> 0` lifecycle and code 773
+publication. The second capture entered with `recovery_required=1` and still
+passed, so the current recovery admission path did not remain wedged after a
+successful transfer. This is stronger current evidence than the earlier
+`SP_0017` candidate/`PHOTO_RECORD Fail`, but remains consumer/integration
+evidence while `pgphoto` owns the USB handle.
+
+The refreshed complete Mlog/Clog and auxiliary log archive is
+`/tmp/k1ii-polaris-camera-logs-repeat-20261115.tar.gz` with SHA-256
+`2e5da7538586a71a25ab404b5f79153ab376ca5a73a4b0c2107151ef00917406`.
+The archive analysis found no current camera crash signature. It did find
+historical `pgphoto is exit`/restart records and repeated Wi-Fi driver resource
+warnings; neither occurred during the two successful captures. The command-261
+shutter setter still returned `-2110` for both target and exact restoration and
+must not be conflated with the successful command-264 capture path.
+
+Required next direct-host gate remains unchanged: reproduce any remaining
+failure with the exact clean libgphoto2 SHA and a directly attached body before
+changing libgphoto2. Do not claim Bulb or setting-write support from these two
+ordinary integration captures.

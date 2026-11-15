@@ -1355,3 +1355,56 @@ No capture or card write occurred. Evidence:
   shutter-write round trip FAIL CLOSED with exact setting preserved.** Raw
   Mlog/Clog were preserved in
   `/tmp/k1ii-polaris-2110-logs-20261115/polaris-logs-20261115-005724.tar.gz`.
+
+
+## 2026-11-15 — K-1 II Polaris two-shot repeat after complete log capture
+
+- The user-authorized capture was repeated twice through the exact v108
+  `pgphoto.stage2ondisk` runtime. Both runs matched code 780
+  `sw:6.0.0.54.108`, downstream USB `25fb:0183`, model `pentax k-1 mark ii`,
+  and camera state `1`. The helper stopped preview, sent only the default
+  `264 state:1;bulb:0;c:-1;` request, and did not guess or write a shutter
+  index. Exposure mode could not be read directly because `pgphoto` owns USB;
+  the helper recorded that no direct PTP request was sent for that probe.
+- Capture 1 published `/app/sd/normal/SP_0018.jpg`, 7,467,182 bytes. Capture
+  2 published `/app/sd/normal/SP_0019.jpg`, 7,802,318 bytes. Each completed
+  `state:1 -> state:4 -> state:2 -> state:3 -> state:0`, emitted code 773,
+  and returned a machine result of `status:pass`, `verdict:success`. The
+  downloaded JPEGs are valid 7360x4912 Pentax K-1 Mark II images with EXIF
+  software `PENTAX K-1 Mark II Ver. 2.51`:
+  `SP_0018.jpg` SHA-256
+  `fa306715812a4fdcb719823357bda0dbabdbda891d82ad1cdfdf346fe9bb106e`;
+  `SP_0019.jpg` SHA-256
+  `fa1407444f9e83d9f14632a0a6775487dcc48c42e0cd357483e685aa42d32c38`.
+- The Clog shows the real camera-side PTP path: both captures returned
+  `0x2001` from `gp_camera_capture`, produced `K1II8735.JPG` and
+  `K1II8736.JPG`, transferred the JPEG member, deleted the camera-side
+  candidate, and published the Polaris output. The body-side image-format
+  widget reported `RAW+JPEG` and `gp_list_count 2`; the existing integration
+  path explicitly deleted the RAW member and published one JPEG. This is a
+  recorded observation, not a claim that code 286's `photoFormat:1` is an
+  authoritative RAW/JPEG setting oracle.
+- The second camlib capture entered with
+  `capture=2 ... transfer=0 recovery=1 output_pending=0`, then passed
+  preconditions and initiated normally. This is consistent with the current
+  source: a completed capture deliberately latches `recovery_required`, and
+  the next capture must clear it through a positive idle/conditions probe.
+  It is evidence that the recovery gate did not permanently wedge the K-1 II
+  after the first successful publication.
+- The complete refreshed device log bundle is
+  `/tmp/k1ii-polaris-camera-logs-repeat-20261115.tar.gz`, SHA-256
+  `2e5da7538586a71a25ab404b5f79153ab376ca5a73a4b0c2107151ef00917406`.
+  It contains all Mlog/Clog generations, access/error generations, current
+  astro camera/solve/watch logs, Wi-Fi logs, and relevant `/tmp` job logs.
+  Post-run metadata recorded USB `25fb:0183`, live `pgphoto` PID 16745, and
+  no crash signature. The kernel log still contains repeated Broadcom Wi-Fi
+  `tdata_psh_info_pool_deq` exhaustion messages, but no camera segfault,
+  SIGABRT, SIGBUS, or core-dump marker.
+- This updates the current Polaris integration evidence from the earlier
+  `SP_0017`/`PHOTO_RECORD Fail`: that failure is not deterministic for this
+  exact v108 session. It does not prove release-wide stability, Bulb timing,
+  shutter writes, or direct-libgphoto2 qualification. The command-261
+  `s:3;` and exact restore `s:2;` failures at 00:51 remain separate and
+  unchanged. In particular, the `-2110` seen while reading current shutter
+  during an active capture is not the same operation as those command-261
+  setter failures.
