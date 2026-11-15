@@ -1323,3 +1323,35 @@ No capture or card write occurred. Evidence:
   libgphoto2 boundary. The exact probe result is
   `/tmp/k1ii-polaris-capture-20261115.json`; preserved Mlog/Clog archive is
   `/tmp/k1ii-polaris-capture-logs-20261115/polaris-logs-20261115-004314.tar.gz`.
+
+
+## 2026-11-15 — K-1 II Polaris preview and shutter-write follow-up
+
+- After the earlier failed capture, a read-only canary probe again verified K-1
+  II `25fb:0183`, code-780 firmware `6.0.0.54.108`, and camera state `1`.
+  Five control-liveness attempts were healthy. The previous empty command-268
+  result was not persistent: two consecutive no-capture passes returned the
+  same 56-entry valid timed list, current index `2` (`00-20`), with `00-15` at
+  index `3` and no unparsable entries. This later result supersedes only the
+  earlier empty read for this session; it does not establish a release-wide fix.
+- A bounded preview cycle passed. Command 291 started preview with `ret:0`,
+  command 292 confirmed `state:1`, and the existing snapshot endpoint returned
+  a baseline 720x480 three-component JPEG of 25,057 bytes, SHA-256
+  `27b04078ee4504e1c310fa3f48df87c3450dbd8f7f54ca696621e684c13d209e`.
+  Command 291 then stopped preview with `ret:0`, and command 292 confirmed
+  `state:0`. No capture or file write occurred.
+- With preview already confirmed off, the live-list-advertised adjacent
+  shutter round trip sent command 261 `s:3;` (`00-15`). The camera returned
+  `s:3;ret:-2110;`, and the device logged `SP_SET_SHUTTER FAIL`. The exact
+  restoration command `s:2;` (`00-20`) also returned `ret:-2110`. A subsequent
+  read-only command 268 still reported `V:2`, so neither request changed the
+  camera setting. No retry was sent.
+- Post-failure identity, control-liveness, storage, process PID 16745, and port
+  8080 remained healthy. This is current Polaris consumer/integration evidence
+  for the known K-1 II `-2110` write-rejection path (patcher #235/#274), not a
+  direct-libgphoto2 reproducer while `pgphoto` owns USB. It does not justify a
+  guessed list, app-side padding, or an unconditional retry in libgphoto2.
+- Verdicts: **preview start/snapshot/stop PASS; shutter-list read PASS;
+  shutter-write round trip FAIL CLOSED with exact setting preserved.** Raw
+  Mlog/Clog were preserved in
+  `/tmp/k1ii-polaris-2110-logs-20261115/polaris-logs-20261115-005724.tar.gz`.

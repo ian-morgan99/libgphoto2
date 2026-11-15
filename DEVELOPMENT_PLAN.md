@@ -1120,3 +1120,33 @@ preserve the candidate/ownership barrier in the implementation, and only then
 design a fresh-session recovery or direct-host reproduction. Do not classify
 this as a passing shutter because the camera emitted an intermediate candidate
 path; the complete lifecycle and output-publication contract failed.
+
+
+## 2026-11-15 K-1 II Polaris follow-up — list/preview pass, writes rejected
+
+The post-capture K-1 II remained reachable through exact v108. Five control
+liveness probes passed. Two consecutive no-capture command-268 reads returned a
+stable 56-entry valid timed list with current index 2 (`00-20`) and no malformed
+entries; this is newer evidence than the earlier empty response, but is only a
+session-local observation.
+
+A bounded command-291/292 preview cycle passed: preview started with `ret:0`, a
+720x480 baseline JPEG was returned by the existing snapshot endpoint (25,057
+bytes, SHA-256
+`27b04078ee4504e1c310fa3f48df87c3450dbd8f7f54ca696621e684c13d209e`), and
+preview stopped with `ret:0` and read back `state:0`. No capture occurred.
+
+With preview confirmed off, one source-defined adjacent advertised value was
+selected through app command 261: index 3 (`00-15`) from the live list. The
+camera returned raw `ret:-2110` and the device logged `SP_SET_SHUTTER FAIL`.
+The exact restoration request for the original index 2 (`00-20`) also returned
+`ret:-2110`. A fresh read-only command-268 response still reported index 2, so
+no setting changed. The camera, storage, pgphoto PID 16745, and port 8080 stayed
+healthy; no retry or capture followed.
+
+This is current Polaris consumer/integration evidence for the known K-1 II
+`-2110` write-rejection path, not a direct-libgphoto2 result. It should inform
+patcher #235/#274 and the canonical libgphoto2 #143 mode-gating work, but it is
+not grounds for a generic library change or an app-side retry/padding
+workaround. Raw logs are retained at
+`/tmp/k1ii-polaris-2110-logs-20261115/polaris-logs-20261115-005724.tar.gz`.
