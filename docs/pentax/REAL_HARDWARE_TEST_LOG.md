@@ -1408,3 +1408,31 @@ No capture or card write occurred. Evidence:
   unchanged. In particular, the `-2110` seen while reading current shutter
   during an active capture is not the same operation as those command-261
   setter failures.
+
+## 2026-11-15 11:54 UTC — K-3 III direct-host startup blocked, no shutter sent
+
+- Authorized charged-camera window; K-3 III on PC, K-1 II on Polaris. Exact
+  clean source e4840f4290ad5acc4df5c228dc9520b044366b87, isolated Meson build
+  /tmp/v109-k3iii-pc.Rl7DeS8I, pentax_research_capture=true. Host suite: 26/26.
+  Installed ptp2.so SHA-256:
+  db73c7d9bed43bd85df7603283f8b5d67f69da9b1aa01dad3ea1fbc558e7ef6a.
+  ldd resolves both cores under that prefix; gphoto2 debug confirms that prefix's
+  ptp2 is loaded. USB 25fb:0189, usb:001,006; no fuser owner before the test.
+- One exact-model gphoto2 --summary exits 1. OpenSession reports an existing
+  session. The first failing observation is GetDevicePropValue(d035), returning
+  0x2017; GetAllConditions(900f) also returns 0x2017. Vendor enable(9001) then
+  returns 0x2002. This is not a USB-claim failure or successful fresh session.
+  No preview, capture, settings write, manual session-close, or USB reset follows.
+- Source boundary: library.c pentax_reconcile_reused_session observes d035 and
+  conditions without clearing an unknown session; pentax_failed_session_init
+  frees host allocations without sending cleanup into an unowned session.
+  No protocol change is justified from this already-open-body observation.
+- The user cannot physically power-cycle now. Startup remains blocked and the
+  earlier shutter restoration obligation remains unresolved: neither its current
+  value nor restoration can be independently read. Do not retry settings or
+  claim control recovered. Next test requires physical power-cycle, same-SHA
+  fresh-session conditions, then bounded preview before any capture/settings.
+- Raw evidence: summary.debug.log and summary.txt under the build directory;
+  publication destination is the v109 PrivateResearch release evidence package.
+
+This is direct-host startup evidence only, not K-3 III v109 firmware qualification.

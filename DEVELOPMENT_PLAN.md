@@ -1176,3 +1176,15 @@ Required next direct-host gate remains unchanged: reproduce any remaining
 failure with the exact clean libgphoto2 SHA and a directly attached body before
 changing libgphoto2. Do not claim Bulb or setting-write support from these two
 ordinary integration captures.
+
+## 2026-11-15 11:54 UTC — exact-main K-3 III startup gate blocked
+
+Clean e4840f4290ad5acc4df5c228dc9520b044366b87 research-enabled host build passes
+26/26 tests; exact installed core/port/camlib paths verified. One --summary on
+25fb:0189 usb:001,006 finds a reused PTP session: d035 and GetAllConditions
+return 0x2017, vendor enable returns 0x2002. No settings or shutter command was
+sent. This is not a clean fresh-session reproducer, and not grounds for guessed
+recovery or a consumer workaround. The user cannot physically power-cycle now.
+Preserve previous restoration obligations; resume with a physical power-cycle,
+fresh conditions and preview, using this same source SHA. Full details and
+private-evidence location are in REAL_HARDWARE_TEST_LOG.md.
