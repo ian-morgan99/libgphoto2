@@ -1222,3 +1222,70 @@ gates; the timing difference is not a reason to weaken verification.
 No capture or card write occurred. Evidence:
  /tmp/pentax-window-20261114-k1ii-pc/research-enabled/focus-peaking-full-lv-fixed.txt
  and conditions-post-focus-peaking-full-lv.txt.
+
+
+## 2026-11-15 — swapped placement: K-3 III direct-PC preview/focus and shutter-restore failure
+
+- Exact body: K-3 Mark III, USB `25fb:0189`, firmware `2.20`, serial `8093033`,
+  fresh direct-PC port `usb:001,004`, model `Pentax K-3 Mark III (MTP mode)`.
+  The exact research-enabled runtime was the existing `build-k1ii-marker`
+  build from the LibGphoto2 main line after source commit `4cbfcf27e`; the
+  rebuilt `ptp2.so` SHA-256 was
+  `b0ba97a46b1ec2b893f4207562f7d0ea8e67f345850b20da625bc069d5b3ee99`.
+- Read-only summary passed. Battery was 100%; the camera reported vendor
+  extension `0x6` version `1.10`, SD1 storage, and no still-capture operation
+  was requested by these tests.
+- The in-memory preview helper passed two frames. PC-LV start and frame reads
+  returned `0x2001`; frames were 78,876 bytes / 15 ms and 77,106 bytes / 14 ms,
+  each on the first bounded attempt, and both passed JPEG SOI/EOI validation.
+  Cleanup passed. This is a current direct-PC preview transport result, not a
+  card-capture result.
+- The source-defined K-3 III new-focus path accepted one `near-lv` action:
+  model `78420`, new-focus family, displacement `-23`, opcode `0x9017`, raw
+  response `0x2001`, followed by a valid 73,497-byte preview and cleanup.
+  The action was not physically observed, so no lens-direction claim is made.
+- The source-faithful shutter round trip exposed a failure. Initial live
+  conditions were `00:20` (`20/1`). The advertised target `1/8000` was written
+  and independently read back successfully (`set_result=0`). The exact
+  restoration write to `00:20` returned `-1`, and live conditions remained
+  `1/8000`; the helper therefore failed closed. No second shutter write was
+  attempted. A subsequent fresh preview/focus start returned `0x02ff` / I/O
+  error and the K-3 III then disappeared from the host USB bus. This is direct
+  libgphoto2 boundary evidence for a restoration/session-wedge defect, not a
+  Polaris ownership result; do not claim shutter qualification or retry until
+  the body is physically recovered and the first failing PTP operation is
+  captured.
+- Verdict: **preview PASS; one bounded new-focus transport action PASS;
+  physical focus direction UNKNOWN; shutter round trip FAIL with restore
+  unverified and camera USB recovery required.**
+
+
+## 2026-11-15 — swapped placement: K-1 II Polaris read-only integration gate
+
+- Polaris reported `FwVer:6.0.0.54.108;date:2026.11.13;` and code 780 reported
+  `hw:1.1.1.2;sw:6.0.0.54.108;exAxis:1.0.2.14;sv:1`. The K-1 II was
+  enumerated downstream as `25fb:0183`, published as `pentax k-1 mark ii`,
+  `state:1`, `storage:2`, `photoFormat:1`.
+- The retained v108 manifest and device provenance agreed on candidate
+  `astro-v108-starved-extract-20261113`, LibGphoto2 commit
+  `51f636d825013dcb87bab972a329114f12a7063a`, and patcher commit
+  `4a412fff06df7cb04597d70f75a21a77a5340e40`; the loaded stage-2 SHA-256 files
+  matched the manifest. The process mapped the same camera bytes through the
+  legacy versioned paths, so this must not be mistaken for a newer uninstalled
+  checkout running.
+- Two control-liveness attempts passed. Read-only commands 284/286/780 passed;
+  preview state command 292 returned `state:1`, battery command 778 returned
+  `capacity:70;charge:1`, and storage command 775 returned
+  `status:1;totalspace:59978;freespace:59504;usespace:474`.
+- The existing Polaris preview endpoint returned a valid baseline JPEG:
+  720x480 RGB, 24,987 bytes, SHA-256
+  `f944414bd0a8c6d43452b8d4777256516a7ef9bcc86aaea12c5de8dde79a5997`.
+  No card capture or camera setting write was sent.
+- The read-only shutter-list query returned `268@RD:0;V:;R:;#`; device logs
+  recorded `shutterString index error` immediately after parsing that empty
+  list. This is current Polaris consumer/integration evidence for the existing
+  empty-array/crash family (patcher issues #235/#327), not a direct libgphoto2
+  defect: `pgphoto` owns the USB handle, so a second host `gphoto2` claim was
+  deliberately not attempted. Verdict: **identity/liveness/preview PASS;
+  shutter-control applicability FAIL CLOSED; no shutter write or capture
+  qualification.**

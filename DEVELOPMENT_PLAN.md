@@ -1062,3 +1062,27 @@ independent verification, then cleared keep-live-view and read back zero.
 Fresh conditions remained idle and restored. This is current direct hardware
 evidence that full-tree enumeration costs roughly 15x on this body; it does
 not justify weakening the verified single-config path.
+
+
+## 2026-11-15 camera-session checkpoint — swapped placement
+
+The K-3 III was directly attached to the PC and the K-1 II was behind Polaris.
+The exact outcomes are recorded in `docs/pentax/REAL_HARDWARE_TEST_LOG.md`.
+
+- K-3 III: two in-memory previews passed and one source-defined new-focus
+  transport action passed. A source-faithful shutter round trip failed closed:
+  `00:20 -> 1/8000` read back correctly, but restoration to `00:20` returned
+  `-1` and the camera then left the USB bus. Treat this as the first current
+  direct-libgphoto2 shutter/session failure to diagnose; do not patch from the
+  Polaris K-1 result and do not retry the shutter until physical recovery.
+- K-1 II on Polaris: identity, exact v108 provenance, control liveness, preview
+  state, battery/storage reads, and one valid 720x480 snapshot passed. Command
+  268 returned an empty shutter list and the device logged `shutterString index
+  error`; no write was attempted. This is consumer/runtime evidence only while
+  `pgphoto` owns the camera USB handle.
+
+Next actions are source/offline first: trace the K-3 restore failure from the
+first PTP operation, compare current code with the last known-good shutter
+round-trip evidence, and add a deterministic regression before any new
+hardware write. For Polaris, fix the empty-list fail-closed path and preserve
+single-owner control; do not solve it by launching a second gphoto2 owner.
