@@ -1086,3 +1086,37 @@ first PTP operation, compare current code with the last known-good shutter
 round-trip evidence, and add a deterministic regression before any new
 hardware write. For Polaris, fix the empty-list fail-closed path and preserve
 single-owner control; do not solve it by launching a second gphoto2 owner.
+
+
+## 2026-11-15 Polaris K-1 II capture gate — current failure preserved
+
+The user-authorized single capture was run through the existing OpenPolaris
+canary helper against the exact v108 runtime. Preflight verified K-1 II
+`25fb:0183`, code-780 firmware `6.0.0.54.108`, the retained v108 provenance,
+and a live `pgphoto.stage2ondisk` process. Because command 268 returned an
+empty list, the test deliberately sent no shutter write or guessed Bulb value;
+it used only the helper's default `264 state:1;bulb:0;c:-1;` request after
+stopping preview.
+
+The live result was `state:1 -> state:-1005` in 3.629 seconds, with no state 4,
+state 0, or code-773 publication. Mlog recorded a camera-side candidate path
+`/app/sd/normal/SP_0017.jpg`, then `state:-110` for that same path, followed by
+Polaris `PHOTO_RECORD Fail` and app-facing `state:-1005`. No new card file was
+present in the before/after inventory. This is current consumer/integration
+evidence of a post-initiation candidate/transfer/publication failure. It is not
+a direct libgphoto2 qualification result, not the empty shutter-array issue, and
+not a reason to patch generic or Pentax library code without a direct-host
+reproducer.
+
+The post-failure K-1 II remained responsive (`286 state:1`), preview was left
+off as the requested cleanup state (`292 state:0`), storage was unchanged,
+`pgphoto` PID 16745 and port 8080 remained alive, and no retry/reset/second USB
+owner was attempted. Retained machine result:
+`/tmp/k1ii-polaris-capture-20261115.json`. Preserved device logs:
+`/tmp/k1ii-polaris-capture-logs-20261115/polaris-logs-20261115-004314.tar.gz`.
+
+Required next steps remain bounded: attach this evidence to patcher issue #145,
+preserve the candidate/ownership barrier in the implementation, and only then
+design a fresh-session recovery or direct-host reproduction. Do not classify
+this as a passing shutter because the camera emitted an intermediate candidate
+path; the complete lifecycle and output-publication contract failed.

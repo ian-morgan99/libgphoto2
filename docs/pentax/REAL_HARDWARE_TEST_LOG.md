@@ -1289,3 +1289,37 @@ No capture or card write occurred. Evidence:
   deliberately not attempted. Verdict: **identity/liveness/preview PASS;
   shutter-control applicability FAIL CLOSED; no shutter write or capture
   qualification.**
+
+
+## 2026-11-15 — K-1 II Polaris single capture failed after camera-side candidate
+
+- The user-authorized one-shot used the existing OpenPolaris `canary-probe.py`
+  against the K-1 II behind the exact v108 runtime. Preflight matched code 780
+  `sw:6.0.0.54.108`, downstream identity `25fb:0183`, model `pentax k-1 mark
+  ii`, and a live `pgphoto.stage2ondisk` process. The source-defined command
+  268 shutter-list query remained empty, so no shutter index, Bulb duration, or
+  guessed exposure value was sent.
+- The helper stopped the previously running preview and issued exactly one
+  default held-shutter request: `264 state:1;bulb:0;c:-1;`. The observed
+  lifecycle was `state:1` followed 3.629 seconds later by terminal
+  `state:-1005`; there was no `state:4`, `state:0`, or `773` publication event.
+- The retained device Mlog is more specific than the app-facing result:
+  `SP_MsgFromCameraProc` reported `state:1` with candidate path
+  `/app/sd/normal/SP_0017.jpg`, then reported `state:-110` for that same path;
+  Polaris mapped this to `state:-1005` and logged `PHOTO_RECORD Fail`. A
+  before/after card inventory found no `SP_0017.jpg` and no new output. This is
+  post-initiation candidate/transfer/publication failure evidence, not proof of
+  a pre-initiation admission refusal and not evidence for the empty-array
+  shutter defect.
+- Post-failure read-only audit remained healthy: code 286 reported K-1 II
+  `state:1`, code 292 reported preview `state:0` (the requested cleanup state),
+  code 775 remained `status:1;totalspace:59978;freespace:59504;usespace:474`,
+  `pgphoto.stage2ondisk` PID `16745` remained alive, and port 8080 remained
+  listening. No retry, reset, daemon stop, or second USB owner was used.
+- Verdict: **capture FAIL / candidate appeared but was not published; camera and
+  daemon remained responsive.** This updates the current Polaris consumer
+  capture evidence for patcher #145. It does not by itself identify a new
+  libgphoto2 defect because the failure was not reproduced at the direct host
+  libgphoto2 boundary. The exact probe result is
+  `/tmp/k1ii-polaris-capture-20261115.json`; preserved Mlog/Clog archive is
+  `/tmp/k1ii-polaris-capture-logs-20261115/polaris-logs-20261115-004314.tar.gz`.
