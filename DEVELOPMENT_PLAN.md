@@ -1188,3 +1188,8 @@ recovery or a consumer workaround. The user cannot physically power-cycle now.
 Preserve previous restoration obligations; resume with a physical power-cycle,
 fresh conditions and preview, using this same source SHA. Full details and
 private-evidence location are in REAL_HARDWARE_TEST_LOG.md.
+## 2026-11-17 K-3 III current-main direct-PC continuation
+
+The clean current `main` SHA `4ef07e9209e827a3ab0013edd5ac1f874892c423` was built in an isolated research-enabled prefix. The exact K-3 III (`25fb:0189`, firmware 2.20) remained usable for read-only operation: exact-model init passed, 53/53 in-memory preview frames passed, and five independent configuration sessions reported stable Manual-mode conditions and non-empty advertised control domains. The host gate passed 26/26.
+
+The bounded shutter test selected the advertised `1/16000` value from a live baseline of `00:30`. The target setter returned `-1` and live conditions still reported `30/1`. The baseline request returned `0` and an independent session confirmed `30/1`. The original value was preserved. This does not qualify restoration from a changed value or identify whether the SET or verification failed. Keep the earlier applied-target/failed-restore result open. Start the next write A/B after physical K-3 III recovery and retain raw `GP_LOG_ALL` for the first failed transaction. See the [continuation evidence](docs/pentax/evidence/2026-11-17/k3iii-current-main/SUMMARY.md).

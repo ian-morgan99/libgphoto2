@@ -1436,3 +1436,12 @@ No capture or card write occurred. Evidence:
   publication destination is the v109 PrivateResearch release evidence package.
 
 This is direct-host startup evidence only, not K-3 III v109 firmware qualification.
+## 2026-11-17 — current-main K-3 III continuation: read-only stability pass, shutter target rejected
+
+- Exact clean source SHA `4ef07e9209e827a3ab0013edd5ac1f874892c423` was built in an isolated research-enabled Meson prefix. The resulting `ptp2.so` SHA-256 was `8145816290829ec22a7dbfbf18ea5abc0917c01e5f269f40bfa9f6bce06ffb9d`; the non-hardware host suite passed `26/26`.
+- The directly attached K-3 III was verified as `25fb:0189`, firmware 2.20, `usb:002,004`. Exact-model init passed with vendor-enable flags `0x00000000`.
+- All 53 in-memory preview frames passed the harness MIME and SOI/EOI checks, and cleanup returned success. Full JPEG decoding was outside this test.
+- Five independent read-only configuration sessions remained stable. Conditions reported `state=48`, exposure mode 8 (`Manual`), `Tv-changeable=yes`, `shooting=no`, `processing=no`, `task-changing=no`, `bulb-timer=no`, and baseline shutter `30/1`. The widgets contained 58 advertised shutter choices, 15 ISO choices, 19 aperture choices, 31 EV choices, and 18 WB choices. The colour temperature query returned `-1` without a classified cause.
+- The shutter harness selected advertised `1/16000` from `00:30`. The setter returned `-1` and conditions still reported `30/1`. The baseline request returned `0` and a later read-only session confirmed `30/1`. The SET/verification boundary is unknown and the original value was preserved. Restoration from a changed value remains unverified.
+- This differs from the earlier current-session result where `1/8000` applied and exact restoration failed. No further setting write or capture mutation was sent after this failure. A physical power-cycle is required before another write A/B. The next mutation must capture raw `GP_LOG_ALL` around the first failed `0xd00f` transaction.
+- Full evidence summary and transcript hashes: `docs/pentax/evidence/2026-11-17/k3iii-current-main/SUMMARY.md`.
