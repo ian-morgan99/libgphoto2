@@ -10205,7 +10205,7 @@ _put_Pentax_DirectAperture (CONFIG_PUT_ARGS)
 		return translate_ptp_result (ret);
 	result = _put_FNumber (camera, widget, &value, &desc, alreadyset);
 	if (result == GP_OK) {
-		ret = ptp_setdevicepropvalue (params, PTP_DPC_FNumber,
+		ret = ptp_generic_setdevicepropvalue (params, PTP_DPC_FNumber,
 			&value, PTP_DTC_UINT16);
 		result = translate_ptp_result (ret);
 		if (result == GP_OK)
@@ -10238,6 +10238,10 @@ _get_Pentax_DirectEV (CONFIG_GET_ARGS)
 		PTP_DPC_ExposureBiasCompensation, &desc);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
+	if (desc.DataType != PTP_DTC_INT16) {
+		ptp_free_devicepropdesc (&desc);
+		return GP_ERROR_NOT_SUPPORTED;
+	}
 	if ((desc.FormFlag == PTP_DPFF_Enumeration) &&
 	    (desc.FORM.Enum.NumberOfValues > 0)) {
 		result = _get_ExpCompensation (camera, widget, menu, &desc);
@@ -10251,8 +10255,11 @@ _get_Pentax_DirectEV (CONFIG_GET_ARGS)
 		gp_widget_set_name (*widget, menu->name);
 		snprintf (buf, sizeof (buf), "%d", desc.CurrentValue.i16);
 		gp_widget_set_value (*widget, buf);
+		gp_widget_set_readonly (*widget, 1);
 		result = GP_OK;
 	}
+	if (result == GP_OK && desc.GetSet != PTP_DPGS_GetSet)
+		gp_widget_set_readonly (*widget, 1);
 	ptp_free_devicepropdesc (&desc);
 	return result;
 }
@@ -12067,7 +12074,7 @@ _put_Pentax_DirectWB (CONFIG_PUT_ARGS)
 	}
 	memset (&value, 0, sizeof (value));
 	value.u16 = (uint16_t)target;
-	ret = ptp_setdevicepropvalue (params, PTP_DPC_WhiteBalance,
+	ret = ptp_generic_setdevicepropvalue (params, PTP_DPC_WhiteBalance,
 		&value, PTP_DTC_UINT16);
 	result = translate_ptp_result (ret);
 	if (result == GP_OK)
@@ -12089,27 +12096,40 @@ _put_Pentax_DirectEV (CONFIG_PUT_ARGS)
 	PTPDevicePropDesc desc;
 	PTPPropValue value;
 	PentaxConditions conditions;
-	int32_t ev_thousandths;
+	const char *requested;
+	unsigned int i;
 	uint16_t ret;
 	int result;
 
 	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
-	result = _pentax_exposure_write_preflight (params,
-		PENTAX_CONDITION_CAN_CHANGE_XV, &conditions);
-	if (result < GP_OK)
-		return result;
 	memset (&desc, 0, sizeof (desc));
 	memset (&value, 0, sizeof (value));
 	ret = ptp_generic_getdevicepropdesc (params,
 		PTP_DPC_ExposureBiasCompensation, &desc);
 	if (ret != PTP_RC_OK)
 		return translate_ptp_result (ret);
-	result = _put_ExpCompensation (camera, widget, &value, &desc,
-		alreadyset);
+	result = GP_ERROR_NOT_SUPPORTED;
+	if (desc.DataType != PTP_DTC_INT16 || desc.GetSet != PTP_DPGS_GetSet ||
+	    desc.FormFlag != PTP_DPFF_Enumeration || !desc.FORM.Enum.NumberOfValues)
+		goto out;
+	result = gp_widget_get_value (widget, &requested);
+	if (result < GP_OK)
+		goto out;
+	result = GP_ERROR_BAD_PARAMETERS;
+	for (i = 0; i < desc.FORM.Enum.NumberOfValues; i++) {
+		char label[16];
+		value.i16 = desc.FORM.Enum.SupportedValue[i].i16;
+		snprintf (label, sizeof (label), "%g", value.i16 / 1000.0);
+		if (requested && !strcmp (requested, label))
+			break;
+	}
+	if (i == desc.FORM.Enum.NumberOfValues)
+		goto out;
+	result = _pentax_exposure_write_preflight (params,
+		PENTAX_CONDITION_CAN_CHANGE_XV, &conditions);
 	if (result == GP_OK) {
-		ev_thousandths = value.i16;
-		ret = ptp_setdevicepropvalue (params,
+		ret = ptp_generic_setdevicepropvalue (params,
 			PTP_DPC_ExposureBiasCompensation,
 			&value, PTP_DTC_INT16);
 		result = translate_ptp_result (ret);
@@ -12117,12 +12137,13 @@ _put_Pentax_DirectEV (CONFIG_PUT_ARGS)
 			/* Conditions report EV in tenths; the wire property is
 			 * thousandths. Verify at tenth granularity. */
 			result = _pentax_verify_rational_in_conditions (params,
-				(uint32_t)(ev_thousandths / 100), 10,
+				(uint32_t)(value.i16 / 100), 10,
 				_pentax_cond_ev_num, _pentax_cond_ev_den,
 				PENTAX_CONDITION_CAN_CHANGE_XV);
 		if (alreadyset)
 			*alreadyset = 1;
 	}
+out:
 	ptp_free_devicepropdesc (&desc);
 	return result;
 }
@@ -12263,7 +12284,7 @@ _put_Pentax_DirectShutter (CONFIG_PUT_ARGS)
 		ptp_free_devicepropdesc (&desc);
 		return GP_ERROR_NOT_SUPPORTED;
 	}
-	ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
+	ret = ptp_generic_setdevicepropvalue (params, PTP_DPC_PENTAX_ShutterSpeed,
 		&value, PTP_DTC_UINT64);
 	result = translate_ptp_result (ret);
 	if (result == GP_OK) {
@@ -12392,7 +12413,7 @@ _put_Pentax_DirectISO (CONFIG_PUT_ARGS)
 		return translate_ptp_result (ret);
 	result = _put_INT (camera, widget, &value, &desc, alreadyset);
 	if (result == GP_OK) {
-		ret = ptp_setdevicepropvalue (params, PTP_DPC_PENTAX_ExtendedISO,
+		ret = ptp_generic_setdevicepropvalue (params, PTP_DPC_PENTAX_ExtendedISO,
 			&value, PTP_DTC_UINT32);
 		result = translate_ptp_result (ret);
 		if (result == GP_OK) {
@@ -15679,6 +15700,24 @@ static struct menu menus[] = {
 	{ N_("WIFI profiles"),              "wifiprofiles",     0,      0,      NULL,                           _get_wifi_profiles_menu, _put_wifi_profiles_menu },
 };
 
+/* Choose one EV implementation for get, list and set. A K-1 II answers
+ * the standard descriptor even when DeviceInfo omits it. Routing that
+ * property through the generic setter would skip IT2's conditions gate. */
+static int
+have_config_entry (Camera *camera, const struct submenu *entry)
+{
+	PTPParams *params = &camera->pl->params;
+
+	if (entry->getfunc == _get_Pentax_DirectEV)
+		return params->pentax.supported_model && params->pentax.vendor_mode_enabled &&
+			ptp_operation_issupported (params, PTP_OC_GetDevicePropDesc);
+	if (params->pentax.supported_model && !entry->vendorid &&
+	    entry->propid == PTP_DPC_ExposureBiasCompensation)
+		return 0;
+	return have_prop (camera, entry->vendorid, entry->propid) ||
+		(!entry->propid && have_prop (camera, entry->vendorid, entry->type));
+}
+
 /*
  * Can do 3 things:
  * - get the whole widget dialog tree (confname = NULL, list = NULL, widget = rootwidget)
@@ -15763,9 +15802,7 @@ _get_config (Camera *camera, const char *confname, CameraWidget **outwidget, Cam
 			struct submenu *cursub = menus[menuno].submenus+submenuno;
 			widget = NULL;
 
-			if (	have_prop(camera,cursub->vendorid,cursub->propid) ||
-				((cursub->propid == 0) && have_prop(camera,cursub->vendorid,cursub->type))
-			) {
+			if (have_config_entry (camera, cursub)) {
 				int			j;
 
 				/* Do not handle a property we have already handled.
@@ -16297,9 +16334,7 @@ _set_config (Camera *camera, const char *confname, CameraWidget *window, GPConte
 					continue;
 			}
 
-			if (	have_prop(camera,cursub->vendorid,cursub->propid) ||
-				((cursub->propid == 0) && have_prop(camera,cursub->vendorid,cursub->type))
-			) {
+			if (have_config_entry (camera, cursub)) {
 				if ((mode == MODE_SINGLE_SET) && strcmp (confname, cursub->name))
 					continue;
 
@@ -16351,6 +16386,8 @@ _set_config (Camera *camera, const char *confname, CameraWidget *window, GPConte
 					}
 				} else {
 					ret = cursub->putfunc (camera, widget, NULL, NULL, NULL);
+					if (ret < GP_OK && cursub->getfunc == _get_Pentax_DirectEV)
+						return ret;
 				}
 				gp_widget_set_changed (widget, FALSE); /* clear flag */
 				if (mode == MODE_SINGLE_SET)

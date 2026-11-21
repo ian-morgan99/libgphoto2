@@ -41,6 +41,47 @@ typedef int (*cam_get_single_config_fn)(Camera *camera, const char *confname,
         } \
 } while (0)
 
+/* The transport can supply idle conditions or reject the preflight.
+ * Reject all writes so both error paths can be exercised offline. */
+static uint16_t first_request;
+static int write_requests;
+static uint16_t written_property;
+static int allow_conditions;
+
+static uint16_t
+reject_request (PTPParams *params, PTPContainer *request, int phase)
+{
+	(void) params;
+	(void) phase;
+	if (!first_request)
+		first_request = request->Code;
+	if (allow_conditions && request->Code == PTP_OC_PENTAX_GetAllConditions)
+		return PTP_RC_OK;
+	if (request->Code == PTP_OC_SetDevicePropValue) {
+		write_requests++;
+		written_property = request->Param1;
+	}
+	return PTP_RC_GeneralError;
+}
+
+static uint16_t
+send_idle_conditions (PTPParams *params, PTPContainer *request, PTPDataHandler *handler)
+{
+	unsigned char conditions[PENTAX_CONDITIONS_MIN_SIZE] = {0};
+	(void) request;
+	conditions[184] = 8; /* Manual */
+	conditions[504] = 15; /* Av, Tv, ISO and EV changeable */
+	return handler->putfunc (params, handler->priv, sizeof (conditions), conditions);
+}
+
+static uint16_t
+respond_ok (PTPParams *params, PTPContainer *response)
+{
+	(void) params;
+	response->Code = PTP_RC_OK;
+	return PTP_RC_OK;
+}
+
 /* Locate and dlopen the built ptp2 camlib via CAMLIBS (set by meson). */
 static void *
 load_ptp2 (void)
@@ -305,6 +346,85 @@ main (void)
 	CHECK (gp_widget_get_value (ev, &ev_value) == GP_OK);
 	CHECK (ev_value && !strcmp (ev_value, "0"));
 
+	/* #169: test the exact K-1 II model exception as well as a body that
+	 * advertises EV. Neither may bypass a failed GetAllConditions. */
+	union {
+		void *p;
+		int (*set) (Camera *, const char *, CameraWidget *, GPContext *);
+	} setter;
+	setter.p = dlsym (handle, "camera_set_single_config");
+	CHECK (setter.set);
+	uint16_t advertised_ev = PTP_DPC_ExposureBiasCompensation;
+	PTPParams *params = &cam->pl->params;
+	params->pentax.model_no = PENTAX_MODEL_K1_MARK_II;
+	params->sendreq_func = reject_request;
+	for (int advertised = 0; advertised <= 1; advertised++) {
+		params->deviceinfo.DeviceProps = &advertised_ev;
+		params->deviceinfo.DeviceProps_len = advertised;
+		first_request = 0;
+		write_requests = 0;
+		CHECK (gp_widget_set_value (ev, "1") == GP_OK);
+		ret = setter.set (cam, "exposurecompensation", ev, context);
+		CHECK (first_request == PTP_OC_PENTAX_GetAllConditions);
+		CHECK (write_requests == 0);
+		CHECK (ret < GP_OK);
+	}
+	/* A caller can supply its own widget. Check descriptor access and exact
+	 * enum membership before even trying the readiness transaction. */
+	PTPDevicePropDesc *ev_desc = &params->dpd_cache.val[5];
+	CameraWidget *supplied = NULL;
+	CHECK (gp_widget_new (GP_WIDGET_TEXT, "EV", &supplied) == GP_OK);
+	CHECK (gp_widget_set_value (supplied, "0.7") == GP_OK);
+	first_request = 0;
+	CHECK (setter.set (cam, "exposurecompensation", supplied, context) < GP_OK);
+	CHECK (!first_request);
+	CHECK (gp_widget_set_value (supplied, "1") == GP_OK);
+	ev_desc->GetSet = PTP_DPGS_Get;
+	CHECK (setter.set (cam, "exposurecompensation", supplied, context) < GP_OK);
+	CHECK (!first_request);
+	ev_desc->GetSet = PTP_DPGS_GetSet;
+	ev_desc->FormFlag = PTP_DPFF_None;
+	CameraWidget *readback = NULL;
+	int readonly = 0;
+	CHECK (get_single (cam, "exposurecompensation", &readback, context) == GP_OK);
+	CHECK (gp_widget_get_readonly (readback, &readonly) == GP_OK && readonly);
+	CHECK (setter.set (cam, "exposurecompensation", supplied, context) < GP_OK);
+	CHECK (!first_request);
+	gp_widget_free (readback);
+	gp_widget_free (supplied);
+	ev_desc->FormFlag = PTP_DPFF_Enumeration;
+
+	params->deviceinfo.DeviceProps = NULL;
+	params->deviceinfo.DeviceProps_len = 0;
+	/* Each attempted setter must expire its own descriptor. Even when the
+	 * write transport fails, the caller cannot rely on the previous value. */
+	static const struct {
+		const char *key;
+		unsigned int cache_index;
+	} settings[] = {
+		{ "aperture", 0 }, { "shutterspeed", 1 }, { "iso", 2 },
+		{ "whitebalance", 4 }, { "exposurecompensation", 5 }
+	};
+	params->cachetime = 60;
+	params->getdata_func = send_idle_conditions;
+	params->getresp_func = respond_ok;
+	allow_conditions = 1;
+	for (unsigned int i = 0; i < sizeof (settings)/sizeof (settings[0]); i++) {
+		PTPDevicePropDesc *cached = &params->dpd_cache.val[settings[i].cache_index];
+		CameraWidget *control = NULL;
+		cached->timestamp = time (NULL);
+		CHECK (get_single (cam, settings[i].key, &control, context) == GP_OK && control);
+		CHECK (gp_widget_set_changed (control, 1) == GP_OK);
+		write_requests = 0;
+		CHECK (setter.set (cam, settings[i].key, control, context) < GP_OK);
+		CHECK (write_requests == 1 && written_property == cached->DevicePropCode);
+		CHECK (cached->timestamp == 0);
+		cached->timestamp = time (NULL);
+		gp_widget_free (control);
+	}
+	allow_conditions = 0;
+	params->pentax.model_no = 0;
+
 	/* K-1 II firmware can omit 0x5005 from DeviceInfo.  The public
 	 * "whitebalance" name must nevertheless resolve through the Pentax direct
 	 * handler and expose the complete IT2 list-index contract. */
@@ -449,6 +569,24 @@ main (void)
 		fprintf (stderr, "FAIL: non-Pentax fixture unexpectedly exposed 'aperture'\n");
 		return 1;
 	}
+
+	/* A non-Pentax body with an advertised standard EV property still
+	 * uses SetDevicePropValue without any Pentax conditions request. */
+	Camera *standard = NULL;
+	CHECK (!build_fixture (&standard, context, 0, 1));
+	PTPParams *standard_params = &standard->pl->params;
+	standard_params->deviceinfo.DeviceProps = &advertised_ev;
+	standard_params->deviceinfo.DeviceProps_len = 1;
+	standard_params->sendreq_func = reject_request;
+	CameraWidget *standard_ev = NULL;
+	CHECK (get_single (standard, "exposurecompensation", &standard_ev, context) == GP_OK);
+	CHECK (standard_ev);
+	CHECK (gp_widget_set_value (standard_ev, "1") == GP_OK);
+	first_request = 0;
+	write_requests = 0;
+	(void) setter.set (standard, "exposurecompensation", standard_ev, context);
+	CHECK (first_request == PTP_OC_SetDevicePropValue && write_requests == 1);
+	gp_widget_free (standard_ev);
 
 	/* --- #69: menu-name uniqueness via the public list-config path. A
 	 * duplicate registration would surface as two identical names in the

@@ -11765,9 +11765,9 @@ pentax_reconcile_reused_session (PTPParams *params, GPContext *context)
 	int live_view_idle = 0;
 	PentaxReconcileDecision decision = PENTAX_RECONCILE_UNREADABLE;
 
-	GP_LOG_D ("Pentax session was already opened; reconciling observed camera state");
+	GP_LOG_D ("Observing Pentax camera state at session initialization");
 	gp_context_status (context,
-		_("Pentax session already open from a previous connection; observing camera state."));
+		_("Observing Pentax camera state."));
 
 	if (PTP_RC_OK == ptp_getdevicepropvalue (params,
 			PTP_DPC_PENTAX_UsbLiveViewMode, &value, PTP_DTC_UINT8)) {
@@ -12100,6 +12100,7 @@ camera_init (Camera *camera, GPContext *context)
 			 * research Pentax bodies observe leftover state
 			 * before treating this as a fresh start (issue #33). */
 			if (pentax_candidate) {
+				gp_context_status (context, _("The camera reported an already open Pentax session."));
 				ret = pentax_recover_stale_session (camera, context, sessionid);
 				if (ret < GP_OK)
 					return pentax_failed_session_init (camera, ret);
