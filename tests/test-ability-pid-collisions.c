@@ -1,6 +1,7 @@
 /**
  * Regression test: two ability rows must not claim the same (vendor, product)
- * on port types that both match a plain USB probe.
+ * on port types with different reachability from a plain USB probe unless
+ * the shared identity is explicitly accounted for below.
  *
  * WHY THIS EXISTS (issue benro-polaris-firmware-patcher #379)
  * -----------------------------------------------------------
@@ -61,8 +62,8 @@ struct known {
 
 static const struct known KNOWN[] = {
 	{ 0x25fb, 0x0130,
-	  "ptp2 'Pentax:645D (PTP Mode)' shadows pentax K-01 MSC; fix gated on "
-	  "K-01 attached in MSC mode (patcher #379)" },
+	  "645D PTP and K-01 MSC share this ID; libusb1 excludes the "
+	  "K-01 SCSI-only interface (patcher #379)" },
 	{ 0x25fb, 0x0182,
 	  "ptp2 'K-1 Mark II (MSC mode)' shadows pentax K-1 II MSC; fix gated on "
 	  "device evidence (patcher #15/#379)" },
@@ -103,6 +104,7 @@ int main(void)
 	int count, i, j;
 	int failures = 0;
 	int stale = 0;
+	int ptp_loaded = 0, pentax_loaded = 0;
 	int matched[sizeof(KNOWN)/sizeof(KNOWN[0])];
 
 	memset(matched, 0, sizeof(matched));
@@ -117,6 +119,10 @@ int main(void)
 	for (i = 0; i < count; i++) {
 		CameraAbilities a;
 		CHECK (gp_abilities_list_get_abilities (al, i, &a));
+		if (!strcmp(a.id, "PTP"))
+			ptp_loaded = 1;
+		if (!strcmp(a.id, "pentax"))
+			pentax_loaded = 1;
 		if (!a.usb_vendor || !a.usb_product)
 			continue;
 
@@ -157,7 +163,7 @@ int main(void)
 	}
 
 	for (i = 0; i < (int)(sizeof(KNOWN)/sizeof(KNOWN[0])); i++) {
-		if (!matched[i]) {
+		if (ptp_loaded && pentax_loaded && !matched[i]) {
 			stale++;
 			fprintf(stderr,
 				"STALE ALLOWLIST ENTRY: %04x:%04x no longer "

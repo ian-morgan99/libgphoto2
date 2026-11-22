@@ -2,6 +2,13 @@ gp_test_env = gp_port_test_env + [
   'CAMLIBS=@0@'.format(':'.join(camlib_paths)),
 ]
 
+test_ability_collisions = executable(
+  'test-ability-pid-collisions',
+  'test-ability-pid-collisions.c',
+  dependencies: libgphoto2_dep,
+)
+test('test-ability-pid-collisions', test_ability_collisions, env: gp_test_env)
+
 ptp_context_test = executable(
   'test-ptp-context',
   'test-ptp-context.c',
