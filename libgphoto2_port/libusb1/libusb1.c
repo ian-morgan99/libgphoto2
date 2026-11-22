@@ -1268,8 +1268,6 @@ gp_libusb1_find_device_lib(GPPort *port, int idvendor, int idproduct)
 		if (devnr && (devnr != libusb_get_device_address (pl->devs[d])))
 			continue;
 
-		port->pl->d = pl->devs[d];
-
 		GP_LOG_D ("Looking for USB device (vendor 0x%x, product 0x%x)... found.", idvendor, idproduct);
 
 		/* Use the first config, interface and altsetting we find */
@@ -1277,6 +1275,21 @@ gp_libusb1_find_device_lib(GPPort *port, int idvendor, int idproduct)
 
 		if (LOG_ON_LIBUSB_E (libusb_get_config_descriptor (pl->devs[d], config, &confdesc)))
 			continue;
+
+		/* K-01 MSC and 645D PTP share a product ID. Only the single
+		 * SCSI/Bulk-Only interface belongs exclusively to usbscsi. */
+		if (idvendor == 0x25fb && idproduct == 0x0130 &&
+		    pl->descs[d].bNumConfigurations == 1 && confdesc->bNumInterfaces == 1 &&
+		    confdesc->interface[0].num_altsetting == 1) {
+			const struct libusb_interface_descriptor *intf = confdesc->interface[0].altsetting;
+			if (intf->bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE &&
+			    intf->bInterfaceSubClass == 6 && intf->bInterfaceProtocol == 0x50) {
+				GP_LOG_D ("Pentax 25fb:0130 mass storage interface belongs to usbscsi");
+				libusb_free_config_descriptor (confdesc);
+				continue;
+			}
+		}
+		port->pl->d = pl->devs[d];
 
 		/* Set the defaults */
 		if (confdesc->interface[interface].altsetting[altsetting].bInterfaceClass

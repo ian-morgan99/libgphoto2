@@ -1,5 +1,22 @@
 # Pentax real-hardware test log
 
+## 2026-11-22 — K-01 MSC, direct PC
+
+The attached body identified as PENTAX DSC_K-01, USB 25fb:0130, one
+08/06/50 interface. USB device revision was 1.05. On clean driver
+9669e360e the same body appeared as both 645D on USB and K01 on usbscsi.
+On dd676defb only the K01 SCSI row remained. The separate K-1 II USB row
+survived. Both builds read shutter 1/200 s, aperture f/5.6 and ISO 800.
+The hardware validator independently checked discovery and all three reads.
+
+On the fixed build, changing ISO 800 to advertised 640 and separately to
+400 failed verification. The 400 trial failed identically on the original
+build. After each trial an independent SCSI session read the original 800.
+The body reported one-stop sensitivity steps, so the 400 refusal also
+reproduces with a whole-stop selection. No exposure or firmware change.
+Raw traces are in Patcher out/k01-378-reviewed-20261122. No physical 645D
+or Polaris runtime participated in this PC test.
+
 This is the canonical, chronological record of tests executed against a
 physical Pentax camera. It is separate from `DEVELOPMENT_PLAN.md`, which tracks
 work and acceptance gates, and from the smaller per-gate evidence records.

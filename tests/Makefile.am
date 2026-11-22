@@ -106,6 +106,19 @@ test_camera_list_LDADD   = \
 	$(INTLLIBS)
 
 
+# Assert no ability row is shadowed by another row claiming the same
+# (vendor, product) on a port type a plain USB probe can reach (patcher #379).
+TESTS          += test-ability-pid-collisions
+check_PROGRAMS         += test-ability-pid-collisions
+test_ability_pid_collisions_SOURCES = test-ability-pid-collisions.c
+test_ability_pid_collisions_LDADD   = \
+	$(top_builddir)/libgphoto2/libgphoto2.la \
+	$(top_builddir)/libgphoto2_port/libgphoto2_port/libgphoto2_port.la \
+	$(LIBLTDL) \
+	$(LIBEXIF_LIBS) \
+	$(INTLLIBS)
+
+
 TESTS          += test-init-localedir
 check_PROGRAMS += test-init-localedir
 test_init_localedir_LDADD =
