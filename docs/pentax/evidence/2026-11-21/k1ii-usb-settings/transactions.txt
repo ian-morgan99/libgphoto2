@@ -1,0 +1,358 @@
+Direct USB K-1 Mark II. DeviceVersion 2.51. Source ed958942f4452ffa8e7554ece32acd75804198fd.
+Clean source export, Meson ptp2,directory and pentax_research_capture=true.
+Qualified runs loaded the following native PC modules (SHA-256).
+3c367df5df9a24a46b6610eb9c0585a73f8f0dabd3f7188af15ed38a461659f9  libgphoto2.so.6
+ddbe769ee93677118e14214a588d0b696c3637dd594112cb0c91252dcff3f7c4  libgphoto2_port.so.12
+106a770dc403addcfcd0c0843408d7f3353c617dccb87f009e0d78b2c0c33a26  ptp2.so
+16a2dd7f37c0a582e00b31c6cc8bed2a648b739c5c252b3b95f21bc9a5d9ea63  usb1.so
+
+Comparison tags ending in -before and ev-comparison-before use the v114 driver pin.
+ev-comparison-after used the intermediate EV routing change before descriptor invalidation.
+baseline-ev-poll required raw state 0. recover-original restored the EV on a fresh session.
+
+qualified-shutterspeed
+init_rc=0 elapsed=1.634
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=shutterspeed current=00:20
+widget=shutterspeed current=00:20
+target_set_rc=0 elapsed=0.441
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=15/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=shutterspeed current=00:15
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=15/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=shutterspeed current=00:15
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=shutterspeed current=00:20
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.866
+_pentax_verify_property_value: Pentax property 0xd00f verification attempt 1: requested=00:15, actual=00:15
+_pentax_verify_property_value: Pentax property 0xd00f verification attempt 1: requested=00:20, actual=00:20
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 46f70c28406495b4780f4f69e7031a15ac1090a7c9e488f85fc581409f4059e8
+
+qualified-aperture
+init_rc=0 elapsed=1.676
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=aperture current=f/1.6
+widget=aperture current=f/1.6
+target_set_rc=0 elapsed=0.408
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=18/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=aperture current=f/1.8
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=18/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=aperture current=f/1.8
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=aperture current=f/1.6
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.696
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=18/10, conditions=18/10
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=16/10, conditions=16/10
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 76a3841e754d29d45cba86588c075fa0ea23d4b4916b4f16c212191ae4408c80
+
+qualified-iso
+init_rc=0 elapsed=1.609
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=iso current=6400
+widget=iso current=6400
+target_set_rc=0 elapsed=0.378
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=3200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=iso current=3200
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=3200; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=iso current=3200
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=iso current=6400
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.631
+_put_Pentax_DirectISO: Pentax ISO verification attempt 1: requested=3200, conditions=3200
+_put_Pentax_DirectISO: Pentax ISO verification attempt 1: requested=6400, conditions=6400
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 b86182b1c46f9ef11024a0607a7e156dfd5998ad0c02418d5d37758712c11399
+
+qualified-whitebalance
+init_rc=0 elapsed=1.598
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=whitebalance current=auto
+widget=whitebalance current=auto
+target_set_rc=0 elapsed=1.467
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=whitebalance current=daylight
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=whitebalance current=daylight
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=whitebalance current=auto
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=5.777
+_pentax_verify_property_value: Pentax property 0x5005 verification attempt 10: requested=4, actual=4
+_pentax_verify_property_value: Pentax property 0x5005 verification attempt 10: requested=2, actual=2
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 e31a6150cafd9ea6a6dfc16f2e371c03496eff1f4e2b8d5d154932c1d66f94f4
+
+qualified-exposurecompensation
+init_rc=0 elapsed=1.622
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+target_set_rc=0 elapsed=0.365
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=0/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0.3
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.626
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=0/10, conditions=0/10
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=3/10, conditions=3/10
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 70070c6a8e964f0cec80771cf7ed92c4f23c815dc6e14302f90a54d63929c145
+
+qualified-negative
+init_rc=0 elapsed=1.626
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+conditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+target_set_rc=0 elapsed=0.406
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=-3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=-0.3
+target_verified_rc=0
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=-3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=-0.3
+conditions=state=3; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1 check=0
+widget=exposurecompensation current=0.3
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.647
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=4294967293/10, conditions=4294967293/10
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=3/10, conditions=3/10
+Independent new process
+deviceversion=2.51
+pentaxconditions=state=0; astro-phase=inactive/other; exposure-mode-raw=8; exposure-mode=Manual; astro-mode=no; user-mode-raw=0; drive-mode-raw=0; ISO=6400; exposure-step=1; open-av-num=14; shooting=no; processing=no; task-changing=no; Tv-changeable=yes; bulb-timer=no; bulb-seconds=20/1; aperture=16/10; exposure-comp=3/10; astrotracer3-capable=no; astro-shift=no; astro-movement-failed=no; astro-time-too-long=no; astro-limit=0; gps-state=1
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 db88a030113187d184b5e5169d172740745e4f8b1093d44ac6b5029bfd970c72
+
+shutter-before
+init_rc=0 elapsed=1.608
+widget=shutterspeed current=00:20
+widget=shutterspeed current=00:20
+target_set_rc=0 elapsed=0.470
+widget=shutterspeed current=00:20
+target_verified_rc=-1
+widget=shutterspeed current=00:20
+widget=shutterspeed current=00:20
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.572
+_pentax_verify_property_value: Pentax property 0xd00f verification attempt 1: requested=00:15, actual=00:15
+_pentax_verify_property_value: Pentax property 0xd00f verification attempt 1: requested=00:20, actual=00:20
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 0c4b5cef790d09dce6b1d0b769dd951980c6b7343e2563f2169c6121e15b10dd
+
+aperture-before
+init_rc=0 elapsed=1.590
+widget=aperture current=f/1.6
+widget=aperture current=f/1.6
+target_set_rc=0 elapsed=0.349
+widget=aperture current=f/1.6
+target_verified_rc=-1
+widget=aperture current=f/1.6
+widget=aperture current=f/1.6
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.221
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=18/10, conditions=18/10
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=16/10, conditions=16/10
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 c390138a03b7691e2227e9e1ef7637f6a690ea4b68ce3b546b7f4aad3a43603a
+
+iso-before
+init_rc=0 elapsed=1.624
+widget=iso current=6400
+widget=iso current=6400
+target_set_rc=0 elapsed=0.310
+widget=iso current=6400
+target_verified_rc=-1
+widget=iso current=6400
+widget=iso current=6400
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.230
+_put_Pentax_DirectISO: Pentax ISO verification attempt 1: requested=3200, conditions=3200
+_put_Pentax_DirectISO: Pentax ISO verification attempt 1: requested=6400, conditions=6400
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 60e6da4db4646075ea225f267ccfbcea1019a97e0e1cc7a01a342da4ee451bfa
+
+wb-before
+init_rc=0 elapsed=1.613
+widget=whitebalance current=auto
+widget=whitebalance current=auto
+target_set_rc=0 elapsed=1.421
+widget=whitebalance current=auto
+target_verified_rc=-1
+widget=whitebalance current=auto
+widget=whitebalance current=auto
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=5.700
+_pentax_verify_property_value: Pentax property 0x5005 verification attempt 10: requested=4, actual=4
+_pentax_verify_property_value: Pentax property 0x5005 verification attempt 10: requested=2, actual=2
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 d9e058eaa0325f84ded70620888f5c868adfaf3ff8fba6b92e0243983fab1714
+
+ev-comparison-before
+init_rc=0 elapsed=1.587
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+target_set_rc=0 elapsed=0.117
+widget=exposurecompensation current=0
+target_verified_rc=0
+widget=exposurecompensation current=0
+widget=exposurecompensation current=0.3
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.160
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 05a83a22c84f1492157608e0cc4d050a7fdec89cbfc2d90417e5872837504201
+
+ev-comparison-after
+init_rc=0 elapsed=1.591
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+target_set_rc=0 elapsed=0.378
+widget=exposurecompensation current=0.3
+target_verified_rc=-1
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+restore_set_rc=0 restore_conditions=0 restore_widget=0
+cleanup=0 elapsed=3.295
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=0/10, conditions=0/10
+_pentax_verify_rational_in_conditions: Pentax rational verification attempt 1: expected=3/10, conditions=3/10
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 f73dc442fc8f744facc91f579377370306c707e951e7920d0489b04b8207a848
+
+baseline-ev-poll
+init_rc=0 elapsed=1.662
+widget=exposurecompensation current=0.3
+widget=exposurecompensation current=0.3
+target_set_rc=0 elapsed=0.131
+target_verified_rc=-10
+widget=exposurecompensation current=0
+restore_set_rc=-10 restore_conditions=-1 restore_widget=-1
+cleanup=0 elapsed=9.889
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0
+cleanup=0
+Unredacted source log SHA-256 203d34c89161c46efc8730329ea5205a438cb93ba2479eabc7ac6f09dd9c7a68
+
+recover-original
+init_rc=0 elapsed=1.565
+widget=exposurecompensation current=0
+widget=exposurecompensation current=0
+target_set_rc=0 elapsed=0.156
+widget=exposurecompensation current=0.3
+target_verified_rc=0
+cleanup=0 elapsed=2.866
+Fresh-session settings
+deviceversion=2.51
+shutterspeed=00:20
+iso=6400
+whitebalance=auto
+aperture=f/1.6
+exposurecompensation=0.3
+cleanup=0
+Unredacted source log SHA-256 5eef6f34fda179cb93fd926e692d20c2228423b32efccffd16be502b46bab897
