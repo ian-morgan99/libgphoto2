@@ -15,6 +15,7 @@ replace the IMAGE Transmitter model gates or direct-request matrix.
 
 | Date | Work | Result | Evidence / next gate |
 |---|---|---|---|
+| 2026-11-22 | K-01 MSC detection on PC, patcher #378/#379 and driver PR #168 | Duplicate 645D detection reproduced on 9669e360e and removed on dd676defb. Validator passed on the real K-01. | Shutter, aperture and ISO read successfully. ISO 800 to 400 failed on both builds. Original 800 verified on reconnect. Qualify the packaged driver on Polaris separately. |
 | 2026-10-29 | Individual static audit: Ricoh WG-M2 PTP (`25fb:210b`) | FAIL-CLOSED / GENERIC ONLY | No IT2 2625 model branch exists. Shared VID/name similarity cannot inherit GR III or Pentax controls; the lookup rejects it before vendor capability selection. |
 | 2026-10-29 | Individual static audit: Pentax Optio W90 PTP (`0a17:00f7`) | FAIL-CLOSED / GENERIC ONLY | No IT2 2625 model branch or modern Pentax vendor identity exists. The lookup rejects it before any modern capability or opcode path is selected. |
 | 2026-10-29 | Individual static audit: Pentax Optio 43WR PTP (`0a17:000d`) | FAIL-CLOSED / GENERIC ONLY | No IT2 model branch or modern Pentax vendor identity exists. The lookup rejects it before any modern capability or opcode path is selected. |
