@@ -1249,3 +1249,13 @@ For the appliance owner: correlate real frame acquisition, 8080 frame publicatio
 2026-11-24 — K-1 II current-value read cost: compare one fresh conditions snapshot against cached ISO/aperture leaf reads; details in hardware log and patcher #369. Candidate consumer optimization requires a changed-value/active-view check.
 
 2026-11-24 — Optional physical K-1 II settings, retained live view and two verified release paths completed; fresh session confirmed original shutter/ISO. See hardware log and patcher #369 for single-JPEG event-drain differential.
+
+## 2026-11-21 — v114 K-1 II direct comparison
+
+The exact v114 libgphoto2 pin `4ef07e9209e827a3ab0013edd5ac1f874892c423` passed direct USB read-only init, bounded in-memory preview, Manual shutter `20/1 → 1/30 → 20/1` and ISO `6400 → 3200 → 6400`. Both changes and restores were verified on conditions with clean exit. Preserve the v114 Polaris idle-gate investigation. The direct shutter test selected another advertised target, so the exact 15 s comparison remains separate. See the same-date canonical hardware log and archived direct traces.
+
+The AC-powered direct preview endurance follow-up completed 50/50 in-memory preview buffers with clean teardown on the same v114 pin. BenroHardwareValidator completed 456 passed and 8 skipped over its full offline suite. Exact v114 Stage-2 hash verification and bounded ARM execution passed with 265 relocations resolved and 100,000 instructions executed. The validator does not drive the attached USB camera. Keep the direct and appliance qualification results separate.
+
+The same-target follow-up proves direct 20 s → 15 s → 20 s on the exact v114 library pin, with PTP property and fresh conditions confirmation. Keep the Patcher idle admission trace as the first fix for the matched Polaris rejection. A separate direct preview run confirmed five valid preview buffers with four byte-distinct adjacent pairs. Neither result qualifies native 8080 forwarding. No driver sources changed.
+
+2026-11-24 — K-1 II direct read-only native startup key reproduction recorded in docs/pentax/REAL_HARDWARE_TEST_LOG.md. Investigate optional autofocusdrive discovery fallback at the consumer boundary; verify frequency on Polaris before changing policy.
