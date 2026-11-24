@@ -1259,3 +1259,11 @@ The AC-powered direct preview endurance follow-up completed 50/50 in-memory prev
 The same-target follow-up proves direct 20 s → 15 s → 20 s on the exact v114 library pin, with PTP property and fresh conditions confirmation. Keep the Patcher idle admission trace as the first fix for the matched Polaris rejection. A separate direct preview run confirmed five valid preview buffers with four byte-distinct adjacent pairs. Neither result qualifies native 8080 forwarding. No driver sources changed.
 
 2026-11-24 — K-1 II direct read-only native startup key reproduction recorded in docs/pentax/REAL_HARDWARE_TEST_LOG.md. Investigate optional autofocusdrive discovery fallback at the consumer boundary; verify frequency on Polaris before changing policy.
+
+## 2026-11-24 — K-3 III PC recognition control for Polaris v115/v116 investigation
+
+Host USB 25fb:0189, usb:001,006. Using the v115 host-driver prefix, auto-detect returned Pentax K-3 Mark III (MTP mode). Fresh gphoto2 --summary reported firmware 2.20 and successful Pentax vendor enable with flags 0x00000000. Read-only session, no settings changed or restoration due. Debug log /tmp/k3iii-recognition-aeeCzM/summary.log. This is host evidence only.
+
+2026-11-24 K-3 III USB ownership check (#347): direct host v115 prefix, fresh gp_camera_init succeeded. Candidate binding producer resolved the actual port usb:001,006, published an open unlinked marker for bus 1/device 6/inode 1511, and the same process held /dev/bus/usb/001/006. gp_camera_exit returned 0. No capture or settings changed; no restoration due. PC producer check only; Polaris hotplug qualification pending.
+
+Second fresh direct PC session: patcher a49e252 supervisor started with empty synthetic sysfs view, then the real K-3 III sysfs entry became visible. A host executable exercising the candidate binding code held the actual camera. The production supervisor adopted 1-4|25fb:0189|1:6, without restarting. Camera exit 0, binding fd cleared (-1), no settings changed. Session and supervisor logs: /tmp/k3iii-native-pc-wrbGEy/.
