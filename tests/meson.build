@@ -47,6 +47,23 @@ test_pentax_camera_exit = executable(
 )
 test('test-pentax-camera-exit', test_pentax_camera_exit)
 
+# translate_ptp_result decides what every PTP failure looks like to a client.
+# Run the extracted production body so a code that used to be reported as a
+# generic GP_ERROR cannot silently regress.
+ptp_result_mapping_source = custom_target(
+  'test-ptp-result-mapping-source',
+  input: '../camlibs/ptp2/library.c',
+  output: 'test-ptp-result-mapping.inc',
+  command: [python, files('extract-ptp-result-mapping.py'), '@INPUT@', '@OUTPUT@'],
+)
+test_ptp_result_mapping = executable(
+  'test-ptp-result-mapping',
+  'test-ptp-result-mapping.c', ptp_result_mapping_source,
+  include_directories: include_directories('..', '../camlibs/ptp2'),
+  dependencies: libgphoto2_dep,
+)
+test('test-ptp-result-mapping', test_ptp_result_mapping)
+
 pentax_session_source = custom_target(
   'test-pentax-session-source',
   input: '../camlibs/ptp2/library.c',

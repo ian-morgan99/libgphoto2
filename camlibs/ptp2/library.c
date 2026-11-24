@@ -97,6 +97,36 @@ translate_ptp_result (uint16_t result)
 	case PTP_ERROR_TIMEOUT:			return GP_ERROR_TIMEOUT;
 	case PTP_ERROR_CANCEL:			return GP_ERROR_CANCEL;
 	case PTP_ERROR_BADPARAM:		return GP_ERROR_BAD_PARAMETERS;
+	/* Standard PTP error codes that used to fall through to the default branch and
+	 * be reported as a generic GP_ERROR, with only a debug line naming the code. A
+	 * client then sees -1 for every one of them and cannot tell an unsupported
+	 * property from a bad value from a full card. Observed live on a K-1 II:
+	 * GetDevicePropDesc answered PTP_RC_DevicePropNotSupported (0x200a) and the log
+	 * said "unmapped PTP result code 0x200a reported as generic error".
+	 *
+	 * Only codes with an unambiguous GP equivalent are mapped here. Protocol-level
+	 * codes (SessionNotOpen, SessionAlreadyOpened, InvalidTransactionID) and
+	 * PTP_RC_CaptureAlreadyTerminated keep their existing handling, because the
+	 * Pentax session-recovery logic depends on those paths. */
+	case PTP_RC_DevicePropNotSupported:
+	case PTP_RC_InvalidObjectFormatCode:
+	case PTP_RC_InvalidCodeFormat:
+	case PTP_RC_SpecificationByFormatUnsupported:
+	case PTP_RC_SpecificationOfDestinationUnsupported:
+	case PTP_RC_NoStreamEnabled:		return GP_ERROR_NOT_SUPPORTED;
+	case PTP_RC_InvalidStorageId:
+	case PTP_RC_InvalidObjectHandle:
+	case PTP_RC_InvalidParentObject:
+	case PTP_RC_InvalidDevicePropFormat:
+	case PTP_RC_InvalidDevicePropValue:
+	case PTP_RC_InvalidParameter:
+	case PTP_RC_InvalidEnumHandle:
+	case PTP_RC_InvalidDataSet:
+	case PTP_RC_NoValidObjectInfo:		return GP_ERROR_BAD_PARAMETERS;
+	case PTP_RC_StoreFull:			return GP_ERROR_FIXED_LIMIT_EXCEEDED;
+	case PTP_RC_StoreNotAvailable:
+	case PTP_RC_StoreReadOnly:
+	case PTP_RC_AccessDenied:			return GP_ERROR_IO;
 	case PTP_ERROR_IO:
 	case PTP_ERROR_DATA_EXPECTED:
 	case PTP_ERROR_RESP_EXPECTED:		return GP_ERROR_IO;
