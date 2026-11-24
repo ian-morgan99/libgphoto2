@@ -174,3 +174,5 @@ docs/pentax/evidence/**/*.log
 /libgphoto2/libgphoto2-buildflags.stamp
 /libgphoto2_port/iolib-buildflags.stamp
 /doc/libgphoto2-api.html.log
+/libgphoto2_port/libgphoto2_port/libgphoto2_port-buildflags.stamp
+/tests/test-ability-pid-collisions
