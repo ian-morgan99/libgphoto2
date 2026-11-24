@@ -1239,3 +1239,13 @@ One long-lived v115 driver session (0f2f34e, research capture enabled), K-1 II 2
 In a separate three-frame comparison, opening and closing PC live view per frame took 2.906–3.136 s per frame. In the first retained-mode comparison the idle-only test assertion rejected state 46 even though conditions showed 2/1 and later 1/1; fresh session verified restoration. The continuous test kept the idle preflight and checked active-state readback, Manual mode and the camera's shooting/processing/task flags. Trace and test programs: Patcher out/k1ii-preview-mixed-wXQX.
 
 For the appliance owner: correlate real frame acquisition, 8080 frame publication and Android display on a verified K-1 II session. Record whether retention is enabled, count live-view starts/stops, measure time in the admission queue and measure the next delivered frame after a setting. Preserve command priority and bounded radio backoff. The PC's sustained rate is a comparison point, not a safe radio polling rate.
+
+2026-11-24 — K-1 II direct read-only native startup key reproduction recorded in docs/pentax/REAL_HARDWARE_TEST_LOG.md. Investigate optional autofocusdrive discovery fallback at the consumer boundary; verify frequency on Polaris before changing policy.
+
+2026-11-24 — Matched direct API and validator K-1 II read timing recorded in REAL_HARDWARE_TEST_LOG.md. Four matched values; costly full-tree fallback and repeated session lifecycle isolated. See patcher #369.
+
+2026-11-24 — K-3 III direct-PC descriptor gate confirms five zero-element enumerations on the wire. See hardware log and patcher #387 for fixture design.
+
+2026-11-24 — K-1 II current-value read cost: compare one fresh conditions snapshot against cached ISO/aperture leaf reads; details in hardware log and patcher #369. Candidate consumer optimization requires a changed-value/active-view check.
+
+2026-11-24 — Optional physical K-1 II settings, retained live view and two verified release paths completed; fresh session confirmed original shutter/ISO. See hardware log and patcher #369 for single-JPEG event-drain differential.
