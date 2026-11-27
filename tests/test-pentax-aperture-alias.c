@@ -506,12 +506,22 @@ main (void)
 	CHECK (ret == GP_OK && manual_focus != NULL);
 	CHECK (gp_widget_get_type (manual_focus, &wtype) == GP_OK);
 	CHECK (wtype == GP_WIDGET_TOGGLE);
-	/* IT2 does not advertise the PC-live-view/immediate-AF control for either
-	 * K-1 body.  The generic autofocus widget above is only the capture policy
-	 * and must not be mistaken for an AF command. */
+	/* pgphoto's updateCameraAutoFocus() resolves the widget literally named
+	 * "autofocusdrive" for every non-Sony body -- verified in pgphoto.stock,
+	 * where .rodata 0x29c7ec holds that string on the branch taken when
+	 * checkCameraVerdor(CAM_VENDOR_SONY) returns 0, which it does for Pentax.
+	 * It requires GP_WIDGET_TOGGLE and rejects readonly widgets, so an old-focus
+	 * body must expose exactly that or AF reports -1 with no other diagnostic.
+	 * The previous assertion here demanded absence on the K-1 family, which is
+	 * what made #359 unfixable from inside the driver: it pinned the gate that
+	 * hid the widget.  Verified on a physical K-1 II at usb:001,010:
+	 * /main/actions/autofocusdrive now enumerates as TOGGLE and writing 1 sends
+	 * PTP_OC 0x9011 and returns GP_OK. */
 	CameraWidget *autofocus_drive = NULL;
 	ret = get_single (cam, "autofocusdrive", &autofocus_drive, context);
-	CHECK (ret != GP_OK || autofocus_drive == NULL);
+	CHECK (ret == GP_OK && autofocus_drive != NULL);
+	CHECK (gp_widget_get_type (autofocus_drive, &wtype) == GP_OK);
+	CHECK (wtype == GP_WIDGET_TOGGLE);
 
 	/* K-3 III and its Monochrome product share the new-focus generic surface;
 	 * the independent product gate is exercised by the utility tests. */

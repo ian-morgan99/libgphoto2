@@ -12783,8 +12783,15 @@ _get_Pentax_AutofocusDrive (CONFIG_GET_ARGS)
 	PTPParams *params = &camera->pl->params;
 	int val = 0;
 
-	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
-	    !pentax_model_supports_pc_live_view (params->pentax.model_no))
+	/* pgphoto's updateCameraAutoFocus() resolves the widget literally named
+	 * "autofocusdrive" for every non-Sony body (verified in pgphoto.stock:
+	 * .rodata 0x29c7ec holds "autofocusdrive" on the branch taken when
+	 * checkCameraVerdor(CAM_VENDOR_SONY) returns 0, which it does for Pentax).
+	 * Returning NOT_SUPPORTED here removes the widget from the tree entirely,
+	 * so pgphoto's _find_widget_by_name fails and AF reports -1 on every body
+	 * this gate excludes -- which included the K-1 II and K-1.  The widget must
+	 * exist wherever IT2 authorises an AF drive; reject at set time instead. */
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
 	gp_widget_new (GP_WIDGET_TOGGLE, _(menu->label), widget);
 	gp_widget_set_name (*widget, menu->name);
@@ -12796,7 +12803,6 @@ static int
 _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 {
 	PTPParams *params = &camera->pl->params;
-	PTPPropValue live_view;
 	PentaxConditions conditions;
 	unsigned char *data = NULL;
 	unsigned int size = 0, attempt;
@@ -12807,22 +12813,24 @@ _put_Pentax_AutofocusDrive (CONFIG_PUT_ARGS)
 	CR (gp_widget_get_value (widget, &val));
 	if (!val)
 		return GP_OK;
-	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled ||
-	    !pentax_model_supports_pc_live_view (params->pentax.model_no))
+	if (!params->pentax.supported_model || !params->pentax.vendor_mode_enabled)
 		return GP_ERROR_NOT_SUPPORTED;
 	result = _pentax_readiness_preflight (params, &conditions);
 	if (result < GP_OK)
 		return result;
 	CR (pentax_it2_release_mode (params->pentax.vendor_ext_version,
 		&conditions, &release_mode));
-	memset (&live_view, 0, sizeof (live_view));
-	ptpres = ptp_getdevicepropvalue (params,
-		PTP_DPC_PENTAX_UsbLiveViewMode, &live_view, PTP_DTC_UINT8);
-	if (ptpres != PTP_RC_OK)
-		return translate_ptp_result (ptpres);
-	if (live_view.u8 != 1) {
+	/* IT2's CamAutoFocus() precondition is _AFMode != 0, and for non-LS bodies
+	 * _AFMode is read from conditions offset 196 -- the same field we parse as
+	 * conditions.af_mode.  It does not require PC live view: AFBtn_Click calls
+	 * CamAutoFocus() unconditionally once connected, and only the touch-AF
+	 * mouse handler checks PcLiveViewMode.  The earlier live-view requirement
+	 * here was ours, not IT2's, and it made AF fail on every old-focus body
+	 * (K-1, K-1 II) whose model is not in the PC-live-view table. */
+	if (conditions.af_mode == 0) {
 		gp_context_error (ptp_context_get (params->data),
-			_("Pentax autofocus drive requires active PC live view."));
+			_("Pentax autofocus drive requires the body to be in an AF mode "
+			"(AF/MF switch set to AF)."));
 		return GP_ERROR_NOT_SUPPORTED;
 	}
 	GP_LOG_D ("Pentax autofocus drive: release_mode=%u, focus_mode=1, "
